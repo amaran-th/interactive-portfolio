@@ -1,3 +1,4 @@
+import Link from "next/link";
 import TiltCard from "./_sections/1_TiltCard/TiltCard";
 import MagneticCard from "./_sections/2_MagneticCard/MagneticCard";
 import RippleClick from "./_sections/3_RippleClick/RippleClick";
@@ -9,6 +10,12 @@ export default function PracticePage() {
   return (
     <div className="min-h-screen bg-gray-950 text-white p-8">
       <header className="max-w-5xl mx-auto mb-12">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-white transition-colors mb-4"
+        >
+          &larr; Home
+        </Link>
         <h1 className="text-4xl font-bold tracking-tight">
           Interaction Archive
         </h1>
