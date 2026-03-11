@@ -5,6 +5,7 @@ import RippleClick from "./_sections/3_RippleClick/RippleClick";
 import StaggeredList from "./_sections/4_StaggeredList/StaggeredList";
 import MorphingShape from "./_sections/5_MorphingShape/MorphingShape";
 import HoverRevealText from "./_sections/6_HoverRevealText/HoverRevealText";
+import SlidingDoor from "./_sections/7_SlidingDoor/SlidingDoor";
 
 export default function PracticePage() {
   return (
@@ -31,6 +32,7 @@ export default function PracticePage() {
         <StaggeredList />
         <MorphingShape />
         <HoverRevealText />
+        <SlidingDoor />
       </main>
     </div>
   );
