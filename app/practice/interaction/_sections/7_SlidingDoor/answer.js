@@ -50,7 +50,7 @@ door.addEventListener("pointermove", (event) => {
     ) /
       Math.PI) *
     180;
-  door.style.right = `${effectiveDelta}px`;
+  door.style.transform = `translateX(${-effectiveDelta}px)`;
   floorlight.style.clipPath = `polygon(${FLOORLIGHT_WIDTH - effectiveDelta}px 0, ${FLOORLIGHT_WIDTH * (1 - Math.sqrt(effectiveDelta / DOOR_WIDTH))}px ${FLOORLIGHT_HEIGHT}px, 100% 100%, 100% 0)`;
   floorlight.style.background = `linear-gradient(${gradationAngle}deg, transparent 30%, #FFFF0033 60%, yellow 120%)`;
 });
