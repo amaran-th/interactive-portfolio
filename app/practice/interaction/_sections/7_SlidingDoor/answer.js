@@ -1,38 +1,33 @@
-const ANGLE = 20;
-const RADIAN = (ANGLE * Math.PI) / 180;
-const DOOR_WIDTH = 100;
-const FLOORLIGHT_WIDTH = 200;
-const FLOORLIGHT_HEIGHT = 200;
+const DOOR_END_POINT = 200;
+
 const door = container.querySelector(".door");
 const floorlight = container.querySelector(".floorlight");
 const hiddenMan = container.querySelector(".hidden-man");
 const manShadow = container.querySelector(".man-shadow");
-const prev = { x: 0, y: 0 };
+
 let isDragging = false;
-let delta = 0;
-let prevDelta = 0;
+let startOpenAmount = 0; // 드래그를 시작했을 때 문이 열린 정도(px 단위)
+let savedOpenAmount = 0; // 현재 문이 열린 정도(px 단위)
+let startX = 0; // 드래그를 시작했을 때 마우스의 x 좌표(px 단위)
 
 door.addEventListener("pointerdown", (event) => {
   isDragging = true;
-  prev.x = event.clientX;
-  prev.y = event.clientY;
+  startX = event.clientX;
+  startOpenAmount = savedOpenAmount;
 });
 
 function initializeDrag() {
   isDragging = false;
-  prevDelta = delta;
 }
 
-container.addEventListener("mouseleave", initializeDrag);
+document.addEventListener("mouseleave", initializeDrag);
 door.addEventListener("pointerup", initializeDrag);
 
 door.addEventListener("pointermove", (event) => {
   if (!isDragging) return;
-  const dx = prev.x - event.clientX;
-  const dy = prev.y - event.clientY;
-
-  delta = prevDelta + Math.cos(RADIAN) * dx + Math.sin(RADIAN) * dy;
-  if (delta <= 0) {
+  const dx = startX - event.clientX; // 이번 드래그 이벤트 동안 문이 열린 정도
+  savedOpenAmount = startOpenAmount + dx; // 현재 문이 열린 정도
+  if (savedOpenAmount <= 0) {
     if (3 * Math.random() > 2) {
       hiddenMan.style.display = "block";
       manShadow.style.display = "block";
@@ -41,16 +36,7 @@ door.addEventListener("pointermove", (event) => {
       manShadow.style.display = "none";
     }
   }
-  const effectiveDelta = Math.max(0, Math.min(delta, DOOR_WIDTH));
-  const gradationAngle =
-    (Math.atan(
-      (FLOORLIGHT_WIDTH * Math.sqrt(effectiveDelta / DOOR_WIDTH) -
-        effectiveDelta) /
-        FLOORLIGHT_HEIGHT,
-    ) /
-      Math.PI) *
-    180;
-  door.style.transform = `translateX(${-effectiveDelta}px)`;
-  floorlight.style.clipPath = `polygon(${FLOORLIGHT_WIDTH - effectiveDelta}px 0, ${FLOORLIGHT_WIDTH * (1 - Math.sqrt(effectiveDelta / DOOR_WIDTH))}px ${FLOORLIGHT_HEIGHT}px, 100% 100%, 100% 0)`;
-  floorlight.style.background = `linear-gradient(${gradationAngle}deg, transparent 30%, #FFFF0033 60%, yellow 120%)`;
+  const effectiveOpenAmount = Math.min(100, Math.max(0, savedOpenAmount));
+  door.style.transform = `translateX(${-effectiveOpenAmount}px)`;
+  floorlight.style.clipPath = `polygon(${DOOR_END_POINT - effectiveOpenAmount}px 0, ${DOOR_END_POINT - 2 * effectiveOpenAmount}px 300px, ${DOOR_END_POINT + effectiveOpenAmount}px 300px, ${DOOR_END_POINT}px 0)`;
 });

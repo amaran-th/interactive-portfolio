@@ -12,48 +12,6 @@
   transform: skewY(-20deg);
   width: 100px;
   height: 100px;
-  overflow: visible;
-}
-.backlight {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-  background: yellow;
-  filter: blur(4);
-}
-.hidden-man {
-  position: absolute;
-  bottom: 0;
-  left: 35px;
-  z-index: 2;
-  background: black;
-  width: 30px;
-  height: 50px;
-  clip-path: path(
-    "M15 0C14.0054 0 13.0516 0.501699 12.3484 1.39473C11.6451 2.28776 11.25 3.49897 11.25 4.7619C11.25 7.40476 12.9187 9.52381 15 9.52381C17.0813 9.52381 18.75 7.40476 18.75 4.7619C18.75 3.49897 18.3549 2.28776 17.6516 1.39473C16.9484 0.501699 15.9946 0 15 0ZM11.25 11.9048C10.7437 11.9048 10.3125 12.1667 9.95625 12.5714H9.9375L0 25.2143L2.6625 28.5714L9.375 20.0238V50H13.125V33.3333H16.875V50H20.625V20.0238L27.3375 28.5714L30 25.2143L20.0625 12.5714C19.6875 12.1667 19.2563 11.9048 18.75 11.9048"
-  );
-  display: none;
-}
-
-.man-shadow {
-  position: absolute;
-  right: 35px;
-  bottom: 200px;
-  transform-origin: bottom center;
-  transform: perspective(36px) rotateX(30deg) scaleY(-1);
-  width: 30px;
-  height: 50px;
-  background: black;
-  mask-image:
-    url(#man), linear-gradient(to top, black 40%, #000033 60%, transparent 120%);
-  mask-composite: intersect;
-  mask-size:
-    30px 50px,
-    100% 100%;
-  filter: blur(16px);
-  display: none;
 }
 
 .door {
@@ -66,11 +24,45 @@
   width: 100px;
   height: 100px;
 }
+
+.backlight {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: yellow;
+}
+
+.hidden-man {
+  position: absolute;
+  bottom: 0;
+  left: 35px;
+  z-index: 2;
+  background: black;
+  width: 30px;
+  height: 50px;
+  clip-path: url("#man");
+  display: none;
+}
+
+.man-shadow {
+  position: absolute;
+  right: 135px;
+  bottom: 300px;
+  width: 30px;
+  height: 50px;
+  background: linear-gradient(0, black -40%, #000033 20%, transparent 100%);
+  transform-origin: bottom;
+  transform: perspective(50px) rotateX(40deg) scaleY(-1);
+  clip-path: url(#man);
+  display: none;
+}
+
 .floorlight {
   position: absolute;
-  width: 200px;
-  height: 200px;
-  transform-origin: right top;
-  transform: translate(-100px, 100px) skew(20deg);
-  clip-path: polygon(100% 0, 100% 100%, 100% 100%, 100% 0);
+  width: 300px;
+  height: 300px;
+  background: linear-gradient(0, transparent 30%, #ffff0033 60%, yellow 120%);
+  transform-origin: top;
+  transform: translate(-100px, 100px) skewX(40deg);
+  clip-path: polygon(200px 0, 200px 300px, 200px 300px, 200px 0);
 }
