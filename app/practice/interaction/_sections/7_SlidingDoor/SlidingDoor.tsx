@@ -15,7 +15,7 @@ export default function SlidingDoor() {
   return (
     <InteractionCard
       title="Sliding Door"
-      description="드래그로 미닫이 문을 열고 닫는 효과. 비스듬한 시점에서 본 2D 문과 문틈으로 새어나오는 빛, 바닥에 드리워지는 빛줄기를 표현한다."
+      description="드래그로 미닫이 문을 열고 닫는 효과. 비스듬한 시점에서 본 2D 문과 문틈으로 새어나오는 빛, 바닥에 드리워지는 빛줄기를 표현한다. 문을 여닫을 때마다 일정 확률로 이스터에그가 나타난다."
       html={htmlCode}
       css={cssCode}
       jsCode={jsCode}

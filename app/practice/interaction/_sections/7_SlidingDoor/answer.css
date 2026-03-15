@@ -57,6 +57,20 @@
   display: none;
 }
 
+.sign {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-100px);
+  text-align: center;
+  white-space: nowrap;
+}
+
 .floorlight {
   position: absolute;
   width: 300px;
