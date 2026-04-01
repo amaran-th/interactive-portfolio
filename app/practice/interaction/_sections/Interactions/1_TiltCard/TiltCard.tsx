@@ -4,18 +4,18 @@ import InteractionCard from "../InteractionCard";
 
 const dir = path.join(
   process.cwd(),
-  "app/practice/interaction/_sections/7_SlidingDoor",
+  "app/practice/interaction/_sections/Interactions/1_TiltCard",
 );
 
-export default function SlidingDoor() {
+export default function TiltCard() {
   const htmlCode = fs.readFileSync(path.join(dir, "answer.html"), "utf-8");
   const cssCode = fs.readFileSync(path.join(dir, "answer.css"), "utf-8");
   const jsCode = fs.readFileSync(path.join(dir, "answer.js"), "utf-8");
 
   return (
     <InteractionCard
-      title="Sliding Door"
-      description="드래그로 미닫이 문을 열고 닫는 효과. 비스듬한 시점에서 본 2D 문과 문틈으로 새어나오는 빛, 바닥에 드리워지는 빛줄기를 표현한다. 문을 여닫을 때마다 일정 확률로 이스터에그가 나타난다."
+      title="3D Tilt Card"
+      description="마우스 위치에 따라 카드가 3D로 기울어지는 효과. perspective + rotateX/Y로 입체감을 표현하고, 마우스 좌표에 따른 광택(shine) 오버레이를 추가한다."
       html={htmlCode}
       css={cssCode}
       jsCode={jsCode}

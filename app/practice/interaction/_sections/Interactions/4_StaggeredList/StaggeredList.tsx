@@ -4,7 +4,7 @@ import InteractionCard from "../InteractionCard";
 
 const dir = path.join(
   process.cwd(),
-  "app/practice/interaction/_sections/4_StaggeredList",
+  "app/practice/interaction/_sections/Interactions/4_StaggeredList",
 );
 
 export default function StaggeredList() {
