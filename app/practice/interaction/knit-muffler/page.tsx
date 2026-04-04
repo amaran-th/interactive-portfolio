@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function KnitMufflerPage() {
   return (
-    <main className="flex min-h-screen justify-center overflow-hidden text-stone-900">
+    <main className="flex min-h-svh justify-center overflow-hidden text-stone-900">
       <div className="w-full max-w-3xl">
         <KnitMuffler />
       </div>
