@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { WorkItem } from "./Work";
 
 interface WorkModalProps {
@@ -18,6 +19,24 @@ export default function WorkModal({
   onClose,
 }: WorkModalProps) {
   const selected = works[selectedIndex];
+
+  useEffect(() => {
+    if (typeof document === "undefined" || !isOpen) {
+      return;
+    }
+
+    const { body, documentElement } = document;
+    const previousBodyOverflow = body.style.overflow;
+    const previousHtmlOverflow = documentElement.style.overflow;
+
+    body.style.overflow = "hidden";
+    documentElement.style.overflow = "hidden";
+
+    return () => {
+      body.style.overflow = previousBodyOverflow;
+      documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [isOpen]);
 
   return (
     <div className="fixed inset-0 z-50" onClick={onClose}>

@@ -1,3 +1,4 @@
+import KnitMuffler from "./1_KnitMuffler/KnitMuffler";
 import { WorkItem } from "./Work";
 
 export const works: WorkItem[] = [
@@ -6,7 +7,7 @@ export const works: WorkItem[] = [
     title: "목도리 뜨기",
     description: "Web App",
     color: "from-violet-600 to-indigo-600",
-    content: <p>Project A 내용 컴포넌트</p>,
+    content: <KnitMuffler />,
   },
   {
     id: 2,
