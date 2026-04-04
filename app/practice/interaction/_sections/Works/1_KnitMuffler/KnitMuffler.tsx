@@ -665,13 +665,13 @@ export default function KnitMuffler() {
   }
 
   return (
-    <div className="h-full max-h-full relative bg-white text-black flex flex-col">
+    <div className="relative flex h-full overflow-hidden bg-white text-black">
       <div
-        className={
+        className={`flex h-full w-full flex-col ${
           screen === "result" ? "blur-md pointer-events-none select-none" : ""
-        }
+        }`}
       >
-        <div className="relative grow overflow-y-auto flex flex-col items-center">
+        <div className="relative flex min-h-0 flex-1 flex-col items-center">
           <div className="px-14 py-5 text-lg font-bold text-center md:p-6 md:text-xl">
             {mode === "challenge"
               ? `챌린지 모드${challengeLevel ? ` · ${challengeLevel === "easy" ? "Easy" : "Hard"}` : ""}`
@@ -696,7 +696,7 @@ export default function KnitMuffler() {
             </div>
           )}
 
-          <div className="w-full pb-28 md:pb-0">
+          <div className="overflow-y-auto w-full pb-28 md:pb-0">
             <MufflerPreview rows={activeRows.length > 0 ? activeRows : [[]]} />
           </div>
         </div>
