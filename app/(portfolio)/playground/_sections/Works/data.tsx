@@ -11,7 +11,7 @@ export const works: WorkItem[] = [
     platforms: ["pc", "mobile"],
     content: <KnitMuffler />,
     thumbnail: "/playground/knit-muffler.png",
-    path: "/playground/knit-muffler",
+    path: "/knit-muffler",
   },
   {
     id: 2,
