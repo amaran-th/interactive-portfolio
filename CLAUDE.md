@@ -20,7 +20,7 @@ No test suite is configured.
 
 - `app/page.tsx` — Landing page, links to the interaction archive
 - `app/playground/page.tsx` — Archive page; renders all interaction components in a 2-column grid
-- `app/playground/_sections/Interactions/` — One folder per interaction demo
+- `app/(portfolio)/playground/_sections/Interactions/` — One folder per interaction demo
 
 **Adding a new interaction:**
 
