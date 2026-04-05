@@ -193,7 +193,7 @@ export default function WorkModal({
                 ) : null}
               </div>
 
-              <div className="prose prose-invert text-pretty">
+              <div className="prose prose-invert text-pretty whitespace-pre-wrap">
                 {selected.description}
               </div>
             </div>

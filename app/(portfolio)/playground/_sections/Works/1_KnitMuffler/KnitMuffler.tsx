@@ -135,7 +135,7 @@ function ResultPattern({
     <div className="flex flex-col items-center gap-3">
       <p className="text-sm font-medium text-stone-600 text-center">{title}</p>
       <DraftPreview
-        draft={[...draft].reverse()}
+        draft={draft}
         cellSize={20}
         showNumbers={showNumbers}
         className="border-stone-300"
@@ -821,7 +821,9 @@ export default function KnitMuffler() {
                     <ResultPattern
                       title="도안"
                       draft={
-                        mode === "challenge" ? challengeDraft : generatedDraft
+                        mode === "challenge"
+                          ? challengeDraft
+                          : [...generatedDraft].reverse()
                       }
                       showNumbers
                     />
