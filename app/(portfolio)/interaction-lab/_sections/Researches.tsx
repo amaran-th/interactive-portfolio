@@ -18,7 +18,7 @@ export default function Researches() {
             key={research.id}
             className={`overflow-hidden rounded-3xl border shadow-[0_20px_80px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-colors ${
               isOpen
-                ? "border-white/15 bg-white/[0.08]"
+                ? "border-white/15 bg-white/8"
                 : "border-white/10 bg-white/5"
             }`}
           >
@@ -29,7 +29,7 @@ export default function Researches() {
                   current === research.id ? "" : research.id,
                 )
               }
-              className="flex w-full items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-white/[0.03] sm:px-6 sm:py-5"
+              className="flex w-full items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-white/3 sm:px-6 sm:py-5"
               aria-expanded={isOpen}
             >
               <div
@@ -109,7 +109,7 @@ export default function Researches() {
                           {research.findings.map((finding) => (
                             <li
                               key={finding}
-                              className="relative pl-4 before:absolute before:left-0 before:top-[0.6em] before:h-1.5 before:w-1.5 before:rounded-full before:bg-white/30 lg:rounded-2xl lg:bg-white/[0.04] lg:px-4 lg:py-3 lg:pl-4 lg:before:hidden"
+                              className="relative pl-4 before:absolute before:left-0 before:top-[0.6em] before:h-1.5 before:w-1.5 before:rounded-full before:bg-white/30 lg:rounded-2xl lg:bg-white/4 lg:px-4 lg:py-3 lg:pl-4 lg:before:hidden"
                             >
                               {finding}
                             </li>
@@ -171,7 +171,7 @@ export default function Researches() {
                                     ? "noreferrer"
                                     : undefined
                                 }
-                                className="inline-flex items-center justify-between gap-2 py-3 text-sm text-gray-200 transition-colors hover:text-white lg:rounded-full lg:border lg:border-white/10 lg:bg-white/[0.04] lg:px-3 lg:hover:bg-white/[0.08]"
+                                className="inline-flex items-center justify-between gap-2 py-3 text-sm text-gray-200 transition-colors hover:text-white lg:rounded-full lg:border lg:border-white/10 lg:bg-white/4 lg:px-3 lg:hover:bg-white/8"
                               >
                                 <span className="inline-flex items-center gap-2">
                                   {reference.type === "document" ? (

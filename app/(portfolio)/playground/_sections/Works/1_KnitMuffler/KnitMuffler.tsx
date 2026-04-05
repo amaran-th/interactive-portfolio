@@ -168,8 +168,6 @@ function ResultStats({
   rows,
   elapsed,
   mode,
-  totalStitches,
-  usedColorsCount,
   slipCount,
   colorAccuracy,
   spm,
@@ -177,8 +175,6 @@ function ResultStats({
   rows: Stitch[][];
   elapsed: number;
   mode: Mode;
-  totalStitches: number;
-  usedColorsCount: number;
   slipCount: number;
   colorAccuracy: number;
   spm: number;
@@ -327,10 +323,7 @@ export default function KnitMuffler() {
       ),
     [finalRows],
   );
-  const totalStitches = useMemo(
-    () => finalRows.reduce((sum, row) => sum + row.length, 0),
-    [finalRows],
-  );
+
   const isChallengeComplete = useMemo(
     () =>
       mode === "challenge" &&
@@ -338,19 +331,7 @@ export default function KnitMuffler() {
       currentRow.length === 0,
     [challengeDraft.length, currentRow.length, knittedRows.length, mode],
   );
-  const usedColors = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          finalRows.flatMap((row) =>
-            row
-              .map((stitch) => stitch.color)
-              .filter((color): color is Color => color !== null),
-          ),
-        ),
-      ),
-    [finalRows],
-  );
+
   const { slipCount, colorAccuracy, progress, spm } = useKnittingStats({
     draft: challengeDraft,
     stitches: activeRows,
@@ -762,7 +743,7 @@ export default function KnitMuffler() {
           </div>
         )}
 
-        <div className="absolute bottom-0 left-0 right-0 z-[70] flex items-center justify-center p-4">
+        <div className="absolute bottom-0 left-0 right-0 z-70 flex items-center justify-center p-4">
           <div className="grid w-full max-w-sm grid-cols-2 gap-2 rounded-2xl border border-stone-200 bg-white/90 p-3 shadow-md backdrop-blur-sm">
             <button
               onClick={handleKnit}
@@ -809,8 +790,6 @@ export default function KnitMuffler() {
                   rows={finalRows}
                   elapsed={elapsed}
                   mode={mode}
-                  totalStitches={totalStitches}
-                  usedColorsCount={usedColors.length}
                   slipCount={slipCount}
                   colorAccuracy={colorAccuracy}
                   spm={spm}
