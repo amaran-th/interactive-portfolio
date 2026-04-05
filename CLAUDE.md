@@ -19,8 +19,8 @@ No test suite is configured.
 **App structure:**
 
 - `app/page.tsx` — Landing page, links to the interaction archive
-- `app/practice/interaction/page.tsx` — Archive page; renders all interaction components in a 2-column grid
-- `app/practice/interaction/_sections/Interactions/` — One folder per interaction demo
+- `app/playground/page.tsx` — Archive page; renders all interaction components in a 2-column grid
+- `app/playground/_sections/Interactions/` — One folder per interaction demo
 
 **Adding a new interaction:**
 
@@ -29,7 +29,7 @@ Each interaction follows a strict pattern:
 1. Create a numbered folder under `_sections/` (e.g., `7_NewEffect/`)
 2. Add three plain files: `answer.html`, `answer.css`, `answer.js`
 3. Create a server component (e.g., `NewEffect.tsx`) that reads those files with `fs.readFileSync` and passes them to `<InteractionCard>`
-4. Import and render the component in `app/practice/interaction/page.tsx`
+4. Import and render the component in `app/playground/page.tsx`
 
 **InteractionCard** (`_sections/InteractionCard.tsx`) is the shared display wrapper. It's a `"use client"` component that:
 

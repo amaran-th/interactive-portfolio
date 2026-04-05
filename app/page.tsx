@@ -17,12 +17,21 @@ export default function Home() {
           인터랙티브 웹 포트폴리오(가 될 예정)
         </p>
 
-        <div className="mt-4">
+        <div className="flex gap-4 mt-4">
           <Link
-            href="/practice/interaction"
+            href="/interaction-lab"
             className="group relative inline-flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-8 py-3.5 text-sm font-medium transition-all hover:bg-white/10 hover:border-white/20 hover:shadow-lg hover:shadow-white/5"
           >
-            Interaction Archive
+            Interaction Lab
+            <span className="transition-transform group-hover:translate-x-1">
+              &rarr;
+            </span>
+          </Link>
+          <Link
+            href="/playground"
+            className="group relative inline-flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-8 py-3.5 text-sm font-medium transition-all hover:bg-white/10 hover:border-white/20 hover:shadow-lg hover:shadow-white/5"
+          >
+            Playground
             <span className="transition-transform group-hover:translate-x-1">
               &rarr;
             </span>

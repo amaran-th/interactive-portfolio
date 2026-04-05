@@ -135,7 +135,7 @@ function ResultPattern({
     <div className="flex flex-col items-center gap-3">
       <p className="text-sm font-medium text-stone-600 text-center">{title}</p>
       <DraftPreview
-        draft={draft}
+        draft={[...draft].reverse()}
         cellSize={20}
         showNumbers={showNumbers}
         className="border-stone-300"
@@ -740,14 +740,14 @@ export default function KnitMuffler() {
         <div className="absolute top-4 left-4 z-70 flex gap-2">
           <button
             onClick={handleBackToSelect}
-            className="rounded-full border border-gray-300 bg-white/90 px-4 py-2 text-sm shadow-sm"
+            className="rounded-full border border-gray-300 bg-white/90 p-2 text-sm shadow-sm"
           >
             <House />
           </button>
         </div>
 
         {mode === "free" && (
-          <div className="absolute top-4 right-4 z-[70] flex gap-2">
+          <div className="absolute top-4 right-4 z-70 flex gap-2">
             <button
               onClick={finishSession}
               disabled={
@@ -853,7 +853,7 @@ export default function KnitMuffler() {
                 <button
                   onClick={handleBackToSelect}
                   disabled={isSavingResult}
-                  className="flex gap-2 rounded-full border border-stone-400 px-2 py-2 text-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex gap-2 rounded-full border border-stone-400 p-2 text-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <House />
                 </button>

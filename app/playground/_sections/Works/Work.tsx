@@ -10,6 +10,7 @@ export interface WorkItem {
   color: string;
   thumbnail?: string;
   content: React.ReactNode;
+  path?: string;
 }
 
 interface WorkProps {

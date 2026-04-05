@@ -1,5 +1,7 @@
 "use client";
 
+import { ExternalLink } from "lucide-react";
+import Link from "next/link";
 import { useEffect } from "react";
 import { WorkItem } from "./Work";
 
@@ -89,9 +91,23 @@ export default function WorkModal({
                 ›
               </button>
             </div>
-            <h4 className="text-white text-center text-2xl font-bold">
-              {selected.title}
-            </h4>
+            <div className="flex justify-center items-center gap-2">
+              <h4 className="text-white text-center text-2xl font-bold">
+                {selected.title}
+              </h4>
+              {selected.path && (
+                <Link
+                  href={selected.path}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink
+                    className="inline-block opacity-60 hover:opacity-80"
+                    size={20}
+                  />
+                </Link>
+              )}
+            </div>
           </div>
           <div className="flex-1 flex divide-gray-800 divide-x overflow-y-auto text-gray-300">
             <div className="w-[calc(80vh-64px)]">{selected.content}</div>

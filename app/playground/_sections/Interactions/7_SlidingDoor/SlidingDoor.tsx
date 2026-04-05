@@ -4,7 +4,7 @@ import InteractionCard from "../InteractionCard";
 
 const dir = path.join(
   process.cwd(),
-  "app/practice/interaction/_sections/Interactions/7_SlidingDoor",
+  "app/playground/_sections/Interactions/7_SlidingDoor",
 );
 
 export default function SlidingDoor() {

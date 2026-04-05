@@ -6,8 +6,10 @@ export const works: WorkItem[] = [
     id: 1,
     title: "목도리 뜨기",
     description: "Web App",
-    color: "from-violet-600 to-indigo-600",
+    color: "from-stone-300 to-stone-500",
     content: <KnitMuffler />,
+    thumbnail: "/playground/knit-muffler.png",
+    path: "/playground/knit-muffler",
   },
   {
     id: 2,
