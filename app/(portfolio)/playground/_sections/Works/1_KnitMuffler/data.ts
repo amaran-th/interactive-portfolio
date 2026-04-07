@@ -3,17 +3,17 @@ import { Color } from "./type";
 export const STITCH_COUNT = 10;
 export const colors: Record<
   Color,
-  { id: number; stroke: string; fill: string }
+  { id: number; stroke: string; fill: string; text: string }
 > = {
-  [Color.SKYBLUE]: { id: 1, stroke: "#6EA8B1", fill: "#ABDEE6" },
-  [Color.VIOLET]: { id: 2, stroke: "#A583A5", fill: "#CBAACB" },
-  [Color.YELLOW]: { id: 3, stroke: "#CDCD74", fill: "#FFFFB6" },
-  [Color.APRICOT]: { id: 4, stroke: "#E59A7A", fill: "#FFCCB6" },
-  [Color.PINK]: { id: 5, stroke: "#E4849F", fill: "#F3B0C3" },
-  [Color.MINT]: { id: 6, stroke: "#67BBB3", fill: "#A2E1DB" },
-  [Color.GREEN]: { id: 7, stroke: "#9ACC98", fill: "#CCE2CB" },
-  [Color.GRAY]: { id: 8, stroke: "#C3BFB3", fill: "#ECEAE4" },
-  [Color.IVORY]: { id: 9, stroke: "#CEC5A8", fill: "#F6EAC2" },
+  [Color.SKYBLUE]: { id: 1, stroke: "#6EA8B1", fill: "#ABDEE6", text: "#333" },
+  [Color.VIOLET]: { id: 2, stroke: "#A583A5", fill: "#CBAACB", text: "#333" },
+  [Color.YELLOW]: { id: 3, stroke: "#CDCD74", fill: "#FFFFB6", text: "#333" },
+  [Color.APRICOT]: { id: 4, stroke: "#E59A7A", fill: "#FFCCB6", text: "#333" },
+  [Color.PINK]: { id: 5, stroke: "#E4849F", fill: "#F3B0C3", text: "#333" },
+  [Color.BLACK]: { id: 6, stroke: "#57638A", fill: "#293046", text: "#FFF" },
+  [Color.GREEN]: { id: 7, stroke: "#9ACC98", fill: "#CCE2CB", text: "#333" },
+  [Color.GRAY]: { id: 8, stroke: "#C3BFB3", fill: "#ECEAE4", text: "#333" },
+  [Color.IVORY]: { id: 9, stroke: "#CEC5A8", fill: "#F6EAC2", text: "#333" },
 };
 
 export const EASY_DRAFTS = {

@@ -4,7 +4,7 @@ export enum Color {
   YELLOW = 3,
   APRICOT = 4,
   PINK = 5,
-  MINT = 6,
+  BLACK = 6,
   GREEN = 7,
   GRAY = 8,
   IVORY = 9,

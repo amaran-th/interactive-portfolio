@@ -1,7 +1,7 @@
 "use client";
 
 import { toPng } from "html-to-image";
-import { Download, House } from "lucide-react";
+import { ArrowRight, Download, House, RotateCcw } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { colors, EASY_DRAFTS, HARD_DRAFTS, STITCH_COUNT } from "./data";
 import Status from "./Status";
@@ -39,18 +39,28 @@ function DraftPreview({
   className = "",
   cellSize = 12,
   showNumbers = true,
+  currentRowIndex,
 }: {
   draft: number[][];
   className?: string;
   cellSize?: number;
   showNumbers?: boolean;
+  currentRowIndex?: number;
 }) {
   return (
     <div
       className={`flex flex-col border border-gray-400 divide-y divide-gray-400 bg-white ${className}`}
     >
       {draft.map((row, ri) => (
-        <div key={ri} className="flex divide-x divide-gray-400">
+        <div
+          key={ri}
+          className={`flex relative divide-x divide-gray-400 ${typeof currentRowIndex === "number" && ri !== currentRowIndex ? "opacity-30" : ""}`}
+        >
+          {currentRowIndex === ri && (
+            <div className="absolute -left-4 top-1/2 transform -translate-y-1/2 flex items-center justify-center w-4 h-4">
+              <ArrowRight className="w-4 h-4 text-red-500" />
+            </div>
+          )}
           {row.map((stitch, si) => (
             <div
               key={si}
@@ -61,6 +71,9 @@ function DraftPreview({
                 backgroundColor:
                   Object.values(colors).find((color) => color.id === stitch)
                     ?.fill ?? "transparent",
+                color:
+                  Object.values(colors).find((color) => color.id === stitch)
+                    ?.text ?? "inherit",
               }}
             >
               {showNumbers ? stitch || "" : null}
@@ -150,7 +163,7 @@ function ResultMuffler({ rows, title }: { rows: Stitch[][]; title: string }) {
   return (
     <div className="flex flex-col items-center gap-3">
       <p className="text-sm font-medium text-stone-600 text-center">{title}</p>
-      <div className="flex flex-col-reverse items-center">
+      <div className="flex flex-col items-center">
         {paddedRows.map((row, rowIndex) => (
           <StitchRow
             key={rowIndex}
@@ -273,7 +286,7 @@ function MufflerPreview({
   const paddedRows = padRows(rows);
 
   return (
-    <div className="px-6 py-4 text-gray-700 flex flex-col-reverse items-center relative">
+    <div className="px-6 py-4 text-gray-700 flex flex-col items-center relative">
       {paddedRows.map((row, rowIndex) => (
         <StitchRow
           key={rowIndex}
@@ -289,6 +302,7 @@ function MufflerPreview({
 export default function KnitMuffler() {
   const resultModalRef = useRef<HTMLDivElement>(null);
   const resultCaptureRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const [screen, setScreen] = useState<Screen>("select");
   const [mode, setMode] = useState<Mode | null>(null);
   const [challengeLevel, setChallengeLevel] = useState<ChallengeLevel | null>(
@@ -344,7 +358,6 @@ export default function KnitMuffler() {
     setKnittedRows([]);
     setCurrentRow([]);
     setCurrentStitch(0);
-    setChallengeLevel(null);
     setResetKey((prev) => prev + 1);
   }, []);
 
@@ -376,6 +389,10 @@ export default function KnitMuffler() {
     resetKnitting();
     setMode(null);
     setScreen("select");
+  }, [resetKnitting]);
+
+  const handleInitialize = useCallback(() => {
+    resetKnitting();
   }, [resetKnitting]);
 
   const handleSaveResult = useCallback(async () => {
@@ -479,59 +496,66 @@ export default function KnitMuffler() {
     setScreen("play");
   }, [mode]);
 
-  const handleKnit = useCallback(() => {
-    if (screen !== "play") {
-      return;
-    }
+  const handleKnit = useCallback(
+    (colorOverride?: Color) => {
+      if (screen !== "play") {
+        return;
+      }
 
-    if (isChallengeComplete) {
-      setScreen("result");
-      return;
-    }
+      if (isChallengeComplete) {
+        setScreen("result");
+        return;
+      }
 
-    if (!started) {
-      setStarted(true);
-    }
+      if (!started) {
+        setStarted(true);
+      }
 
-    const nextStitch: Stitch = {
-      color: currentThread,
-      slipped: mode === "challenge" ? Math.random() < 0.2 : false,
-    };
+      const nextStitch: Stitch = {
+        color: colorOverride ?? currentThread,
+        slipped:
+          mode === "challenge" && challengeLevel === "hard"
+            ? Math.random() < 0.2
+            : false,
+      };
 
-    if (
-      mode === "challenge" &&
-      knittedRows.length === challengeDraft.length - 1 &&
-      currentStitch === STITCH_COUNT
-    ) {
+      if (
+        mode === "challenge" &&
+        knittedRows.length === challengeDraft.length - 1 &&
+        currentStitch === STITCH_COUNT
+      ) {
+        setKnittedRows((prev) => [...prev, currentRow]);
+        setCurrentRow([]);
+        setCurrentStitch(0);
+        setStarted(false);
+        setScreen("result");
+        return;
+      }
+
+      if (currentStitch < STITCH_COUNT) {
+        const nextRow = [...currentRow, nextStitch];
+        setCurrentRow(nextRow);
+        setCurrentStitch(nextRow.length);
+        return;
+      }
+
       setKnittedRows((prev) => [...prev, currentRow]);
-      setCurrentRow([]);
-      setCurrentStitch(0);
-      setStarted(false);
-      setScreen("result");
-      return;
-    }
-
-    if (currentStitch < STITCH_COUNT) {
-      const nextRow = [...currentRow, nextStitch];
-      setCurrentRow(nextRow);
-      setCurrentStitch(nextRow.length);
-      return;
-    }
-
-    setKnittedRows((prev) => [...prev, currentRow]);
-    setCurrentRow([nextStitch]);
-    setCurrentStitch(1);
-  }, [
-    challengeDraft.length,
-    currentRow,
-    currentStitch,
-    currentThread,
-    isChallengeComplete,
-    knittedRows.length,
-    mode,
-    screen,
-    started,
-  ]);
+      setCurrentRow([nextStitch]);
+      setCurrentStitch(1);
+    },
+    [
+      challengeDraft.length,
+      challengeLevel,
+      currentRow,
+      currentStitch,
+      currentThread,
+      isChallengeComplete,
+      knittedRows.length,
+      mode,
+      screen,
+      started,
+    ],
+  );
 
   const handleUnravel = useCallback(() => {
     if (screen !== "play" || currentStitch === 0) {
@@ -551,7 +575,7 @@ export default function KnitMuffler() {
     setCurrentStitch((prev) => prev - 1);
   }, [currentStitch, knittedRows, mode, screen]);
 
-  const handleSelectColor = useCallback(
+  const handleSelectColorAndKnit = useCallback(
     (id: number) => {
       if (screen !== "play") {
         return;
@@ -562,9 +586,17 @@ export default function KnitMuffler() {
         return;
       }
       setCurrentThread(name);
+      handleKnit(name);
     },
-    [screen],
+    [handleKnit, screen],
   );
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    el.scrollTop = el.scrollHeight;
+  }, [activeRows.length]);
 
   useEffect(() => {
     if (screen !== "play") {
@@ -590,12 +622,9 @@ export default function KnitMuffler() {
         case "Digit7":
         case "Digit8":
         case "Digit9":
-          handleSelectColor(parseInt(e.code.replace("Digit", ""), 10));
+          handleSelectColorAndKnit(parseInt(e.code.replace("Digit", ""), 10));
           break;
-        case "KeyF":
-          handleKnit();
-          break;
-        case "KeyJ":
+        case "Backspace":
           handleUnravel();
           break;
       }
@@ -605,7 +634,7 @@ export default function KnitMuffler() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [handleKnit, handleSelectColor, handleUnravel, screen]);
+  }, [handleSelectColorAndKnit, handleUnravel, screen]);
 
   useEffect(() => {
     if (isChallengeComplete) {
@@ -652,6 +681,21 @@ export default function KnitMuffler() {
           screen === "result" ? "blur-md pointer-events-none select-none" : ""
         }`}
       >
+        <div className="absolute top-4 left-4 z-70 flex gap-2">
+          <button
+            onClick={handleBackToSelect}
+            className="rounded-full border border-gray-300 bg-white/90 p-2 text-sm shadow-sm"
+          >
+            <House />
+          </button>
+          <button
+            onClick={handleInitialize}
+            className="rounded-full border border-gray-300 bg-white/90 p-2 text-sm shadow-sm"
+          >
+            <RotateCcw />
+          </button>
+        </div>
+
         <div className="relative flex min-h-0 flex-1 flex-col items-center">
           <div className="px-14 py-5 text-lg font-bold text-center md:p-6 md:text-xl">
             {mode === "challenge"
@@ -659,6 +703,21 @@ export default function KnitMuffler() {
               : "자유 모드"}
           </div>
 
+          {mode === "free" && (
+            <div className="absolute top-4 right-4 z-70 flex gap-2">
+              <button
+                onClick={finishSession}
+                disabled={
+                  knittedRows.length === 0 && currentRow.length < STITCH_COUNT
+                    ? true
+                    : currentRow.length > 0 && currentRow.length < STITCH_COUNT
+                }
+                className="rounded-full bg-stone-900 px-4 py-2 text-sm text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                완성하기
+              </button>
+            </div>
+          )}
           {mode === "challenge" && (
             <div className="w-full px-4 pb-3 md:hidden">
               <div className="grid grid-cols-2 gap-3 items-start">
@@ -668,96 +727,82 @@ export default function KnitMuffler() {
                   colorAccuracy={colorAccuracy}
                   progress={progress}
                   spm={spm}
+                  showSlipCount={challengeLevel === "hard"}
                 />
                 <div className="flex flex-col items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm">
                   <p className="text-sm text-stone-500">도안</p>
-                  <DraftPreview draft={challengeDraft} />
+                  <DraftPreview
+                    draft={challengeDraft}
+                    currentRowIndex={knittedRows.length}
+                  />
                 </div>
               </div>
             </div>
           )}
 
-          <div className="overflow-y-auto w-full pb-28 md:pb-0">
-            <MufflerPreview rows={activeRows.length > 0 ? activeRows : [[]]} />
-          </div>
-        </div>
+          {mode === "challenge" && (
+            <div className="absolute left-4 top-20 hidden flex-col justify-center gap-4 md:flex">
+              <Status
+                elapsed={elapsed}
+                slipCount={slipCount}
+                colorAccuracy={colorAccuracy}
+                progress={progress}
+                spm={spm}
+                showSlipCount={challengeLevel === "hard"}
+              />
+            </div>
+          )}
 
-        {mode === "challenge" && (
-          <div className="absolute left-4 top-20 hidden flex-col justify-center gap-4 md:flex">
-            <Status
-              elapsed={elapsed}
-              slipCount={slipCount}
-              colorAccuracy={colorAccuracy}
-              progress={progress}
-              spm={spm}
-            />
+          {mode === "challenge" && (
+            <div className="absolute right-4 top-20 hidden flex-col items-center justify-center gap-4 rounded-md bg-gray-50 p-4 shadow-md md:flex">
+              <p>도안</p>
+              <DraftPreview
+                draft={challengeDraft}
+                currentRowIndex={knittedRows.length}
+              />
+            </div>
+          )}
+          <div
+            ref={scrollRef}
+            className="flex-1 min-h-0 overflow-y-auto w-full"
+          >
+            <div className="flex min-h-full flex-col justify-end w-full">
+              <MufflerPreview
+                rows={activeRows.length > 0 ? activeRows : [[]]}
+              />
+            </div>
           </div>
-        )}
-
-        {mode === "challenge" && (
-          <div className="absolute right-4 top-20 hidden flex-col items-center justify-center gap-4 rounded-md bg-gray-50 p-4 shadow-md md:flex">
-            <p>도안</p>
-            <DraftPreview draft={challengeDraft} />
-          </div>
-        )}
-
-        <div className="absolute bottom-24 left-1/2 z-70 w-full max-w-70 -translate-x-1/2 px-4 md:w-auto md:max-w-fit">
-          <div className="grid grid-cols-5 justify-items-center gap-2 rounded-2xl border border-stone-200 bg-white/90 px-3 py-3 shadow-md backdrop-blur-sm md:flex md:items-end md:gap-2 md:px-4">
-            {Object.entries(colors).map(([, color]) => (
-              <div key={color.id} className="flex flex-col items-center gap-1">
+          <div className="flex flex-col items-center gap-2 py-4">
+            <div className="w-full max-w-70 px-4 md:w-auto md:max-w-fit">
+              <div className="grid grid-cols-5 justify-items-center gap-2 rounded-2xl border border-stone-200 bg-white/90 px-3 py-3 shadow-md backdrop-blur-sm md:flex md:items-end md:gap-2 md:px-4">
+                {Object.entries(colors).map(([, color]) => (
+                  <div
+                    key={color.id}
+                    className="flex flex-col items-center gap-1"
+                  >
+                    <button
+                      onClick={() => handleSelectColorAndKnit(color.id)}
+                      className={`h-8 w-8 rounded-full text-xs border border-stone-200 transition-all ${currentThread === color.id ? "ring-2 ring-stone-900 ring-offset-2" : "hover:ring-2 hover:ring-stone-300"}`}
+                      style={{ backgroundColor: color.fill, color: color.text }}
+                      aria-label={`${color.id}번 실 선택`}
+                    >
+                      {color.id}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="w-full flex items-center justify-center">
+              <div className="w-full max-w-sm rounded-2xl border border-stone-200 bg-white/90 p-3 shadow-md backdrop-blur-sm">
                 <button
-                  onClick={() => handleSelectColor(color.id)}
-                  className={`h-8 w-8 rounded-full text-xs text-gray-500 border border-stone-200 transition-all ${currentThread === color.id ? "ring-2 ring-stone-900 ring-offset-2" : "hover:ring-2 hover:ring-stone-300"}`}
-                  style={{ backgroundColor: color.fill }}
-                  aria-label={`${color.id}번 실 선택`}
+                  onClick={handleUnravel}
+                  disabled={currentStitch === 0}
+                  className="w-full rounded border border-stone-300 bg-stone-100 px-4 py-2 text-stone-700 transition-colors hover:bg-stone-200 disabled:cursor-not-allowed disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-400"
                 >
-                  {color.id}
+                  풀기(Backspace)
                 </button>
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="absolute top-4 left-4 z-70 flex gap-2">
-          <button
-            onClick={handleBackToSelect}
-            className="rounded-full border border-gray-300 bg-white/90 p-2 text-sm shadow-sm"
-          >
-            <House />
-          </button>
-        </div>
-
-        {mode === "free" && (
-          <div className="absolute top-4 right-4 z-70 flex gap-2">
-            <button
-              onClick={finishSession}
-              disabled={
-                knittedRows.length === 0 && currentRow.length < STITCH_COUNT
-                  ? true
-                  : currentRow.length > 0 && currentRow.length < STITCH_COUNT
-              }
-              className="rounded-full bg-stone-900 px-4 py-2 text-sm text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              완성하기
-            </button>
-          </div>
-        )}
-
-        <div className="absolute bottom-0 left-0 right-0 z-70 flex items-center justify-center p-4">
-          <div className="grid w-full max-w-sm grid-cols-2 gap-2 rounded-2xl border border-stone-200 bg-white/90 p-3 shadow-md backdrop-blur-sm">
-            <button
-              onClick={handleKnit}
-              className="rounded border border-stone-400 bg-stone-800 px-4 py-2 text-white transition-colors hover:bg-stone-900"
-            >
-              뜨기(F)
-            </button>
-            <button
-              onClick={handleUnravel}
-              disabled={currentStitch === 0}
-              className="rounded border border-stone-300 bg-stone-100 px-4 py-2 text-stone-700 transition-colors hover:bg-stone-200 disabled:cursor-not-allowed disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-400"
-            >
-              풀기(J)
-            </button>
+            </div>
           </div>
         </div>
       </div>
@@ -800,9 +845,7 @@ export default function KnitMuffler() {
                     <ResultPattern
                       title="도안"
                       draft={
-                        mode === "challenge"
-                          ? challengeDraft
-                          : [...generatedDraft].reverse()
+                        mode === "challenge" ? challengeDraft : generatedDraft
                       }
                       showNumbers
                     />

@@ -6,6 +6,7 @@ type Props = {
   colorAccuracy: number;
   progress: number;
   spm: number;
+  showSlipCount?: boolean;
 };
 
 export default function Status({
@@ -14,6 +15,7 @@ export default function Status({
   colorAccuracy,
   progress,
   spm,
+  showSlipCount = true,
 }: Props) {
   // ⏱ 시간 포맷 (MM:SS:CS)
   const time = useMemo(() => {
@@ -41,12 +43,14 @@ export default function Status({
         <span className="font-mono">{time}</span>
       </div>
       {/* 정확도 (분리) */}
-      <div className="flex justify-between">
-        <span className="text-gray-500">실수</span>
-        <span className={slipCount > 0 ? "text-red-600" : "text-gray-600"}>
-          {slipCount}회
-        </span>
-      </div>
+      {showSlipCount && (
+        <div className="flex justify-between">
+          <span className="text-gray-500">실수</span>
+          <span className={slipCount > 0 ? "text-red-600" : "text-gray-600"}>
+            {slipCount}회
+          </span>
+        </div>
+      )}
       <div className="flex justify-between">
         <span className="text-gray-500">정확도</span>
         <span className={getColor(colorAccuracy)}>
