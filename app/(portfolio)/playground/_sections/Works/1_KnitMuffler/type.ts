@@ -1,5 +1,5 @@
 export enum Color {
-  SKYBLUE = 1,
+  BLUE = 1,
   VIOLET = 2,
   YELLOW = 3,
   APRICOT = 4,
@@ -14,3 +14,8 @@ export interface Stitch {
   color: Color | null;
   slipped: boolean;
 }
+
+export type ColorMode = "normal" | "weakness";
+export type Mode = "challenge" | "free";
+export type Screen = "select" | "play" | "result";
+export type ChallengeLevel = "easy" | "hard";

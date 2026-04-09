@@ -1,21 +1,22 @@
 "use client";
 
 import {
+  BookOpen,
   ChevronDown,
   ExternalLink,
   FileText,
-  FolderKanban,
   Link2,
 } from "lucide-react";
 import { useState } from "react";
 import { engineeringEntries } from "./data";
 
 export default function Notes() {
-  const [openId, setOpenId] = useState<string>(engineeringEntries[0]?.id ?? "");
+  const sorted = [...engineeringEntries].sort((a, b) => b.date.localeCompare(a.date));
+  const [openId, setOpenId] = useState<string>(sorted[0]?.id ?? "");
 
   return (
     <section className="space-y-4">
-      {engineeringEntries.map((entry) => {
+      {sorted.map((entry) => {
         const isOpen = openId === entry.id;
 
         return (
@@ -158,10 +159,10 @@ export default function Notes() {
                               className="flex items-center justify-between py-3 text-sm text-gray-200 transition-colors hover:text-white lg:rounded-2xl lg:border lg:border-white/10 lg:bg-black/20 lg:px-4 lg:hover:bg-black/30"
                             >
                               <span className="inline-flex items-center gap-2">
-                                {link.kind === "document" ? (
+                                {link.type === "blog" ? (
+                                  <BookOpen className="h-4 w-4 text-stone-300" />
+                                ) : link.type === "document" ? (
                                   <FileText className="h-4 w-4 text-stone-300" />
-                                ) : link.kind === "project" ? (
-                                  <FolderKanban className="h-4 w-4 text-stone-300" />
                                 ) : (
                                   <Link2 className="h-4 w-4 text-stone-300" />
                                 )}

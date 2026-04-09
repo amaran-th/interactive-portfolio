@@ -1,16 +1,17 @@
 "use client";
 
-import { ChevronDown, ExternalLink, FileText, Link2 } from "lucide-react";
+import { BookOpen, ChevronDown, ExternalLink, FileText, Link2 } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 import { researches } from "./data";
 
 export default function Researches() {
-  const [openId, setOpenId] = useState<string>(researches[0].id ?? "");
+  const sorted = [...researches].sort((a, b) => b.period.localeCompare(a.period));
+  const [openId, setOpenId] = useState<string>(sorted[0]?.id ?? "");
 
   return (
     <section className="space-y-4">
-      {researches.map((research) => {
+      {sorted.map((research) => {
         const isOpen = openId === research.id;
 
         return (
@@ -176,6 +177,8 @@ export default function Researches() {
                                 <span className="inline-flex items-center gap-2">
                                   {reference.type === "document" ? (
                                     <FileText className="h-4 w-4 text-gray-400" />
+                                  ) : reference.type === "blog" ? (
+                                    <BookOpen className="h-4 w-4 text-gray-400" />
                                   ) : (
                                     <Link2 className="h-4 w-4 text-gray-400" />
                                   )}

@@ -10,7 +10,7 @@ export type EngineeringEntry = {
   links?: {
     label: string;
     href: string;
-    kind: "document" | "project" | "reference";
+    type: "blog" | "document" | "project";
   }[];
 };
 
@@ -36,12 +36,12 @@ export const engineeringEntries: EngineeringEntry[] = [
       {
         label: "블로그 포스트",
         href: "https://amaran-th.vercel.app/",
-        kind: "document",
+        type: "blog",
       },
       {
         label: "프로젝트",
         href: "/playground/knit-muffler",
-        kind: "project",
+        type: "project",
       },
     ],
   },

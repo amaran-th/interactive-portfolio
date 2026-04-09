@@ -1,0 +1,64 @@
+import { Stitch } from "./type";
+
+export type ChallengeStat = {
+  elapsed: number;
+  slipCount: number;
+  colorAccuracy: number;
+  spm: number;
+  savedAt: number;
+};
+
+export type FreeSave = {
+  rows: Stitch[][];
+  elapsed: number;
+  savedAt: number;
+};
+
+function challengeKey(level: string, draftKey: string) {
+  return `knitMuffler_challenge_${level}_${draftKey}`;
+}
+
+const FREE_KEY = "knitMuffler_free";
+
+export function getChallengeStat(level: string, draftKey: string): ChallengeStat | null {
+  try {
+    const raw = localStorage.getItem(challengeKey(level, draftKey));
+    return raw ? (JSON.parse(raw) as ChallengeStat) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveChallengeStat(
+  level: string,
+  draftKey: string,
+  stat: Omit<ChallengeStat, "savedAt">,
+): void {
+  try {
+    localStorage.setItem(
+      challengeKey(level, draftKey),
+      JSON.stringify({ ...stat, savedAt: Date.now() }),
+    );
+  } catch {}
+}
+
+export function getFreeSave(): FreeSave | null {
+  try {
+    const raw = localStorage.getItem(FREE_KEY);
+    return raw ? (JSON.parse(raw) as FreeSave) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveFreeMuffler(rows: Stitch[][], elapsed: number): void {
+  try {
+    localStorage.setItem(FREE_KEY, JSON.stringify({ rows, elapsed, savedAt: Date.now() }));
+  } catch {}
+}
+
+export function clearFreeSave(): void {
+  try {
+    localStorage.removeItem(FREE_KEY);
+  } catch {}
+}

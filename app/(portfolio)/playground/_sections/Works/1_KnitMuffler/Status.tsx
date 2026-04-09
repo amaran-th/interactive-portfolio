@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { formatElapsed } from "./utils";
 
 type Props = {
   elapsed: number;
@@ -17,17 +17,7 @@ export default function Status({
   spm,
   showSlipCount = true,
 }: Props) {
-  // ⏱ 시간 포맷 (MM:SS:CS)
-  const time = useMemo(() => {
-    const minutes = Math.floor(elapsed / 6000);
-    const seconds = Math.floor((elapsed / 100) % 60);
-    const centiseconds = elapsed % 100;
-
-    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
-      2,
-      "0",
-    )}:${String(centiseconds).padStart(2, "0")}`;
-  }, [elapsed]);
+  const time = formatElapsed(elapsed);
 
   const getColor = (value: number) => {
     if (value === 100) return "text-green-600";
