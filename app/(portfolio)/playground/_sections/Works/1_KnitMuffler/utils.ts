@@ -25,6 +25,15 @@ export const MEDAL_COLOR: Record<
  * - hard: 정확도 + 실수 개수 복합 기준
  *   gold: 100% & 0회, silver: ≥90% & ≤2회, bronze: ≥70% & ≤5회
  */
+const MEDAL_RANK: Record<NonNullable<Medal>, number> = { gold: 3, silver: 2, bronze: 1 };
+
+export function isBetterMedal(current: Medal, existing: Medal | null): boolean {
+  if (!existing) return true;
+  const cur = current ? MEDAL_RANK[current] : 0;
+  const ex = MEDAL_RANK[existing];
+  return cur > ex;
+}
+
 export function calcMedal(
   level: "easy" | "hard",
   colorAccuracy: number,

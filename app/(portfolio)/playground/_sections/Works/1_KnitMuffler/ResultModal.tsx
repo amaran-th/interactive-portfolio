@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, House } from "lucide-react";
+import { Download, House, RotateCcw } from "lucide-react";
 import { RefObject, useState } from "react";
 import DraftPreview from "./DraftPreview";
 import { ResultMuffler } from "./MufflerPreview";
@@ -11,7 +11,7 @@ import {
   getChallengeStat,
   saveChallengeStat,
 } from "./useKnittingStorage";
-import { calcMedal, formatElapsed } from "./utils";
+import { calcMedal, formatElapsed, isBetterMedal } from "./utils";
 
 function ResultModeLabel({
   mode,
@@ -148,7 +148,21 @@ function ChallengeStatSaver({
   current: Omit<ChallengeStat, "savedAt">;
 }) {
   const existing = getChallengeStat(level, draftKey);
-  const [saved, setSaved] = useState(false);
+  const existingMedal = existing
+    ? calcMedal(level, existing.colorAccuracy, existing.slipCount)
+    : null;
+  const currentMedal = calcMedal(
+    level,
+    current.colorAccuracy,
+    current.slipCount,
+  );
+  const [saved, setSaved] = useState(() => {
+    if (isBetterMedal(currentMedal, existingMedal)) {
+      saveChallengeStat(level, draftKey, current);
+      return true;
+    }
+    return false;
+  });
 
   const save = () => {
     saveChallengeStat(level, draftKey, current);
@@ -161,27 +175,7 @@ function ChallengeStatSaver({
     );
   }
 
-  if (!existing) {
-    return (
-      <button
-        onClick={save}
-        className="rounded-full border border-stone-300 bg-white px-4 py-2 text-sm text-stone-700 hover:bg-stone-100 transition-colors"
-      >
-        기록 저장
-      </button>
-    );
-  }
-
-  const existingMedal = calcMedal(
-    level,
-    existing.colorAccuracy,
-    existing.slipCount,
-  );
-  const currentMedal = calcMedal(
-    level,
-    current.colorAccuracy,
-    current.slipCount,
-  );
+  if (!existing) return null;
 
   return (
     <div className="flex flex-col items-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-5 py-4 text-sm text-stone-700">
@@ -258,6 +252,7 @@ export default function ResultModal({
   onResumeFreeMode,
   onRestartFreeMode,
   onBackToSelect,
+  onInitialize,
 }: {
   resultModalRef: RefObject<HTMLDivElement | null>;
   resultCaptureRef: RefObject<HTMLDivElement | null>;
@@ -275,6 +270,7 @@ export default function ResultModal({
   onResumeFreeMode: () => void;
   onRestartFreeMode: () => void;
   onBackToSelect: () => void;
+  onInitialize: () => void;
 }) {
   const medal =
     mode === "challenge" && challengeLevel
@@ -329,7 +325,12 @@ export default function ResultModal({
               )}
               <ResultMuffler title="완성품" rows={finalRows} />
             </div>
+          </div>
 
+          <div
+            className="flex flex-col items-center gap-3 pt-4"
+            data-html-to-image-ignore="true"
+          >
             {/* 챌린지 기록 저장 */}
             {mode === "challenge" && challengeLevel && challengeDraftKey && (
               <ChallengeStatSaver
@@ -338,45 +339,40 @@ export default function ResultModal({
                 current={{ elapsed, slipCount, colorAccuracy, spm }}
               />
             )}
-          </div>
-
-          <div
-            className="flex flex-wrap justify-center gap-3 pt-4"
-            data-html-to-image-ignore="true"
-          >
-            {mode === "free" && (
-              <>
-                <button
-                  onClick={onResumeFreeMode}
-                  disabled={isSavingResult}
-                  className="flex items-center gap-2 rounded-full border border-stone-400 px-4 py-2 text-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  이어 뜨기
-                </button>
-                <button
-                  onClick={onRestartFreeMode}
-                  disabled={isSavingResult}
-                  className="flex items-center gap-2 rounded-full border border-stone-400 px-4 py-2 text-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  다시 만들기
-                </button>
-              </>
-            )}
-            <button
-              onClick={onSaveResult}
-              disabled={isSavingResult}
-              className="flex items-center gap-2 rounded-full bg-stone-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Download />
-              {isSavingResult ? "이미지 생성 중..." : "결과 저장하기"}
-            </button>
-            <button
-              onClick={onBackToSelect}
-              disabled={isSavingResult}
-              className="flex gap-2 rounded-full border border-stone-400 p-2 text-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <House />
-            </button>
+            <div className="flex flex-wrap justify-center gap-3">
+              <button
+                onClick={onSaveResult}
+                disabled={isSavingResult}
+                className="flex items-center gap-2 rounded-full bg-stone-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Download />
+                {isSavingResult ? "이미지 생성 중..." : "결과 저장하기"}
+              </button>
+              {mode === "free" && (
+                <>
+                  <button
+                    onClick={onResumeFreeMode}
+                    disabled={isSavingResult}
+                    className="flex items-center gap-2 rounded-full border border-stone-400 px-4 py-2 text-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    이어 뜨기
+                  </button>
+                </>
+              )}
+              <button
+                onClick={onBackToSelect}
+                disabled={isSavingResult}
+                className="rounded-full border border-gray-300 bg-white/90 p-2 text-sm shadow-sm"
+              >
+                <House />
+              </button>
+              <button
+                onClick={onInitialize}
+                className="rounded-full border border-gray-300 bg-white/90 p-2 text-sm shadow-sm"
+              >
+                <RotateCcw />
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -62,3 +62,14 @@ export function clearFreeSave(): void {
     localStorage.removeItem(FREE_KEY);
   } catch {}
 }
+
+export function clearAllStats(): void {
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("knitMuffler_")) keysToRemove.push(key);
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+  } catch {}
+}

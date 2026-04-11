@@ -2,8 +2,8 @@
 
 import { House, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { PALETTES, STITCH_COUNT } from "./data";
 import { ColorModeContext } from "./ColorModeContext";
+import { PALETTES, STITCH_COUNT } from "./data";
 import DraftPreview from "./DraftPreview";
 import { MufflerPreview } from "./MufflerPreview";
 import ResultModal from "./ResultModal";
@@ -34,6 +34,8 @@ export default function KnitMuffler() {
     knittedRows,
     currentRow,
     currentStitch,
+    currentRowEverKnitted,
+    isChallengeComplete,
     activeRows,
     finalRows,
     elapsed,
@@ -53,10 +55,11 @@ export default function KnitMuffler() {
     handleSelectColorAndKnit,
   } = useKnittingGame();
 
-  const { resultCaptureRef, isSavingResult, handleSaveResult } = useResultExport({
-    finalRows,
-    mode,
-  });
+  const { resultCaptureRef, isSavingResult, handleSaveResult } =
+    useResultExport({
+      finalRows,
+      mode,
+    });
 
   // 목도리 영역 스크롤: 항상 하단 유지
   useEffect(() => {
@@ -153,7 +156,8 @@ export default function KnitMuffler() {
                   disabled={
                     knittedRows.length === 0 && currentRow.length < STITCH_COUNT
                       ? true
-                      : currentRow.length > 0 && currentRow.length < STITCH_COUNT
+                      : currentRow.length > 0 &&
+                        currentRow.length < STITCH_COUNT
                   }
                   className="rounded-full bg-stone-900 px-4 py-2 text-sm text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -176,7 +180,10 @@ export default function KnitMuffler() {
                   />
                   <div className="flex flex-col items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm">
                     <p className="text-sm text-stone-500">도안</p>
-                    <DraftPreview draft={challengeDraft} currentRowIndex={knittedRows.length} />
+                    <DraftPreview
+                      draft={challengeDraft}
+                      currentRowIndex={knittedRows.length}
+                    />
                   </div>
                 </div>
               </div>
@@ -200,14 +207,26 @@ export default function KnitMuffler() {
             {mode === "challenge" && (
               <div className="absolute right-4 top-20 hidden flex-col items-center justify-center gap-4 rounded-md bg-gray-50 p-4 shadow-md md:flex">
                 <p>도안</p>
-                <DraftPreview draft={challengeDraft} currentRowIndex={knittedRows.length} />
+                <DraftPreview
+                  draft={challengeDraft}
+                  currentRowIndex={knittedRows.length}
+                />
               </div>
             )}
 
             {/* 목도리 영역 (하단 정렬) */}
-            <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto w-full">
+            <div
+              ref={scrollRef}
+              className="flex-1 min-h-0 overflow-y-auto w-full"
+            >
               <div className="flex min-h-full flex-col justify-end w-full">
-                <MufflerPreview rows={activeRows.length > 0 ? activeRows : [[]]} />
+                <MufflerPreview
+                  rows={
+                    isChallengeComplete
+                      ? knittedRows
+                      : [...knittedRows, currentRow]
+                  }
+                />
               </div>
             </div>
 
@@ -216,11 +235,17 @@ export default function KnitMuffler() {
               <div className="w-full max-w-70 px-4 md:w-auto md:max-w-fit">
                 <div className="grid grid-cols-5 justify-items-center gap-2 rounded-2xl border border-stone-200 bg-white/90 px-3 py-3 shadow-md backdrop-blur-sm md:flex md:items-end md:gap-2 md:px-4">
                   {Object.values(palette).map((color) => (
-                    <div key={color.id} className="flex flex-col items-center gap-1">
+                    <div
+                      key={color.id}
+                      className="flex flex-col items-center gap-1"
+                    >
                       <button
                         onClick={() => handleSelectColorAndKnit(color.id)}
                         className={`h-8 w-8 rounded-full text-xs border border-stone-200 transition-all ${currentThread === color.id ? "ring-2 ring-stone-900 ring-offset-2" : "hover:ring-2 hover:ring-stone-300"}`}
-                        style={{ backgroundColor: color.fill, color: color.text }}
+                        style={{
+                          backgroundColor: color.fill,
+                          color: color.text,
+                        }}
                         aria-label={`${color.id}번 실 선택`}
                       >
                         {color.id}
@@ -233,7 +258,13 @@ export default function KnitMuffler() {
                 <div className="w-full max-w-sm rounded-2xl border border-stone-200 bg-white/90 p-3 shadow-md backdrop-blur-sm">
                   <button
                     onClick={handleUnravel}
-                    disabled={currentStitch === 0}
+                    disabled={
+                      mode === "free"
+                        ? currentStitch === 0 && knittedRows.length === 0
+                        : currentRowEverKnitted
+                          ? currentStitch === 0
+                          : knittedRows.length === 0
+                    }
                     className="w-full rounded border border-stone-300 bg-stone-100 px-4 py-2 text-stone-700 transition-colors hover:bg-stone-200 disabled:cursor-not-allowed disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-400"
                   >
                     풀기(Backspace)
@@ -262,6 +293,7 @@ export default function KnitMuffler() {
             onResumeFreeMode={handleResumeFree}
             onRestartFreeMode={handleRestartFree}
             onBackToSelect={handleBackToSelect}
+            onInitialize={handleInitialize}
           />
         )}
       </div>

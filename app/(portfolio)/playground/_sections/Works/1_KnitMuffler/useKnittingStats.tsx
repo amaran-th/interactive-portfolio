@@ -14,7 +14,10 @@ export const useKnittingStats = ({ draft, stitches, elapsed }: Props) => {
     let correctColor = 0;
 
     draft.forEach((row, y) => {
-      row.forEach((targetColor, x) => {
+      const isReversed = y % 2 === 1;
+      row.forEach((_, x) => {
+        const draftX = isReversed ? row.length - 1 - x : x;
+        const targetColor = row[draftX];
         const stitch = stitches[y]?.[x];
         if (!stitch) return;
 

@@ -33,6 +33,7 @@ export function useKnittingGame() {
   const [knittedRows, setKnittedRows] = useState<Stitch[][]>([]);
   const [currentRow, setCurrentRow] = useState<Stitch[]>([]);
   const [currentStitch, setCurrentStitch] = useState(0);
+  const [currentRowEverKnitted, setCurrentRowEverKnitted] = useState(false);
 
   const rawElapsed = useTimer(started, resetKey);
   const elapsed = elapsedOffset + rawElapsed;
@@ -72,6 +73,7 @@ export function useKnittingGame() {
     setKnittedRows([]);
     setCurrentRow([]);
     setCurrentStitch(0);
+    setCurrentRowEverKnitted(false);
     setElapsedOffset(0);
     setResetKey((prev) => prev + 1);
   }, []);
@@ -151,6 +153,7 @@ export function useKnittingGame() {
       if (screen !== "play") return;
 
       if (isChallengeComplete) {
+        setStarted(false);
         setScreen("result");
         return;
       }
@@ -165,38 +168,25 @@ export function useKnittingGame() {
             : false,
       };
 
-      if (
-        mode === "challenge" &&
-        knittedRows.length === challengeDraft.length - 1 &&
-        currentStitch === STITCH_COUNT
-      ) {
-        setKnittedRows((prev) => [...prev, currentRow]);
+      const nextRow = [...currentRow, nextStitch];
+      setCurrentRowEverKnitted(true);
+
+      if (nextRow.length === STITCH_COUNT) {
+        setKnittedRows((prev) => [...prev, nextRow]);
         setCurrentRow([]);
         setCurrentStitch(0);
-        setStarted(false);
-        setScreen("result");
+        setCurrentRowEverKnitted(false);
         return;
       }
 
-      if (currentStitch < STITCH_COUNT) {
-        const nextRow = [...currentRow, nextStitch];
-        setCurrentRow(nextRow);
-        setCurrentStitch(nextRow.length);
-        return;
-      }
-
-      setKnittedRows((prev) => [...prev, currentRow]);
-      setCurrentRow([nextStitch]);
-      setCurrentStitch(1);
+      setCurrentRow(nextRow);
+      setCurrentStitch(nextRow.length);
     },
     [
-      challengeDraft.length,
       challengeLevel,
       currentRow,
-      currentStitch,
       currentThread,
       isChallengeComplete,
-      knittedRows.length,
       mode,
       screen,
       started,
@@ -204,19 +194,39 @@ export function useKnittingGame() {
   );
 
   const handleUnravel = useCallback(() => {
-    if (screen !== "play" || currentStitch === 0) return;
+    if (screen !== "play") return;
 
-    if (mode === "free" && currentStitch === 1 && knittedRows.length > 0) {
-      const previousRow = knittedRows[knittedRows.length - 1];
-      setKnittedRows((prev) => prev.slice(0, -1));
-      setCurrentRow(previousRow);
-      setCurrentStitch(previousRow.length);
+    if (mode === "free") {
+      // 자유 모드: 이전 행으로 자유롭게 돌아갈 수 있음
+      if (currentStitch === 0) {
+        if (knittedRows.length === 0) return;
+        const previousRow = knittedRows[knittedRows.length - 1];
+        setKnittedRows((prev) => prev.slice(0, -1));
+        setCurrentRow(previousRow);
+        setCurrentStitch(previousRow.length);
+        return;
+      }
+      setCurrentRow((prev) => prev.slice(0, -1));
+      setCurrentStitch((prev) => prev - 1);
       return;
     }
 
+    // 챌린지 모드: 새 행에 한 번이라도 뜬 적 있으면 현재 행 내에서만 풀기
+    if (!currentRowEverKnitted) {
+      if (knittedRows.length === 0) return;
+      const previousRow = knittedRows[knittedRows.length - 1];
+      const trimmedRow = previousRow.slice(0, -1);
+      setKnittedRows((prev) => prev.slice(0, -1));
+      setCurrentRow(trimmedRow);
+      setCurrentStitch(trimmedRow.length);
+      setCurrentRowEverKnitted(true);
+      return;
+    }
+
+    if (currentStitch === 0) return;
     setCurrentRow((prev) => prev.slice(0, -1));
     setCurrentStitch((prev) => prev - 1);
-  }, [currentStitch, knittedRows, mode, screen]);
+  }, [currentRowEverKnitted, currentStitch, knittedRows, mode, screen]);
 
   const handleSelectColorAndKnit = useCallback(
     (id: number) => {
@@ -273,6 +283,7 @@ export function useKnittingGame() {
     knittedRows,
     currentRow,
     currentStitch,
+    currentRowEverKnitted,
     activeRows,
     finalRows,
     generatedDraft,

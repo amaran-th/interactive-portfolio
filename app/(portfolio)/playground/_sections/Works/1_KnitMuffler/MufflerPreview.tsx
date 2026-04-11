@@ -14,16 +14,29 @@ export const StitchRow = memo(function StitchRow({
   row,
   stitchSize,
   emptyClassName,
+  rowIndex = 0,
+  totalRows = 1,
 }: {
   row: (Stitch | null)[];
   stitchSize: number;
   emptyClassName: string;
+  rowIndex?: number;
+  totalRows?: number;
 }) {
-  const nextEmptyIndex = row.findIndex((stitch) => stitch === null);
+  const isReversed = rowIndex % 2 === 1;
+  const displayRow = isReversed ? [...row].reverse() : row;
+  const nextEmptyIndex = isReversed
+    ? displayRow.findLastIndex((stitch) => stitch === null)
+    : displayRow.findIndex((stitch) => stitch === null);
 
   return (
-    <div className="grid w-fit grid-cols-10">
-      {row.map((thread, stitchIndex) =>
+    <div
+      className="relative grid w-fit grid-cols-10"
+      style={{
+        zIndex: totalRows - rowIndex,
+      }}
+    >
+      {displayRow.map((thread, stitchIndex) =>
         thread ? (
           <div
             key={stitchIndex}
@@ -34,7 +47,11 @@ export const StitchRow = memo(function StitchRow({
               zIndex: thread.slipped ? 50 : 1,
             }}
           >
-            <StitchBlock color={thread.color} slipped={thread.slipped} size={stitchSize} />
+            <StitchBlock
+              color={thread.color}
+              slipped={thread.slipped}
+              size={stitchSize}
+            />
           </div>
         ) : stitchIndex === nextEmptyIndex ? (
           <div
@@ -57,13 +74,26 @@ export function MufflerPreview({ rows, compact = false }: { rows: Stitch[][]; co
   return (
     <div className="px-6 py-4 text-gray-700 flex flex-col items-center relative">
       {paddedRows.map((row, rowIndex) => (
-        <StitchRow key={rowIndex} row={row} stitchSize={cellSize} emptyClassName={emptyClassName} />
+        <StitchRow
+          key={rowIndex}
+          row={row}
+          stitchSize={cellSize}
+          emptyClassName={emptyClassName}
+          rowIndex={rowIndex}
+          totalRows={paddedRows.length}
+        />
       ))}
     </div>
   );
 }
 
-export function ResultMuffler({ rows, title }: { rows: Stitch[][]; title: string }) {
+export function ResultMuffler({
+  rows,
+  title,
+}: {
+  rows: Stitch[][];
+  title: string;
+}) {
   const paddedRows = padRows(rows);
 
   return (
@@ -71,7 +101,14 @@ export function ResultMuffler({ rows, title }: { rows: Stitch[][]; title: string
       <p className="text-sm font-medium text-stone-600 text-center">{title}</p>
       <div className="flex flex-col items-center">
         {paddedRows.map((row, rowIndex) => (
-          <StitchRow key={rowIndex} row={row} stitchSize={20} emptyClassName="h-5 w-5" />
+          <StitchRow
+            key={rowIndex}
+            row={row}
+            stitchSize={20}
+            emptyClassName="h-5 w-5"
+            rowIndex={rowIndex}
+            totalRows={paddedRows.length}
+          />
         ))}
       </div>
     </div>

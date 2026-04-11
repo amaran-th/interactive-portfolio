@@ -1,11 +1,11 @@
 "use client";
 
-import { CircleCheck, CircleStar, Eye, Gauge, Share2 } from "lucide-react";
+import { CircleCheck, CircleStar, Eye, Gauge, Share2, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { EASY_DRAFTS, HARD_DRAFTS } from "./data";
 import DraftPreview from "./DraftPreview";
 import { ChallengeLevel, ColorMode } from "./type";
-import { ChallengeStat, getChallengeStat } from "./useKnittingStorage";
+import { ChallengeStat, clearAllStats, getChallengeStat } from "./useKnittingStorage";
 import { calcMedal, MEDAL_COLOR, Medal as MedalType } from "./utils";
 
 type DraftEntry = { key: string; draft: number[][] };
@@ -48,7 +48,9 @@ function DraftCard({
   level: ChallengeLevel;
   onClick: () => void;
 }) {
-  const stat = getChallengeStat(level, entry.key);
+  const [stat, setStat] = useState<ChallengeStat | null>(null);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setStat(getChallengeStat(level, entry.key)); }, [level, entry.key]);
   const medal = stat
     ? calcMedal(level, stat.colorAccuracy, stat.slipCount)
     : null;
@@ -135,6 +137,49 @@ const HARD_ENTRIES: DraftEntry[] = Object.entries(HARD_DRAFTS).map(
   ([key, draft]) => ({ key, draft }),
 );
 
+function ResetButton() {
+  const [open, setOpen] = useState(false);
+
+  const handleConfirm = () => {
+    clearAllStats();
+    setOpen(false);
+    window.location.reload();
+  };
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-2 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm text-stone-600 shadow-sm hover:bg-stone-50 transition-colors"
+      >
+        <Trash2 className="w-4 h-4" />
+        기록 초기화
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="flex flex-col gap-4 rounded-2xl bg-white px-8 py-6 shadow-xl text-stone-800">
+            <p className="text-base font-medium">지금까지의 모든 기록을 삭제하시겠습니까?</p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setOpen(false)}
+                className="rounded-full border border-stone-300 px-4 py-2 text-sm hover:bg-stone-100 transition-colors"
+              >
+                아니오
+              </button>
+              <button
+                onClick={handleConfirm}
+                className="rounded-full bg-red-500 px-4 py-2 text-sm text-white hover:bg-red-600 transition-colors"
+              >
+                네
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function ShareButton() {
   const [copied, setCopied] = useState(false);
 
@@ -179,6 +224,7 @@ export default function SelectScreen({
         <div className="flex flex-col items-center gap-3">
           <h2 className="text-4xl font-bold">목도리 뜨기</h2>
           <div className="flex items-center gap-3">
+            <ResetButton />
             <ShareButton />
             <button
               role="switch"
