@@ -118,7 +118,7 @@ function ResultStats({
             valueClassName: "text-stone-900",
           },
           {
-            label: "목도리 길이",
+            label: "길이",
             value: `${rows.length}`,
             valueClassName: "text-stone-900",
           },
@@ -255,6 +255,7 @@ export default function ResultModal({
   isSavingResult,
   onSaveResult,
   onResumeFreeMode,
+  onRestartFreeMode,
   onBackToSelect,
   onInitialize,
 }: {
@@ -272,6 +273,7 @@ export default function ResultModal({
   isSavingResult: boolean;
   onSaveResult: () => void;
   onResumeFreeMode: () => void;
+  onRestartFreeMode: () => void;
   onBackToSelect: () => void;
   onInitialize: () => void;
 }) {
@@ -296,9 +298,7 @@ export default function ResultModal({
             className="flex flex-col items-center gap-4 bg-[#f6f0e8] pb-4 text-center"
           >
             <div className="flex flex-col items-center gap-2">
-              <h2 className="text-4xl font-semibold text-stone-900">
-                목도리 완성!
-              </h2>
+              <h2 className="text-4xl font-semibold text-stone-900">완성!</h2>
               <div className="flex items-center gap-2">
                 <ResultModeLabel mode={mode} challengeLevel={challengeLevel} />
                 <MedalIcon medal={medal} />
@@ -369,7 +369,9 @@ export default function ResultModal({
                   <House />
                 </button>
                 <button
-                  onClick={onInitialize}
+                  onClick={
+                    mode === "challenge" ? onInitialize : onRestartFreeMode
+                  }
                   className="rounded-full border border-gray-300 bg-white/90 p-2 text-sm"
                 >
                   <RotateCcw />

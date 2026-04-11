@@ -2,9 +2,8 @@ import KnitMuffler from "@/app/(portfolio)/playground/_sections/Works/1_KnitMuff
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "목도리 뜨기",
-  description:
-    "도안을 따라 뜨거나 자유롭게 색을 골라 목도리를 완성하는 인터랙션",
+  title: "뜨개뜨개",
+  description: "도안을 따라 뜨거나 자유롭게 색을 골라 작품을 완성하는 인터랙션",
 };
 
 export default function KnitMufflerPage() {

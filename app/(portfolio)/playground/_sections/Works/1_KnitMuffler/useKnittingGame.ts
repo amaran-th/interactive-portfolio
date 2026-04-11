@@ -260,6 +260,7 @@ export function useKnittingGame() {
         case "Digit7":
         case "Digit8":
         case "Digit9":
+        case "Digit0":
           handleSelectColorAndKnit(parseInt(e.code.replace("Digit", ""), 10));
           break;
         case "Backspace":

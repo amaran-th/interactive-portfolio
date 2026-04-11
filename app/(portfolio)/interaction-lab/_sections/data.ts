@@ -56,7 +56,7 @@ export const researches: ResearchRecord[] = [
   },
   {
     id: "knit-muffler-accessibility-color",
-    title: "목도리 뜨기 색약 모드",
+    title: "뜨개뜨개 색약 모드",
     subtitle: "색각 이상 사용자를 위한 팔레트 접근성 개선",
     period: "2026.04.09",
     thumbnailLabel: "A11Y",

@@ -1,7 +1,7 @@
 "use client";
 
 import { House, RotateCcw } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ColorModeContext } from "./ColorModeContext";
 import { PALETTES, STITCH_COUNT } from "./data";
 import DraftPreview from "./DraftPreview";
@@ -101,7 +101,11 @@ export default function KnitMuffler() {
     startMode("free");
   };
 
-  const palette = PALETTES[colorMode];
+  const palette = useMemo(() => {
+    const list = Object.values(PALETTES[colorMode]);
+    list.push(list.shift()!);
+    return list;
+  }, [colorMode]);
 
   if (screen === "select") {
     return (
@@ -118,7 +122,7 @@ export default function KnitMuffler() {
 
   return (
     <ColorModeContext.Provider value={colorMode}>
-      <div className="relative flex h-full overflow-hidden bg-white text-black">
+      <div className="font-knit-muffler relative flex h-full overflow-hidden bg-white text-black">
         <div
           className={`flex h-full w-full flex-col ${
             screen === "result" ? "blur-md pointer-events-none select-none" : ""
@@ -234,7 +238,7 @@ export default function KnitMuffler() {
             <div className="flex flex-col items-center gap-2 py-4">
               <div className="w-full max-w-70 px-4 md:w-auto md:max-w-fit">
                 <div className="grid grid-cols-5 justify-items-center gap-2 rounded-2xl border border-stone-200 bg-white/90 px-3 py-3 shadow-md backdrop-blur-sm md:flex md:items-end md:gap-2 md:px-4">
-                  {Object.values(palette).map((color) => (
+                  {palette.map((color) => (
                     <div
                       key={color.id}
                       className="flex flex-col items-center gap-1"
@@ -291,6 +295,7 @@ export default function KnitMuffler() {
             isSavingResult={isSavingResult}
             onSaveResult={handleSaveResult}
             onResumeFreeMode={handleResumeFree}
+            onRestartFreeMode={handleRestartFree}
             onBackToSelect={handleBackToSelect}
             onInitialize={handleInitialize}
           />

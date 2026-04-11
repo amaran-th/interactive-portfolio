@@ -8,6 +8,7 @@ export enum Color {
   GREEN = 7,
   GRAY = 8,
   IVORY = 9,
+  WHITE = 0,
 }
 
 export interface Stitch {

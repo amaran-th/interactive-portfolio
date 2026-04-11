@@ -20,6 +20,7 @@ export const PALETTES: Record<ColorMode, Record<Color, ColorDef>> = {
     [Color.GREEN]: { id: 7, stroke: "#9ACC98", fill: "#CCE2CB", text: "#333" },
     [Color.GRAY]: { id: 8, stroke: "#C3BFB3", fill: "#ECEAE4", text: "#333" },
     [Color.IVORY]: { id: 9, stroke: "#CEC5A8", fill: "#F6EAC2", text: "#333" },
+    [Color.WHITE]: { id: 0, stroke: "#C3BFB3", fill: "#FFFFFF", text: "#333" },
   },
   // Wong palette 기반 색약 친화 팔레트
   weakness: {
@@ -37,6 +38,7 @@ export const PALETTES: Record<ColorMode, Record<Color, ColorDef>> = {
     [Color.GREEN]: { id: 7, stroke: "#007A58", fill: "#009E73", text: "#FFF" }, // Bluish green
     [Color.GRAY]: { id: 8, stroke: "#C3BFB3", fill: "#ECEAE4", text: "#333" }, // Gray
     [Color.IVORY]: { id: 9, stroke: "#CEC5A8", fill: "#F6EAC2", text: "#333" }, // Ivory
+    [Color.WHITE]: { id: 0, stroke: "#C3BFB3", fill: "#FFFFFF", text: "#333" },
   },
 };
 

@@ -4,9 +4,9 @@ import {
   CircleCheck,
   CircleStar,
   Eye,
-  Gauge,
   Share2,
   Trash2,
+  Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { EASY_DRAFTS, HARD_DRAFTS } from "./data";
@@ -41,9 +41,9 @@ export function MedalIcon({
 function StatBadge({ stat }: { stat: ChallengeStat }) {
   return (
     <div className="flex items-center gap-1">
-      <span className="text-[10px] gap-1 flex items-center text-stone-500 bg-stone-100 rounded-full px-2 py-0.5">
-        <Gauge className="size-2" /> {stat.spm.toFixed(1)}{" "}
-        <CircleCheck className="size-2" />
+      <span className="text-sm gap-2 flex items-center text-stone-500 bg-stone-100 rounded-full px-2 py-0.5">
+        <Zap className="size-4" /> {stat.spm.toFixed(1)}{" "}
+        <CircleCheck className="size-4" />
         {stat.colorAccuracy.toFixed(0)}%
       </span>
     </div>
@@ -83,7 +83,7 @@ function DraftCard({
       {stat ? (
         <StatBadge stat={stat} />
       ) : (
-        <span className="text-[10px] text-stone-400">미완료</span>
+        <span className="text-sm text-stone-400">미완료</span>
       )}
       <MedalIcon className="absolute -left-3 -top-3 size-8" medal={medal} />
     </button>
@@ -118,17 +118,20 @@ function Accordion({
 
   return (
     <div
-      className={`rounded-[28px] border-2 border-stone-300 ${bgClassName} shadow-[0_20px_60px_rgba(0,0,0,0.08)] overflow-hidden transition-transform hover:-translate-y-1`}
+      className={`rounded-xl border-2 border-stone-400 ${bgClassName} shadow-[0_20px_60px_rgba(0,0,0,0.08)] overflow-hidden transition-transform hover:-translate-y-1`}
     >
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-center px-7 py-7"
+        className="w-full flex items-center justify-center px-6 py-4"
       >
         <span className="text-2xl font-semibold">{label}</span>
       </button>
       <div style={{ height, transition: "height 300ms ease" }}>
-        <div ref={contentRef} className="px-7 pb-7 pt-0">
-          <div className="p-3 flex overflow-x-auto  gap-3">
+        <div className="px-6">
+          <div className="border-b border-stone-400"></div>
+        </div>
+        <div ref={contentRef} className="px-6 py-4">
+          <div className="p-3 flex overflow-x-auto gap-3">
             {drafts.map((entry) => (
               <DraftCard
                 key={entry.key}
@@ -203,7 +206,7 @@ function ShareButton() {
     const url = typeof window !== "undefined" ? window.location.href : "";
     if (navigator.share) {
       try {
-        await navigator.share({ title: "목도리 뜨기", url });
+        await navigator.share({ title: "뜨개뜨개", url });
       } catch {}
     } else {
       await navigator.clipboard.writeText(url);
@@ -235,10 +238,13 @@ export default function SelectScreen({
   onColorModeChange: (mode: ColorMode) => void;
 }) {
   return (
-    <div className="h-full max-h-full bg-[#f8f4ee] text-stone-900 flex flex-col items-center px-6 py-10 overflow-y-auto">
+    <div className="font-knit-muffler h-full max-h-full bg-[#f8f4ee] text-stone-900 flex flex-col items-center px-6 py-10 overflow-y-auto">
       <div className="max-w-4xl w-full flex flex-col gap-6">
-        <div className="flex flex-col items-center gap-3">
-          <h2 className="text-4xl font-bold">목도리 뜨기</h2>
+        <div className="flex flex-col items-center gap-6">
+          <h2 className="text-5xl font-bold">
+            🧶 뜨<span className="text-4xl text-orange-400">개</span>뜨
+            <span className="text-4xl text-orange-400">개</span> 🧶
+          </h2>
           <div className="flex items-center gap-3 flex-wrap justify-center">
             <ResetButton />
             <ShareButton />
@@ -272,24 +278,24 @@ export default function SelectScreen({
         </div>
         <div className="flex flex-col gap-4">
           <Accordion
-            label="이지 모드"
+            label="🌱 EASY"
             level="easy"
             drafts={EASY_ENTRIES}
-            bgClassName="bg-green-50"
+            bgClassName="bg-amber-50"
             onSelectDraft={onStartChallenge}
           />
           <Accordion
-            label="하드 모드"
+            label="🔥 HARD"
             level="hard"
             drafts={HARD_ENTRIES}
-            bgClassName="bg-red-50"
+            bgClassName="bg-rose-50"
             onSelectDraft={onStartChallenge}
           />
           <button
             onClick={onStartFree}
-            className="text-left rounded-[28px] border-2 border-stone-300 bg-stone-50 p-7 shadow-[0_20px_60px_rgba(0,0,0,0.08)] transition-transform hover:-translate-y-1"
+            className="text-left rounded-xl border-2 border-stone-400 bg-stone-50 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.08)] transition-transform hover:-translate-y-1"
           >
-            <p className="text-2xl font-semibold text-center">자유 모드</p>
+            <p className="text-2xl font-semibold text-center">🎨 자유 모드</p>
           </button>
         </div>
       </div>
