@@ -9,6 +9,7 @@ export interface WorkItem {
   description: string;
   period?: string;
   platforms?: ("mobile" | "pc")[];
+  skills?: { icon: string | null; name: string }[];
   thumbnail?: string;
   content: React.ReactNode;
   path?: string;
@@ -24,8 +25,7 @@ const RADIUS = 320;
 const TILT_DEG = 12;
 const DRAG_PX_PER_STEP = RADIUS * Math.sin((STEP_ANGLE * Math.PI) / 180);
 const CENTER_COMPENSATION = RADIUS * Math.sin((TILT_DEG * Math.PI) / 180);
-const WORK_THUMBNAIL_THEME =
-  "from-[#1f2733] via-[#2d3a4d] to-[#465f80]";
+const WORK_THUMBNAIL_THEME = "from-[#1f2733] via-[#2d3a4d] to-[#465f80]";
 
 export default function Work({ items, onItemClick }: WorkProps) {
   const [activeIndex, setActiveIndex] = useState(0);

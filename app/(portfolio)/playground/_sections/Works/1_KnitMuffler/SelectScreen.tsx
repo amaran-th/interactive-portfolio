@@ -1,11 +1,22 @@
 "use client";
 
-import { CircleCheck, CircleStar, Eye, Gauge, Share2, Trash2 } from "lucide-react";
+import {
+  CircleCheck,
+  CircleStar,
+  Eye,
+  Gauge,
+  Share2,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { EASY_DRAFTS, HARD_DRAFTS } from "./data";
 import DraftPreview from "./DraftPreview";
 import { ChallengeLevel, ColorMode } from "./type";
-import { ChallengeStat, clearAllStats, getChallengeStat } from "./useKnittingStorage";
+import {
+  ChallengeStat,
+  clearAllStats,
+  getChallengeStat,
+} from "./useKnittingStorage";
 import { calcMedal, MEDAL_COLOR, Medal as MedalType } from "./utils";
 
 type DraftEntry = { key: string; draft: number[][] };
@@ -49,8 +60,11 @@ function DraftCard({
   onClick: () => void;
 }) {
   const [stat, setStat] = useState<ChallengeStat | null>(null);
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setStat(getChallengeStat(level, entry.key)); }, [level, entry.key]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStat(getChallengeStat(level, entry.key));
+  }, [level, entry.key]);
   const medal = stat
     ? calcMedal(level, stat.colorAccuracy, stat.slipCount)
     : null;
@@ -156,9 +170,11 @@ function ResetButton() {
         기록 초기화
       </button>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="flex flex-col gap-4 rounded-2xl bg-white px-8 py-6 shadow-xl text-stone-800">
-            <p className="text-base font-medium">지금까지의 모든 기록을 삭제하시겠습니까?</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="flex flex-col items-center gap-4 rounded-2xl bg-white px-8 py-6 shadow-xl text-stone-800">
+            <p className="text-base break-keep text-center font-medium">
+              지금까지 저장된 모든 기록을 삭제하시겠습니까?
+            </p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setOpen(false)}
@@ -223,20 +239,24 @@ export default function SelectScreen({
       <div className="max-w-4xl w-full flex flex-col gap-6">
         <div className="flex flex-col items-center gap-3">
           <h2 className="text-4xl font-bold">목도리 뜨기</h2>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap justify-center">
             <ResetButton />
             <ShareButton />
             <button
               role="switch"
               aria-checked={colorMode === "weakness"}
-              onClick={() => onColorModeChange(colorMode === "normal" ? "weakness" : "normal")}
+              onClick={() =>
+                onColorModeChange(
+                  colorMode === "normal" ? "weakness" : "normal",
+                )
+              }
               className="flex items-center gap-2 rounded-full border border-stone-300 bg-white px-3 py-2 text-sm text-stone-600 shadow-sm hover:bg-stone-50 transition-colors"
             >
               <Eye className="w-4 h-4 text-stone-500" />
               <span>색약 모드</span>
               {/* Switch track */}
               <span
-                className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${
+                className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${
                   colorMode === "weakness" ? "bg-stone-700" : "bg-stone-200"
                 }`}
               >

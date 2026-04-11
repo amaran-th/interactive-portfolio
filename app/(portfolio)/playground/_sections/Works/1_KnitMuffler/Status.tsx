@@ -26,7 +26,7 @@ export default function Status({
   };
 
   return (
-    <div className="flex flex-col gap-2 p-4 rounded-md shadow-md bg-gray-50 min-w-38.5">
+    <div className="flex flex-col gap-2 p-4 rounded-md shadow-md bg-gray-50 h-full min-w-38.5">
       {/* 타이머 */}
       <div className="flex justify-between text-sm">
         <span className="text-gray-500">시간</span>

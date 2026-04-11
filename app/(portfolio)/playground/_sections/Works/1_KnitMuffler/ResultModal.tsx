@@ -20,14 +20,19 @@ function ResultModeLabel({
   mode: Mode;
   challengeLevel: ChallengeLevel | null;
 }) {
-  const label =
-    mode === "challenge"
-      ? `챌린지${challengeLevel ? ` · ${challengeLevel === "easy" ? "쉬움" : "어려움"}` : ""}`
-      : "자유 모드";
+  if (mode === "challenge") {
+    return (
+      <p
+        className={`rounded-full border border-stone-300 px-3 py-1 text-xs font-medium ${challengeLevel === "easy" ? "text-green-400 bg-green-50" : "text-red-400 bg-red-50"}`}
+      >
+        {challengeLevel === "easy" ? "EASY" : "HARD"}
+      </p>
+    );
+  }
 
   return (
     <p className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-600">
-      {label}
+      자유 모드
     </p>
   );
 }
@@ -220,13 +225,13 @@ function ChallengeStatSaver({
       <div className="flex gap-2 mt-1">
         <button
           onClick={save}
-          className="rounded-full bg-stone-900 px-4 py-1.5 text-xs text-white hover:bg-stone-800 transition-colors"
+          className="rounded-full break-keep bg-stone-900 px-4 py-1.5 text-xs text-white hover:bg-stone-800 transition-colors"
         >
           이번 기록으로 덮어쓰기
         </button>
         <button
           onClick={() => setSaved(true)}
-          className="rounded-full border border-stone-300 px-4 py-1.5 text-xs text-stone-600 hover:bg-stone-100 transition-colors"
+          className="rounded-full border shrink-0 border-stone-300 px-4 py-1.5 text-xs text-stone-600 hover:bg-stone-100 transition-colors"
         >
           유지
         </button>
@@ -250,7 +255,6 @@ export default function ResultModal({
   isSavingResult,
   onSaveResult,
   onResumeFreeMode,
-  onRestartFreeMode,
   onBackToSelect,
   onInitialize,
 }: {
@@ -268,7 +272,6 @@ export default function ResultModal({
   isSavingResult: boolean;
   onSaveResult: () => void;
   onResumeFreeMode: () => void;
-  onRestartFreeMode: () => void;
   onBackToSelect: () => void;
   onInitialize: () => void;
 }) {
@@ -349,29 +352,29 @@ export default function ResultModal({
                 {isSavingResult ? "이미지 생성 중..." : "결과 저장하기"}
               </button>
               {mode === "free" && (
-                <>
-                  <button
-                    onClick={onResumeFreeMode}
-                    disabled={isSavingResult}
-                    className="flex items-center gap-2 rounded-full border border-stone-400 px-4 py-2 text-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    이어 뜨기
-                  </button>
-                </>
+                <button
+                  onClick={onResumeFreeMode}
+                  disabled={isSavingResult}
+                  className="flex items-center rounded-full border border-gray-300 bg-white/90 px-4 py-2 text-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  이어 뜨기
+                </button>
               )}
-              <button
-                onClick={onBackToSelect}
-                disabled={isSavingResult}
-                className="rounded-full border border-gray-300 bg-white/90 p-2 text-sm shadow-sm"
-              >
-                <House />
-              </button>
-              <button
-                onClick={onInitialize}
-                className="rounded-full border border-gray-300 bg-white/90 p-2 text-sm shadow-sm"
-              >
-                <RotateCcw />
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={onBackToSelect}
+                  disabled={isSavingResult}
+                  className="rounded-full border border-gray-300 bg-white/90 p-2 text-sm"
+                >
+                  <House />
+                </button>
+                <button
+                  onClick={onInitialize}
+                  className="rounded-full border border-gray-300 bg-white/90 p-2 text-sm"
+                >
+                  <RotateCcw />
+                </button>
+              </div>
             </div>
           </div>
         </div>

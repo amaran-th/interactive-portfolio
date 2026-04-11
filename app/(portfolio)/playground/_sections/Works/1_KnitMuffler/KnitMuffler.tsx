@@ -125,18 +125,18 @@ export default function KnitMuffler() {
           }`}
         >
           {/* 상단 좌측 버튼 */}
-          <div className="absolute top-4 left-4 z-70 flex gap-2">
+          <div className="absolute top-4 left-4 z-70 flex gap-1 sm:gap-2">
             <button
               onClick={handleBackToSelect}
               className="rounded-full border border-gray-300 bg-white/90 p-2 text-sm shadow-sm"
             >
-              <House />
+              <House className="size-5 sm:size-6" />
             </button>
             <button
               onClick={handleInitialize}
               className="rounded-full border border-gray-300 bg-white/90 p-2 text-sm shadow-sm"
             >
-              <RotateCcw />
+              <RotateCcw className="size-5 sm:size-6" />
             </button>
           </div>
 
@@ -144,7 +144,7 @@ export default function KnitMuffler() {
             {/* 타이틀 */}
             <div className="px-14 py-5 text-lg font-bold text-center md:p-6 md:text-xl">
               {mode === "challenge"
-                ? `챌린지 모드${challengeLevel ? ` · ${challengeLevel === "easy" ? "Easy" : "Hard"}` : ""}`
+                ? `챌린지 모드${challengeLevel ? ` · ${challengeLevel === "easy" ? "EASY" : "HARD"}` : ""}`
                 : "자유 모드"}
             </div>
 
@@ -291,7 +291,6 @@ export default function KnitMuffler() {
             isSavingResult={isSavingResult}
             onSaveResult={handleSaveResult}
             onResumeFreeMode={handleResumeFree}
-            onRestartFreeMode={handleRestartFree}
             onBackToSelect={handleBackToSelect}
             onInitialize={handleInitialize}
           />

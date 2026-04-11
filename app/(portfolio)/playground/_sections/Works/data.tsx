@@ -22,12 +22,4 @@ export const works: WorkItem[] = [
     thumbnail: "/playground/knit-muffler.png",
     path: "/knit-muffler",
   },
-  {
-    id: 2,
-    title: "Project B",
-    description: "프로젝트 설명이 들어갈 자리.",
-    period: "2026.02",
-    platforms: ["pc"],
-    content: <p>Project B 내용 컴포넌트</p>,
-  },
 ];
