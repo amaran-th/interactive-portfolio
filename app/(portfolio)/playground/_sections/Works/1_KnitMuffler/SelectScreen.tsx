@@ -130,7 +130,7 @@ function ModeAccordion({
     >
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-6 py-4"
+        className="w-full flex items-center justify-between p-4"
       >
         <span className="shrink-0 text-2xl font-semibold">{label}</span>
         {progress ? (
