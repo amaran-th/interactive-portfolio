@@ -1,7 +1,9 @@
 "use client";
 
+import { KnitMufflerIcon } from "@/components/SVG";
 import {
   CircleCheck,
+  CircleDashed,
   CircleStar,
   Eye,
   Share2,
@@ -13,9 +15,13 @@ import { EASY_DRAFTS, HARD_DRAFTS } from "./data";
 import DraftPreview from "./DraftPreview";
 import { ChallengeLevel, ColorMode } from "./type";
 import {
+  ChallengeProgress,
   ChallengeStat,
   clearAllStats,
+  FreeSave,
+  getChallengeProgress,
   getChallengeStat,
+  getFreeSave,
 } from "./useKnittingStorage";
 import { calcMedal, MEDAL_COLOR, Medal as MedalType } from "./utils";
 
@@ -90,17 +96,19 @@ function DraftCard({
   );
 }
 
-function Accordion({
+function ModeAccordion({
   label,
   level,
   drafts,
   bgClassName,
+  progress,
   onSelectDraft,
 }: {
   label: string;
   level: ChallengeLevel;
   drafts: DraftEntry[];
   bgClassName: string;
+  progress: ChallengeProgress | null;
   onSelectDraft: (level: ChallengeLevel, draftKey: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -118,13 +126,24 @@ function Accordion({
 
   return (
     <div
-      className={`rounded-xl border-2 border-stone-400 ${bgClassName} shadow-[0_20px_60px_rgba(0,0,0,0.08)] overflow-hidden transition-transform hover:-translate-y-1`}
+      className={`rounded-xl border-2 border-stone-400 ${bgClassName} overflow-hidden transition-transform hover:-translate-y-1`}
     >
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-center px-6 py-4"
+        className="w-full flex items-center justify-between px-6 py-4"
       >
-        <span className="text-2xl font-semibold">{label}</span>
+        <span className="shrink-0 text-2xl font-semibold">{label}</span>
+        {progress ? (
+          <div
+            className={`text-xl shrink-0 font-bold ${
+              progress.clear === progress.total ? "text-green-400" : ""
+            }`}
+          >
+            {progress.clear}/{progress.total}
+          </div>
+        ) : (
+          ""
+        )}
       </button>
       <div style={{ height, transition: "height 300ms ease" }}>
         <div className="px-6">
@@ -237,14 +256,36 @@ export default function SelectScreen({
   colorMode: ColorMode;
   onColorModeChange: (mode: ColorMode) => void;
 }) {
+  const [progress, setProgress] = useState<{
+    easy: ChallengeProgress | null;
+    hard: ChallengeProgress | null;
+    free: FreeSave | null;
+  }>({
+    easy: null,
+    hard: null,
+    free: null,
+  });
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setProgress({
+      easy: getChallengeProgress("easy"),
+      hard: getChallengeProgress("hard"),
+      free: getFreeSave(),
+    });
+  }, []);
+
   return (
     <div className="font-knit-muffler h-full max-h-full bg-[#f8f4ee] text-stone-900 flex flex-col items-center px-6 py-10 overflow-y-auto">
-      <div className="max-w-4xl w-full flex flex-col gap-6">
-        <div className="flex flex-col items-center gap-6">
-          <h2 className="text-5xl font-bold">
-            🧶 뜨<span className="text-4xl text-orange-400">개</span>뜨
-            <span className="text-4xl text-orange-400">개</span> 🧶
-          </h2>
+      <div className="max-w-xl w-full flex flex-col gap-6">
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex gap-1 items-center border-y-4 border-dashed border-orange-200 w-full justify-between py-2">
+            <KnitMufflerIcon size="40" />
+            <h2 className="text-5xl font-bold">
+              뜨<span className="text-4xl text-orange-400">개</span>뜨
+              <span className="text-4xl text-orange-400">개</span>
+            </h2>
+            <KnitMufflerIcon size="40" />
+          </div>
           <div className="flex items-center gap-3 flex-wrap justify-center">
             <ResetButton />
             <ShareButton />
@@ -276,26 +317,52 @@ export default function SelectScreen({
             </button>
           </div>
         </div>
+        {!!progress.easy?.total &&
+        !!progress.hard?.total &&
+        progress.easy?.total === progress.easy?.perfect &&
+        progress.hard?.total === progress.hard?.perfect ? (
+          <div className="flex flex-col gap-1 items-center border border-stone-200 bg-white p-2 py-4 rounded-md">
+            <p className="text-xl">🎉 축하합니다! 🎉</p>
+            <p>모든 도안을 완벽하게 완성했습니다.</p>
+            <p>이제 [자유모드]에서 나만의 도안을 만들어보세요!</p>
+            <p>플레이해주셔서 감사합니다(_ _)</p>
+            <p className="text-xs text-gray-400">
+              이따금씩 새로운 도안이 업데이트될 예정이니 기대해주세요!
+            </p>
+          </div>
+        ) : (
+          ""
+        )}
         <div className="flex flex-col gap-4">
-          <Accordion
+          <ModeAccordion
             label="🌱 EASY"
             level="easy"
             drafts={EASY_ENTRIES}
             bgClassName="bg-amber-50"
+            progress={progress.easy}
             onSelectDraft={onStartChallenge}
           />
-          <Accordion
+          <ModeAccordion
             label="🔥 HARD"
             level="hard"
             drafts={HARD_ENTRIES}
-            bgClassName="bg-rose-50"
+            bgClassName="bg-orange-100"
+            progress={progress.hard}
             onSelectDraft={onStartChallenge}
           />
           <button
             onClick={onStartFree}
-            className="text-left rounded-xl border-2 border-stone-400 bg-stone-50 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.08)] transition-transform hover:-translate-y-1"
+            className="flex justify-between gap-2 items-center rounded-xl border-2 border-stone-400 bg-stone-50 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.08)] transition-transform hover:-translate-y-1"
           >
-            <p className="text-2xl font-semibold text-center">🎨 자유 모드</p>
+            <p className="text-2xl font-semibold shrink-0">🎨 자유 모드</p>
+            {progress.free ? (
+              <div className="flex gap-1 text-gray-400 break-keep items-center">
+                <CircleDashed className="size-4" />
+                <p className="shrink">작업하던 기록이 있습니다.</p>
+              </div>
+            ) : (
+              ""
+            )}
           </button>
         </div>
       </div>

@@ -245,7 +245,7 @@ export default function KnitMuffler() {
                     >
                       <button
                         onClick={() => handleSelectColorAndKnit(color.id)}
-                        className={`h-8 w-8 rounded-full text-xs border border-stone-200 transition-all ${currentThread === color.id ? "ring-2 ring-stone-900 ring-offset-2" : "hover:ring-2 hover:ring-stone-300"}`}
+                        className={`select-none h-8 w-8 rounded-full text-xs border border-stone-200 transition-all ${currentThread === color.id ? "ring-2 ring-stone-900 ring-offset-2" : "hover:ring-2 hover:ring-stone-300"}`}
                         style={{
                           backgroundColor: color.fill,
                           color: color.text,

@@ -30,12 +30,7 @@ export const StitchRow = memo(function StitchRow({
     : displayRow.findIndex((stitch) => stitch === null);
 
   return (
-    <div
-      className="relative grid w-fit grid-cols-10"
-      style={{
-        zIndex: totalRows - rowIndex,
-      }}
-    >
+    <>
       {displayRow.map((thread, stitchIndex) =>
         thread ? (
           <div
@@ -44,7 +39,7 @@ export const StitchRow = memo(function StitchRow({
             style={{
               width: stitchSize,
               height: stitchSize,
-              zIndex: thread.slipped ? 50 : 1,
+              zIndex: thread.slipped ? 50 : totalRows - rowIndex,
             }}
           >
             <StitchBlock
@@ -62,27 +57,35 @@ export const StitchRow = memo(function StitchRow({
           <div key={stitchIndex} className={emptyClassName} />
         ),
       )}
-    </div>
+    </>
   );
 });
 
-export function MufflerPreview({ rows, compact = false }: { rows: Stitch[][]; compact?: boolean }) {
+export function MufflerPreview({
+  rows,
+  compact = false,
+}: {
+  rows: Stitch[][];
+  compact?: boolean;
+}) {
   const cellSize = compact ? 20 : 32;
   const emptyClassName = compact ? "w-5 h-5" : "w-8 h-8";
   const paddedRows = padRows(rows);
 
   return (
-    <div className="px-6 py-4 text-gray-700 flex flex-col items-center relative">
-      {paddedRows.map((row, rowIndex) => (
-        <StitchRow
-          key={rowIndex}
-          row={row}
-          stitchSize={cellSize}
-          emptyClassName={emptyClassName}
-          rowIndex={rowIndex}
-          totalRows={paddedRows.length}
-        />
-      ))}
+    <div className="px-6 py-4 text-gray-700 flex justify-center">
+      <div className="relative grid w-fit grid-cols-10">
+        {paddedRows.map((row, rowIndex) => (
+          <StitchRow
+            key={rowIndex}
+            row={row}
+            stitchSize={cellSize}
+            emptyClassName={emptyClassName}
+            rowIndex={rowIndex}
+            totalRows={paddedRows.length}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -99,7 +102,7 @@ export function ResultMuffler({
   return (
     <div className="flex flex-col items-center gap-3">
       <p className="text-sm font-medium text-stone-600 text-center">{title}</p>
-      <div className="flex flex-col items-center">
+      <div className="relative grid w-fit grid-cols-10">
         {paddedRows.map((row, rowIndex) => (
           <StitchRow
             key={rowIndex}

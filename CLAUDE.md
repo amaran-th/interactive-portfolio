@@ -39,6 +39,19 @@ Each interaction follows a strict pattern:
 
 **Design system:** Dark theme (`bg-gray-950`, `text-white`) throughout. UI uses `white/5`, `white/10` etc. glass-morphism tokens with Tailwind. Geist Sans/Mono fonts loaded via `next/font/google`.
 
+## Slash Commands
+
+프로젝트에 콘텐츠를 추가하는 4개의 커맨드가 `.claude/commands/`에 정의되어 있다.
+
+| 커맨드 | 역할 | 핵심 데이터 타입 | 데이터 파일 |
+|--------|------|-----------------|------------|
+| `/new-work` | 플레이그라운드 Work 추가 | `WorkItem` | `Works/data.tsx` |
+| `/new-interaction` | 인터랙션 랩 Interaction 추가 | — | `Interactions.tsx` |
+| `/new-research` | 인터랙션 랩 Research 추가 | `ResearchRecord` | `interaction-lab/_sections/data.ts` |
+| `/new-note` | 엔지니어링 노트 항목 추가 | `EngineeringEntry` | `engineering-note/_sections/data.ts` |
+
+**동기화 규칙:** 위 데이터 타입(`WorkItem`, `ResearchRecord`, `EngineeringEntry`) 또는 컴포넌트 패턴(`InteractionCard` props 등)이 변경되면, 대응하는 커맨드 파일(`.claude/commands/new-*.md`)의 예시 코드도 함께 업데이트해야 한다.
+
 ## Interaction Guidance Policy
 
 When the user asks about implementing a new interaction, **do not write the answer files directly**. Instead, provide a learning guide that covers:
