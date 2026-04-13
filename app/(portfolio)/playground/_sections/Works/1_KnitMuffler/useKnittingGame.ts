@@ -1,12 +1,94 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import { EASY_DRAFTS, NORMAL_DRAFTS, STITCH_COUNT } from "./data";
 import { ChallengeLevel, Color, Mode, Screen, Stitch } from "./type";
 import { useKnittingStats } from "./useKnittingStats";
 import { useTimer } from "./useTimer";
+import {
+  clearFreeSave,
+  getFreeSave,
+  saveFreeMuffler,
+} from "./useKnittingStorage";
 
-const DEFAULT_THREAD_COLOR = Color.BLUE;
+// --- Challenge context ---
+export type ChallengeCtx = {
+  level: ChallengeLevel;
+  draftKey: string;
+  draft: number[][];
+};
+
+// --- Knitting reducer ---
+type KnittingState = {
+  knittedRows: Stitch[][];
+  currentRow: Stitch[];
+  currentRowEverKnitted: boolean;
+};
+
+const INITIAL_KNITTING: KnittingState = {
+  knittedRows: [],
+  currentRow: [],
+  currentRowEverKnitted: false,
+};
+
+type KnittingAction =
+  | { type: "KNIT"; stitch: Stitch }
+  | { type: "UNRAVEL"; mode: Mode }
+  | { type: "RESET" }
+  | { type: "LOAD_ROWS"; rows: Stitch[][] };
+
+function knittingReducer(
+  state: KnittingState,
+  action: KnittingAction,
+): KnittingState {
+  switch (action.type) {
+    case "KNIT": {
+      const nextRow = [...state.currentRow, action.stitch];
+      if (nextRow.length === STITCH_COUNT) {
+        return {
+          knittedRows: [...state.knittedRows, nextRow],
+          currentRow: [],
+          currentRowEverKnitted: false,
+        };
+      }
+      return { ...state, currentRow: nextRow, currentRowEverKnitted: true };
+    }
+    case "UNRAVEL": {
+      if (action.mode === "free") {
+        if (state.currentRow.length > 0) {
+          return { ...state, currentRow: state.currentRow.slice(0, -1) };
+        }
+        if (state.knittedRows.length === 0) return state;
+        const prev = state.knittedRows[state.knittedRows.length - 1];
+        return {
+          knittedRows: state.knittedRows.slice(0, -1),
+          currentRow: prev,
+          currentRowEverKnitted: true,
+        };
+      }
+      // challenge mode
+      if (!state.currentRowEverKnitted) {
+        if (state.knittedRows.length === 0) return state;
+        const prev = state.knittedRows[state.knittedRows.length - 1];
+        return {
+          knittedRows: state.knittedRows.slice(0, -1),
+          currentRow: prev.slice(0, -1),
+          currentRowEverKnitted: true,
+        };
+      }
+      if (state.currentRow.length === 0) return state;
+      return { ...state, currentRow: state.currentRow.slice(0, -1) };
+    }
+    case "RESET":
+      return INITIAL_KNITTING;
+    case "LOAD_ROWS":
+      return { ...INITIAL_KNITTING, knittedRows: action.rows };
+  }
+}
+
+// ---
+
+const DEFAULT_THREAD = Color.BLUE;
 
 const DRAFT_MAP: Record<ChallengeLevel, Record<string, number[][]>> = {
   easy: EASY_DRAFTS,
@@ -16,43 +98,25 @@ const DRAFT_MAP: Record<ChallengeLevel, Record<string, number[][]>> = {
 export function useKnittingGame() {
   const [screen, setScreen] = useState<Screen>("select");
   const [mode, setMode] = useState<Mode | null>(null);
-  const [challengeLevel, setChallengeLevel] = useState<ChallengeLevel | null>(
-    null,
-  );
-  const [challengeDraftKey, setChallengeDraftKey] = useState<string | null>(
-    null,
-  );
-  const [challengeDraft, setChallengeDraft] = useState<number[][]>(
-    Object.values(EASY_DRAFTS)[0],
-  );
-  const [resetKey, setResetKey] = useState(0);
-  const [elapsedOffset, setElapsedOffset] = useState(0);
-  const [currentThread, setCurrentThread] =
-    useState<Color>(DEFAULT_THREAD_COLOR);
+  const [challengeCtx, setChallengeCtx] = useState<ChallengeCtx | null>(null);
+  const [currentThread, setCurrentThread] = useState<Color>(DEFAULT_THREAD);
   const [started, setStarted] = useState(false);
-  const [knittedRows, setKnittedRows] = useState<Stitch[][]>([]);
-  const [currentRow, setCurrentRow] = useState<Stitch[]>([]);
-  const [currentStitch, setCurrentStitch] = useState(0);
-  const [currentRowEverKnitted, setCurrentRowEverKnitted] = useState(false);
+  const [knitting, dispatch] = useReducer(knittingReducer, INITIAL_KNITTING);
+  const { elapsed, reset: resetTimer } = useTimer(started);
 
-  const rawElapsed = useTimer(started, resetKey);
-  const elapsed = elapsedOffset + rawElapsed;
+  const { knittedRows, currentRow, currentRowEverKnitted } = knitting;
+  const challengeDraft = challengeCtx?.draft ?? Object.values(EASY_DRAFTS)[0];
 
   const activeRows = useMemo(
     () => (currentRow.length > 0 ? [...knittedRows, currentRow] : knittedRows),
     [currentRow, knittedRows],
   );
+
   const finalRows = useMemo(
     () => (screen === "result" ? activeRows : knittedRows),
     [activeRows, knittedRows, screen],
   );
-  const generatedDraft = useMemo(
-    () =>
-      finalRows.map((row) =>
-        row.map((stitch) => (stitch.color ? (stitch.color as number) : 0)),
-      ),
-    [finalRows],
-  );
+
   const isChallengeComplete = useMemo(
     () =>
       mode === "challenge" &&
@@ -68,15 +132,11 @@ export function useKnittingGame() {
   });
 
   const resetKnitting = useCallback(() => {
-    setCurrentThread(DEFAULT_THREAD_COLOR);
+    setCurrentThread(DEFAULT_THREAD);
     setStarted(false);
-    setKnittedRows([]);
-    setCurrentRow([]);
-    setCurrentStitch(0);
-    setCurrentRowEverKnitted(false);
-    setElapsedOffset(0);
-    setResetKey((prev) => prev + 1);
-  }, []);
+    dispatch({ type: "RESET" });
+    resetTimer();
+  }, [resetTimer]);
 
   const startMode = useCallback(
     (nextMode: Mode) => {
@@ -87,66 +147,81 @@ export function useKnittingGame() {
     [resetKnitting],
   );
 
-  /** 특정 도안 키를 지정해서 챌린지 시작 */
   const startChallenge = useCallback(
     (level: ChallengeLevel, draftKey: string) => {
-      resetKnitting();
       const draft = DRAFT_MAP[level][draftKey];
       if (!draft) return;
+      resetKnitting();
+      setChallengeCtx({ level, draftKey, draft });
       setMode("challenge");
-      setChallengeLevel(level);
-      setChallengeDraftKey(draftKey);
-      setChallengeDraft(draft);
       setScreen("play");
     },
     [resetKnitting],
   );
 
-  /** 저장된 자유 모드 데이터를 로드해 플레이 화면으로 복귀 (자유 모드 전용) */
   const resumeFromFreeSave = useCallback(
     (rows: Stitch[][], savedElapsed: number) => {
       resetKnitting();
       setMode("free");
-      setKnittedRows(rows);
-      setCurrentStitch(0);
-      setElapsedOffset(savedElapsed);
+      dispatch({ type: "LOAD_ROWS", rows });
+      resetTimer(savedElapsed);
       setScreen("play");
     },
-    [resetKnitting],
+    [resetKnitting, resetTimer],
   );
 
-  /** 저장된 자유 모드 데이터를 로드해 결과 화면으로 바로 진입 (자유 모드 전용) */
   const loadFreeSaveAsResult = useCallback(
     (rows: Stitch[][], savedElapsed: number) => {
       resetKnitting();
       setMode("free");
-      setKnittedRows(rows);
-      setElapsedOffset(savedElapsed);
+      dispatch({ type: "LOAD_ROWS", rows });
+      resetTimer(savedElapsed);
       setScreen("result");
     },
-    [resetKnitting],
+    [resetKnitting, resetTimer],
   );
+
+  // Free mode handlers — storage 접근은 hook 내부에서만
+  const startFree = useCallback(() => {
+    const saved = getFreeSave();
+    if (saved) {
+      loadFreeSaveAsResult(saved.rows, saved.elapsed);
+    } else {
+      startMode("free");
+    }
+  }, [loadFreeSaveAsResult, startMode]);
+
+  const finishFree = useCallback(() => {
+    if (activeRows.length === 0) return;
+    saveFreeMuffler(activeRows, elapsed);
+    setStarted(false);
+    setScreen("result");
+  }, [activeRows, elapsed]);
+
+  const resumeFree = useCallback(() => {
+    const saved = getFreeSave();
+    if (saved) {
+      resumeFromFreeSave(saved.rows, saved.elapsed);
+    } else if (mode === "free") {
+      setScreen("play");
+    }
+  }, [mode, resumeFromFreeSave]);
+
+  const restartFree = useCallback(() => {
+    clearFreeSave();
+    startMode("free");
+  }, [startMode]);
 
   const handleBackToSelect = useCallback(() => {
     resetKnitting();
     setMode(null);
+    setChallengeCtx(null);
     setScreen("select");
   }, [resetKnitting]);
 
   const handleInitialize = useCallback(() => {
     resetKnitting();
   }, [resetKnitting]);
-
-  const finishSession = useCallback(() => {
-    if (activeRows.length === 0) return;
-    setStarted(false);
-    setScreen("result");
-  }, [activeRows.length]);
-
-  const handleResumeFreeMode = useCallback(() => {
-    if (mode !== "free") return;
-    setScreen("play");
-  }, [mode]);
 
   const handleKnit = useCallback(
     (colorOverride?: Color) => {
@@ -160,81 +235,31 @@ export function useKnittingGame() {
 
       if (!started) setStarted(true);
 
-      const nextStitch: Stitch = {
+      const stitch: Stitch = {
         color: colorOverride ?? currentThread,
         slipped:
-          mode === "challenge" && challengeLevel === "normal"
+          mode === "challenge" && challengeCtx?.level === "normal"
             ? Math.random() < 0.2
             : false,
       };
 
-      const nextRow = [...currentRow, nextStitch];
-      setCurrentRowEverKnitted(true);
-
-      if (nextRow.length === STITCH_COUNT) {
-        setKnittedRows((prev) => [...prev, nextRow]);
-        setCurrentRow([]);
-        setCurrentStitch(0);
-        setCurrentRowEverKnitted(false);
-        return;
-      }
-
-      setCurrentRow(nextRow);
-      setCurrentStitch(nextRow.length);
+      dispatch({ type: "KNIT", stitch });
     },
-    [
-      challengeLevel,
-      currentRow,
-      currentThread,
-      isChallengeComplete,
-      mode,
-      screen,
-      started,
-    ],
+    [challengeCtx?.level, currentThread, isChallengeComplete, mode, screen, started],
   );
 
   const handleUnravel = useCallback(() => {
-    if (screen !== "play") return;
-
-    if (mode === "free") {
-      // 자유 모드: 이전 행으로 자유롭게 돌아갈 수 있음
-      if (currentStitch === 0) {
-        if (knittedRows.length === 0) return;
-        const previousRow = knittedRows[knittedRows.length - 1];
-        setKnittedRows((prev) => prev.slice(0, -1));
-        setCurrentRow(previousRow);
-        setCurrentStitch(previousRow.length);
-        return;
-      }
-      setCurrentRow((prev) => prev.slice(0, -1));
-      setCurrentStitch((prev) => prev - 1);
-      return;
-    }
-
-    // 챌린지 모드: 새 행에 한 번이라도 뜬 적 있으면 현재 행 내에서만 풀기
-    if (!currentRowEverKnitted) {
-      if (knittedRows.length === 0) return;
-      const previousRow = knittedRows[knittedRows.length - 1];
-      const trimmedRow = previousRow.slice(0, -1);
-      setKnittedRows((prev) => prev.slice(0, -1));
-      setCurrentRow(trimmedRow);
-      setCurrentStitch(trimmedRow.length);
-      setCurrentRowEverKnitted(true);
-      return;
-    }
-
-    if (currentStitch === 0) return;
-    setCurrentRow((prev) => prev.slice(0, -1));
-    setCurrentStitch((prev) => prev - 1);
-  }, [currentRowEverKnitted, currentStitch, knittedRows, mode, screen]);
+    if (screen !== "play" || mode === null) return;
+    dispatch({ type: "UNRAVEL", mode });
+  }, [mode, screen]);
 
   const handleSelectColorAndKnit = useCallback(
     (id: number) => {
       if (screen !== "play") return;
-      const name = id as Color;
-      if (!Object.values(Color).includes(name)) return;
-      setCurrentThread(name);
-      handleKnit(name);
+      const color = id as Color;
+      if (!Object.values(Color).includes(color)) return;
+      setCurrentThread(color);
+      handleKnit(color);
     },
     [handleKnit, screen],
   );
@@ -276,33 +301,26 @@ export function useKnittingGame() {
   return {
     screen,
     mode,
-    challengeLevel,
-    challengeDraftKey,
-    challengeDraft,
+    challengeCtx,
     currentThread,
-    started,
     knittedRows,
     currentRow,
-    currentStitch,
     currentRowEverKnitted,
     activeRows,
     finalRows,
-    generatedDraft,
     isChallengeComplete,
     elapsed,
     slipCount,
     colorAccuracy,
     progress,
     spm,
-    startMode,
     startChallenge,
-    resumeFromFreeSave,
-    loadFreeSaveAsResult,
+    startFree,
+    finishFree,
+    resumeFree,
+    restartFree,
     handleBackToSelect,
     handleInitialize,
-    finishSession,
-    handleResumeFreeMode,
-    handleKnit,
     handleUnravel,
     handleSelectColorAndKnit,
   };
