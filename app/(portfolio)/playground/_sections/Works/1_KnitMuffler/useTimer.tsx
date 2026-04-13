@@ -1,31 +1,27 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-export function useTimer(started: boolean, resetKey = 0) {
+export function useTimer(running: boolean): {
+  elapsed: number;
+  reset: (base?: number) => void;
+} {
   const [elapsed, setElapsed] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const baseRef = useRef(0);
+  const countRef = useRef(0);
+
+  const reset = useCallback((base = 0) => {
+    baseRef.current = base;
+    countRef.current = 0;
+    setElapsed(base);
+  }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setElapsed(0);
-  }, [resetKey]);
-
-  useEffect(() => {
-    if (!started) {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      return;
-    }
-
-    timerRef.current = setInterval(() => {
-      setElapsed((prev) => prev + 1);
+    if (!running) return;
+    const id = setInterval(() => {
+      countRef.current += 1;
+      setElapsed(baseRef.current + countRef.current);
     }, 10);
+    return () => clearInterval(id);
+  }, [running]);
 
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [started]);
-
-  return elapsed;
+  return { elapsed, reset };
 }
