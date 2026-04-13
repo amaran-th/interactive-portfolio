@@ -148,7 +148,7 @@ export default function KnitMuffler() {
             {/* 타이틀 */}
             <div className="px-14 py-5 text-lg font-bold text-center md:p-6 md:text-xl">
               {mode === "challenge"
-                ? `챌린지 모드${challengeLevel ? ` · ${challengeLevel === "easy" ? "EASY" : "HARD"}` : ""}`
+                ? `챌린지 모드${challengeLevel ? ` · ${challengeLevel === "easy" ? "EASY" : "NORMAL"}` : ""}`
                 : "자유 모드"}
             </div>
 
@@ -180,7 +180,7 @@ export default function KnitMuffler() {
                     colorAccuracy={colorAccuracy}
                     progress={progress}
                     spm={spm}
-                    showSlipCount={challengeLevel === "hard"}
+                    showSlipCount={challengeLevel === "normal"}
                   />
                   <div className="flex flex-col items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm">
                     <p className="text-sm text-stone-500">도안</p>
@@ -202,7 +202,7 @@ export default function KnitMuffler() {
                   colorAccuracy={colorAccuracy}
                   progress={progress}
                   spm={spm}
-                  showSlipCount={challengeLevel === "hard"}
+                  showSlipCount={challengeLevel === "normal"}
                 />
               </div>
             )}

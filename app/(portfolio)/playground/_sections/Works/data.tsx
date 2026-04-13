@@ -16,7 +16,7 @@ export const works: WorkItem[] = [
 특징:
 - 색약을 위한 팔레트 모드가 제공된다.
       `,
-    period: "2026.04.02 - 04.04",
+    period: "2026.04.02 - 04.14",
     platforms: ["pc", "mobile"],
     content: <KnitMuffler />,
     thumbnail: "/playground/knit-muffler.png",

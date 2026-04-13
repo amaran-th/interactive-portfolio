@@ -22,7 +22,7 @@ export const MEDAL_COLOR: Record<
  * 클리어 메달 판정
  * - easy: 실수 없음 → 정확도만 기준
  *   gold ≥ 100%, silver ≥ 90%, bronze ≥ 70%
- * - hard: 정확도 + 실수 개수 복합 기준
+ * - normal: 정확도 + 실수 개수 복합 기준
  *   gold: 100% & 0회, silver: ≥90% & ≤2회, bronze: ≥70% & ≤5회
  */
 const MEDAL_RANK: Record<NonNullable<Medal>, number> = { gold: 3, silver: 2, bronze: 1 };
@@ -35,7 +35,7 @@ export function isBetterMedal(current: Medal, existing: Medal | null): boolean {
 }
 
 export function calcMedal(
-  level: "easy" | "hard",
+  level: "easy" | "normal",
   colorAccuracy: number,
   slipCount: number,
 ): Medal {

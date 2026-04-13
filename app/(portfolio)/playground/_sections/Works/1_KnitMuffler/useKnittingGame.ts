@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { EASY_DRAFTS, HARD_DRAFTS, STITCH_COUNT } from "./data";
+import { EASY_DRAFTS, NORMAL_DRAFTS, STITCH_COUNT } from "./data";
 import { ChallengeLevel, Color, Mode, Screen, Stitch } from "./type";
 import { useKnittingStats } from "./useKnittingStats";
 import { useTimer } from "./useTimer";
@@ -10,7 +10,7 @@ const DEFAULT_THREAD_COLOR = Color.BLUE;
 
 const DRAFT_MAP: Record<ChallengeLevel, Record<string, number[][]>> = {
   easy: EASY_DRAFTS,
-  hard: HARD_DRAFTS,
+  normal: NORMAL_DRAFTS,
 };
 
 export function useKnittingGame() {
@@ -163,7 +163,7 @@ export function useKnittingGame() {
       const nextStitch: Stitch = {
         color: colorOverride ?? currentThread,
         slipped:
-          mode === "challenge" && challengeLevel === "hard"
+          mode === "challenge" && challengeLevel === "normal"
             ? Math.random() < 0.2
             : false,
       };

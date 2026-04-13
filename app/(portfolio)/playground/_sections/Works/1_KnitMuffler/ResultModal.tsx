@@ -25,7 +25,7 @@ function ResultModeLabel({
       <p
         className={`rounded-full border border-stone-300 px-3 py-1 text-xs font-medium ${challengeLevel === "easy" ? "text-green-400 bg-green-50" : "text-red-400 bg-red-50"}`}
       >
-        {challengeLevel === "easy" ? "EASY" : "HARD"}
+        {challengeLevel === "easy" ? "EASY" : "NORMAL"}
       </p>
     );
   }
@@ -90,7 +90,7 @@ function ResultStats({
             value: formatElapsed(elapsed),
             valueClassName: "text-stone-900",
           },
-          ...(challengeLevel === "hard"
+          ...(challengeLevel === "normal"
             ? [
                 {
                   label: "실수",
@@ -191,7 +191,7 @@ function ChallengeStatSaver({
           {existingMedal && <MedalIcon medal={existingMedal} />}
           <span>{formatElapsed(existing.elapsed)}</span>
           <span>{existing.colorAccuracy.toFixed(1)}%</span>
-          {level === "hard" && <span>{existing.spm.toFixed(1)} SPM</span>}
+          {level !== "easy" && <span>{existing.spm.toFixed(1)} SPM</span>}
         </div>
         <div className="w-px bg-stone-200" />
         <div className="flex flex-col items-center gap-0.5">
@@ -213,7 +213,7 @@ function ChallengeStatSaver({
           >
             {current.colorAccuracy.toFixed(1)}%
           </span>
-          {level === "hard" && (
+          {level !== "easy" && (
             <span
               className={current.spm > existing.spm ? "text-green-600" : ""}
             >

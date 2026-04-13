@@ -1,4 +1,4 @@
-import { EASY_DRAFTS, HARD_DRAFTS } from "./data";
+import { EASY_DRAFTS, NORMAL_DRAFTS } from "./data";
 import { ChallengeLevel, Stitch } from "./type";
 import { calcMedal } from "./utils";
 
@@ -45,7 +45,7 @@ export function getChallengeProgress(
   level: ChallengeLevel,
 ): ChallengeProgress | null {
   try {
-    return Object.keys(level === "easy" ? EASY_DRAFTS : HARD_DRAFTS).reduce(
+    return Object.keys(level === "easy" ? EASY_DRAFTS : NORMAL_DRAFTS).reduce(
       (acc, curr) => {
         const raw = localStorage.getItem(challengeKey(level, curr));
         const currentHistory = raw ? (JSON.parse(raw) as ChallengeStat) : null;

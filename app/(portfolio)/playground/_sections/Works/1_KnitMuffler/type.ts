@@ -19,4 +19,4 @@ export interface Stitch {
 export type ColorMode = "normal" | "weakness";
 export type Mode = "challenge" | "free";
 export type Screen = "select" | "play" | "result";
-export type ChallengeLevel = "easy" | "hard";
+export type ChallengeLevel = "easy" | "normal";

@@ -112,7 +112,7 @@ export const EASY_DRAFTS = {
   ],
 };
 
-export const HARD_DRAFTS = {
+export const NORMAL_DRAFTS = {
   // 토끼 — ivory(9) + gray body(8) + pink ears/nose(5) + dark eyes(6) + yellow ground(3)
   rabbit: [
     [9, 9, 8, 9, 9, 9, 8, 9, 9, 9],

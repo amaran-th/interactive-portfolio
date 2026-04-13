@@ -11,7 +11,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { EASY_DRAFTS, HARD_DRAFTS } from "./data";
+import { EASY_DRAFTS, NORMAL_DRAFTS } from "./data";
 import DraftPreview from "./DraftPreview";
 import { ChallengeLevel, ColorMode } from "./type";
 import {
@@ -169,7 +169,7 @@ function ModeAccordion({
 const EASY_ENTRIES: DraftEntry[] = Object.entries(EASY_DRAFTS).map(
   ([key, draft]) => ({ key, draft }),
 );
-const HARD_ENTRIES: DraftEntry[] = Object.entries(HARD_DRAFTS).map(
+const NORMAL_ENTRIES: DraftEntry[] = Object.entries(NORMAL_DRAFTS).map(
   ([key, draft]) => ({ key, draft }),
 );
 
@@ -258,18 +258,18 @@ export default function SelectScreen({
 }) {
   const [progress, setProgress] = useState<{
     easy: ChallengeProgress | null;
-    hard: ChallengeProgress | null;
+    normal: ChallengeProgress | null;
     free: FreeSave | null;
   }>({
     easy: null,
-    hard: null,
+    normal: null,
     free: null,
   });
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setProgress({
       easy: getChallengeProgress("easy"),
-      hard: getChallengeProgress("hard"),
+      normal: getChallengeProgress("normal"),
       free: getFreeSave(),
     });
   }, []);
@@ -318,9 +318,9 @@ export default function SelectScreen({
           </div>
         </div>
         {!!progress.easy?.total &&
-        !!progress.hard?.total &&
+        !!progress.normal?.total &&
         progress.easy?.total === progress.easy?.perfect &&
-        progress.hard?.total === progress.hard?.perfect ? (
+        progress.normal?.total === progress.normal?.perfect ? (
           <div className="flex flex-col gap-1 items-center border border-stone-200 bg-white p-2 py-4 rounded-md">
             <p className="text-xl">🎉 축하합니다! 🎉</p>
             <p>모든 도안을 완벽하게 완성했습니다.</p>
@@ -343,11 +343,11 @@ export default function SelectScreen({
             onSelectDraft={onStartChallenge}
           />
           <ModeAccordion
-            label="🔥 HARD"
-            level="hard"
-            drafts={HARD_ENTRIES}
+            label="🔥 NORMAL"
+            level="normal"
+            drafts={NORMAL_ENTRIES}
             bgClassName="bg-orange-100"
-            progress={progress.hard}
+            progress={progress.normal}
             onSelectDraft={onStartChallenge}
           />
           <button
