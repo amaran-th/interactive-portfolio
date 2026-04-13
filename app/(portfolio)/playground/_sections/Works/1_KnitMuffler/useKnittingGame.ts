@@ -66,7 +66,9 @@ function knittingReducer(
           currentRowEverKnitted: true,
         };
       }
-      // challenge mode
+      // 챌린지 모드: currentRowEverKnitted가 true이면 현재 행 내에서만 풀기.
+      // currentRow가 빈 상태에서 더 이상 풀기를 허용하지 않는 것은 의도된 동작이며,
+      // UI에서 버튼을 비활성화하여 이 상태를 처리한다.
       if (!state.currentRowEverKnitted) {
         if (state.knittedRows.length === 0) return state;
         const prev = state.knittedRows[state.knittedRows.length - 1];
@@ -105,6 +107,8 @@ export function useKnittingGame() {
   const { elapsed, reset: resetTimer } = useTimer(started);
 
   const { knittedRows, currentRow, currentRowEverKnitted } = knitting;
+  // 자유 모드나 선택 화면에서 challengeCtx가 null일 때의 fallback.
+  // 이 값은 useKnittingStats에 전달되지만, 자유 모드에서는 stats가 UI에 표시되지 않으므로 무해하다.
   const challengeDraft = challengeCtx?.draft ?? Object.values(EASY_DRAFTS)[0];
 
   const activeRows = useMemo(
