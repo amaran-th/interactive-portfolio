@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+/**
+ * Interval-based timer. Elapsed counts in 10 ms ticks (1 tick = 10 ms).
+ * The `base` parameter of `reset` must also be in 10 ms ticks.
+ *
+ * Note: `reset` does not pause the timer. Callers control the `running` flag independently.
+ */
 export function useTimer(running: boolean): {
   elapsed: number;
   reset: (base?: number) => void;
