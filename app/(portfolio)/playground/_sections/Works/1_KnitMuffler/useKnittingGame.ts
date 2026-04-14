@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import { Draft, EASY_DRAFTS, NORMAL_DRAFTS, STITCH_COUNT } from "./data";
-import { ChallengeLevel, Color, Mode, Screen, Stitch } from "./type";
+import { Draft, EASY_DRAFTS, NORMAL_DRAFTS } from "./data";
+import { ChallengeLevel, Color, Mode, Screen, Stitch, Width } from "./type";
 import { useKnittingStats } from "./useKnittingStats";
 import {
   clearFreeSave,
@@ -20,12 +20,14 @@ export type ChallengeCtx = {
 
 // --- Knitting reducer ---
 type KnittingState = {
+  stitchCount: Width;
   knittedRows: Stitch[][];
   currentRow: Stitch[];
   currentRowEverKnitted: boolean;
 };
 
 const INITIAL_KNITTING: KnittingState = {
+  stitchCount: 10,
   knittedRows: [],
   currentRow: [],
   currentRowEverKnitted: false,
@@ -34,8 +36,8 @@ const INITIAL_KNITTING: KnittingState = {
 type KnittingAction =
   | { type: "KNIT"; stitch: Stitch }
   | { type: "UNRAVEL"; mode: Mode }
-  | { type: "RESET" }
-  | { type: "LOAD_ROWS"; rows: Stitch[][] };
+  | { type: "RESET"; stitchCount?: Width }
+  | { type: "LOAD_ROWS"; rows: Stitch[][]; stitchCount: Width };
 
 function knittingReducer(
   state: KnittingState,
@@ -44,8 +46,9 @@ function knittingReducer(
   switch (action.type) {
     case "KNIT": {
       const nextRow = [...state.currentRow, action.stitch];
-      if (nextRow.length === STITCH_COUNT) {
+      if (nextRow.length === state.stitchCount) {
         return {
+          ...state,
           knittedRows: [...state.knittedRows, nextRow],
           currentRow: [],
           currentRowEverKnitted: false,
@@ -61,6 +64,7 @@ function knittingReducer(
         if (state.knittedRows.length === 0) return state;
         const prev = state.knittedRows[state.knittedRows.length - 1];
         return {
+          ...state,
           knittedRows: state.knittedRows.slice(0, -1),
           currentRow: prev,
           currentRowEverKnitted: true,
@@ -73,6 +77,7 @@ function knittingReducer(
         if (state.knittedRows.length === 0) return state;
         const prev = state.knittedRows[state.knittedRows.length - 1];
         return {
+          ...state,
           knittedRows: state.knittedRows.slice(0, -1),
           currentRow: prev.slice(0, -1),
           currentRowEverKnitted: true,
@@ -82,9 +87,9 @@ function knittingReducer(
       return { ...state, currentRow: state.currentRow.slice(0, -1) };
     }
     case "RESET":
-      return INITIAL_KNITTING;
+      return { ...INITIAL_KNITTING, stitchCount: action.stitchCount ?? INITIAL_KNITTING.stitchCount };
     case "LOAD_ROWS":
-      return { ...INITIAL_KNITTING, knittedRows: action.rows };
+      return { ...INITIAL_KNITTING, stitchCount: action.stitchCount, knittedRows: action.rows };
   }
 }
 
@@ -131,10 +136,10 @@ export function useKnittingGame() {
     elapsed,
   });
 
-  const resetKnitting = useCallback(() => {
+  const resetKnitting = useCallback((stitchCount?: Width) => {
     setCurrentThread(DEFAULT_THREAD);
     setStarted(false);
-    dispatch({ type: "RESET" });
+    dispatch({ type: "RESET", stitchCount });
     resetTimer();
   }, [resetTimer]);
 
@@ -152,7 +157,7 @@ export function useKnittingGame() {
       const levelDrafts = level === "easy" ? EASY_DRAFTS : NORMAL_DRAFTS;
       const draft = levelDrafts.find((d) => d.id === draftId);
       if (!draft) return;
-      resetKnitting();
+      resetKnitting(draft.width);
       setChallengeCtx({ level, draftId, draft });
       setMode("challenge");
       setScreen("play");
@@ -161,10 +166,10 @@ export function useKnittingGame() {
   );
 
   const resumeFromFreeSave = useCallback(
-    (rows: Stitch[][], savedElapsed: number) => {
+    (rows: Stitch[][], savedElapsed: number, stitchCount: Width) => {
       resetKnitting();
       setMode("free");
-      dispatch({ type: "LOAD_ROWS", rows });
+      dispatch({ type: "LOAD_ROWS", rows, stitchCount });
       resetTimer(savedElapsed);
       setScreen("play");
     },
@@ -172,10 +177,10 @@ export function useKnittingGame() {
   );
 
   const loadFreeSaveAsResult = useCallback(
-    (rows: Stitch[][], savedElapsed: number) => {
+    (rows: Stitch[][], savedElapsed: number, stitchCount: Width) => {
       resetKnitting();
       setMode("free");
-      dispatch({ type: "LOAD_ROWS", rows });
+      dispatch({ type: "LOAD_ROWS", rows, stitchCount });
       resetTimer(savedElapsed);
       setScreen("result");
     },
@@ -186,7 +191,7 @@ export function useKnittingGame() {
   const startFree = useCallback(() => {
     const saved = getFreeSave();
     if (saved) {
-      loadFreeSaveAsResult(saved.rows, saved.elapsed);
+      loadFreeSaveAsResult(saved.rows, saved.elapsed, saved.width);
     } else {
       startMode("free");
     }
@@ -194,15 +199,15 @@ export function useKnittingGame() {
 
   const finishFree = useCallback(() => {
     if (activeRows.length === 0) return;
-    saveFreeMuffler(activeRows, elapsed);
+    saveFreeMuffler(activeRows, elapsed, knitting.stitchCount);
     setStarted(false);
     setScreen("result");
-  }, [activeRows, elapsed]);
+  }, [activeRows, elapsed, knitting.stitchCount]);
 
   const resumeFree = useCallback(() => {
     const saved = getFreeSave();
     if (saved) {
-      resumeFromFreeSave(saved.rows, saved.elapsed);
+      resumeFromFreeSave(saved.rows, saved.elapsed, saved.width);
     } else if (mode === "free") {
       setScreen("play");
     }
@@ -317,6 +322,7 @@ export function useKnittingGame() {
     currentRowEverKnitted,
     activeRows,
     finalRows,
+    stitchCount: knitting.stitchCount,
     isChallengeComplete,
     elapsed,
     slipCount,

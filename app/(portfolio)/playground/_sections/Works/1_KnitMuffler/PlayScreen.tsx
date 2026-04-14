@@ -2,7 +2,7 @@
 
 import { House, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
-import { PALETTES, STITCH_COUNT } from "./data";
+import { PALETTES } from "./data";
 import DraftPreview from "./DraftPreview";
 import { MufflerPreview } from "./MufflerPreview";
 import ResultModal from "./ResultModal";
@@ -26,6 +26,7 @@ export default function PlayScreen({
     knittedRows,
     currentRow,
     currentRowEverKnitted,
+    stitchCount,
     isChallengeComplete,
     activeRows,
     finalRows,
@@ -105,10 +106,10 @@ export default function PlayScreen({
               <button
                 onClick={finishFree}
                 disabled={
-                  knittedRows.length === 0 && currentStitchCount < STITCH_COUNT
+                  knittedRows.length === 0 && currentStitchCount < stitchCount
                     ? true
                     : currentStitchCount > 0 &&
-                      currentStitchCount < STITCH_COUNT
+                      currentStitchCount < stitchCount
                 }
                 className="rounded-full bg-stone-900 px-4 py-2 text-sm text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -166,9 +167,13 @@ export default function PlayScreen({
           )}
 
           {/* 목도리 영역 (하단 정렬) */}
-          <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto w-full">
+          <div
+            ref={scrollRef}
+            className="flex-1 min-h-0 overflow-y-auto w-full"
+          >
             <div className="flex min-h-full flex-col justify-end w-full">
               <MufflerPreview
+                stitchCount={stitchCount}
                 rows={
                   isChallengeComplete
                     ? knittedRows
@@ -183,7 +188,10 @@ export default function PlayScreen({
             <div className="w-full max-w-70 px-4 md:w-auto md:max-w-fit">
               <div className="grid grid-cols-5 justify-items-center gap-2 rounded-2xl border border-stone-200 bg-white/90 px-3 py-3 shadow-md backdrop-blur-sm md:flex md:items-end md:gap-2 md:px-4">
                 {palette.map((color) => (
-                  <div key={color.id} className="flex flex-col items-center gap-1">
+                  <div
+                    key={color.id}
+                    className="flex flex-col items-center gap-1"
+                  >
                     <button
                       onClick={() => handleSelectColorAndKnit(color.id)}
                       className={`select-none h-8 w-8 rounded-full text-xs border border-stone-200 transition-all ${currentThread === color.id ? "ring-2 ring-stone-900 ring-offset-2" : "hover:ring-2 hover:ring-stone-300"}`}

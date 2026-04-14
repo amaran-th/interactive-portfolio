@@ -6,6 +6,7 @@ import {
   FreeSave,
   KnitMufflerHistory,
   Stitch,
+  Width,
 } from "./type";
 import { calcMedal } from "./utils";
 
@@ -91,23 +92,12 @@ export function getFreeSave(): FreeSave | null {
   return history.free[0] ?? null;
 }
 
-export function saveFreeMuffler(rows: Stitch[][], elapsed: number): void {
+export function saveFreeMuffler(rows: Stitch[][], elapsed: number, width: Width): void {
   const history = getHistory();
   if (history.free.length === 0) {
-    history.free.push({
-      name: "",
-      width: 10,
-      rows,
-      elapsed,
-      savedAt: Date.now(),
-    });
+    history.free.push({ name: "", width, rows, elapsed, savedAt: Date.now() });
   } else {
-    history.free[0] = {
-      ...history.free[0],
-      rows,
-      elapsed,
-      savedAt: Date.now(),
-    };
+    history.free[0] = { ...history.free[0], width, rows, elapsed, savedAt: Date.now() };
   }
   saveHistory(history);
 }

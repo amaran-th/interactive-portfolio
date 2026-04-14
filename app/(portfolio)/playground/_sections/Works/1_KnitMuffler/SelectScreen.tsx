@@ -221,18 +221,24 @@ function ResetButton() {
 }
 
 function ShareButton() {
-  const [copied, setCopied] = useState(false);
+  const [canShare, setCanShare] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCanShare(!!navigator.share);
+  }, []);
+
+  if (!canShare) return null;
 
   const handleShare = async () => {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: "뜨개뜨개", url });
-      } catch {}
-    } else {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.share({
+        title: "뜨개뜨개",
+        text: "색실로 목도리를 완성해보세요!",
+        url: window.location.href,
+      });
+    } catch {
+      // 사용자가 공유를 취소한 경우 등 — 아무 것도 하지 않음
     }
   };
 
@@ -242,7 +248,7 @@ function ShareButton() {
       className="flex items-center gap-2 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm text-stone-600 shadow-sm hover:bg-stone-50 transition-colors"
     >
       <Share2 className="w-4 h-4" />
-      {copied ? "복사됐어요!" : "공유하기"}
+      공유하기
     </button>
   );
 }

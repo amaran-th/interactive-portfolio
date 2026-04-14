@@ -1,12 +1,11 @@
 import { memo } from "react";
-import { STITCH_COUNT } from "./data";
 import StitchBlock from "./StitchBlock";
-import { Stitch } from "./type";
+import { Stitch, Width } from "./type";
 
-export function padRows(rows: Stitch[][]) {
+export function padRows(rows: Stitch[][], stitchCount: number) {
   return rows.map((row) => [
     ...row,
-    ...Array.from({ length: STITCH_COUNT - row.length }, () => null),
+    ...Array.from({ length: stitchCount - row.length }, () => null),
   ]);
 }
 
@@ -64,18 +63,23 @@ export const StitchRow = memo(function StitchRow({
 
 export function MufflerPreview({
   rows,
+  stitchCount,
   compact = false,
 }: {
   rows: Stitch[][];
+  stitchCount: Width;
   compact?: boolean;
 }) {
   const cellSize = compact ? 20 : 32;
   const emptyClassName = compact ? "w-5 h-5" : "w-8 h-8";
-  const paddedRows = padRows(rows);
+  const paddedRows = padRows(rows, stitchCount);
 
   return (
     <div className="px-6 py-4 text-gray-700 flex justify-center">
-      <div className="relative grid w-fit grid-cols-10">
+      <div
+        className="relative grid w-fit"
+        style={{ gridTemplateColumns: `repeat(${stitchCount}, 1fr)` }}
+      >
         {paddedRows.map((row, rowIndex) => (
           <StitchRow
             key={rowIndex}
@@ -98,12 +102,16 @@ export function ResultMuffler({
   rows: Stitch[][];
   title: string;
 }) {
-  const paddedRows = padRows(rows);
+  const stitchCount = rows[0]?.length ?? 10;
+  const paddedRows = padRows(rows, stitchCount);
 
   return (
     <div className="flex flex-col items-center gap-3">
       <p className="text-sm font-medium text-stone-600 text-center">{title}</p>
-      <div className="relative grid w-fit grid-cols-10">
+      <div
+        className="relative grid w-fit"
+        style={{ gridTemplateColumns: `repeat(${stitchCount}, 1fr)` }}
+      >
         {paddedRows.map((row, rowIndex) => (
           <StitchRow
             key={rowIndex}

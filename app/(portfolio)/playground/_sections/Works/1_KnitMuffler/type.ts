@@ -47,10 +47,6 @@ export type FreeSave = {
   savedAt: number;
 };
 
-export type ChallengeProgressMap = {
+export type KnitMufflerHistory = {
   [level in ChallengeLevel]: ChallengeStat[];
-};
-
-export type KnitMufflerHistory = ChallengeProgressMap & {
-  free: FreeSave[];
-};
+} & { free: FreeSave[] };
