@@ -2,12 +2,12 @@
 
 import { Download, House, RotateCcw } from "lucide-react";
 import { RefObject, useState } from "react";
+import { Draft } from "./data";
 import DraftPreview from "./DraftPreview";
 import { ResultMuffler } from "./MufflerPreview";
 import { MedalIcon } from "./SelectScreen";
-import { ChallengeLevel, Mode, Stitch } from "./type";
+import { ChallengeStat, ChallengeLevel, Mode, Stitch } from "./type";
 import {
-  ChallengeStat,
   getChallengeStat,
   saveChallengeStat,
 } from "./useKnittingStorage";
@@ -21,11 +21,23 @@ function ResultModeLabel({
   challengeLevel: ChallengeLevel | null;
 }) {
   if (mode === "challenge") {
+    const label =
+      challengeLevel === "easy"
+        ? "EASY"
+        : challengeLevel === "normal"
+          ? "NORMAL"
+          : "HARD";
+    const className =
+      challengeLevel === "easy"
+        ? "text-green-400 bg-green-50"
+        : challengeLevel === "hard"
+          ? "text-red-600 bg-red-100"
+          : "text-red-400 bg-red-50";
     return (
       <p
-        className={`rounded-full border border-stone-300 px-3 py-1 text-xs font-medium ${challengeLevel === "easy" ? "text-green-400 bg-green-50" : "text-red-400 bg-red-50"}`}
+        className={`rounded-full border border-stone-300 px-3 py-1 text-xs font-medium ${className}`}
       >
-        {challengeLevel === "easy" ? "EASY" : "NORMAL"}
+        {label}
       </p>
     );
   }
@@ -42,7 +54,7 @@ function ResultPattern({
   title,
   showNumbers = false,
 }: {
-  draft: number[][];
+  draft: Draft;
   title: string;
   showNumbers?: boolean;
 }) {
@@ -145,14 +157,14 @@ function ResultStats({
 /** 기존 성과가 있을 때 비교해서 저장 여부를 물어보는 UI */
 function ChallengeStatSaver({
   level,
-  draftKey,
+  draftId,
   current,
 }: {
   level: ChallengeLevel;
-  draftKey: string;
+  draftId: number;
   current: Omit<ChallengeStat, "savedAt">;
 }) {
-  const existing = getChallengeStat(level, draftKey);
+  const existing = getChallengeStat(level, draftId);
   const existingMedal = existing
     ? calcMedal(level, existing.colorAccuracy, existing.slipCount)
     : null;
@@ -163,14 +175,14 @@ function ChallengeStatSaver({
   );
   const [saved, setSaved] = useState(() => {
     if (isBetterMedal(currentMedal, existingMedal)) {
-      saveChallengeStat(level, draftKey, current);
+      saveChallengeStat(level, current);
       return true;
     }
     return false;
   });
 
   const save = () => {
-    saveChallengeStat(level, draftKey, current);
+    saveChallengeStat(level, current);
     setSaved(true);
   };
 
@@ -245,7 +257,7 @@ export default function ResultModal({
   resultCaptureRef,
   mode,
   challengeLevel,
-  challengeDraftKey,
+  challengeDraftId,
   finalRows,
   elapsed,
   slipCount,
@@ -263,13 +275,13 @@ export default function ResultModal({
   resultCaptureRef: RefObject<HTMLDivElement | null>;
   mode: Mode;
   challengeLevel: ChallengeLevel | null;
-  challengeDraftKey: string | null;
+  challengeDraftId: number | null;
   finalRows: Stitch[][];
   elapsed: number;
   slipCount: number;
   colorAccuracy: number;
   spm: number;
-  challengeDraft: number[][];
+  challengeDraft: Draft | null;
   isSavingResult: boolean;
   onSaveResult: () => void;
   onResumeFreeMode: () => void;
@@ -317,7 +329,7 @@ export default function ResultModal({
             <div
               className={`grid w-full justify-center gap-10 ${mode === "challenge" ? "md:grid-cols-2" : ""}`}
             >
-              {mode === "challenge" && (
+              {mode === "challenge" && challengeDraft && (
                 <div className="hidden md:block">
                   <ResultPattern
                     title="도안"
@@ -335,11 +347,11 @@ export default function ResultModal({
             data-html-to-image-ignore="true"
           >
             {/* 챌린지 기록 저장 */}
-            {mode === "challenge" && challengeLevel && challengeDraftKey && (
+            {mode === "challenge" && challengeLevel && challengeDraftId !== null && (
               <ChallengeStatSaver
                 level={challengeLevel}
-                draftKey={challengeDraftKey}
-                current={{ elapsed, slipCount, colorAccuracy, spm }}
+                draftId={challengeDraftId}
+                current={{ id: challengeDraftId, elapsed, slipCount, colorAccuracy, spm }}
               />
             )}
             <div className="flex flex-wrap justify-center gap-3">

@@ -1,8 +1,10 @@
 import { useMemo } from "react";
-import { Stitch } from "./type";
+import { Color, Stitch, StitchType } from "./type";
+
+type DraftCell = { type: StitchType; color: Color };
 
 type Props = {
-  draft: number[][];
+  draft: DraftCell[][];
   stitches: Stitch[][];
   elapsed: number;
 };
@@ -17,7 +19,7 @@ export const useKnittingStats = ({ draft, stitches, elapsed }: Props) => {
       const isReversed = y % 2 === 1;
       row.forEach((_, x) => {
         const draftX = isReversed ? row.length - 1 - x : x;
-        const targetColor = row[draftX];
+        const targetColor = row[draftX].color;
         const stitch = stitches[y]?.[x];
         if (!stitch) return;
 
@@ -36,7 +38,10 @@ export const useKnittingStats = ({ draft, stitches, elapsed }: Props) => {
     const slipAccuracy = total === 0 ? 0 : (success / total) * 100;
     const colorAccuracy = total === 0 ? 0 : (correctColor / total) * 100;
     const spm = elapsed > 0 ? total / (elapsed / 6000) : 0;
-    const progress = (total / (draft.length * draft[0].length)) * 100;
+    const progress =
+      draft.length === 0
+        ? 0
+        : (total / (draft.length * (draft[0]?.length ?? 1))) * 100;
     const slipCount = total - success;
 
     return {

@@ -43,6 +43,7 @@ export const StitchRow = memo(function StitchRow({
             }}
           >
             <StitchBlock
+              type={thread.type}
               color={thread.color}
               slipped={thread.slipped}
               size={stitchSize}

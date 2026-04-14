@@ -11,21 +11,22 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { EASY_DRAFTS, NORMAL_DRAFTS } from "./data";
+import { Draft, EASY_DRAFTS, NORMAL_DRAFTS } from "./data";
 import DraftPreview from "./DraftPreview";
-import { ChallengeLevel, ColorMode } from "./type";
 import {
+  ChallengeLevel,
   ChallengeProgress,
   ChallengeStat,
-  clearAllStats,
+  ColorMode,
   FreeSave,
+} from "./type";
+import {
+  clearAllStats,
   getChallengeProgress,
   getChallengeStat,
   getFreeSave,
 } from "./useKnittingStorage";
 import { calcMedal, MEDAL_COLOR, Medal as MedalType } from "./utils";
-
-type DraftEntry = { key: string; draft: number[][] };
 
 export function MedalIcon({
   medal,
@@ -61,7 +62,7 @@ function DraftCard({
   level,
   onClick,
 }: {
-  entry: DraftEntry;
+  entry: Draft;
   level: ChallengeLevel;
   onClick: () => void;
 }) {
@@ -69,8 +70,8 @@ function DraftCard({
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setStat(getChallengeStat(level, entry.key));
-  }, [level, entry.key]);
+    setStat(getChallengeStat(level, entry.id));
+  }, [level, entry.id]);
   const medal = stat
     ? calcMedal(level, stat.colorAccuracy, stat.slipCount)
     : null;
@@ -81,7 +82,7 @@ function DraftCard({
       style={medal ? { borderColor: MEDAL_COLOR[medal].stroke } : {}}
     >
       <DraftPreview
-        draft={entry.draft}
+        draft={entry}
         cellSize={12}
         showNumbers={false}
         className="pointer-events-none"
@@ -102,14 +103,16 @@ function ModeAccordion({
   drafts,
   bgClassName,
   progress,
+  description,
   onSelectDraft,
 }: {
   label: string;
   level: ChallengeLevel;
-  drafts: DraftEntry[];
+  drafts: Draft[];
   bgClassName: string;
   progress: ChallengeProgress | null;
-  onSelectDraft: (level: ChallengeLevel, draftKey: string) => void;
+  description: string;
+  onSelectDraft: (level: ChallengeLevel, draftId: number) => void;
 }) {
   const [open, setOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -146,32 +149,31 @@ function ModeAccordion({
         )}
       </button>
       <div style={{ height, transition: "height 300ms ease" }}>
-        <div className="px-6">
-          <div className="border-b border-stone-400"></div>
-        </div>
-        <div ref={contentRef} className="px-6 py-4">
-          <div className="p-3 flex overflow-x-auto gap-3">
-            {drafts.map((entry) => (
-              <DraftCard
-                key={entry.key}
-                entry={entry}
-                level={level}
-                onClick={() => onSelectDraft(level, entry.key)}
-              />
-            ))}
+        <div ref={contentRef}>
+          <div className="border-t-2 border-stone-400 px-6">
+            <div className="py-2 border-b border-stone-400">
+              <p className="text-sm break-keep text-center text-stone-500 mt-2">
+                {description}
+              </p>
+            </div>
+          </div>
+          <div className="px-6 py-4">
+            <div className="p-3 flex overflow-x-auto gap-3">
+              {drafts.map((entry) => (
+                <DraftCard
+                  key={entry.id}
+                  entry={entry}
+                  level={level}
+                  onClick={() => onSelectDraft(level, entry.id)}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 }
-
-const EASY_ENTRIES: DraftEntry[] = Object.entries(EASY_DRAFTS).map(
-  ([key, draft]) => ({ key, draft }),
-);
-const NORMAL_ENTRIES: DraftEntry[] = Object.entries(NORMAL_DRAFTS).map(
-  ([key, draft]) => ({ key, draft }),
-);
 
 function ResetButton() {
   const [open, setOpen] = useState(false);
@@ -251,7 +253,7 @@ export default function SelectScreen({
   colorMode,
   onColorModeChange,
 }: {
-  onStartChallenge: (level: ChallengeLevel, draftKey: string) => void;
+  onStartChallenge: (level: ChallengeLevel, draftId: number) => void;
   onStartFree: () => void;
   colorMode: ColorMode;
   onColorModeChange: (mode: ColorMode) => void;
@@ -259,10 +261,12 @@ export default function SelectScreen({
   const [progress, setProgress] = useState<{
     easy: ChallengeProgress | null;
     normal: ChallengeProgress | null;
+    hard: ChallengeProgress | null;
     free: FreeSave | null;
   }>({
     easy: null,
     normal: null,
+    hard: null,
     free: null,
   });
   useEffect(() => {
@@ -270,6 +274,7 @@ export default function SelectScreen({
     setProgress({
       easy: getChallengeProgress("easy"),
       normal: getChallengeProgress("normal"),
+      hard: getChallengeProgress("hard"),
       free: getFreeSave(),
     });
   }, []);
@@ -337,17 +342,28 @@ export default function SelectScreen({
           <ModeAccordion
             label="🌱 EASY"
             level="easy"
-            drafts={EASY_ENTRIES}
+            drafts={EASY_DRAFTS}
             bgClassName="bg-amber-50"
             progress={progress.easy}
+            description="도안을 따라 알맞은 색상으로 작품을 완성해보세요!"
             onSelectDraft={onStartChallenge}
           />
           <ModeAccordion
-            label="🔥 NORMAL"
+            label="⭐️ NORMAL"
             level="normal"
-            drafts={NORMAL_ENTRIES}
+            drafts={NORMAL_DRAFTS}
             bgClassName="bg-orange-100"
             progress={progress.normal}
+            description="일정 확률로 잘못 뜬 코가 만들어집니다. 잘못 뜬 코를 풀고 다시 뜨면서 실수 없이 도안을 완성해보세요!"
+            onSelectDraft={onStartChallenge}
+          />
+          <ModeAccordion
+            label="🔥 HARD"
+            level="hard"
+            drafts={NORMAL_DRAFTS}
+            bgClassName="bg-red-100"
+            progress={progress.hard}
+            description="뜰 수 있는 코의 종류가 늘어났습니다. 건투를 빕니다!"
             onSelectDraft={onStartChallenge}
           />
           <button

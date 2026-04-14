@@ -1,21 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import { EASY_DRAFTS, NORMAL_DRAFTS, STITCH_COUNT } from "./data";
+import { Draft, EASY_DRAFTS, NORMAL_DRAFTS, STITCH_COUNT } from "./data";
 import { ChallengeLevel, Color, Mode, Screen, Stitch } from "./type";
 import { useKnittingStats } from "./useKnittingStats";
-import { useTimer } from "./useTimer";
 import {
   clearFreeSave,
   getFreeSave,
   saveFreeMuffler,
 } from "./useKnittingStorage";
+import { useTimer } from "./useTimer";
 
 // --- Challenge context ---
 export type ChallengeCtx = {
   level: ChallengeLevel;
-  draftKey: string;
-  draft: number[][];
+  draftId: number;
+  draft: Draft;
 };
 
 // --- Knitting reducer ---
@@ -92,10 +92,6 @@ function knittingReducer(
 
 const DEFAULT_THREAD = Color.BLUE;
 
-const DRAFT_MAP: Record<ChallengeLevel, Record<string, number[][]>> = {
-  easy: EASY_DRAFTS,
-  normal: NORMAL_DRAFTS,
-};
 
 export function useKnittingGame() {
   const [screen, setScreen] = useState<Screen>("select");
@@ -109,7 +105,7 @@ export function useKnittingGame() {
   const { knittedRows, currentRow, currentRowEverKnitted } = knitting;
   // 자유 모드나 선택 화면에서 challengeCtx가 null일 때의 fallback.
   // 이 값은 useKnittingStats에 전달되지만, 자유 모드에서는 stats가 UI에 표시되지 않으므로 무해하다.
-  const challengeDraft = challengeCtx?.draft ?? Object.values(EASY_DRAFTS)[0];
+  const challengeDraft = challengeCtx?.draft ?? EASY_DRAFTS[0];
 
   const activeRows = useMemo(
     () => (currentRow.length > 0 ? [...knittedRows, currentRow] : knittedRows),
@@ -124,13 +120,13 @@ export function useKnittingGame() {
   const isChallengeComplete = useMemo(
     () =>
       mode === "challenge" &&
-      knittedRows.length === challengeDraft.length &&
+      knittedRows.length === challengeDraft.data.length &&
       currentRow.length === 0,
-    [challengeDraft.length, currentRow.length, knittedRows.length, mode],
+    [challengeDraft.data.length, currentRow.length, knittedRows.length, mode],
   );
 
   const { slipCount, colorAccuracy, progress, spm } = useKnittingStats({
-    draft: challengeDraft,
+    draft: challengeDraft.data,
     stitches: activeRows,
     elapsed,
   });
@@ -152,11 +148,12 @@ export function useKnittingGame() {
   );
 
   const startChallenge = useCallback(
-    (level: ChallengeLevel, draftKey: string) => {
-      const draft = DRAFT_MAP[level][draftKey];
+    (level: ChallengeLevel, draftId: number) => {
+      const levelDrafts = level === "easy" ? EASY_DRAFTS : NORMAL_DRAFTS;
+      const draft = levelDrafts.find((d) => d.id === draftId);
       if (!draft) return;
       resetKnitting();
-      setChallengeCtx({ level, draftKey, draft });
+      setChallengeCtx({ level, draftId, draft });
       setMode("challenge");
       setScreen("play");
     },
@@ -240,6 +237,7 @@ export function useKnittingGame() {
       if (!started) setStarted(true);
 
       const stitch: Stitch = {
+        type: "V",
         color: colorOverride ?? currentThread,
         slipped:
           mode === "challenge" && challengeCtx?.level === "normal"
@@ -249,7 +247,14 @@ export function useKnittingGame() {
 
       dispatch({ type: "KNIT", stitch });
     },
-    [challengeCtx?.level, currentThread, isChallengeComplete, mode, screen, started],
+    [
+      challengeCtx?.level,
+      currentThread,
+      isChallengeComplete,
+      mode,
+      screen,
+      started,
+    ],
   );
 
   const handleUnravel = useCallback(() => {

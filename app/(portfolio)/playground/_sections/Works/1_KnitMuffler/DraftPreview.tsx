@@ -2,6 +2,7 @@
 
 import { ArrowRight } from "lucide-react";
 import { useColorPalette } from "./ColorModeContext";
+import { Draft } from "./data";
 
 export default function DraftPreview({
   draft,
@@ -10,7 +11,7 @@ export default function DraftPreview({
   showNumbers = true,
   currentRowIndex,
 }: {
-  draft: number[][];
+  draft: Draft;
   className?: string;
   cellSize?: number;
   showNumbers?: boolean;
@@ -23,7 +24,7 @@ export default function DraftPreview({
     <div
       className={`flex flex-col border border-gray-400 divide-y divide-gray-400 bg-white ${className}`}
     >
-      {draft.map((row, ri) => (
+      {draft.data.map((row, ri) => (
         <div
           key={ri}
           className={`flex relative ${typeof currentRowIndex === "number" && ri !== currentRowIndex ? "opacity-30" : ""}`}
@@ -39,7 +40,7 @@ export default function DraftPreview({
               </div>
             ))}
           {row.map((stitch, si) => {
-            const colorDef = colorList.find((c) => c.id === stitch);
+            const colorDef = colorList.find((c) => c.id === stitch.color);
             return (
               <div
                 key={si}
@@ -51,7 +52,7 @@ export default function DraftPreview({
                   color: colorDef?.text ?? "inherit",
                 }}
               >
-                {showNumbers ? stitch || "" : null}
+                {showNumbers ? stitch.color || "" : null}
               </div>
             );
           })}

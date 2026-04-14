@@ -1,64 +1,62 @@
 import { EASY_DRAFTS, NORMAL_DRAFTS } from "./data";
-import { ChallengeLevel, Stitch } from "./type";
+import {
+  ChallengeLevel,
+  ChallengeProgress,
+  ChallengeStat,
+  FreeSave,
+  KnitMufflerHistory,
+  Stitch,
+} from "./type";
 import { calcMedal } from "./utils";
 
-export type ChallengeStat = {
-  elapsed: number;
-  slipCount: number;
-  colorAccuracy: number;
-  spm: number;
-  savedAt: number;
-};
+const STORAGE_KEY = "knit-muffler-history";
 
-export type FreeSave = {
-  rows: Stitch[][];
-  elapsed: number;
-  savedAt: number;
-};
 
-export type ChallengeProgress = {
-  clear: number;
-  perfect: number;
-  total: number;
-};
-
-function challengeKey(level: string, draftKey: string) {
-  return `knitMuffler_challenge_${level}_${draftKey}`;
-}
-
-const FREE_KEY = "knitMuffler_free";
-
-export function getChallengeStat(
-  level: ChallengeLevel,
-  draftKey: string,
-): ChallengeStat | null {
+function getHistory(): KnitMufflerHistory {
   try {
-    const raw = localStorage.getItem(challengeKey(level, draftKey));
-    return raw ? (JSON.parse(raw) as ChallengeStat) : null;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { easy: [], normal: [], hard: [], free: [] };
+    const parsed = JSON.parse(raw) as Partial<KnitMufflerHistory>;
+    return {
+      easy: parsed.easy ?? [],
+      normal: parsed.normal ?? [],
+      hard: parsed.hard ?? [],
+      free: parsed.free ?? [],
+    };
   } catch {
-    return null;
+    return { easy: [], normal: [], hard: [], free: [] };
   }
 }
 
-// TODO 키 별로 따로따로 저장하지 않고 리스트 혹은 객체로 한 번에 저장하게끔 수정하기
+function saveHistory(history: KnitMufflerHistory): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+  } catch {}
+}
+
+export function getChallengeStat(
+  level: ChallengeLevel,
+  id: number,
+): ChallengeStat | null {
+  const history = getHistory();
+  return history[level].find((e) => e.id === id) ?? null;
+}
+
 export function getChallengeProgress(
   level: ChallengeLevel,
 ): ChallengeProgress | null {
   try {
-    return Object.keys(level === "easy" ? EASY_DRAFTS : NORMAL_DRAFTS).reduce(
-      (acc, curr) => {
-        const raw = localStorage.getItem(challengeKey(level, curr));
-        const currentHistory = raw ? (JSON.parse(raw) as ChallengeStat) : null;
-        const currentMedal = currentHistory
-          ? calcMedal(
-              level,
-              currentHistory.colorAccuracy,
-              currentHistory.slipCount,
-            )
+    const history = getHistory();
+    const drafts = level === "easy" ? EASY_DRAFTS : NORMAL_DRAFTS;
+    return drafts.reduce(
+      (acc, draft) => {
+        const entry = history[level].find((e) => e.id === draft.id);
+        const medal = entry
+          ? calcMedal(level, entry.colorAccuracy, entry.slipCount)
           : null;
         return {
-          clear: acc.clear + (currentHistory ? 1 : 0),
-          perfect: acc.perfect + (currentMedal === "gold" ? 1 : 0),
+          clear: acc.clear + (entry ? 1 : 0),
+          perfect: acc.perfect + (medal === "gold" ? 1 : 0),
           total: acc.total + 1,
         };
       },
@@ -71,48 +69,57 @@ export function getChallengeProgress(
 
 export function saveChallengeStat(
   level: string,
-  draftKey: string,
   stat: Omit<ChallengeStat, "savedAt">,
 ): void {
-  try {
-    localStorage.setItem(
-      challengeKey(level, draftKey),
-      JSON.stringify({ ...stat, savedAt: Date.now() }),
-    );
-  } catch {}
+  const history = getHistory();
+  const lv = level as ChallengeLevel;
+  const newEntry: ChallengeStat = {
+    ...stat,
+    savedAt: Date.now(),
+  };
+  const idx = history[lv].findIndex((e) => e.id === newEntry.id);
+  if (idx === -1) {
+    history[lv].push(newEntry);
+  } else {
+    history[lv][idx] = newEntry;
+  }
+  saveHistory(history);
 }
 
 export function getFreeSave(): FreeSave | null {
-  try {
-    const raw = localStorage.getItem(FREE_KEY);
-    return raw ? (JSON.parse(raw) as FreeSave) : null;
-  } catch {
-    return null;
-  }
+  const history = getHistory();
+  return history.free[0] ?? null;
 }
 
 export function saveFreeMuffler(rows: Stitch[][], elapsed: number): void {
-  try {
-    localStorage.setItem(
-      FREE_KEY,
-      JSON.stringify({ rows, elapsed, savedAt: Date.now() }),
-    );
-  } catch {}
+  const history = getHistory();
+  if (history.free.length === 0) {
+    history.free.push({
+      name: "",
+      width: 10,
+      rows,
+      elapsed,
+      savedAt: Date.now(),
+    });
+  } else {
+    history.free[0] = {
+      ...history.free[0],
+      rows,
+      elapsed,
+      savedAt: Date.now(),
+    };
+  }
+  saveHistory(history);
 }
 
 export function clearFreeSave(): void {
-  try {
-    localStorage.removeItem(FREE_KEY);
-  } catch {}
+  const history = getHistory();
+  history.free = [];
+  saveHistory(history);
 }
 
 export function clearAllStats(): void {
   try {
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith("knitMuffler_")) keysToRemove.push(key);
-    }
-    keysToRemove.forEach((key) => localStorage.removeItem(key));
+    localStorage.removeItem(STORAGE_KEY);
   } catch {}
 }

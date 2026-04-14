@@ -43,7 +43,7 @@ export default function Status({
       )}
       <div className="flex justify-between">
         <span className="text-gray-500">정확도</span>
-        <span className={getColor(colorAccuracy)}>
+        <span className={`font-mono ${getColor(colorAccuracy)}`}>
           {colorAccuracy.toFixed(1)}%
         </span>
       </div>
@@ -52,7 +52,7 @@ export default function Status({
       <div className="flex flex-col gap-1 text-sm">
         <div className="flex justify-between">
           <span className="text-gray-500">진행도</span>
-          <span>{progress.toFixed(1)}%</span>
+          <span className="font-mono">{progress.toFixed(1)}%</span>
         </div>
         <div className="w-full h-2 bg-gray-200 rounded">
           <div
@@ -65,7 +65,7 @@ export default function Status({
       {/* 속도 */}
       <div className="flex justify-between text-sm">
         <span className="text-gray-500">속도</span>
-        <span>{spm.toFixed(1)} SPM</span>
+        <span className="font-mono">{spm.toFixed(1)} SPM</span>
       </div>
     </div>
   );
