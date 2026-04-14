@@ -49,4 +49,4 @@ export type FreeSave = {
 
 export type KnitMufflerHistory = {
   [level in ChallengeLevel]: ChallengeStat[];
-} & { free: FreeSave[] };
+} & { free: (FreeSave | null)[] };

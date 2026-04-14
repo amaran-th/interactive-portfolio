@@ -70,8 +70,8 @@ export function MufflerPreview({
   stitchCount: Width;
   compact?: boolean;
 }) {
-  const cellSize = compact ? 20 : 32;
-  const emptyClassName = compact ? "w-5 h-5" : "w-8 h-8";
+  const cellSize = (compact ? 20 : 32) / (stitchCount / 10);
+  const emptyClassName = `size-[${cellSize}]`;
   const paddedRows = padRows(rows, stitchCount);
 
   return (

@@ -1,21 +1,24 @@
+import { ChallengeLevel } from "./type";
 import { formatElapsed } from "./utils";
 
 type Props = {
+  level: ChallengeLevel | null;
   elapsed: number;
   slipCount: number;
   colorAccuracy: number;
   progress: number;
   spm: number;
-  showSlipCount?: boolean;
+  freeMode?: boolean;
 };
 
 export default function Status({
+  level,
   elapsed,
   slipCount,
   colorAccuracy,
   progress,
   spm,
-  showSlipCount = true,
+  freeMode,
 }: Props) {
   const time = formatElapsed(elapsed);
 
@@ -24,6 +27,16 @@ export default function Status({
     if (value > 70) return "text-yellow-600";
     return "text-red-600";
   };
+  if (freeMode) {
+    return (
+      <div className="flex flex-col gap-2 p-4 rounded-md shadow-md bg-gray-50 h-full min-w-38.5">
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-500">시간</span>
+          <span className="font-mono">{time.slice(0, 5)}</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2 p-4 rounded-md shadow-md bg-gray-50 h-full min-w-38.5">
@@ -33,7 +46,7 @@ export default function Status({
         <span className="font-mono">{time}</span>
       </div>
       {/* 정확도 (분리) */}
-      {showSlipCount && (
+      {level !== "easy" && (
         <div className="flex justify-between">
           <span className="text-gray-500">실수</span>
           <span className={slipCount > 0 ? "text-red-600" : "text-gray-600"}>

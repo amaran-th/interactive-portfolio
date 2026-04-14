@@ -108,8 +108,7 @@ export default function PlayScreen({
                 disabled={
                   knittedRows.length === 0 && currentStitchCount < stitchCount
                     ? true
-                    : currentStitchCount > 0 &&
-                      currentStitchCount < stitchCount
+                    : currentStitchCount > 0 && currentStitchCount < stitchCount
                 }
                 className="rounded-full bg-stone-900 px-4 py-2 text-sm text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -119,17 +118,18 @@ export default function PlayScreen({
           )}
 
           {/* 챌린지 모드 - 모바일 Status + 도안 */}
-          {mode === "challenge" && challengeDraft && (
-            <div className="w-full px-4 pb-3 md:hidden">
-              <div className="grid grid-cols-2 gap-3 items-start">
-                <Status
-                  elapsed={elapsed}
-                  slipCount={slipCount}
-                  colorAccuracy={colorAccuracy}
-                  progress={progress}
-                  spm={spm}
-                  showSlipCount={challengeLevel === "normal"}
-                />
+          <div className="w-full px-4 pb-3 md:hidden">
+            <div className="grid grid-cols-2 gap-3 items-start">
+              <Status
+                level={challengeLevel}
+                elapsed={elapsed}
+                slipCount={slipCount}
+                colorAccuracy={colorAccuracy}
+                progress={progress}
+                spm={spm}
+                freeMode={mode === "free"}
+              />
+              {mode === "challenge" && challengeDraft && (
                 <div className="flex flex-col items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm">
                   <p className="text-sm text-stone-500">도안</p>
                   <DraftPreview
@@ -137,23 +137,22 @@ export default function PlayScreen({
                     currentRowIndex={knittedRows.length}
                   />
                 </div>
-              </div>
+              )}
             </div>
-          )}
+          </div>
 
           {/* 챌린지 모드 - 데스크탑 Status */}
-          {mode === "challenge" && (
-            <div className="absolute left-4 top-20 hidden flex-col justify-center gap-4 md:flex">
-              <Status
-                elapsed={elapsed}
-                slipCount={slipCount}
-                colorAccuracy={colorAccuracy}
-                progress={progress}
-                spm={spm}
-                showSlipCount={challengeLevel === "normal"}
-              />
-            </div>
-          )}
+          <div className="absolute left-4 top-20 hidden flex-col justify-center gap-4 md:flex">
+            <Status
+              level={challengeLevel}
+              elapsed={elapsed}
+              slipCount={slipCount}
+              colorAccuracy={colorAccuracy}
+              progress={progress}
+              spm={spm}
+              freeMode={mode === "free"}
+            />
+          </div>
 
           {/* 챌린지 모드 - 데스크탑 도안 */}
           {mode === "challenge" && challengeDraft && (

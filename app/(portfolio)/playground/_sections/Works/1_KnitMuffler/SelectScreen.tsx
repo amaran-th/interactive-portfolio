@@ -3,7 +3,6 @@
 import { KnitMufflerIcon } from "@/components/SVG";
 import {
   CircleCheck,
-  CircleDashed,
   CircleStar,
   Eye,
   Share2,
@@ -19,14 +18,17 @@ import {
   ChallengeStat,
   ColorMode,
   FreeSave,
+  Width,
 } from "./type";
 import {
   clearAllStats,
+  clearFreeSave,
+  FREE_SLOT_COUNT,
   getChallengeProgress,
   getChallengeStat,
-  getFreeSave,
+  getFreeSaves,
 } from "./useKnittingStorage";
-import { calcMedal, MEDAL_COLOR, Medal as MedalType } from "./utils";
+import { calcMedal, formatElapsed, MEDAL_COLOR, Medal as MedalType } from "./utils";
 
 export function MedalIcon({
   medal,
@@ -253,14 +255,174 @@ function ShareButton() {
   );
 }
 
+function FreeSlotCard({
+  index,
+  save,
+  onStart,
+  onResume,
+  onDelete,
+}: {
+  index: number;
+  save: FreeSave | null;
+  onStart: (index: number, width: Width, name: string) => void;
+  onResume: (index: number) => void;
+  onDelete: (index: number) => void;
+}) {
+  const [name, setName] = useState("");
+  const [width, setWidth] = useState<Width>(10);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  if (save) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex flex-col min-w-0">
+          <p className="font-semibold truncate">{save.name || `슬롯 ${index + 1}`}</p>
+          <p className="text-xs text-stone-400">{save.width}코 · {formatElapsed(save.elapsed)}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => onResume(index)}
+            className="rounded-full bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-700 transition-colors"
+          >
+            이어하기
+          </button>
+          {confirmDelete ? (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => onDelete(index)}
+                className="rounded-full bg-red-500 px-3 py-1.5 text-sm text-white hover:bg-red-600 transition-colors"
+              >
+                삭제
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="rounded-full border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-100 transition-colors"
+              >
+                취소
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="rounded-full border border-stone-200 p-1.5 text-stone-400 hover:text-red-500 hover:border-red-300 transition-colors"
+              aria-label="삭제"
+            >
+              <Trash2 className="size-4" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-3">
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="작품 이름"
+        maxLength={20}
+        className="min-w-0 flex-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-stone-400"
+      />
+      <div className="flex shrink-0 rounded-lg border border-stone-200 bg-white text-sm overflow-hidden">
+        <button
+          onClick={() => setWidth(10)}
+          className={`px-3 py-1.5 transition-colors ${width === 10 ? "bg-stone-900 text-white" : "hover:bg-stone-100"}`}
+        >
+          10코
+        </button>
+        <button
+          onClick={() => setWidth(20)}
+          className={`px-3 py-1.5 transition-colors ${width === 20 ? "bg-stone-900 text-white" : "hover:bg-stone-100"}`}
+        >
+          20코
+        </button>
+      </div>
+      <button
+        onClick={() => onStart(index, width, name.trim() || `슬롯 ${index + 1}`)}
+        className="shrink-0 rounded-full bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-700 transition-colors"
+      >
+        시작
+      </button>
+    </div>
+  );
+}
+
+function FreeAccordion({
+  freeSlots,
+  onStartFreeSlot,
+  onResumeFreeSlot,
+  onDeleteSlot,
+}: {
+  freeSlots: (FreeSave | null)[];
+  onStartFreeSlot: (index: number, width: Width, name: string) => void;
+  onResumeFreeSlot: (index: number) => void;
+  onDeleteSlot: (index: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(0);
+
+  useEffect(() => {
+    if (!contentRef.current) return;
+    if (open) {
+      setHeight(contentRef.current.scrollHeight);
+    } else {
+      setHeight(0);
+    }
+  }, [open, freeSlots]);
+
+  const filledCount = freeSlots.filter(Boolean).length;
+
+  return (
+    <div className="rounded-xl border-2 border-stone-400 bg-stone-50 overflow-hidden transition-transform hover:-translate-y-1">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between p-4"
+      >
+        <span className="shrink-0 text-2xl font-semibold">🎨 자유 모드</span>
+        {filledCount > 0 && (
+          <span className="text-xl shrink-0 font-bold">{filledCount}/{FREE_SLOT_COUNT}</span>
+        )}
+      </button>
+      <div style={{ height, transition: "height 300ms ease" }}>
+        <div ref={contentRef}>
+          <div className="border-t-2 border-stone-400 px-6">
+            <div className="py-2 border-b border-stone-400">
+              <p className="text-sm break-keep text-center text-stone-500 mt-2">
+                자유롭게 나만의 목도리를 만들어보세요!
+              </p>
+            </div>
+          </div>
+          <div className="px-6 py-4 flex flex-col gap-3">
+            {Array.from({ length: FREE_SLOT_COUNT }, (_, i) => (
+              <FreeSlotCard
+                key={i}
+                index={i}
+                save={freeSlots[i] ?? null}
+                onStart={onStartFreeSlot}
+                onResume={onResumeFreeSlot}
+                onDelete={onDeleteSlot}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SelectScreen({
   onStartChallenge,
-  onStartFree,
+  onStartFreeSlot,
+  onResumeFreeSlot,
   colorMode,
   onColorModeChange,
 }: {
   onStartChallenge: (level: ChallengeLevel, draftId: number) => void;
-  onStartFree: () => void;
+  onStartFreeSlot: (index: number, width: Width, name: string) => void;
+  onResumeFreeSlot: (index: number) => void;
   colorMode: ColorMode;
   onColorModeChange: (mode: ColorMode) => void;
 }) {
@@ -268,22 +430,33 @@ export default function SelectScreen({
     easy: ChallengeProgress | null;
     normal: ChallengeProgress | null;
     hard: ChallengeProgress | null;
-    free: FreeSave | null;
   }>({
     easy: null,
     normal: null,
     hard: null,
-    free: null,
   });
+  const [freeSlots, setFreeSlots] = useState<(FreeSave | null)[]>(
+    Array.from({ length: FREE_SLOT_COUNT }, () => null),
+  );
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setProgress({
       easy: getChallengeProgress("easy"),
       normal: getChallengeProgress("normal"),
       hard: getChallengeProgress("hard"),
-      free: getFreeSave(),
     });
+    setFreeSlots(getFreeSaves());
   }, []);
+
+  const handleDeleteSlot = (index: number) => {
+    clearFreeSave(index);
+    setFreeSlots((prev) => {
+      const next = [...prev];
+      next[index] = null;
+      return next;
+    });
+  };
 
   return (
     <div className="font-knit-muffler h-full max-h-full bg-[#f8f4ee] text-stone-900 flex flex-col items-center px-6 py-10 overflow-y-auto">
@@ -372,20 +545,12 @@ export default function SelectScreen({
             description="뜰 수 있는 코의 종류가 늘어났습니다. 건투를 빕니다!"
             onSelectDraft={onStartChallenge}
           />
-          <button
-            onClick={onStartFree}
-            className="flex justify-between gap-2 items-center rounded-xl border-2 border-stone-400 bg-stone-50 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.08)] transition-transform hover:-translate-y-1"
-          >
-            <p className="text-2xl font-semibold shrink-0">🎨 자유 모드</p>
-            {progress.free ? (
-              <div className="flex gap-1 text-gray-400 break-keep items-center">
-                <CircleDashed className="size-4" />
-                <p className="shrink">작업하던 기록이 있습니다.</p>
-              </div>
-            ) : (
-              ""
-            )}
-          </button>
+          <FreeAccordion
+            freeSlots={freeSlots}
+            onStartFreeSlot={onStartFreeSlot}
+            onResumeFreeSlot={onResumeFreeSlot}
+            onDeleteSlot={handleDeleteSlot}
+          />
         </div>
       </div>
     </div>

@@ -16,7 +16,8 @@ export default function KnitMuffler() {
       {game.screen === "select" ? (
         <SelectScreen
           onStartChallenge={game.startChallenge}
-          onStartFree={game.startFree}
+          onStartFreeSlot={game.startFreeSlot}
+          onResumeFreeSlot={game.resumeFreeSlot}
           colorMode={colorMode}
           onColorModeChange={setColorMode}
         />

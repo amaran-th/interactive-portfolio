@@ -87,24 +87,33 @@ export function saveChallengeStat(
   saveHistory(history);
 }
 
-export function getFreeSave(): FreeSave | null {
+export const FREE_SLOT_COUNT = 2;
+
+export function getFreeSave(index: number): FreeSave | null {
   const history = getHistory();
-  return history.free[0] ?? null;
+  return history.free[index] ?? null;
 }
 
-export function saveFreeMuffler(rows: Stitch[][], elapsed: number, width: Width): void {
+export function getFreeSaves(): (FreeSave | null)[] {
   const history = getHistory();
-  if (history.free.length === 0) {
-    history.free.push({ name: "", width, rows, elapsed, savedAt: Date.now() });
-  } else {
-    history.free[0] = { ...history.free[0], width, rows, elapsed, savedAt: Date.now() };
-  }
+  return Array.from({ length: FREE_SLOT_COUNT }, (_, i) => history.free[i] ?? null);
+}
+
+export function saveFreeMuffler(
+  rows: Stitch[][],
+  elapsed: number,
+  width: Width,
+  name: string,
+  index: number,
+): void {
+  const history = getHistory();
+  history.free[index] = { name, width, rows, elapsed, savedAt: Date.now() };
   saveHistory(history);
 }
 
-export function clearFreeSave(): void {
+export function clearFreeSave(index: number): void {
   const history = getHistory();
-  history.free = [];
+  history.free[index] = null;
   saveHistory(history);
 }
 
