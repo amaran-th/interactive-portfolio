@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, House, RotateCcw } from "lucide-react";
+import { Download, Edit, House, RotateCcw } from "lucide-react";
 import { RefObject, useState } from "react";
 import { Draft } from "./data";
 import DraftPreview from "./DraftPreview";
@@ -290,6 +290,7 @@ export default function ResultModal({
   onBackToSelect: () => void;
   onInitialize: () => void;
 }) {
+  const [editMode, setMode] = useState<boolean>(!freeName);
   const medal =
     mode === "challenge" && challengeLevel
       ? calcMedal(challengeLevel, colorAccuracy, slipCount)
@@ -317,17 +318,38 @@ export default function ResultModal({
                 <MedalIcon medal={medal} />
               </div>
             </div>
-            <div className="flex gap-1 items-center">
-              <span>작품명: </span>
-              <input
-                type="text"
-                defaultValue={freeName ?? ""}
-                placeholder="작품 이름을 입력하세요"
-                maxLength={20}
-                onBlur={(e) => onSaveFreeName?.(e.target.value.trim())}
-                className="border-b text-2xl border-stone-300 px-4 py-1 text-stone-800 outline-none focus:border-stone-500"
-              />
-            </div>
+            {mode === "free" && (
+              <div className="flex gap-2 justify-center items-center">
+                <span>작품명:</span>
+                {!freeName || editMode ? (
+                  <div>
+                    <input
+                      type="text"
+                      defaultValue={freeName ?? ""}
+                      placeholder="작품 이름을 입력하세요"
+                      maxLength={20}
+                      onBlur={(e) => {
+                        onSaveFreeName?.(e.target.value.trim());
+                        setMode(false);
+                      }}
+                      className="border-b text-3xl border-stone-300 px-4 py-1 text-stone-800 outline-none focus:border-stone-500"
+                    />
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <p className="text-3xl">{freeName}</p>
+                    <button
+                      className="absolute -right-8 top-0 bottom-0 image-ignore"
+                      onClick={() => {
+                        setMode(true);
+                      }}
+                    >
+                      <Edit className="size-6 text-gray-400" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             <ResultStats
               rows={finalRows}
               elapsed={elapsed}

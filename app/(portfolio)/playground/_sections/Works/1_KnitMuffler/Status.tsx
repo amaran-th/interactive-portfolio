@@ -50,7 +50,7 @@ export default function Status({
         <div className="flex justify-between">
           <span className="text-gray-500">실수</span>
           <span className={slipCount > 0 ? "text-red-600" : "text-gray-600"}>
-            {slipCount}회
+            <span className="font-mono">{slipCount}</span>회
           </span>
         </div>
       )}

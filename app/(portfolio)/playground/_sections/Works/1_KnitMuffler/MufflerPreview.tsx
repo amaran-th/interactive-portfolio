@@ -78,7 +78,7 @@ export function MufflerPreview({
 
   return (
     <div
-      className={`${compact ? "" : "px-6 py-4"} text-gray-700 flex justify-center`}
+      className={`${compact ? "" : "px-6 py-4"} text-gray-700 flex items-start justify-center`}
     >
       <div
         className="relative grid w-fit"

@@ -17,7 +17,12 @@ export function useResultExport({
   const [isSavingResult, setIsSavingResult] = useState(false);
 
   const handleSaveResult = useCallback(async () => {
-    if (typeof window === "undefined" || finalRows.length === 0 || isSavingResult) return;
+    if (
+      typeof window === "undefined" ||
+      finalRows.length === 0 ||
+      isSavingResult
+    )
+      return;
 
     setIsSavingResult(true);
     try {
@@ -25,7 +30,9 @@ export function useResultExport({
 
       const el = resultCaptureRef.current;
       const exportWidth = Math.ceil(Math.max(el.scrollWidth, el.clientWidth));
-      const exportHeight = Math.ceil(Math.max(el.scrollHeight, el.clientHeight));
+      const exportHeight = Math.ceil(
+        Math.max(el.scrollHeight, el.clientHeight),
+      );
 
       const dataUrl = await toPng(el, {
         cacheBust: true,
@@ -42,13 +49,18 @@ export function useResultExport({
           overflowY: "visible",
         },
         filter: (node) =>
-          !(node instanceof HTMLElement && node.dataset.htmlToImageIgnore === "true"),
+          !(
+            (node instanceof HTMLElement &&
+              node.dataset.htmlToImageIgnore === "true") ||
+            (node.classList && node.classList.contains("image-ignore"))
+          ),
       });
 
       const image = new Image();
       await new Promise<void>((resolve, reject) => {
         image.onload = () => resolve();
-        image.onerror = () => reject(new Error("Failed to load generated image"));
+        image.onerror = () =>
+          reject(new Error("Failed to load generated image"));
         image.src = dataUrl;
       });
 

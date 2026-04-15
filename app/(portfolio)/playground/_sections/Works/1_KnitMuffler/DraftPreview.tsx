@@ -52,7 +52,7 @@ export default function DraftPreview({
                   color: colorDef?.text ?? "inherit",
                 }}
               >
-                {showNumbers ? stitch.color || "" : null}
+                {showNumbers ? (stitch.color ?? "") : ""}
               </div>
             );
           })}
