@@ -17,12 +17,12 @@ export default function KnitMuffler() {
         <SelectScreen
           onStartChallenge={game.startChallenge}
           onStartFreeSlot={game.startFreeSlot}
-          onResumeFreeSlot={game.resumeFreeSlot}
+          onViewFreeSave={game.viewFreeSave}
           colorMode={colorMode}
           onColorModeChange={setColorMode}
         />
       ) : (
-        <PlayScreen game={game} colorMode={colorMode} />
+        <PlayScreen game={game} />
       )}
     </ColorModeContext.Provider>
   );

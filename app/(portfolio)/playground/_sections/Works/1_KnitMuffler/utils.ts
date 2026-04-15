@@ -1,4 +1,18 @@
-import { ChallengeLevel } from "./type";
+import { ChallengeLevel, Medal } from "./type";
+
+/** 결과 화면용 한국어 시간 포맷
+ * showCentiseconds = true  → "X분 X초 XX"  (챌린지)
+ * showCentiseconds = false → "X분 X초"      (자유)
+ */
+export function formatElapsedResult(elapsed: number, showCentiseconds = true): string {
+  const minutes = Math.floor(elapsed / 6000);
+  const seconds = Math.floor((elapsed / 100) % 60);
+  const centiseconds = elapsed % 100;
+  const cs = String(centiseconds).padStart(2, "0");
+  if (minutes === 0) return showCentiseconds ? `${seconds}초 ${cs}` : `${seconds}초`;
+  const base = `${minutes}분 ${seconds}초`;
+  return showCentiseconds ? `${base} ${cs}` : base;
+}
 
 export function formatElapsed(elapsed: number): string {
   const minutes = Math.floor(elapsed / 6000);
@@ -7,8 +21,6 @@ export function formatElapsed(elapsed: number): string {
 
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}:${String(centiseconds).padStart(2, "0")}`;
 }
-
-export type Medal = "gold" | "silver" | "bronze" | null;
 
 /** 메달 색상 (Tailwind) */
 export const MEDAL_COLOR: Record<

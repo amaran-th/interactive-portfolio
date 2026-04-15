@@ -1,10 +1,8 @@
 "use client";
 
 import { createContext, useContext } from "react";
+import { ColorDef, PALETTES } from "./data";
 import { Color, ColorMode } from "./type";
-import { PALETTES } from "./data";
-
-type ColorDef = { id: number; stroke: string; fill: string; text: string };
 
 export const ColorModeContext = createContext<ColorMode>("normal");
 

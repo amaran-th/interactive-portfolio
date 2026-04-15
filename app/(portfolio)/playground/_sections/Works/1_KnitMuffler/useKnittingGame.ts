@@ -12,7 +12,7 @@ import {
 import { useTimer } from "./useTimer";
 
 // --- Challenge context ---
-export type ChallengeCtx = {
+type ChallengeCtx = {
   level: ChallengeLevel;
   draftId: number;
   draft: Draft;
@@ -173,12 +173,29 @@ export function useKnittingGame() {
 
   // Free mode handlers — storage 접근은 hook 내부에서만
 
-  /** 빈 슬롯에서 새 자유 모드 게임 시작 */
-  const startFreeSlot = useCallback(
-    (slotIndex: number, width: Width, name: string) => {
-      resetKnitting(width);
+  /** 저장된 슬롯을 결과 화면으로 바로 열기 */
+  const viewFreeSave = useCallback(
+    (slotIndex: number) => {
+      const saved = getFreeSave(slotIndex);
+      if (!saved) return;
       setFreeSlotIndex(slotIndex);
-      setFreeName(name);
+      setFreeName(saved.name);
+      setMode("free");
+      setCurrentThread(DEFAULT_THREAD);
+      setStarted(false);
+      dispatch({ type: "LOAD_ROWS", rows: saved.rows, stitchCount: saved.width });
+      resetTimer(saved.elapsed);
+      setScreen("result");
+    },
+    [resetTimer],
+  );
+
+  /** 빈 슬롯에서 새 자유 모드 게임 시작 (너비는 플레이 화면에서 선택, 이름은 결과 화면에서 입력) */
+  const startFreeSlot = useCallback(
+    (slotIndex: number) => {
+      resetKnitting(10);
+      setFreeSlotIndex(slotIndex);
+      setFreeName("");
       setMode("free");
       setScreen("play");
     },
@@ -216,14 +233,35 @@ export function useKnittingGame() {
     }
   }, [freeSlotIndex, mode, resumeFromFreeSave]);
 
-  /** 결과 화면의 "다시 시작" 버튼 — 같은 슬롯/너비/이름으로 재시작 */
+  /** 결과 화면의 "다시 시작" 버튼 — 같은 슬롯/너비로 재시작, 이름 초기화 */
   const restartFree = useCallback(() => {
     if (freeSlotIndex === null) return;
     clearFreeSave(freeSlotIndex);
     resetKnitting(knitting.stitchCount);
+    setFreeName("");
     setMode("free");
     setScreen("play");
   }, [freeSlotIndex, knitting.stitchCount, resetKnitting]);
+
+  /** 자유 모드 결과 화면에서 이름 저장 — storage 즉시 업데이트 */
+  const handleSaveFreeName = useCallback(
+    (name: string) => {
+      setFreeName(name);
+      if (freeSlotIndex === null) return;
+      const saved = getFreeSave(freeSlotIndex);
+      if (!saved) return;
+      saveFreeMuffler(saved.rows, saved.elapsed, saved.width, name, freeSlotIndex);
+    },
+    [freeSlotIndex],
+  );
+
+  /** 자유 모드 플레이 화면에서 너비 전환 — 작업 내용 초기화 포함 */
+  const handleChangeWidth = useCallback(
+    (width: Width) => {
+      resetKnitting(width);
+    },
+    [resetKnitting],
+  );
 
   const handleBackToSelect = useCallback(() => {
     resetKnitting();
@@ -232,9 +270,10 @@ export function useKnittingGame() {
     setScreen("select");
   }, [resetKnitting]);
 
+  /** 플레이 화면 초기화 버튼 — 현재 너비 유지 */
   const handleInitialize = useCallback(() => {
-    resetKnitting();
-  }, [resetKnitting]);
+    resetKnitting(knitting.stitchCount);
+  }, [knitting.stitchCount, resetKnitting]);
 
   const handleKnit = useCallback(
     (colorOverride?: Color) => {
@@ -338,10 +377,14 @@ export function useKnittingGame() {
     spm,
     startChallenge,
     startFreeSlot,
+    viewFreeSave,
     resumeFreeSlot,
     finishFree,
     resumeFree,
     restartFree,
+    freeName,
+    handleSaveFreeName,
+    handleChangeWidth,
     handleBackToSelect,
     handleInitialize,
     handleUnravel,

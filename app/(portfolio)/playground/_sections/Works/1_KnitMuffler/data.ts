@@ -1,6 +1,6 @@
 import { Color, ColorMode, StitchType, Width } from "./type";
 
-type ColorDef = { id: number; stroke: string; fill: string; text: string };
+export type ColorDef = { id: number; stroke: string; fill: string; text: string };
 export type Draft = {
   id: number;
   name: string;

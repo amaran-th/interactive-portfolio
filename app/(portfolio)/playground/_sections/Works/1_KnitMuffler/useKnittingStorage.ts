@@ -12,7 +12,6 @@ import { calcMedal } from "./utils";
 
 const STORAGE_KEY = "knit-muffler-history";
 
-
 function getHistory(): KnitMufflerHistory {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -58,10 +57,9 @@ export function getChallengeProgress(
         return {
           clear: acc.clear + (entry ? 1 : 0),
           perfect: acc.perfect + (medal === "gold" ? 1 : 0),
-          total: acc.total + 1,
         };
       },
-      { clear: 0, perfect: 0, total: 0 },
+      { clear: 0, perfect: 0 },
     );
   } catch {
     return null;
@@ -87,7 +85,7 @@ export function saveChallengeStat(
   saveHistory(history);
 }
 
-export const FREE_SLOT_COUNT = 2;
+export const FREE_SLOT_COUNT = 5;
 
 export function getFreeSave(index: number): FreeSave | null {
   const history = getHistory();
@@ -96,7 +94,10 @@ export function getFreeSave(index: number): FreeSave | null {
 
 export function getFreeSaves(): (FreeSave | null)[] {
   const history = getHistory();
-  return Array.from({ length: FREE_SLOT_COUNT }, (_, i) => history.free[i] ?? null);
+  return Array.from(
+    { length: FREE_SLOT_COUNT },
+    (_, i) => history.free[i] ?? null,
+  );
 }
 
 export function saveFreeMuffler(

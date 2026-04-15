@@ -6,12 +6,9 @@ import { Draft } from "./data";
 import DraftPreview from "./DraftPreview";
 import { ResultMuffler } from "./MufflerPreview";
 import { MedalIcon } from "./SelectScreen";
-import { ChallengeStat, ChallengeLevel, Mode, Stitch } from "./type";
-import {
-  getChallengeStat,
-  saveChallengeStat,
-} from "./useKnittingStorage";
-import { calcMedal, formatElapsed, isBetterMedal } from "./utils";
+import { ChallengeLevel, ChallengeStat, Mode, Stitch } from "./type";
+import { getChallengeStat, saveChallengeStat } from "./useKnittingStorage";
+import { calcMedal, formatElapsedResult, isBetterMedal } from "./utils";
 
 function ResultModeLabel({
   mode,
@@ -99,7 +96,7 @@ function ResultStats({
       ? [
           {
             label: "걸린 시간",
-            value: formatElapsed(elapsed),
+            value: formatElapsedResult(elapsed),
             valueClassName: "text-stone-900",
           },
           ...(challengeLevel === "normal"
@@ -126,7 +123,7 @@ function ResultStats({
       : [
           {
             label: "걸린 시간",
-            value: formatElapsed(elapsed),
+            value: formatElapsedResult(elapsed, false),
             valueClassName: "text-stone-900",
           },
           {
@@ -201,7 +198,7 @@ function ChallengeStatSaver({
         <div className="flex flex-col items-center gap-0.5">
           <span className="font-semibold text-stone-400">이전</span>
           {existingMedal && <MedalIcon medal={existingMedal} />}
-          <span>{formatElapsed(existing.elapsed)}</span>
+          <span>{formatElapsedResult(existing.elapsed)}</span>
           <span>{existing.colorAccuracy.toFixed(1)}%</span>
           {level !== "easy" && <span>{existing.spm.toFixed(1)} SPM</span>}
         </div>
@@ -214,7 +211,7 @@ function ChallengeStatSaver({
               current.elapsed < existing.elapsed ? "text-green-600" : ""
             }
           >
-            {formatElapsed(current.elapsed)}
+            {formatElapsedResult(current.elapsed)}
           </span>
           <span
             className={
@@ -264,8 +261,10 @@ export default function ResultModal({
   colorAccuracy,
   spm,
   challengeDraft,
+  freeName,
   isSavingResult,
   onSaveResult,
+  onSaveFreeName,
   onResumeFreeMode,
   onRestartFreeMode,
   onBackToSelect,
@@ -282,8 +281,10 @@ export default function ResultModal({
   colorAccuracy: number;
   spm: number;
   challengeDraft: Draft | null;
+  freeName?: string;
   isSavingResult: boolean;
   onSaveResult: () => void;
+  onSaveFreeName?: (name: string) => void;
   onResumeFreeMode: () => void;
   onRestartFreeMode: () => void;
   onBackToSelect: () => void;
@@ -316,6 +317,17 @@ export default function ResultModal({
                 <MedalIcon medal={medal} />
               </div>
             </div>
+            <div className="flex gap-1 items-center">
+              <span>작품명: </span>
+              <input
+                type="text"
+                defaultValue={freeName ?? ""}
+                placeholder="작품 이름을 입력하세요"
+                maxLength={20}
+                onBlur={(e) => onSaveFreeName?.(e.target.value.trim())}
+                className="border-b text-2xl border-stone-300 px-4 py-1 text-stone-800 outline-none focus:border-stone-500"
+              />
+            </div>
             <ResultStats
               rows={finalRows}
               elapsed={elapsed}
@@ -325,7 +337,6 @@ export default function ResultModal({
               colorAccuracy={colorAccuracy}
               spm={spm}
             />
-
             <div
               className={`grid w-full justify-center gap-10 ${mode === "challenge" ? "md:grid-cols-2" : ""}`}
             >
@@ -347,13 +358,21 @@ export default function ResultModal({
             data-html-to-image-ignore="true"
           >
             {/* 챌린지 기록 저장 */}
-            {mode === "challenge" && challengeLevel && challengeDraftId !== null && (
-              <ChallengeStatSaver
-                level={challengeLevel}
-                draftId={challengeDraftId}
-                current={{ id: challengeDraftId, elapsed, slipCount, colorAccuracy, spm }}
-              />
-            )}
+            {mode === "challenge" &&
+              challengeLevel &&
+              challengeDraftId !== null && (
+                <ChallengeStatSaver
+                  level={challengeLevel}
+                  draftId={challengeDraftId}
+                  current={{
+                    id: challengeDraftId,
+                    elapsed,
+                    slipCount,
+                    colorAccuracy,
+                    spm,
+                  }}
+                />
+              )}
             <div className="flex flex-wrap justify-center gap-3">
               <button
                 onClick={onSaveResult}

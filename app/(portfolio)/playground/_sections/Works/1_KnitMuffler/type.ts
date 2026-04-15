@@ -27,7 +27,6 @@ export interface Stitch {
 export type ChallengeProgress = {
   clear: number;
   perfect: number;
-  total: number;
 };
 
 export type ChallengeStat = {
@@ -50,3 +49,5 @@ export type FreeSave = {
 export type KnitMufflerHistory = {
   [level in ChallengeLevel]: ChallengeStat[];
 } & { free: (FreeSave | null)[] };
+
+export type Medal = "gold" | "silver" | "bronze" | null;

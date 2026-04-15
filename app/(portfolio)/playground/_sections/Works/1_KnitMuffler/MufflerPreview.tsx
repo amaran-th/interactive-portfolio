@@ -64,18 +64,22 @@ export const StitchRow = memo(function StitchRow({
 export function MufflerPreview({
   rows,
   stitchCount,
-  compact = false,
+  cellSize,
+  compact,
 }: {
   rows: Stitch[][];
   stitchCount: Width;
   compact?: boolean;
+  cellSize: number;
 }) {
-  const cellSize = (compact ? 20 : 32) / (stitchCount / 10);
-  const emptyClassName = `size-[${cellSize}]`;
+  const size = cellSize / (stitchCount / 10);
+  const emptyClassName = `size-[${size}px]`;
   const paddedRows = padRows(rows, stitchCount);
 
   return (
-    <div className="px-6 py-4 text-gray-700 flex justify-center">
+    <div
+      className={`${compact ? "" : "px-6 py-4"} text-gray-700 flex justify-center`}
+    >
       <div
         className="relative grid w-fit"
         style={{ gridTemplateColumns: `repeat(${stitchCount}, 1fr)` }}
@@ -84,7 +88,7 @@ export function MufflerPreview({
           <StitchRow
             key={rowIndex}
             row={row}
-            stitchSize={cellSize}
+            stitchSize={size}
             emptyClassName={emptyClassName}
             rowIndex={rowIndex}
             totalRows={paddedRows.length}
@@ -103,6 +107,7 @@ export function ResultMuffler({
   title: string;
 }) {
   const stitchCount = rows[0]?.length ?? 10;
+  const stitchSize = 20 / (stitchCount / 10);
   const paddedRows = padRows(rows, stitchCount);
 
   return (
@@ -116,8 +121,8 @@ export function ResultMuffler({
           <StitchRow
             key={rowIndex}
             row={row}
-            stitchSize={20}
-            emptyClassName="h-5 w-5"
+            stitchSize={stitchSize}
+            emptyClassName={`size-[${stitchSize}px]`}
             rowIndex={rowIndex}
             totalRows={paddedRows.length}
           />

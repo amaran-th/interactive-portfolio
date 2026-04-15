@@ -1,22 +1,20 @@
 "use client";
 
 import { House, RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
-import { PALETTES } from "./data";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useColorPalette } from "./ColorModeContext";
 import DraftPreview from "./DraftPreview";
 import { MufflerPreview } from "./MufflerPreview";
 import ResultModal from "./ResultModal";
 import Status from "./Status";
-import { ColorMode } from "./type";
+import { Width } from "./type";
 import { useKnittingGame } from "./useKnittingGame";
 import { useResultExport } from "./useResultExport";
 
 export default function PlayScreen({
   game,
-  colorMode,
 }: {
   game: ReturnType<typeof useKnittingGame>;
-  colorMode: ColorMode;
 }) {
   const {
     screen,
@@ -35,11 +33,14 @@ export default function PlayScreen({
     colorAccuracy,
     progress,
     spm,
+    freeName,
     finishFree,
     resumeFree,
     restartFree,
     handleBackToSelect,
     handleInitialize,
+    handleChangeWidth,
+    handleSaveFreeName,
     handleUnravel,
     handleSelectColorAndKnit,
   } = game;
@@ -51,6 +52,9 @@ export default function PlayScreen({
   const resultModalRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // 너비 전환 경고 모달
+  const [pendingWidth, setPendingWidth] = useState<Width | null>(null);
+
   const { resultCaptureRef, isSavingResult, handleSaveResult } =
     useResultExport({ finalRows, mode });
 
@@ -61,13 +65,24 @@ export default function PlayScreen({
     el.scrollTop = el.scrollHeight;
   }, [activeRows.length]);
 
+  const paletteMap = useColorPalette();
   const palette = useMemo(() => {
-    const list = Object.values(PALETTES[colorMode]);
+    const list = Object.values(paletteMap);
     list.push(list.shift()!);
     return list;
-  }, [colorMode]);
+  }, [paletteMap]);
 
   const currentStitchCount = currentRow.length;
+  const hasContent = knittedRows.length > 0 || currentRow.length > 0;
+
+  const handleWidthChange = (newWidth: Width) => {
+    if (newWidth === stitchCount) return;
+    if (hasContent) {
+      setPendingWidth(newWidth);
+    } else {
+      handleChangeWidth(newWidth);
+    }
+  };
 
   return (
     <div className="font-knit-muffler relative flex h-full overflow-hidden bg-white text-black">
@@ -100,9 +115,9 @@ export default function PlayScreen({
               : "자유 모드"}
           </div>
 
-          {/* 자유 모드 저장하기 버튼 */}
+          {/* 자유 모드 - 너비 선택 + 저장하기 버튼 */}
           {mode === "free" && (
-            <div className="absolute top-4 right-4 z-70 flex gap-2">
+            <div className="absolute top-4 right-4 z-70 flex gap-2 items-center">
               <button
                 onClick={finishFree}
                 disabled={
@@ -110,7 +125,7 @@ export default function PlayScreen({
                     ? true
                     : currentStitchCount > 0 && currentStitchCount < stitchCount
                 }
-                className="rounded-full bg-stone-900 px-4 py-2 text-sm text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-full bg-yellow-800 px-4 py-2 text-sm text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
               >
                 저장하기
               </button>
@@ -129,13 +144,28 @@ export default function PlayScreen({
                 spm={spm}
                 freeMode={mode === "free"}
               />
-              {mode === "challenge" && challengeDraft && (
+              {mode === "challenge" && challengeDraft ? (
                 <div className="flex flex-col items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm">
                   <p className="text-sm text-stone-500">도안</p>
                   <DraftPreview
                     draft={challengeDraft}
                     currentRowIndex={knittedRows.length}
                   />
+                </div>
+              ) : (
+                <div className="flex rounded-full bg-white/90 text-sm shadow-sm overflow-hidden">
+                  <button
+                    onClick={() => handleWidthChange(10)}
+                    className={`px-3 py-2 border rounded-l-full flex-1 transition-colors ${stitchCount === 10 ? "bg-yellow-600/25 text-yellow-600 border-yellow-600" : "border-stone-300 text-stone-600 hover:bg-stone-50"}`}
+                  >
+                    10수
+                  </button>
+                  <button
+                    onClick={() => handleWidthChange(20)}
+                    className={`px-3 py-2 border rounded-r-full flex-1 transition-colors ${stitchCount === 20 ? "bg-yellow-600/25 text-yellow-600 border-yellow-600" : "border-stone-300 text-stone-600 hover:bg-stone-50"}`}
+                  >
+                    20수
+                  </button>
                 </div>
               )}
             </div>
@@ -155,13 +185,28 @@ export default function PlayScreen({
           </div>
 
           {/* 챌린지 모드 - 데스크탑 도안 */}
-          {mode === "challenge" && challengeDraft && (
+          {mode === "challenge" && challengeDraft ? (
             <div className="absolute right-4 top-20 hidden flex-col items-center justify-center gap-4 rounded-md bg-gray-50 p-4 shadow-md md:flex">
               <p>도안</p>
               <DraftPreview
                 draft={challengeDraft}
                 currentRowIndex={knittedRows.length}
               />
+            </div>
+          ) : (
+            <div className="absolute right-4 top-20 hidden min-w-30 rounded-full bg-white/90 text-sm shadow-sm overflow-hidden md:flex">
+              <button
+                onClick={() => handleWidthChange(10)}
+                className={`px-3 py-2 border rounded-l-full flex-1 transition-colors ${stitchCount === 10 ? "bg-yellow-600/25 text-yellow-600 border-yellow-600" : "border-stone-300 text-stone-600 hover:bg-stone-50"}`}
+              >
+                10수
+              </button>
+              <button
+                onClick={() => handleWidthChange(20)}
+                className={`px-3 py-2 border rounded-r-full flex-1 transition-colors ${stitchCount === 20 ? "bg-yellow-600/25 text-yellow-600 border-yellow-600" : "border-stone-300 text-stone-600 hover:bg-stone-50"}`}
+              >
+                20수
+              </button>
             </div>
           )}
 
@@ -178,6 +223,7 @@ export default function PlayScreen({
                     ? knittedRows
                     : [...knittedRows, currentRow]
                 }
+                cellSize={32}
               />
             </div>
           </div>
@@ -217,7 +263,7 @@ export default function PlayScreen({
                         ? currentStitchCount === 0
                         : knittedRows.length === 0
                   }
-                  className="w-full rounded border border-stone-300 bg-stone-100 px-4 py-2 text-stone-700 transition-colors hover:bg-stone-200 disabled:cursor-not-allowed disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-400"
+                  className="w-full rounded border border-stone-300 bg-red-100 px-4 py-2 text-red-700 transition-colors hover:bg-red-200 disabled:cursor-not-allowed disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-400"
                 >
                   풀기(Backspace)
                 </button>
@@ -226,6 +272,36 @@ export default function PlayScreen({
           </div>
         </div>
       </div>
+
+      {/* 너비 전환 경고 모달 */}
+      {pendingWidth !== null && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="flex flex-col items-center gap-4 rounded-2xl bg-white px-8 py-6 shadow-xl text-stone-800">
+            <p className="text-base break-keep text-center font-medium">
+              지금까지 작업한 내용이 모두 사라집니다.
+              <br />
+              계속하시겠습니까?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPendingWidth(null)}
+                className="rounded-full border border-stone-300 px-4 py-2 text-sm hover:bg-stone-100 transition-colors"
+              >
+                아니요
+              </button>
+              <button
+                onClick={() => {
+                  handleChangeWidth(pendingWidth);
+                  setPendingWidth(null);
+                }}
+                className="rounded-full bg-stone-900 px-4 py-2 text-sm text-white hover:bg-stone-700 transition-colors"
+              >
+                네
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {screen === "result" && mode && (
         <ResultModal
@@ -240,8 +316,10 @@ export default function PlayScreen({
           colorAccuracy={colorAccuracy}
           spm={spm}
           challengeDraft={challengeDraft}
+          freeName={freeName}
           isSavingResult={isSavingResult}
           onSaveResult={handleSaveResult}
+          onSaveFreeName={handleSaveFreeName}
           onResumeFreeMode={resumeFree}
           onRestartFreeMode={restartFree}
           onBackToSelect={handleBackToSelect}
