@@ -17,9 +17,7 @@ export default function PlayScreen({
   game: ReturnType<typeof useKnittingGame>;
 }) {
   const {
-    screen,
-    mode,
-    challengeCtx,
+    gameState,
     currentThread,
     knittedRows,
     currentRow,
@@ -33,7 +31,6 @@ export default function PlayScreen({
     colorAccuracy,
     progress,
     spm,
-    freeName,
     finishFree,
     resumeFree,
     restartFree,
@@ -45,9 +42,12 @@ export default function PlayScreen({
     handleSelectColorAndKnit,
   } = game;
 
-  const challengeLevel = challengeCtx?.level ?? null;
-  const challengeDraftId = challengeCtx?.draftId ?? null;
-  const challengeDraft = challengeCtx?.draft ?? null;
+  // gameState에서 타입 좁히기로 도출
+  const mode = gameState.screen !== "select" ? gameState.mode : null;
+  const challengeLevel = gameState.screen !== "select" && gameState.mode === "challenge" ? gameState.level : null;
+  const challengeDraftId = gameState.screen !== "select" && gameState.mode === "challenge" ? gameState.draftId : null;
+  const challengeDraft = gameState.screen !== "select" && gameState.mode === "challenge" ? gameState.draft : null;
+  const freeName = gameState.screen !== "select" && gameState.mode === "free" ? gameState.name : "";
 
   const resultModalRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -88,7 +88,7 @@ export default function PlayScreen({
     <div className="font-knit-muffler relative flex h-full overflow-hidden bg-white text-black">
       <div
         className={`flex h-full w-full flex-col ${
-          screen === "result" ? "blur-md pointer-events-none select-none" : ""
+          gameState.screen === "result" ? "blur-md pointer-events-none select-none" : ""
         }`}
       >
         {/* 상단 좌측 버튼 */}
@@ -303,7 +303,7 @@ export default function PlayScreen({
         </div>
       )}
 
-      {screen === "result" && mode && (
+      {gameState.screen === "result" && mode && (
         <ResultModal
           resultModalRef={resultModalRef}
           resultCaptureRef={resultCaptureRef}

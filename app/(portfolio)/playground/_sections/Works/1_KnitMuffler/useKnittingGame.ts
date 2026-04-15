@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import { Draft, EASY_DRAFTS, NORMAL_DRAFTS } from "./data";
-import { ChallengeLevel, Color, Mode, Screen, Stitch, Width } from "./type";
+import { ChallengeLevel, Color, Mode, Stitch, Width } from "./type";
 import { useKnittingStats } from "./useKnittingStats";
 import {
   clearFreeSave,
@@ -11,12 +11,13 @@ import {
 } from "./useKnittingStorage";
 import { useTimer } from "./useTimer";
 
-// --- Challenge context ---
-type ChallengeCtx = {
-  level: ChallengeLevel;
-  draftId: number;
-  draft: Draft;
-};
+// --- Game state (discriminated union) ---
+// screen + mode + mode별 컨텍스트를 하나의 상태로 관리.
+// nullable 상태 조합(mode=null, challengeCtx=null 등)이 불가능해진다.
+export type GameState =
+  | { screen: "select" }
+  | { screen: "play" | "result"; mode: "challenge"; level: ChallengeLevel; draftId: number; draft: Draft }
+  | { screen: "play" | "result"; mode: "free"; slotIndex: number; name: string };
 
 // --- Knitting reducer ---
 type KnittingState = {
@@ -97,22 +98,21 @@ function knittingReducer(
 
 const DEFAULT_THREAD = Color.BLUE;
 
-
 export function useKnittingGame() {
-  const [screen, setScreen] = useState<Screen>("select");
-  const [mode, setMode] = useState<Mode | null>(null);
-  const [challengeCtx, setChallengeCtx] = useState<ChallengeCtx | null>(null);
-  const [freeSlotIndex, setFreeSlotIndex] = useState<number | null>(null);
-  const [freeName, setFreeName] = useState("");
+  const [gameState, setGameState] = useState<GameState>({ screen: "select" });
   const [currentThread, setCurrentThread] = useState<Color>(DEFAULT_THREAD);
   const [started, setStarted] = useState(false);
   const [knitting, dispatch] = useReducer(knittingReducer, INITIAL_KNITTING);
   const { elapsed, reset: resetTimer } = useTimer(started);
 
   const { knittedRows, currentRow, currentRowEverKnitted } = knitting;
-  // 자유 모드나 선택 화면에서 challengeCtx가 null일 때의 fallback.
-  // 이 값은 useKnittingStats에 전달되지만, 자유 모드에서는 stats가 UI에 표시되지 않으므로 무해하다.
-  const challengeDraft = challengeCtx?.draft ?? EASY_DRAFTS[0];
+
+  // 자유 모드나 선택 화면에서 챌린지 draft가 없을 때의 fallback.
+  // useKnittingStats에 전달되지만 자유 모드에서는 stats가 UI에 표시되지 않으므로 무해하다.
+  const challengeDraft =
+    gameState.screen !== "select" && gameState.mode === "challenge"
+      ? gameState.draft
+      : EASY_DRAFTS[0];
 
   const activeRows = useMemo(
     () => (currentRow.length > 0 ? [...knittedRows, currentRow] : knittedRows),
@@ -120,16 +120,17 @@ export function useKnittingGame() {
   );
 
   const finalRows = useMemo(
-    () => (screen === "result" ? activeRows : knittedRows),
-    [activeRows, knittedRows, screen],
+    () => (gameState.screen === "result" ? activeRows : knittedRows),
+    [activeRows, knittedRows, gameState.screen],
   );
 
   const isChallengeComplete = useMemo(
     () =>
-      mode === "challenge" &&
+      gameState.screen !== "select" &&
+      gameState.mode === "challenge" &&
       knittedRows.length === challengeDraft.data.length &&
       currentRow.length === 0,
-    [challengeDraft.data.length, currentRow.length, knittedRows.length, mode],
+    [challengeDraft.data.length, currentRow.length, gameState, knittedRows.length],
   );
 
   const { slipCount, colorAccuracy, progress, spm } = useKnittingStats({
@@ -145,6 +146,16 @@ export function useKnittingGame() {
     resetTimer();
   }, [resetTimer]);
 
+  /** 자유 모드 저장 데이터를 뜨개 상태에만 로드 (gameState는 호출자가 설정) */
+  const loadFreeRows = useCallback(
+    (rows: Stitch[][], savedElapsed: number, stitchCount: Width) => {
+      setCurrentThread(DEFAULT_THREAD);
+      setStarted(false);
+      dispatch({ type: "LOAD_ROWS", rows, stitchCount });
+      resetTimer(savedElapsed);
+    },
+    [resetTimer],
+  );
 
   const startChallenge = useCallback(
     (level: ChallengeLevel, draftId: number) => {
@@ -152,24 +163,10 @@ export function useKnittingGame() {
       const draft = levelDrafts.find((d) => d.id === draftId);
       if (!draft) return;
       resetKnitting(draft.width);
-      setChallengeCtx({ level, draftId, draft });
-      setMode("challenge");
-      setScreen("play");
+      setGameState({ screen: "play", mode: "challenge", level, draftId, draft });
     },
     [resetKnitting],
   );
-
-  const resumeFromFreeSave = useCallback(
-    (rows: Stitch[][], savedElapsed: number, stitchCount: Width) => {
-      resetKnitting();
-      setMode("free");
-      dispatch({ type: "LOAD_ROWS", rows, stitchCount });
-      resetTimer(savedElapsed);
-      setScreen("play");
-    },
-    [resetKnitting, resetTimer],
-  );
-
 
   // Free mode handlers — storage 접근은 hook 내부에서만
 
@@ -178,81 +175,77 @@ export function useKnittingGame() {
     (slotIndex: number) => {
       const saved = getFreeSave(slotIndex);
       if (!saved) return;
-      setFreeSlotIndex(slotIndex);
-      setFreeName(saved.name);
-      setMode("free");
-      setCurrentThread(DEFAULT_THREAD);
-      setStarted(false);
-      dispatch({ type: "LOAD_ROWS", rows: saved.rows, stitchCount: saved.width });
-      resetTimer(saved.elapsed);
-      setScreen("result");
+      loadFreeRows(saved.rows, saved.elapsed, saved.width);
+      setGameState({ screen: "result", mode: "free", slotIndex, name: saved.name });
     },
-    [resetTimer],
+    [loadFreeRows],
   );
 
   /** 빈 슬롯에서 새 자유 모드 게임 시작 (너비는 플레이 화면에서 선택, 이름은 결과 화면에서 입력) */
   const startFreeSlot = useCallback(
     (slotIndex: number) => {
       resetKnitting(10);
-      setFreeSlotIndex(slotIndex);
-      setFreeName("");
-      setMode("free");
-      setScreen("play");
+      setGameState({ screen: "play", mode: "free", slotIndex, name: "" });
     },
     [resetKnitting],
   );
 
-  /** 저장된 슬롯 이어하기 (결과 화면 → 플레이) */
+  /** 저장된 슬롯 이어하기 */
   const resumeFreeSlot = useCallback(
     (slotIndex: number) => {
       const saved = getFreeSave(slotIndex);
       if (!saved) return;
-      setFreeSlotIndex(slotIndex);
-      setFreeName(saved.name);
-      resumeFromFreeSave(saved.rows, saved.elapsed, saved.width);
+      loadFreeRows(saved.rows, saved.elapsed, saved.width);
+      setGameState({ screen: "play", mode: "free", slotIndex, name: saved.name });
     },
-    [resumeFromFreeSave],
+    [loadFreeRows],
   );
 
   /** 저장하기 버튼 — 현재 슬롯에 저장 후 결과 화면 */
   const finishFree = useCallback(() => {
-    if (activeRows.length === 0 || freeSlotIndex === null) return;
-    saveFreeMuffler(activeRows, elapsed, knitting.stitchCount, freeName, freeSlotIndex);
+    if (gameState.screen !== "play" || gameState.mode !== "free") return;
+    if (activeRows.length === 0) return;
+    const { slotIndex, name } = gameState;
+    saveFreeMuffler(activeRows, elapsed, knitting.stitchCount, name, slotIndex);
     setStarted(false);
-    setScreen("result");
-  }, [activeRows, elapsed, freeName, freeSlotIndex, knitting.stitchCount]);
+    setGameState({ screen: "result", mode: "free", slotIndex, name });
+  }, [gameState, activeRows, elapsed, knitting.stitchCount]);
 
   /** 결과 화면의 "이어 뜨기" 버튼 */
   const resumeFree = useCallback(() => {
-    if (freeSlotIndex === null) return;
-    const saved = getFreeSave(freeSlotIndex);
+    if (gameState.screen !== "result" || gameState.mode !== "free") return;
+    const { slotIndex, name } = gameState;
+    const saved = getFreeSave(slotIndex);
     if (saved) {
-      resumeFromFreeSave(saved.rows, saved.elapsed, saved.width);
-    } else if (mode === "free") {
-      setScreen("play");
+      loadFreeRows(saved.rows, saved.elapsed, saved.width);
+      setGameState({ screen: "play", mode: "free", slotIndex, name: saved.name });
+    } else {
+      setGameState({ screen: "play", mode: "free", slotIndex, name });
     }
-  }, [freeSlotIndex, mode, resumeFromFreeSave]);
+  }, [gameState, loadFreeRows]);
 
   /** 결과 화면의 "다시 시작" 버튼 — 같은 슬롯/너비로 재시작, 이름 초기화 */
   const restartFree = useCallback(() => {
-    if (freeSlotIndex === null) return;
-    clearFreeSave(freeSlotIndex);
+    if (gameState.screen !== "result" || gameState.mode !== "free") return;
+    const { slotIndex } = gameState;
+    clearFreeSave(slotIndex);
     resetKnitting(knitting.stitchCount);
-    setFreeName("");
-    setMode("free");
-    setScreen("play");
-  }, [freeSlotIndex, knitting.stitchCount, resetKnitting]);
+    setGameState({ screen: "play", mode: "free", slotIndex, name: "" });
+  }, [gameState, knitting.stitchCount, resetKnitting]);
 
   /** 자유 모드 결과 화면에서 이름 저장 — storage 즉시 업데이트 */
   const handleSaveFreeName = useCallback(
     (name: string) => {
-      setFreeName(name);
-      if (freeSlotIndex === null) return;
-      const saved = getFreeSave(freeSlotIndex);
+      if (gameState.screen === "select" || gameState.mode !== "free") return;
+      const { slotIndex } = gameState;
+      setGameState((prev) =>
+        prev.screen !== "select" && prev.mode === "free" ? { ...prev, name } : prev,
+      );
+      const saved = getFreeSave(slotIndex);
       if (!saved) return;
-      saveFreeMuffler(saved.rows, saved.elapsed, saved.width, name, freeSlotIndex);
+      saveFreeMuffler(saved.rows, saved.elapsed, saved.width, name, slotIndex);
     },
-    [freeSlotIndex],
+    [gameState],
   );
 
   /** 자유 모드 플레이 화면에서 너비 전환 — 작업 내용 초기화 포함 */
@@ -265,9 +258,7 @@ export function useKnittingGame() {
 
   const handleBackToSelect = useCallback(() => {
     resetKnitting();
-    setMode(null);
-    setChallengeCtx(null);
-    setScreen("select");
+    setGameState({ screen: "select" });
   }, [resetKnitting]);
 
   /** 플레이 화면 초기화 버튼 — 현재 너비 유지 */
@@ -277,11 +268,13 @@ export function useKnittingGame() {
 
   const handleKnit = useCallback(
     (colorOverride?: Color) => {
-      if (screen !== "play") return;
+      if (gameState.screen !== "play") return;
 
       if (isChallengeComplete) {
         setStarted(false);
-        setScreen("result");
+        setGameState((prev) =>
+          prev.screen === "play" ? { ...prev, screen: "result" } : prev,
+        );
         return;
       }
 
@@ -291,41 +284,34 @@ export function useKnittingGame() {
         type: "V",
         color: colorOverride ?? currentThread,
         slipped:
-          mode === "challenge" && challengeCtx?.level === "normal"
+          gameState.mode === "challenge" && gameState.level === "normal"
             ? Math.random() < 0.2
             : false,
       };
 
       dispatch({ type: "KNIT", stitch });
     },
-    [
-      challengeCtx?.level,
-      currentThread,
-      isChallengeComplete,
-      mode,
-      screen,
-      started,
-    ],
+    [currentThread, gameState, isChallengeComplete, started],
   );
 
   const handleUnravel = useCallback(() => {
-    if (screen !== "play" || mode === null) return;
-    dispatch({ type: "UNRAVEL", mode });
-  }, [mode, screen]);
+    if (gameState.screen !== "play") return;
+    dispatch({ type: "UNRAVEL", mode: gameState.mode });
+  }, [gameState]);
 
   const handleSelectColorAndKnit = useCallback(
     (id: number) => {
-      if (screen !== "play") return;
+      if (gameState.screen !== "play") return;
       const color = id as Color;
       if (!Object.values(Color).includes(color)) return;
       setCurrentThread(color);
       handleKnit(color);
     },
-    [handleKnit, screen],
+    [handleKnit, gameState.screen],
   );
 
   useEffect(() => {
-    if (screen !== "play") return;
+    if (gameState.screen !== "play") return;
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.repeat) return;
@@ -356,12 +342,10 @@ export function useKnittingGame() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleSelectColorAndKnit, handleUnravel, screen]);
+  }, [handleSelectColorAndKnit, handleUnravel, gameState.screen]);
 
   return {
-    screen,
-    mode,
-    challengeCtx,
+    gameState,
     currentThread,
     knittedRows,
     currentRow,
@@ -382,7 +366,6 @@ export function useKnittingGame() {
     finishFree,
     resumeFree,
     restartFree,
-    freeName,
     handleSaveFreeName,
     handleChangeWidth,
     handleBackToSelect,

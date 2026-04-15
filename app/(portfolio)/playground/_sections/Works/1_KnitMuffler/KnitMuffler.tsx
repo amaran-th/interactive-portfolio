@@ -13,7 +13,7 @@ export default function KnitMuffler() {
 
   return (
     <ColorModeContext.Provider value={colorMode}>
-      {game.screen === "select" ? (
+      {game.gameState.screen === "select" ? (
         <SelectScreen
           onStartChallenge={game.startChallenge}
           onStartFreeSlot={game.startFreeSlot}
