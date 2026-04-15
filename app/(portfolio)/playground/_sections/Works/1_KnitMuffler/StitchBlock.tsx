@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { useColorPalette } from "./ColorModeContext";
-import { Stitch } from "./type";
+import { Stitch, StitchType } from "./type";
 
 function StitchBlock({
   type,
@@ -55,12 +55,12 @@ function StitchBlock({
       </svg>
     );
   }
-  if (type === "Flower") {
+  if (type === StitchType.Flower) {
     return (
       <svg
         width={size}
         height={size}
-        viewBox="0 0 37 37"
+        viewBox="2 2 32 32"
         fill="none"
         style={{
           overflow: "visible",

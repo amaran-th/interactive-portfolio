@@ -3,7 +3,10 @@ export type Mode = "challenge" | "free";
 export type Screen = "select" | "play" | "result";
 export type ChallengeLevel = "easy" | "normal" | "hard";
 export type Width = 10 | 20;
-export type StitchType = "V" | "Flower";
+export enum StitchType {
+  V = "V",
+  Flower = "Flower",
+}
 
 export enum Color {
   BLUE = 1,

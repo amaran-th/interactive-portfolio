@@ -7,7 +7,8 @@ import DraftPreview from "./DraftPreview";
 import { MufflerPreview } from "./MufflerPreview";
 import ResultModal from "./ResultModal";
 import Status from "./Status";
-import { Width } from "./type";
+import StitchBlock from "./StitchBlock";
+import { StitchType, Width } from "./type";
 import { useKnittingGame } from "./useKnittingGame";
 import { useResultExport } from "./useResultExport";
 
@@ -40,14 +41,31 @@ export default function PlayScreen({
     handleSaveFreeName,
     handleUnravel,
     handleSelectColorAndKnit,
+    currentStitchType,
+    handleSelectStitchType,
   } = game;
 
   // gameState에서 타입 좁히기로 도출
   const mode = gameState.screen !== "select" ? gameState.mode : null;
-  const challengeLevel = gameState.screen !== "select" && gameState.mode === "challenge" ? gameState.level : null;
-  const challengeDraftId = gameState.screen !== "select" && gameState.mode === "challenge" ? gameState.draftId : null;
-  const challengeDraft = gameState.screen !== "select" && gameState.mode === "challenge" ? gameState.draft : null;
-  const freeName = gameState.screen !== "select" && gameState.mode === "free" ? gameState.name : "";
+  const challengeLevel =
+    gameState.screen !== "select" && gameState.mode === "challenge"
+      ? gameState.level
+      : null;
+  const challengeDraftId =
+    gameState.screen !== "select" && gameState.mode === "challenge"
+      ? gameState.draftId
+      : null;
+  const challengeDraft =
+    gameState.screen !== "select" && gameState.mode === "challenge"
+      ? gameState.draft
+      : null;
+  const freeName =
+    gameState.screen !== "select" && gameState.mode === "free"
+      ? gameState.name
+      : "";
+
+  const showStitchSelector =
+    mode === "free" || (mode === "challenge" && challengeLevel === "hard");
 
   const resultModalRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -88,7 +106,9 @@ export default function PlayScreen({
     <div className="font-knit-muffler relative flex h-full overflow-hidden bg-white text-black">
       <div
         className={`flex h-full w-full flex-col ${
-          gameState.screen === "result" ? "blur-md pointer-events-none select-none" : ""
+          gameState.screen === "result"
+            ? "blur-md pointer-events-none select-none"
+            : ""
         }`}
       >
         {/* 상단 좌측 버튼 */}
@@ -228,9 +248,10 @@ export default function PlayScreen({
             </div>
           </div>
 
-          {/* 색상 팔레트 + 풀기 버튼 */}
+          {/* 코 종류 선택 + 색상 팔레트 + 풀기 버튼 */}
           <div className="flex flex-col items-center gap-2 py-4">
-            <div className="w-full max-w-70 px-4 md:w-auto md:max-w-fit">
+            <div className="flex items-stretch justify-center gap-3 px-4">
+              {/* 색상 팔레트 */}
               <div className="grid grid-cols-5 justify-items-center gap-2 rounded-2xl border border-stone-200 bg-white/90 px-3 py-3 shadow-md backdrop-blur-sm md:flex md:items-end md:gap-2 md:px-4">
                 {palette.map((color) => (
                   <div
@@ -252,7 +273,35 @@ export default function PlayScreen({
                 ))}
               </div>
             </div>
-            <div className="w-full flex items-center justify-center">
+
+            <div className="w-full flex items-center justify-center gap-1">
+              {/* 코 종류 선택 (하드/자유 모드) */}
+              {showStitchSelector && (
+                <div className="flex flex-col justify-center items-center gap-1 rounded-2xl border border-stone-200 bg-white/90 px-3 py-3 shadow-md backdrop-blur-sm">
+                  <div className="flex gap-2">
+                    {[StitchType.V, StitchType.Flower].map((stitchType) => (
+                      <button
+                        key={stitchType}
+                        onClick={() => handleSelectStitchType(stitchType)}
+                        className={`flex items-center gap-0.5 rounded-full p-2 transition-colors border border-gray-300 ${
+                          currentStitchType === stitchType
+                            ? "ring-2 ring-stone-900 ring-offset-1"
+                            : "hover:bg-stone-100"
+                        }`}
+                        aria-label={`${stitchType} 코 선택`}
+                      >
+                        <StitchBlock
+                          type={stitchType}
+                          color={currentThread}
+                          slipped={false}
+                          size={16}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400">Space</p>
+                </div>
+              )}
               <div className="w-full max-w-sm rounded-2xl border border-stone-200 bg-white/90 p-3 shadow-md backdrop-blur-sm">
                 <button
                   onClick={handleUnravel}

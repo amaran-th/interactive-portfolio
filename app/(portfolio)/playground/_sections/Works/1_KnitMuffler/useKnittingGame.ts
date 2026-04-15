@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import { Draft, EASY_DRAFTS, NORMAL_DRAFTS } from "./data";
-import { ChallengeLevel, Color, Mode, Stitch, Width } from "./type";
+import { ChallengeLevel, Color, Mode, Stitch, StitchType, Width } from "./type";
 import { useKnittingStats } from "./useKnittingStats";
 import {
   clearFreeSave,
@@ -97,10 +97,12 @@ function knittingReducer(
 // ---
 
 const DEFAULT_THREAD = Color.BLUE;
+const DEFAULT_STITCH_TYPE = StitchType.V;
 
 export function useKnittingGame() {
   const [gameState, setGameState] = useState<GameState>({ screen: "select" });
   const [currentThread, setCurrentThread] = useState<Color>(DEFAULT_THREAD);
+  const [currentStitchType, setCurrentStitchType] = useState<StitchType>(DEFAULT_STITCH_TYPE);
   const [started, setStarted] = useState(false);
   const [knitting, dispatch] = useReducer(knittingReducer, INITIAL_KNITTING);
   const { elapsed, reset: resetTimer } = useTimer(started);
@@ -137,10 +139,23 @@ export function useKnittingGame() {
     draft: challengeDraft.data,
     stitches: activeRows,
     elapsed,
+    checkStitchType:
+      gameState.screen !== "select" &&
+      gameState.mode === "challenge" &&
+      gameState.level === "hard",
   });
+
+  const handleSelectStitchType = useCallback((type: StitchType) => {
+    setCurrentStitchType(type);
+  }, []);
+
+  const handleToggleStitchType = useCallback(() => {
+    setCurrentStitchType((prev) => (prev === StitchType.V ? StitchType.Flower : StitchType.V));
+  }, []);
 
   const resetKnitting = useCallback((stitchCount?: Width) => {
     setCurrentThread(DEFAULT_THREAD);
+    setCurrentStitchType(DEFAULT_STITCH_TYPE);
     setStarted(false);
     dispatch({ type: "RESET", stitchCount });
     resetTimer();
@@ -281,7 +296,7 @@ export function useKnittingGame() {
       if (!started) setStarted(true);
 
       const stitch: Stitch = {
-        type: "V",
+        type: currentStitchType,
         color: colorOverride ?? currentThread,
         slipped:
           gameState.mode === "challenge" && gameState.level === "normal"
@@ -291,7 +306,7 @@ export function useKnittingGame() {
 
       dispatch({ type: "KNIT", stitch });
     },
-    [currentThread, gameState, isChallengeComplete, started],
+    [currentStitchType, currentThread, gameState, isChallengeComplete, started],
   );
 
   const handleUnravel = useCallback(() => {
@@ -337,12 +352,22 @@ export function useKnittingGame() {
         case "Backspace":
           handleUnravel();
           break;
+        case "Space":
+          if (
+            gameState.screen === "play" &&
+            (gameState.mode === "free" ||
+              (gameState.mode === "challenge" && gameState.level === "hard"))
+          ) {
+            e.preventDefault();
+            handleToggleStitchType();
+          }
+          break;
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleSelectColorAndKnit, handleUnravel, gameState.screen]);
+  }, [handleSelectColorAndKnit, handleToggleStitchType, handleUnravel, gameState]);
 
   return {
     gameState,
@@ -372,5 +397,8 @@ export function useKnittingGame() {
     handleInitialize,
     handleUnravel,
     handleSelectColorAndKnit,
+    currentStitchType,
+    handleSelectStitchType,
+    handleToggleStitchType,
   };
 }

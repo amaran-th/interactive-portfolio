@@ -122,6 +122,17 @@ function ModeAccordion({
   const contentRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(0);
 
+  const availableWidths = [...new Set(drafts.map((d) => d.width))].sort(
+    (a, b) => a - b,
+  );
+  const [selectedWidth, setSelectedWidth] = useState<number>(
+    availableWidths[0],
+  );
+  const filteredDrafts =
+    availableWidths.length > 1
+      ? drafts.filter((d) => d.width === selectedWidth)
+      : drafts;
+
   useEffect(() => {
     if (!contentRef.current) return;
     if (open) {
@@ -129,7 +140,7 @@ function ModeAccordion({
     } else {
       setHeight(0);
     }
-  }, [open]);
+  }, [open, selectedWidth]);
 
   return (
     <div
@@ -161,9 +172,27 @@ function ModeAccordion({
               </p>
             </div>
           </div>
+
+          {/* 코 수 필터 탭 */}
+          <div className="px-6 pt-4 flex gap-2">
+            {availableWidths.map((w) => (
+              <button
+                key={w}
+                onClick={() => setSelectedWidth(w)}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium border transition-colors ${
+                  selectedWidth === w
+                    ? "bg-stone-800 text-white border-stone-800"
+                    : "border-stone-400 text-stone-600 hover:bg-stone-100"
+                }`}
+              >
+                {w}수
+              </button>
+            ))}
+          </div>
+
           <div className="px-6 py-4">
             <div className="p-3 flex overflow-x-auto gap-3">
-              {drafts.map((entry) => (
+              {filteredDrafts.map((entry) => (
                 <DraftCard
                   key={entry.id}
                   entry={entry}
@@ -262,7 +291,6 @@ function FreeSlotCard({
   save,
   onStart,
   onView,
-  onDelete,
 }: {
   index: number;
   save: FreeSave | null;
@@ -270,8 +298,6 @@ function FreeSlotCard({
   onView: (index: number) => void;
   onDelete: (index: number) => void;
 }) {
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
   if (!save) {
     return (
       <button
@@ -287,32 +313,6 @@ function FreeSlotCard({
 
   return (
     <div className="relative flex flex-col items-center gap-2 p-3 rounded-2xl border-2 border-stone-200 bg-white shadow-sm min-w-37 transition-all hover:border-stone-400 hover:-translate-y-0.5 hover:shadow-md">
-      {/* 삭제 버튼 */}
-      {!confirmDelete ? (
-        <button
-          onClick={() => setConfirmDelete(true)}
-          className="absolute top-2 right-2 rounded-full border border-stone-200 p-1 text-stone-300 hover:text-red-500 hover:border-red-300 transition-colors z-10"
-          aria-label="삭제"
-        >
-          <Trash2 className="size-3" />
-        </button>
-      ) : (
-        <div className="absolute top-2 right-2 flex gap-1 z-10">
-          <button
-            onClick={() => onDelete(index)}
-            className="rounded-full bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600 transition-colors"
-          >
-            삭제
-          </button>
-          <button
-            onClick={() => setConfirmDelete(false)}
-            className="rounded-full border border-stone-300 px-2 py-1 text-xs hover:bg-stone-100 transition-colors"
-          >
-            취소
-          </button>
-        </div>
-      )}
-      {/* 미리보기 */}
       <button
         onClick={() => onView(index)}
         className="flex flex-col items-center gap-2 w-full"
@@ -331,12 +331,13 @@ function FreeSlotCard({
         </p>
         <div className="flex items-center gap-1">
           <span className="text-sm gap-2 flex items-center text-stone-500 bg-stone-100 rounded-full px-2 py-0.5">
-            <Zap className="size-4" /> {formatElapsedResult(save.elapsed, false)}
+            <Zap className="size-4" />{" "}
+            {formatElapsedResult(save.elapsed, false)}
           </span>
         </div>
       </button>
       <div className="absolute -left-3 -top-3 size-8 rounded-full flex justify-center items-center -rotate-20 bg-stone-800 text-white z-80 text-xs">
-        {save.width}코
+        {save.width}수
       </div>
     </div>
   );

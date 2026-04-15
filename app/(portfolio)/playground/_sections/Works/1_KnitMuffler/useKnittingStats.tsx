@@ -7,9 +7,10 @@ type Props = {
   draft: DraftCell[][];
   stitches: Stitch[][];
   elapsed: number;
+  checkStitchType?: boolean;
 };
 
-export const useKnittingStats = ({ draft, stitches, elapsed }: Props) => {
+export const useKnittingStats = ({ draft, stitches, elapsed, checkStitchType = false }: Props) => {
   return useMemo(() => {
     let total = 0;
     let success = 0; // slipped === false
@@ -19,7 +20,7 @@ export const useKnittingStats = ({ draft, stitches, elapsed }: Props) => {
       const isReversed = y % 2 === 1;
       row.forEach((_, x) => {
         const draftX = isReversed ? row.length - 1 - x : x;
-        const targetColor = row[draftX].color;
+        const target = row[draftX];
         const stitch = stitches[y]?.[x];
         if (!stitch) return;
 
@@ -29,7 +30,9 @@ export const useKnittingStats = ({ draft, stitches, elapsed }: Props) => {
           success++;
         }
 
-        if (stitch.color === targetColor) {
+        const colorMatch = stitch.color === target.color;
+        const typeMatch = !checkStitchType || stitch.type === target.type;
+        if (colorMatch && typeMatch) {
           correctColor++;
         }
       });
@@ -53,5 +56,5 @@ export const useKnittingStats = ({ draft, stitches, elapsed }: Props) => {
       spm,
       progress,
     };
-  }, [draft, stitches, elapsed]);
+  }, [draft, stitches, elapsed, checkStitchType]);
 };
