@@ -42,6 +42,7 @@ export default function PlayScreen({
     handleSelectColorAndKnit,
     currentStitchType,
     handleSelectStitchType,
+    handleToggleStitchType,
   } = game;
 
   // gameState에서 타입 좁히기로 도출
@@ -153,7 +154,9 @@ export default function PlayScreen({
 
           {/* 챌린지 모드 - 모바일 Status + 도안 */}
           <div className="w-full px-4 pb-3 md:hidden">
-            <div className={`flex gap-3 items-start ${challengeDraft?.width === 20 ? "flex-col" : "grid grid-cols-2"}`}>
+            <div
+              className={`flex gap-3 items-start ${challengeDraft?.width === 20 ? "flex-col" : "grid grid-cols-2"}`}
+            >
               <Status
                 level={challengeLevel}
                 elapsed={elapsed}
@@ -247,10 +250,43 @@ export default function PlayScreen({
           </div>
 
           {/* 코 종류 선택 + 색상 팔레트 + 풀기 버튼 */}
-          <div className="flex flex-col items-center gap-2 py-4">
-            <div className="flex items-stretch justify-center gap-3 px-4">
+          <div className="flex justify-center gap-2 w-full border-t border-stone-200 bg-white/90 p-3 pb-0 shadow-md">
+            {showStitchSelector && (
+              <div className="flex flex-col justify-center items-center gap-2 rounded-t-2xl border border-b-0 border-stone-200 bg-white/90 px-3 py-3 shadow-md backdrop-blur-sm">
+                <div className="flex gap-2">
+                  {[StitchType.V, StitchType.Flower].map((stitchType) => (
+                    <button
+                      key={stitchType}
+                      onClick={() => handleSelectStitchType(stitchType)}
+                      className={`flex items-center gap-0.5 rounded-full p-2 transition-colors border border-gray-300 ${
+                        currentStitchType === stitchType
+                          ? "ring-2 ring-stone-900 ring-offset-1"
+                          : "hover:bg-stone-100"
+                      }`}
+                      aria-label={`${stitchType} 코 선택`}
+                    >
+                      <StitchBlock
+                        type={stitchType}
+                        color={currentThread}
+                        slipped={false}
+                        size={16}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => handleToggleStitchType()}
+                  className="text-xs text-blue-400 grow rounded border border-stone-300 bg-blue-100 px-4 py-1 transition-colors hover:bg-blue-200"
+                >
+                  모양 바꾸기
+                  <br />
+                  (Space)
+                </button>
+              </div>
+            )}
+            <div className="flex flex-col items-center gap-2 pb-3">
               {/* 색상 팔레트 */}
-              <div className="grid grid-cols-5 justify-items-center gap-2 rounded-2xl border border-stone-200 bg-white/90 px-3 py-3 shadow-md backdrop-blur-sm md:flex md:items-end md:gap-2 md:px-4">
+              <div className="grid grid-cols-5 justify-items-center gap-2 rounded-2xl border border-stone-200 p-3 md:flex md:items-end md:gap-2 md:px-4">
                 {palette.map((color) => (
                   <div
                     key={color.id}
@@ -270,51 +306,20 @@ export default function PlayScreen({
                   </div>
                 ))}
               </div>
-            </div>
 
-            <div className="w-full flex items-center justify-center gap-1">
-              {/* 코 종류 선택 (하드/자유 모드) */}
-              {showStitchSelector && (
-                <div className="flex flex-col justify-center items-center gap-1 rounded-2xl border border-stone-200 bg-white/90 px-3 py-3 shadow-md backdrop-blur-sm">
-                  <div className="flex gap-2">
-                    {[StitchType.V, StitchType.Flower].map((stitchType) => (
-                      <button
-                        key={stitchType}
-                        onClick={() => handleSelectStitchType(stitchType)}
-                        className={`flex items-center gap-0.5 rounded-full p-2 transition-colors border border-gray-300 ${
-                          currentStitchType === stitchType
-                            ? "ring-2 ring-stone-900 ring-offset-1"
-                            : "hover:bg-stone-100"
-                        }`}
-                        aria-label={`${stitchType} 코 선택`}
-                      >
-                        <StitchBlock
-                          type={stitchType}
-                          color={currentThread}
-                          slipped={false}
-                          size={16}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-400">Space</p>
-                </div>
-              )}
-              <div className="w-full max-w-sm rounded-2xl border border-stone-200 bg-white/90 p-3 shadow-md backdrop-blur-sm">
-                <button
-                  onClick={handleUnravel}
-                  disabled={
-                    mode === "free"
-                      ? currentStitchCount === 0 && knittedRows.length === 0
-                      : currentRowEverKnitted
-                        ? currentStitchCount === 0
-                        : knittedRows.length === 0
-                  }
-                  className="w-full rounded border border-stone-300 bg-red-100 px-4 py-2 text-red-700 transition-colors hover:bg-red-200 disabled:cursor-not-allowed disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-400"
-                >
-                  풀기(Backspace)
-                </button>
-              </div>
+              <button
+                onClick={handleUnravel}
+                disabled={
+                  mode === "free"
+                    ? currentStitchCount === 0 && knittedRows.length === 0
+                    : currentRowEverKnitted
+                      ? currentStitchCount === 0
+                      : knittedRows.length === 0
+                }
+                className="w-full rounded border border-stone-300 bg-red-100 px-4 py-2 text-red-700 transition-colors hover:bg-red-200 disabled:cursor-not-allowed disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-400"
+              >
+                풀기(Backspace)
+              </button>
             </div>
           </div>
         </div>

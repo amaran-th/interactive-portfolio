@@ -90,7 +90,7 @@ function DraftCard({
     >
       <DraftPreview
         draft={entry}
-        cellSize={12}
+        cellSize={12 / (entry.width / 10)}
         showNumbers={false}
         className="pointer-events-none"
       />

@@ -22,12 +22,12 @@ export default function DraftPreview({
 
   return (
     <div
-      className={`flex flex-col border border-gray-400 divide-y divide-gray-400 bg-white ${className}`}
+      className={`flex flex-col gap-px border border-gray-400 bg-gray-400 ${className}`}
     >
       {draft.data.map((row, ri) => (
         <div
           key={ri}
-          className={`flex relative ${typeof currentRowIndex === "number" && ri !== currentRowIndex ? "opacity-30" : ""}`}
+          className={`flex gap-px bg-gray-400 relative ${typeof currentRowIndex === "number" && ri !== currentRowIndex ? "opacity-30" : ""}`}
         >
           {currentRowIndex === ri &&
             (ri % 2 === 1 ? (
@@ -44,11 +44,11 @@ export default function DraftPreview({
             return (
               <div
                 key={si}
-                className={`flex justify-center items-center text-[8px] ${si < row.length - 1 ? "border-r border-gray-400" : ""}`}
+                className="flex justify-center items-center text-[8px]"
                 style={{
                   width: cellSize,
                   height: cellSize,
-                  backgroundColor: colorDef?.fill ?? "transparent",
+                  backgroundColor: colorDef?.fill ?? "white",
                   color: colorDef?.text ?? "inherit",
                 }}
               >

@@ -350,7 +350,7 @@ export function useKnittingGame() {
         type: currentStitchType,
         color: colorOverride ?? currentThread,
         slipped:
-          gameState.mode === "challenge" && gameState.level === "normal"
+          gameState.mode === "challenge" && gameState.level !== "easy"
             ? Math.random() < 0.2
             : false,
       };
