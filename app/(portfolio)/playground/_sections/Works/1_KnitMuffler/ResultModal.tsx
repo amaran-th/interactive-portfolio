@@ -49,19 +49,18 @@ function ResultModeLabel({
 function ResultPattern({
   draft,
   title,
-  showNumbers = false,
 }: {
   draft: Draft;
   title: string;
-  showNumbers?: boolean;
 }) {
+  const cellSize = 20 / (draft.width / 10);
   return (
     <div className="flex flex-col items-center gap-3">
       <p className="text-sm font-medium text-stone-600 text-center">{title}</p>
       <DraftPreview
         draft={draft}
-        cellSize={20}
-        showNumbers={showNumbers}
+        cellSize={cellSize}
+        showNumbers={false}
         className="border-stone-300"
       />
     </div>
@@ -75,7 +74,6 @@ function ResultStats({
   challengeLevel,
   slipCount,
   colorAccuracy,
-  spm,
 }: {
   rows: Stitch[][];
   elapsed: number;
@@ -83,7 +81,6 @@ function ResultStats({
   challengeLevel: ChallengeLevel | null;
   slipCount: number;
   colorAccuracy: number;
-  spm: number;
 }) {
   const getAccuracyColor = (value: number) => {
     if (value === 100) return "text-green-600";
@@ -113,11 +110,6 @@ function ResultStats({
             label: "정확도",
             value: `${colorAccuracy.toFixed(1)}%`,
             valueClassName: getAccuracyColor(colorAccuracy),
-          },
-          {
-            label: "속도",
-            value: `${spm.toFixed(1)} SPM`,
-            valueClassName: "text-stone-900",
           },
         ]
       : [
@@ -200,7 +192,6 @@ function ChallengeStatSaver({
           {existingMedal && <MedalIcon medal={existingMedal} />}
           <span>{formatElapsedResult(existing.elapsed)}</span>
           <span>{existing.colorAccuracy.toFixed(1)}%</span>
-          {level !== "easy" && <span>{existing.spm.toFixed(1)} SPM</span>}
         </div>
         <div className="w-px bg-stone-200" />
         <div className="flex flex-col items-center gap-0.5">
@@ -222,13 +213,6 @@ function ChallengeStatSaver({
           >
             {current.colorAccuracy.toFixed(1)}%
           </span>
-          {level !== "easy" && (
-            <span
-              className={current.spm > existing.spm ? "text-green-600" : ""}
-            >
-              {current.spm.toFixed(1)} SPM
-            </span>
-          )}
         </div>
       </div>
       <div className="flex gap-2 mt-1">
@@ -259,7 +243,6 @@ export default function ResultModal({
   elapsed,
   slipCount,
   colorAccuracy,
-  spm,
   challengeDraft,
   freeName,
   isSavingResult,
@@ -279,7 +262,6 @@ export default function ResultModal({
   elapsed: number;
   slipCount: number;
   colorAccuracy: number;
-  spm: number;
   challengeDraft: Draft | null;
   freeName?: string;
   isSavingResult: boolean;
@@ -357,7 +339,6 @@ export default function ResultModal({
               challengeLevel={challengeLevel}
               slipCount={slipCount}
               colorAccuracy={colorAccuracy}
-              spm={spm}
             />
             <div
               className={`grid w-full justify-center gap-10 ${mode === "challenge" ? "md:grid-cols-2" : ""}`}
@@ -367,7 +348,6 @@ export default function ResultModal({
                   <ResultPattern
                     title="도안"
                     draft={challengeDraft}
-                    showNumbers
                   />
                 </div>
               )}
@@ -391,7 +371,6 @@ export default function ResultModal({
                     elapsed,
                     slipCount,
                     colorAccuracy,
-                    spm,
                   }}
                 />
               )}

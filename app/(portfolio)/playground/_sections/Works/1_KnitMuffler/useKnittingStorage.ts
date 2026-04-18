@@ -1,4 +1,4 @@
-import { EASY_DRAFTS, NORMAL_DRAFTS } from "./data";
+import { DRAFTS } from "./data";
 import {
   ChallengeLevel,
   ChallengeProgress,
@@ -47,7 +47,7 @@ export function getChallengeProgress(
 ): ChallengeProgress | null {
   try {
     const history = getHistory();
-    const drafts = level === "easy" ? EASY_DRAFTS : NORMAL_DRAFTS;
+    const drafts = DRAFTS[level];
     return drafts.reduce(
       (acc, draft) => {
         const entry = history[level].find((e) => e.id === draft.id);

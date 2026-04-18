@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import { Draft, EASY_DRAFTS, NORMAL_DRAFTS } from "./data";
+import { Draft, DRAFTS } from "./data";
 import { ChallengeLevel, Color, Mode, Stitch, StitchType, Width } from "./type";
 import { useKnittingStats } from "./useKnittingStats";
 import {
@@ -16,8 +16,19 @@ import { useTimer } from "./useTimer";
 // nullable 상태 조합(mode=null, challengeCtx=null 등)이 불가능해진다.
 export type GameState =
   | { screen: "select" }
-  | { screen: "play" | "result"; mode: "challenge"; level: ChallengeLevel; draftId: number; draft: Draft }
-  | { screen: "play" | "result"; mode: "free"; slotIndex: number; name: string };
+  | {
+      screen: "play" | "result";
+      mode: "challenge";
+      level: ChallengeLevel;
+      draftId: number;
+      draft: Draft;
+    }
+  | {
+      screen: "play" | "result";
+      mode: "free";
+      slotIndex: number;
+      name: string;
+    };
 
 // --- Knitting reducer ---
 type KnittingState = {
@@ -88,9 +99,16 @@ function knittingReducer(
       return { ...state, currentRow: state.currentRow.slice(0, -1) };
     }
     case "RESET":
-      return { ...INITIAL_KNITTING, stitchCount: action.stitchCount ?? INITIAL_KNITTING.stitchCount };
+      return {
+        ...INITIAL_KNITTING,
+        stitchCount: action.stitchCount ?? INITIAL_KNITTING.stitchCount,
+      };
     case "LOAD_ROWS":
-      return { ...INITIAL_KNITTING, stitchCount: action.stitchCount, knittedRows: action.rows };
+      return {
+        ...INITIAL_KNITTING,
+        stitchCount: action.stitchCount,
+        knittedRows: action.rows,
+      };
   }
 }
 
@@ -102,7 +120,8 @@ const DEFAULT_STITCH_TYPE = StitchType.V;
 export function useKnittingGame() {
   const [gameState, setGameState] = useState<GameState>({ screen: "select" });
   const [currentThread, setCurrentThread] = useState<Color>(DEFAULT_THREAD);
-  const [currentStitchType, setCurrentStitchType] = useState<StitchType>(DEFAULT_STITCH_TYPE);
+  const [currentStitchType, setCurrentStitchType] =
+    useState<StitchType>(DEFAULT_STITCH_TYPE);
   const [started, setStarted] = useState(false);
   const [knitting, dispatch] = useReducer(knittingReducer, INITIAL_KNITTING);
   const { elapsed, reset: resetTimer } = useTimer(started);
@@ -114,7 +133,7 @@ export function useKnittingGame() {
   const challengeDraft =
     gameState.screen !== "select" && gameState.mode === "challenge"
       ? gameState.draft
-      : EASY_DRAFTS[0];
+      : DRAFTS.easy[0];
 
   const activeRows = useMemo(
     () => (currentRow.length > 0 ? [...knittedRows, currentRow] : knittedRows),
@@ -132,13 +151,17 @@ export function useKnittingGame() {
       gameState.mode === "challenge" &&
       knittedRows.length === challengeDraft.data.length &&
       currentRow.length === 0,
-    [challengeDraft.data.length, currentRow.length, gameState, knittedRows.length],
+    [
+      challengeDraft.data.length,
+      currentRow.length,
+      gameState,
+      knittedRows.length,
+    ],
   );
 
-  const { slipCount, colorAccuracy, progress, spm } = useKnittingStats({
+  const { slipCount, colorAccuracy, progress } = useKnittingStats({
     draft: challengeDraft.data,
     stitches: activeRows,
-    elapsed,
     checkStitchType:
       gameState.screen !== "select" &&
       gameState.mode === "challenge" &&
@@ -150,16 +173,21 @@ export function useKnittingGame() {
   }, []);
 
   const handleToggleStitchType = useCallback(() => {
-    setCurrentStitchType((prev) => (prev === StitchType.V ? StitchType.Flower : StitchType.V));
+    setCurrentStitchType((prev) =>
+      prev === StitchType.V ? StitchType.Flower : StitchType.V,
+    );
   }, []);
 
-  const resetKnitting = useCallback((stitchCount?: Width) => {
-    setCurrentThread(DEFAULT_THREAD);
-    setCurrentStitchType(DEFAULT_STITCH_TYPE);
-    setStarted(false);
-    dispatch({ type: "RESET", stitchCount });
-    resetTimer();
-  }, [resetTimer]);
+  const resetKnitting = useCallback(
+    (stitchCount?: Width) => {
+      setCurrentThread(DEFAULT_THREAD);
+      setCurrentStitchType(DEFAULT_STITCH_TYPE);
+      setStarted(false);
+      dispatch({ type: "RESET", stitchCount });
+      resetTimer();
+    },
+    [resetTimer],
+  );
 
   /** 자유 모드 저장 데이터를 뜨개 상태에만 로드 (gameState는 호출자가 설정) */
   const loadFreeRows = useCallback(
@@ -174,11 +202,17 @@ export function useKnittingGame() {
 
   const startChallenge = useCallback(
     (level: ChallengeLevel, draftId: number) => {
-      const levelDrafts = level === "easy" ? EASY_DRAFTS : NORMAL_DRAFTS;
+      const levelDrafts = DRAFTS[level];
       const draft = levelDrafts.find((d) => d.id === draftId);
       if (!draft) return;
       resetKnitting(draft.width);
-      setGameState({ screen: "play", mode: "challenge", level, draftId, draft });
+      setGameState({
+        screen: "play",
+        mode: "challenge",
+        level,
+        draftId,
+        draft,
+      });
     },
     [resetKnitting],
   );
@@ -191,7 +225,12 @@ export function useKnittingGame() {
       const saved = getFreeSave(slotIndex);
       if (!saved) return;
       loadFreeRows(saved.rows, saved.elapsed, saved.width);
-      setGameState({ screen: "result", mode: "free", slotIndex, name: saved.name });
+      setGameState({
+        screen: "result",
+        mode: "free",
+        slotIndex,
+        name: saved.name,
+      });
     },
     [loadFreeRows],
   );
@@ -211,7 +250,12 @@ export function useKnittingGame() {
       const saved = getFreeSave(slotIndex);
       if (!saved) return;
       loadFreeRows(saved.rows, saved.elapsed, saved.width);
-      setGameState({ screen: "play", mode: "free", slotIndex, name: saved.name });
+      setGameState({
+        screen: "play",
+        mode: "free",
+        slotIndex,
+        name: saved.name,
+      });
     },
     [loadFreeRows],
   );
@@ -233,7 +277,12 @@ export function useKnittingGame() {
     const saved = getFreeSave(slotIndex);
     if (saved) {
       loadFreeRows(saved.rows, saved.elapsed, saved.width);
-      setGameState({ screen: "play", mode: "free", slotIndex, name: saved.name });
+      setGameState({
+        screen: "play",
+        mode: "free",
+        slotIndex,
+        name: saved.name,
+      });
     } else {
       setGameState({ screen: "play", mode: "free", slotIndex, name });
     }
@@ -254,7 +303,9 @@ export function useKnittingGame() {
       if (gameState.screen === "select" || gameState.mode !== "free") return;
       const { slotIndex } = gameState;
       setGameState((prev) =>
-        prev.screen !== "select" && prev.mode === "free" ? { ...prev, name } : prev,
+        prev.screen !== "select" && prev.mode === "free"
+          ? { ...prev, name }
+          : prev,
       );
       const saved = getFreeSave(slotIndex);
       if (!saved) return;
@@ -367,7 +418,12 @@ export function useKnittingGame() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleSelectColorAndKnit, handleToggleStitchType, handleUnravel, gameState]);
+  }, [
+    handleSelectColorAndKnit,
+    handleToggleStitchType,
+    handleUnravel,
+    gameState,
+  ]);
 
   return {
     gameState,
@@ -383,7 +439,6 @@ export function useKnittingGame() {
     slipCount,
     colorAccuracy,
     progress,
-    spm,
     startChallenge,
     startFreeSlot,
     viewFreeSave,

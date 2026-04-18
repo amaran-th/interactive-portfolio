@@ -31,7 +31,6 @@ export default function PlayScreen({
     slipCount,
     colorAccuracy,
     progress,
-    spm,
     finishFree,
     resumeFree,
     restartFree,
@@ -154,18 +153,18 @@ export default function PlayScreen({
 
           {/* 챌린지 모드 - 모바일 Status + 도안 */}
           <div className="w-full px-4 pb-3 md:hidden">
-            <div className="grid grid-cols-2 gap-3 items-start">
+            <div className={`flex gap-3 items-start ${challengeDraft?.width === 20 ? "flex-col" : "grid grid-cols-2"}`}>
               <Status
                 level={challengeLevel}
                 elapsed={elapsed}
                 slipCount={slipCount}
                 colorAccuracy={colorAccuracy}
                 progress={progress}
-                spm={spm}
                 freeMode={mode === "free"}
+                wrap={challengeDraft?.width === 20}
               />
               {mode === "challenge" && challengeDraft ? (
-                <div className="flex flex-col items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm">
+                <div className="flex flex-col items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm w-full overflow-x-auto">
                   <p className="text-sm text-stone-500">도안</p>
                   <DraftPreview
                     draft={challengeDraft}
@@ -199,7 +198,6 @@ export default function PlayScreen({
               slipCount={slipCount}
               colorAccuracy={colorAccuracy}
               progress={progress}
-              spm={spm}
               freeMode={mode === "free"}
             />
           </div>
@@ -363,7 +361,6 @@ export default function PlayScreen({
           elapsed={elapsed}
           slipCount={slipCount}
           colorAccuracy={colorAccuracy}
-          spm={spm}
           challengeDraft={challengeDraft}
           freeName={freeName}
           isSavingResult={isSavingResult}

@@ -37,7 +37,6 @@ export type ChallengeStat = {
   elapsed: number;
   slipCount: number;
   colorAccuracy: number;
-  spm: number;
   savedAt: number;
 };
 

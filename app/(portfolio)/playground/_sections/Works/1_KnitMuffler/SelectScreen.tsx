@@ -4,14 +4,14 @@ import { KnitMufflerIcon } from "@/components/SVG";
 import {
   CircleCheck,
   CircleStar,
+  Clock,
   Eye,
   Plus,
   Share2,
   Trash2,
-  Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Draft, EASY_DRAFTS, NORMAL_DRAFTS } from "./data";
+import { Draft, DRAFTS } from "./data";
 import DraftPreview from "./DraftPreview";
 import { MufflerPreview } from "./MufflerPreview";
 import {
@@ -52,9 +52,12 @@ export function MedalIcon({
 function StatBadge({ stat }: { stat: ChallengeStat }) {
   return (
     <div className="flex items-center gap-1">
-      <span className="text-sm gap-2 flex items-center text-stone-500 bg-stone-100 rounded-full px-2 py-0.5">
-        <Zap className="size-4" /> {stat.spm.toFixed(1)}{" "}
-        <CircleCheck className="size-4" />
+      <span className="text-sm gap-1.5 flex items-center text-stone-500 bg-stone-100 rounded-full px-2 py-0.5">
+        <Clock className="size-3.5" />
+        {formatElapsedResult(stat.elapsed, false)}
+      </span>
+      <span className="text-sm gap-1.5 flex items-center text-stone-500 bg-stone-100 rounded-full px-2 py-0.5">
+        <CircleCheck className="size-3.5" />
         {stat.colorAccuracy.toFixed(0)}%
       </span>
     </div>
@@ -144,7 +147,7 @@ function ModeAccordion({
 
   return (
     <div
-      className={`rounded-xl border-2 border-stone-400 ${bgClassName} overflow-hidden transition-transform hover:-translate-y-1`}
+      className={`rounded-xl border-2 border-gray-900 ${bgClassName} overflow-hidden transition-transform hover:-translate-y-1`}
     >
       <button
         onClick={() => setOpen((v) => !v)}
@@ -165,7 +168,7 @@ function ModeAccordion({
       </button>
       <div style={{ height, transition: "height 300ms ease" }}>
         <div ref={contentRef}>
-          <div className="border-t-2 border-stone-400 px-6">
+          <div className="border-t-2 border-gray-900 px-6">
             <div className="py-2 border-b border-stone-400">
               <p className="text-sm break-keep text-center text-stone-500 mt-2">
                 {description}
@@ -329,10 +332,13 @@ function FreeSlotCard({
         <p className="text-sm font-medium text-center break-all line-clamp-2">
           {save.name || `슬롯 ${index + 1}`}
         </p>
-        <div className="flex items-center gap-1">
-          <span className="text-sm gap-2 flex items-center text-stone-500 bg-stone-100 rounded-full px-2 py-0.5">
-            <Zap className="size-4" />{" "}
+        <div className="flex flex-wrap justify-center gap-1">
+          <span className="text-sm gap-1.5 flex items-center text-stone-500 bg-stone-100 rounded-full px-2 py-0.5">
+            <Clock className="size-3.5" />
             {formatElapsedResult(save.elapsed, false)}
+          </span>
+          <span className="text-sm gap-1.5 flex items-center text-stone-500 bg-stone-100 rounded-full px-2 py-0.5">
+            {save.rows.length}줄
           </span>
         </div>
       </button>
@@ -368,7 +374,7 @@ function FreeAccordion({
   }, [open, freeSlots]);
 
   return (
-    <div className="rounded-xl border-2 border-stone-400 bg-stone-50 overflow-hidden transition-transform hover:-translate-y-1">
+    <div className="rounded-xl border-2 border-gray-900 bg-stone-50 overflow-hidden transition-transform hover:-translate-y-1">
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between p-4"
@@ -377,7 +383,7 @@ function FreeAccordion({
       </button>
       <div style={{ height, transition: "height 300ms ease" }}>
         <div ref={contentRef}>
-          <div className="border-t-2 border-stone-400 px-6">
+          <div className="border-t-2 border-gray-900 px-6">
             <div className="py-2 border-b border-stone-400">
               <p className="text-sm break-keep text-center text-stone-500 mt-2">
                 자유롭게 나만의 작품을 만들어보세요!
@@ -431,9 +437,9 @@ export default function SelectScreen({
   );
 
   const allPerfect =
-    progress.easy?.perfect === EASY_DRAFTS.length &&
-    progress.normal?.perfect === NORMAL_DRAFTS.length &&
-    progress.hard?.perfect === NORMAL_DRAFTS.length;
+    progress.easy?.perfect === DRAFTS.easy.length &&
+    progress.normal?.perfect === DRAFTS.normal.length &&
+    progress.hard?.perfect === DRAFTS.hard.length;
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -512,7 +518,7 @@ export default function SelectScreen({
           <ModeAccordion
             label="🌱 EASY"
             level="easy"
-            drafts={EASY_DRAFTS}
+            drafts={DRAFTS.easy}
             bgClassName="bg-amber-50"
             progress={progress.easy}
             description="도안을 따라 알맞은 색상으로 작품을 완성해보세요!"
@@ -521,7 +527,7 @@ export default function SelectScreen({
           <ModeAccordion
             label="⭐️ NORMAL"
             level="normal"
-            drafts={NORMAL_DRAFTS}
+            drafts={DRAFTS.normal}
             bgClassName="bg-orange-100"
             progress={progress.normal}
             description="일정 확률로 잘못 뜬 코가 만들어집니다. 잘못 뜬 코를 풀고 다시 뜨면서 실수 없이 도안을 완성해보세요!"
@@ -530,7 +536,7 @@ export default function SelectScreen({
           <ModeAccordion
             label="🔥 HARD"
             level="hard"
-            drafts={NORMAL_DRAFTS}
+            drafts={DRAFTS.hard}
             bgClassName="bg-red-100"
             progress={progress.hard}
             description="뜰 수 있는 코의 종류가 늘어났습니다. 건투를 빕니다!"

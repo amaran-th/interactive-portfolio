@@ -6,11 +6,10 @@ type DraftCell = { type: StitchType; color: Color };
 type Props = {
   draft: DraftCell[][];
   stitches: Stitch[][];
-  elapsed: number;
   checkStitchType?: boolean;
 };
 
-export const useKnittingStats = ({ draft, stitches, elapsed, checkStitchType = false }: Props) => {
+export const useKnittingStats = ({ draft, stitches, checkStitchType = false }: Props) => {
   return useMemo(() => {
     let total = 0;
     let success = 0; // slipped === false
@@ -40,7 +39,6 @@ export const useKnittingStats = ({ draft, stitches, elapsed, checkStitchType = f
 
     const slipAccuracy = total === 0 ? 0 : (success / total) * 100;
     const colorAccuracy = total === 0 ? 0 : (correctColor / total) * 100;
-    const spm = elapsed > 0 ? total / (elapsed / 6000) : 0;
     const progress =
       draft.length === 0
         ? 0
@@ -53,8 +51,7 @@ export const useKnittingStats = ({ draft, stitches, elapsed, checkStitchType = f
       slipCount,
       slipAccuracy,
       colorAccuracy,
-      spm,
       progress,
     };
-  }, [draft, stitches, elapsed, checkStitchType]);
+  }, [draft, stitches, checkStitchType]);
 };
