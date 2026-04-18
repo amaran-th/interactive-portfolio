@@ -3,6 +3,7 @@
 import { ArrowRight } from "lucide-react";
 import { useColorPalette } from "./ColorModeContext";
 import { Draft } from "./data";
+import { StitchType } from "./type";
 
 export default function DraftPreview({
   draft,
@@ -44,7 +45,7 @@ export default function DraftPreview({
             return (
               <div
                 key={si}
-                className="flex justify-center items-center text-[8px]"
+                className={`flex justify-center items-center text-[8px]${stitch.type === StitchType.Flower ? " rounded-full" : ""}`}
                 style={{
                   width: cellSize,
                   height: cellSize,

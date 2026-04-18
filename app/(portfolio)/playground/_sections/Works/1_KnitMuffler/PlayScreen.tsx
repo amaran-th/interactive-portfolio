@@ -258,11 +258,11 @@ export default function PlayScreen({
                     <button
                       key={stitchType}
                       onClick={() => handleSelectStitchType(stitchType)}
-                      className={`flex items-center gap-0.5 rounded-full p-2 transition-colors border border-gray-300 ${
+                      className={`flex items-center gap-0.5 p-2 transition-colors border border-gray-300 ${
                         currentStitchType === stitchType
                           ? "ring-2 ring-stone-900 ring-offset-1"
                           : "hover:bg-stone-100"
-                      }`}
+                      } ${stitchType === StitchType.Flower ? "rounded-full" : ""}`}
                       aria-label={`${stitchType} 코 선택`}
                     >
                       <StitchBlock

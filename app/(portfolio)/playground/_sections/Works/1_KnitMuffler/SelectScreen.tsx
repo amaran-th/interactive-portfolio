@@ -52,11 +52,11 @@ export function MedalIcon({
 function StatBadge({ stat }: { stat: ChallengeStat }) {
   return (
     <div className="flex items-center gap-1">
-      <span className="text-sm gap-1.5 flex items-center text-stone-500 bg-stone-100 rounded-full px-2 py-0.5">
+      <span className="shrink-0 text-sm gap-1.5 flex items-center text-stone-500 bg-stone-100 rounded-full px-2 py-0.5">
         <Clock className="size-3.5" />
         {formatElapsedResult(stat.elapsed, false)}
       </span>
-      <span className="text-sm gap-1.5 flex items-center text-stone-500 bg-stone-100 rounded-full px-2 py-0.5">
+      <span className="shrink-0 text-sm gap-1.5 flex items-center text-stone-500 bg-stone-100 rounded-full px-2 py-0.5">
         <CircleCheck className="size-3.5" />
         {stat.colorAccuracy.toFixed(0)}%
       </span>
