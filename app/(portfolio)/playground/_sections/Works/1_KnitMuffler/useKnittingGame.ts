@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Draft, DRAFTS } from "./data";
 import { ChallengeLevel, Color, Mode, Stitch, StitchType, Width } from "./type";
 import { useKnittingStats } from "./useKnittingStats";
@@ -117,7 +117,7 @@ function knittingReducer(
 const DEFAULT_THREAD = Color.BLUE;
 const DEFAULT_STITCH_TYPE = StitchType.V;
 
-export function useKnittingGame() {
+export function useKnittingGame({ soundEnabled = true }: { soundEnabled?: boolean } = {}) {
   const [gameState, setGameState] = useState<GameState>({ screen: "select" });
   const [currentThread, setCurrentThread] = useState<Color>(DEFAULT_THREAD);
   const [currentStitchType, setCurrentStitchType] =
@@ -125,6 +125,11 @@ export function useKnittingGame() {
   const [started, setStarted] = useState(false);
   const [knitting, dispatch] = useReducer(knittingReducer, INITIAL_KNITTING);
   const { elapsed, reset: resetTimer } = useTimer(started);
+
+  const failAudioRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    failAudioRef.current = new Audio("/playground/fail.mp3");
+  }, []);
 
   const { knittedRows, currentRow, currentRowEverKnitted } = knitting;
 
@@ -346,18 +351,25 @@ export function useKnittingGame() {
 
       if (!started) setStarted(true);
 
+      const slipped =
+        gameState.mode === "challenge" && gameState.level !== "easy"
+          ? Math.random() < 0.2
+          : false;
+
+      if (slipped && soundEnabled && failAudioRef.current) {
+        failAudioRef.current.currentTime = 0;
+        failAudioRef.current.play().catch(() => {});
+      }
+
       const stitch: Stitch = {
         type: currentStitchType,
         color: colorOverride ?? currentThread,
-        slipped:
-          gameState.mode === "challenge" && gameState.level !== "easy"
-            ? Math.random() < 0.2
-            : false,
+        slipped,
       };
 
       dispatch({ type: "KNIT", stitch });
     },
-    [currentStitchType, currentThread, gameState, isChallengeComplete, started],
+    [currentStitchType, currentThread, gameState, isChallengeComplete, started, soundEnabled],
   );
 
   const handleUnravel = useCallback(() => {

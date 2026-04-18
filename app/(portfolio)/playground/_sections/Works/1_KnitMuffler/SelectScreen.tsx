@@ -13,6 +13,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Draft, DRAFTS } from "./data";
 import DraftPreview from "./DraftPreview";
+import { SoundToggleButton } from "./KnitMuffler";
 import { MufflerPreview } from "./MufflerPreview";
 import {
   ChallengeLevel,
@@ -270,7 +271,7 @@ function ShareButton() {
     try {
       await navigator.share({
         title: "뜨개뜨개",
-        text: "색실로 목도리를 완성해보세요!",
+        text: "도안을 따라 뜨개질 작품을 만들어보세요!",
         url: window.location.href,
       });
     } catch {
@@ -416,12 +417,16 @@ export default function SelectScreen({
   onViewFreeSave,
   colorMode,
   onColorModeChange,
+  soundEnabled,
+  onToggleSound,
 }: {
   onStartChallenge: (level: ChallengeLevel, draftId: number) => void;
   onStartFreeSlot: (index: number) => void;
   onViewFreeSave: (index: number) => void;
   colorMode: ColorMode;
   onColorModeChange: (mode: ColorMode) => void;
+  soundEnabled: boolean;
+  onToggleSound: () => void;
 }) {
   const [progress, setProgress] = useState<{
     easy: ChallengeProgress | null;
@@ -461,9 +466,10 @@ export default function SelectScreen({
   };
 
   return (
-    <div className="font-knit-muffler h-full max-h-full bg-[#f8f4ee] text-stone-900 flex flex-col items-center px-6 py-10 overflow-y-auto">
-      <div className="max-w-xl w-full flex flex-col gap-6">
-        <div className="flex flex-col items-center gap-4">
+    <div className="font-knit-muffler relative h-full max-h-full bg-[#f8f4ee] text-stone-900 flex flex-col items-center p-6 pt-16 overflow-y-auto">
+      <SoundToggleButton enabled={soundEnabled} onToggle={onToggleSound} />
+      <div className="max-w-xl w-full flex flex-col gap-8">
+        <div className="flex flex-col items-center gap-8">
           <div className="flex gap-1 items-center border-y-4 border-dashed border-orange-200 w-full justify-between py-2">
             <KnitMufflerIcon size="40" />
             <h2 className="text-5xl font-bold">

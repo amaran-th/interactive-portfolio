@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "뜨개뜨개",
-  description: "도안을 따라 뜨거나 자유롭게 색을 골라 작품을 완성하는 인터랙션",
+  description: "도안을 따라 나만의 뜨개질 작품을 만들어보세요!",
 
   icons: {
     icon: "/playground/knit-muffler.svg",
@@ -11,8 +11,7 @@ export const metadata: Metadata = {
 
   openGraph: {
     title: "뜨개뜨개",
-    description:
-      "도안을 따라 뜨거나 자유롭게 색을 골라 작품을 완성하는 인터랙션",
+    description: "도안을 따라 나만의 뜨개질 작품을 만들어보세요!",
     images: [
       {
         url: "/playground/knit-muffler.png",
@@ -24,8 +23,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "뜨개뜨개",
-    description:
-      "도안을 따라 뜨거나 자유롭게 색을 골라 작품을 완성하는 인터랙션",
+    description: "도안을 따라 나만의 뜨개질 작품을 만들어보세요!",
     images: ["/playground/knit-muffler.png"],
   },
 };
