@@ -250,43 +250,10 @@ export default function PlayScreen({
           </div>
 
           {/* 코 종류 선택 + 색상 팔레트 + 풀기 버튼 */}
-          <div className="flex justify-center gap-2 w-full border-t border-stone-200 bg-white/90 p-3 pb-0 shadow-md">
-            {showStitchSelector && (
-              <div className="flex flex-col justify-center items-center gap-2 rounded-t-2xl border border-b-0 border-stone-200 bg-white/90 px-3 py-3 shadow-md backdrop-blur-sm">
-                <div className="flex gap-2">
-                  {[StitchType.V, StitchType.Flower].map((stitchType) => (
-                    <button
-                      key={stitchType}
-                      onClick={() => handleSelectStitchType(stitchType)}
-                      className={`flex items-center gap-0.5 p-2 transition-colors border border-gray-300 ${
-                        currentStitchType === stitchType
-                          ? "ring-2 ring-stone-900 ring-offset-1"
-                          : "hover:bg-stone-100"
-                      } ${stitchType === StitchType.Flower ? "rounded-full" : ""}`}
-                      aria-label={`${stitchType} 코 선택`}
-                    >
-                      <StitchBlock
-                        type={stitchType}
-                        color={currentThread}
-                        slipped={false}
-                        size={16}
-                      />
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={() => handleToggleStitchType()}
-                  className="text-xs text-blue-400 grow rounded border border-stone-300 bg-blue-100 px-4 py-1 transition-colors hover:bg-blue-200"
-                >
-                  모양 바꾸기
-                  <br />
-                  (Space)
-                </button>
-              </div>
-            )}
+          <div className="flex items-center justify-between sm:justify-center gap-2 w-full border-t border-stone-200 bg-white/90 p-3 pb-0 shadow-md">
             <div className="flex flex-col items-center gap-2 pb-3">
               {/* 색상 팔레트 */}
-              <div className="grid grid-cols-5 justify-items-center gap-2 rounded-2xl border border-stone-200 p-3 md:flex md:items-end md:gap-2 md:px-4">
+              <div className="grid grid-cols-5 justify-items-center gap-2 rounded-2xl sm:border border-stone-200 sm:p-3 md:flex md:items-end md:gap-2 md:px-4">
                 {palette.map((color) => (
                   <div
                     key={color.id}
@@ -306,20 +273,58 @@ export default function PlayScreen({
                   </div>
                 ))}
               </div>
-
-              <button
-                onClick={handleUnravel}
-                disabled={
-                  mode === "free"
-                    ? currentStitchCount === 0 && knittedRows.length === 0
-                    : currentRowEverKnitted
-                      ? currentStitchCount === 0
-                      : knittedRows.length === 0
-                }
-                className="w-full rounded border border-stone-300 bg-red-100 px-4 py-2 text-red-700 transition-colors hover:bg-red-200 disabled:cursor-not-allowed disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-400"
+            </div>
+            <div className="flex flex-col gap-2 ">
+              <div
+                className={`flex justify-center rounded-2xl border-stone-200 bg-white/90 backdrop-blur-sm ${mode === "free" || challengeLevel === "hard" ? "sm:border sm:p-3 sm:shadow-md" : "pb-3"}`}
               >
-                풀기(Backspace)
-              </button>
+                <button
+                  onClick={handleUnravel}
+                  disabled={
+                    mode === "free"
+                      ? currentStitchCount === 0 && knittedRows.length === 0
+                      : currentRowEverKnitted
+                        ? currentStitchCount === 0
+                        : knittedRows.length === 0
+                  }
+                  className="w-full rounded border border-stone-300 bg-red-100 px-4 py-2 text-red-700 transition-colors hover:bg-red-200 disabled:cursor-not-allowed disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-400"
+                >
+                  풀기(Backspace)
+                </button>
+              </div>
+              {showStitchSelector && (
+                <div className="flex justify-center gap-2 rounded-t-2xl border border-b-0 border-stone-200 bg-white/90 p-3 shadow-md backdrop-blur-sm">
+                  <div className="flex flex-col gap-2">
+                    {[StitchType.V, StitchType.Flower].map((stitchType) => (
+                      <button
+                        key={stitchType}
+                        onClick={() => handleSelectStitchType(stitchType)}
+                        className={`flex items-center gap-0.5 p-2 transition-colors border border-gray-300 ${
+                          currentStitchType === stitchType
+                            ? "ring-2 ring-stone-900 ring-offset-1"
+                            : "hover:bg-stone-100"
+                        } ${stitchType === StitchType.Flower ? "rounded-full" : ""}`}
+                        aria-label={`${stitchType} 코 선택`}
+                      >
+                        <StitchBlock
+                          type={stitchType}
+                          color={currentThread}
+                          slipped={false}
+                          size={16}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => handleToggleStitchType()}
+                    className="text-xs text-blue-400 grow rounded border break-keep border-stone-300 bg-blue-100 px-4 py-1 transition-colors hover:bg-blue-200"
+                  >
+                    모양 바꾸기
+                    <br />
+                    (Space)
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

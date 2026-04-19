@@ -10,6 +10,10 @@ export type ResearchRecord = {
   methods: string[];
   findings: string[];
   nextSteps: string[];
+  images?: {
+    label: string;
+    src: string;
+  }[];
   references?: {
     label: string;
     href: string;
@@ -86,13 +90,19 @@ export const researches: ResearchRecord[] = [
     thumbnailLabel: "MOB",
     accentClassName: "from-sky-100 via-stone-100 to-violet-100",
     summary:
-      "모바일에서 양 엄지로 조작하는 사용자를 고려해, 역할이 다른 컨트롤을 좌우로 분리 배치했다. 뜨기 동작에 해당하는 색상 팔레트는 왼쪽에, 풀기·툴 변경 등 액션 버튼은 오른쪽에 배치해 각 손의 역할을 명확히 구분했다.",
+      "양 엄지로 손가락으로 플레이하는 모바일 사용자를 고려해, 동작 분류에 따라 좌우로 분리 배치했다. 메인 동작에 해당하는 색상 팔레트는 왼쪽에, 풀기&툴 변경 등 부가적인 동작 버튼은 오른쪽에 배치해 양 손가락의 역할이 명확히 구분되도록 하였다.",
     methods: [
       "모바일 양손 그립 패턴 분석 및 Thumb Zone 고려",
-      "컨트롤 역할 기반 좌우 분리 배치 설계",
+      "동작 유형에 기반한 좌우 분리 배치 UI 설계",
     ],
     findings: [
-      "기존 상하 배치는 시각적 균형을 기준으로 구성된 레이아웃이었다. 모바일에서 양 엄지로 조작할 때는 화면 좌우 가장자리가 더 자연스럽게 닿는 영역이므로, 뜨기(색상 팔레트)와 액션(풀기·툴 변경)을 좌우로 나눠 각 엄지의 역할과 물리적 위치를 일치시켰다.",
+      "기존 상하 배치는 시각적 균형을 기준으로 구성된 레이아웃이었다. 모바일에서 양 엄지로 조작할 때는 화면 좌우 가장자리가 더 자연스럽게 닿는 영역이므로, 메인 동작(색상 팔레트)와 부가 동작(풀기·툴 변경)을 좌우로 나눠 각 엄지의 역할과 물리적 위치를 일치시켰다.",
+    ],
+    images: [
+      {
+        label: "before",
+        src: "/interaction-lab/knit-muffler-mobile-layout_before.png",
+      },
     ],
     nextSteps: ["다양한 모바일 기기 크기에서 Thumb Zone 검증"],
     references: [
@@ -101,25 +111,42 @@ export const researches: ResearchRecord[] = [
         href: "/playground/knit-muffler",
         type: "project",
       },
+      {
+        label:
+          "Hoober, S. (2013). How Do Users Really Hold Mobile Devices? UXmatters.",
+        href: "https://www.uxmatters.com/mt/archives/2013/02/how-do-users-really-hold-mobile-devices.php",
+        type: "document",
+      },
     ],
   },
   {
     id: "knit-muffler-accessibility-color",
-    title: "뜨개뜨개 색약 모드",
+    title: "뜨개뜨개 색약 모드 도입",
     subtitle: "색각 이상 사용자를 위한 팔레트 접근성 개선",
     period: "2026.04.09",
     thumbnailLabel: "A11Y",
     accentClassName: "from-blue-100 via-stone-100 to-amber-100",
     summary:
-      "색각 이상(색약·색맹) 사용자는 기본 팔레트의 유사 색조를 구분하기 어렵다는 문제가 이전 리서치에서 미해결 과제로 남아 있었다. 이를 해결하기 위해 색각 이상에서도 혼동이 적은 Wong palette를 기반으로 대체 팔레트를 설계하고, 선택 화면에서 스위치 토글로 전환할 수 있는 색약 모드를 구현했다.",
+      "뜨개뜨개의 기본 팔레트는 파스텔 계열 색상으로 구성되어 있어, 색각 이상(색약·색맹) 사용자가 색상을 구분하기 어렵다는 문제가 있었다. 색각 이상 환경에서도 혼동이 적은 Wong palette를 기반으로 대체 팔레트를 설계하고, 모드 선택 화면에서 토글로 전환할 수 있는 색약 모드를 구현했다.",
     methods: [
-      "색각 유형(1형·2형 색맹, 색약) 시뮬레이션 분석",
-      "Wong palette 기반 대체 색상 정의",
+      "시뮬레이션 도구를 활용한 색각 유형별(적녹·청황색약, 완전색맹) 기존 팔레트 가시성 분석",
+      "Wong palette 기반 실 색상별 대체 색상 매핑",
     ],
     findings: [
-      "Wong palette는 8가지 색상이 주요 색각 이상 유형에서도 서로 구분 가능하도록 설계된 표준 팔레트다. 이를 기반으로 각 실 색상에 대응하는 대체 색상을 정의했다(파란 하늘·빨간보라·노랑·주황·버밀리온·검정·청록·회색·아이보리).",
+      "기본 팔레트의 파스텔 계열 색상은 명도 차이가 작아, 색각 이상 시뮬레이션에서 여러 색상이 유사하게 표시됐다.",
+      "Wong palette는 주요 색각 이상 유형에서도 8가지 색상이 서로 구분 가능하도록 설계된 표준 팔레트다. 이를 기반으로 각 실 색상에 대응하는 대체 색상을 정의했다.",
     ],
     nextSteps: ["실제 색각 이상 사용자 테스트를 통한 팔레트 유효성 검증"],
+    images: [
+      {
+        label: "기본 모드",
+        src: "/interaction-lab/knit-muffler-accessibility-color_default.png",
+      },
+      {
+        label: "색약 모드",
+        src: "/interaction-lab/knit-muffler-accessibility-color_weakness-mode.png",
+      },
+    ],
     references: [
       {
         label: "프로젝트",

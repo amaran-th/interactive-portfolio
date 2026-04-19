@@ -66,7 +66,7 @@ export default function WorkModal({
         onClick={onClose}
       >
         <div
-          className="relative flex h-full w-full flex-col overflow-hidden bg-gray-900 md:h-[80vh] md:w-[80vw] md:rounded-xl md:border md:border-white/10"
+          className="relative flex h-full w-full flex-col overflow-hidden bg-gray-900 md:h-[90vh] md:w-[90vw] md:rounded-xl md:border md:border-white/10"
           onClick={(e) => e.stopPropagation()}
         >
           <div
