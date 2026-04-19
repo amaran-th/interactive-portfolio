@@ -172,6 +172,7 @@ export default function PlayScreen({
                   <DraftPreview
                     draft={challengeDraft}
                     currentRowIndex={knittedRows.length}
+                    currentStitchCount={currentRow.length}
                   />
                 </div>
               ) : (
@@ -212,6 +213,7 @@ export default function PlayScreen({
               <DraftPreview
                 draft={challengeDraft}
                 currentRowIndex={knittedRows.length}
+                currentStitchCount={currentRow.length}
               />
             </div>
           ) : (

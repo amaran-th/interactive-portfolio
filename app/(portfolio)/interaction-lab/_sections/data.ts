@@ -59,30 +59,6 @@ export const researches: ResearchRecord[] = [
   //   ],
   // },
   {
-    id: "knit-muffler-sound-feedback",
-    title: "뜨개뜨개 실패 효과음 추가",
-    subtitle: "멀티태스킹 상황에서 시각 채널 의존도를 낮추는 청각 피드백 도입",
-    period: "2026.04.19",
-    thumbnailLabel: "SFX",
-    accentClassName: "from-violet-100 via-stone-100 to-rose-100",
-    summary:
-      "뜨개뜨개는 색상 변경 타이밍 파악, 실패 코 인지, 하드 모드에서는 코 종류까지 동시에 처리해야 하는 멀티태스킹 상황이다. 처리해야 할 정보가 많아질수록 시각 채널만으로는 실패를 제때 인지하기 어렵다는 판단 하에 실패 효과음을 추가했다.",
-    methods: ["Web Audio API를 활용한 실패 효과음 생성"],
-    findings: [
-      "색상 선택·실패 코 인지·코 종류 파악을 동시에 처리해야 하는 상황에서 시각 피드백만으로는 실패 인지가 지연되기 쉽다. 효과음을 추가하자 화면을 응시하지 않아도 실수 여부를 즉시 인지할 수 있게 됐다.",
-    ],
-    nextSteps: [
-      "뜨기 완료·챌린지 달성 등 효과음을 도입할 수 있는 추가 포인트 탐색",
-    ],
-    references: [
-      {
-        label: "프로젝트",
-        href: "/playground/knit-muffler",
-        type: "project",
-      },
-    ],
-  },
-  {
     id: "knit-muffler-mobile-layout",
     title: "뜨개뜨개 모바일 레이아웃 개선",
     subtitle: "역할별 좌우 분리 배치로 양 엄지 조작 동선 최적화",
@@ -100,8 +76,12 @@ export const researches: ResearchRecord[] = [
     ],
     images: [
       {
-        label: "before",
+        label: "Before",
         src: "/interaction-lab/knit-muffler-mobile-layout_before.png",
+      },
+      {
+        label: "After",
+        src: "/interaction-lab/knit-muffler-mobile-layout_after.png",
       },
     ],
     nextSteps: ["다양한 모바일 기기 크기에서 Thumb Zone 검증"],
@@ -115,6 +95,35 @@ export const researches: ResearchRecord[] = [
         label:
           "Hoober, S. (2013). How Do Users Really Hold Mobile Devices? UXmatters.",
         href: "https://www.uxmatters.com/mt/archives/2013/02/how-do-users-really-hold-mobile-devices.php",
+        type: "document",
+      },
+    ],
+  },
+  {
+    id: "knit-muffler-sound-feedback",
+    title: "뜨개뜨개 실패 효과음 추가",
+    subtitle: "멀티태스킹 상황에서 시각 채널 의존도를 낮추는 청각 피드백 도입",
+    period: "2026.04.18",
+    thumbnailLabel: "SFX",
+    accentClassName: "from-violet-100 via-stone-100 to-rose-100",
+    summary:
+      "뜨개뜨개는 색상 변경 타이밍 파악, 실패 코 인지, 하드 모드에서는 코 종류까지 동시에 처리해야 하는 멀티태스킹 상황이다. 처리해야 할 정보가 많아질수록 시각 채널만으로는 실패를 제때 인지하기 어렵다는 판단 하에 실패 효과음을 추가했다.",
+    methods: ["Web Audio API를 활용한 실패 효과음 생성"],
+    findings: [
+      "색상 선택·실패 코 인지·코 종류 파악을 동시에 처리해야 하는 상황에서 시각 피드백만으로는 실패 인지가 지연되기 쉽다. 효과음을 추가하자 화면을 응시하지 않아도 실수 여부를 즉시 인지할 수 있게 됐다.",
+    ],
+    nextSteps: [
+      "뜨기 완료·챌린지 달성 등 효과음을 도입할 수 있는 추가 포인트 탐색",
+    ],
+    references: [
+      {
+        label: "프로젝트",
+        href: "/playground/knit-muffler",
+        type: "project",
+      },
+      {
+        label: "Gaver, W. W. (1986). Auditory Icons: Using Sound in Computer Interfaces. Human-Computer Interaction.",
+        href: "https://doi.org/10.1207/s15327051hci0202_3",
         type: "document",
       },
     ],
