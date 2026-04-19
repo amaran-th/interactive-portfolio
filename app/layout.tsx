@@ -17,7 +17,10 @@ export const metadata: Metadata = {
     template: "%s | Interactive Portfolio",
     default: "Interactive Portfolio",
   },
-  description: "인터랙티브 웹 실험 공간",
+  description: "인터랙티브 웹 개발 기록",
+  verification: {
+    google: "GYxbiNXZ79bcXCmZMoBUWuI9DTE4nXL-6tk3bY5aDeU",
+  },
 };
 
 export default function RootLayout({
