@@ -1,9 +1,8 @@
 "use client";
 
-import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { JumpTarget } from "./BenchmarkPanel";
-import { ITEM_GAP, OVERSCAN } from "./constants";
+import { ITEM_GAP, OVERSCAN, VIEWPORT_HEIGHT } from "./constants";
 import { useJumpWithScrollCount } from "./hooks";
 import { BASE_ITEM_STYLE, itemBackgroundColor } from "./styles";
 import { VirtualListShell } from "./VirtualListShell";
@@ -17,12 +16,6 @@ interface Props {
   onScrollCount?: (count: number) => void;
 }
 
-const itemStyle: React.CSSProperties = {
-  ...BASE_ITEM_STYLE,
-  borderColor: "rgba(74,222,128,0.22)",
-  color: "rgba(255,255,255,0.74)",
-};
-
 export default function VirtualList({
   texts,
   heights,
@@ -32,51 +25,88 @@ export default function VirtualList({
   onScrollCount,
 }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
 
-  const virtualizer = useVirtualizer({
-    count: texts.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: (index) => heights[index] ?? 0,
-    gap: ITEM_GAP,
-    overscan: OVERSCAN,
-  });
+  const { offsets, totalSize } = useMemo(() => {
+    const offsets = new Array<number>(heights.length);
+    let acc = 0;
+    for (let i = 0; i < heights.length; i++) {
+      offsets[i] = acc;
+      acc += heights[i] + ITEM_GAP;
+    }
+    return { offsets, totalSize: Math.max(0, acc - ITEM_GAP) };
+  }, [heights]);
 
-  const virtualItems = virtualizer.getVirtualItems();
+  const startIndex = useMemo(() => {
+    if (offsets.length === 0) return 0;
+    let lo = 0,
+      hi = offsets.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (offsets[mid] + heights[mid] <= scrollTop) lo = mid + 1;
+      else hi = mid;
+    }
+    return Math.max(0, lo - OVERSCAN);
+  }, [offsets, heights, scrollTop]);
+
+  const endIndex = useMemo(() => {
+    if (offsets.length === 0) return 0;
+    let lo = 0,
+      hi = offsets.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (offsets[mid] <= scrollTop + VIEWPORT_HEIGHT) lo = mid;
+      else hi = mid - 1;
+    }
+    return Math.min(offsets.length - 1, lo + OVERSCAN);
+  }, [offsets, scrollTop]);
 
   useEffect(() => {
-    virtualizer.measure();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [heights]);
+    const el = parentRef.current;
+    if (!el) return;
+    const onScroll = () => setScrollTop(el.scrollTop);
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
 
   useJumpWithScrollCount(
     parentRef,
     jumpTarget ?? null,
     onJumpComplete,
     onScrollCount,
-    () => virtualizer.scrollToIndex(jumpTarget!.index, { align: "start" }),
+    (el) => {
+      el.scrollTop = offsets[jumpTarget!.index] ?? 0;
+    },
   );
+
+  const items: { index: number; top: number; height: number }[] = [];
+  for (let i = startIndex; i <= endIndex; i++) {
+    items.push({ index: i, top: offsets[i], height: heights[i] });
+  }
 
   return (
     <VirtualListShell
       dotColor="bg-green-400"
       label="Pretext"
-      rendered={virtualItems.length}
+      rendered={items.length}
       total={texts.length}
       parentRef={parentRef}
-      totalSize={virtualizer.getTotalSize()}
+      totalSize={totalSize}
     >
-      {virtualItems.map((virtualRow) => (
+      {items.map(({ index, top, height }) => (
         <div
-          key={virtualRow.key}
+          key={index}
           style={{
-            ...itemStyle,
+            ...BASE_ITEM_STYLE,
             width: itemWidth,
-            height: virtualRow.size,
-            background: itemBackgroundColor(virtualRow.index),
-            transform: `translateY(${virtualRow.start}px)`,
+            height,
+            background: itemBackgroundColor(index),
+            borderColor: "rgba(74,222,128,0.22)",
+            color: "rgba(255,255,255,0.74)",
+            transform: `translateY(${top}px)`,
           }}
         >
-          {texts[virtualRow.index]}
+          {texts[index]}
         </div>
       ))}
     </VirtualListShell>

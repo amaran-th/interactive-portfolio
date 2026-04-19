@@ -23,8 +23,8 @@ type JumpResult = {
 } | null;
 
 const MODES: { value: Mode; label: string }[] = [
-  { value: "dom-naive", label: "DOM (naive)" },
-  { value: "dom", label: "DOM + Virtual" },
+  { value: "dom-naive", label: "Native" },
+  { value: "dom", label: "@tanstack/react-virtual" },
   { value: "pretext", label: "Pretext" },
 ];
 
