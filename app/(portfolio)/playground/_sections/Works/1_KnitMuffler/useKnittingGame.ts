@@ -332,9 +332,12 @@ export function useKnittingGame({ soundEnabled = true }: { soundEnabled?: boolea
     setGameState({ screen: "select" });
   }, [resetKnitting]);
 
-  /** 플레이 화면 초기화 버튼 — 현재 너비 유지 */
+  /** 플레이 화면 초기화 버튼 — 현재 너비 유지, result 화면에서 호출 시 play로 복귀 */
   const handleInitialize = useCallback(() => {
     resetKnitting(knitting.stitchCount);
+    setGameState((prev) =>
+      prev.screen === "result" ? { ...prev, screen: "play" } : prev,
+    );
   }, [knitting.stitchCount, resetKnitting]);
 
   const handleKnit = useCallback(

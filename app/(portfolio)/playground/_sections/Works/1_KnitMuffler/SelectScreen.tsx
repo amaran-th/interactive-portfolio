@@ -467,7 +467,12 @@ export default function SelectScreen({
 
   return (
     <div className="font-knit-muffler relative h-full max-h-full bg-[#f8f4ee] text-stone-900 flex flex-col items-center p-6 pt-16 overflow-y-auto">
-      <SoundToggleButton enabled={soundEnabled} onToggle={onToggleSound} />
+      <div className="absolute top-4 left-4 z-70 flex items-center gap-2">
+        <SoundToggleButton enabled={soundEnabled} onToggle={onToggleSound} />
+        <p className="text-sm text-stone-400 break-keep">
+          Tip: 소리를 키면 &apos;잘못 뜬 코&apos;를 좀 더 쉽게 찾을 수 있어요!
+        </p>
+      </div>
       <div className="max-w-xl w-full flex flex-col gap-8">
         <div className="flex flex-col items-center gap-8">
           <div className="flex gap-1 items-center border-y-4 border-dashed border-orange-200 w-full justify-between py-2">

@@ -6,6 +6,7 @@ import { ColorModeContext } from "./ColorModeContext";
 import PlayScreen from "./PlayScreen";
 import SelectScreen from "./SelectScreen";
 import { ColorMode } from "./type";
+import { useBackgroundMusic } from "./useBackgroundMusic";
 import { useKnittingGame } from "./useKnittingGame";
 
 export function SoundToggleButton({
@@ -18,7 +19,7 @@ export function SoundToggleButton({
   return (
     <button
       onClick={onToggle}
-      className="absolute top-4 left-4 z-70 rounded-full border border-gray-300 bg-white/90 p-2 shadow-sm"
+      className="rounded-full border border-gray-300 bg-white/90 p-2 shadow-sm"
       aria-label={enabled ? "소리 끄기" : "소리 켜기"}
     >
       {enabled ? (
@@ -32,10 +33,8 @@ export function SoundToggleButton({
 
 export default function KnitMuffler() {
   const [colorMode, setColorMode] = useState<ColorMode>("normal");
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const { soundEnabled, toggleSound } = useBackgroundMusic();
   const game = useKnittingGame({ soundEnabled });
-
-  const toggleSound = () => setSoundEnabled((v) => !v);
 
   return (
     <ColorModeContext.Provider value={colorMode}>
