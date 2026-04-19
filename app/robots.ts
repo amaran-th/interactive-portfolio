@@ -5,7 +5,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        disallow: ["/", "/playground", "/interaction-lab", "/engineering-note"],
+        allow: ["/pretext", "/knit-muffler"],
+        disallow: ["/"],
       },
     ],
     sitemap: `${process.env.SITE_URL || "https://example.com"}/sitemap.xml`,
