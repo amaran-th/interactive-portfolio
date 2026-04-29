@@ -53,7 +53,7 @@ export const researches: ResearchRecord[] = [
   //   references: [
   //     {
   //       label: "프로젝트",
-  //       href: "/playground/knit-muffler",
+  //       href: "/knit-muffler",
   //       type: "project",
   //     },
   //   ],
@@ -88,7 +88,7 @@ export const researches: ResearchRecord[] = [
     references: [
       {
         label: "프로젝트",
-        href: "/playground/knit-muffler",
+        href: "/knit-muffler",
         type: "project",
       },
       {
@@ -118,11 +118,12 @@ export const researches: ResearchRecord[] = [
     references: [
       {
         label: "프로젝트",
-        href: "/playground/knit-muffler",
+        href: "/knit-muffler",
         type: "project",
       },
       {
-        label: "Gaver, W. W. (1986). Auditory Icons: Using Sound in Computer Interfaces. Human-Computer Interaction.",
+        label:
+          "Gaver, W. W. (1986). Auditory Icons: Using Sound in Computer Interfaces. Human-Computer Interaction.",
         href: "https://doi.org/10.1207/s15327051hci0202_3",
         type: "document",
       },
@@ -159,7 +160,7 @@ export const researches: ResearchRecord[] = [
     references: [
       {
         label: "프로젝트",
-        href: "/playground/knit-muffler",
+        href: "/knit-muffler",
         type: "project",
       },
       {
