@@ -19,7 +19,7 @@ export default function Home() {
           Interactive Portfolio
         </h1>
         <p className="max-w-xl text-base text-gray-400 sm:text-lg">
-          인터랙티브 웹 포트폴리오(가 될 예정)
+          인터랙티브 웹 포트폴리오(beta)
         </p>
 
         <div className="mt-4 grid w-full max-w-sm gap-3 sm:max-w-none sm:grid-cols-3 sm:gap-4">
