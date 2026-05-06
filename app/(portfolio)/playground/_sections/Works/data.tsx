@@ -1,4 +1,5 @@
 import KnitMuffler from "./1_KnitMuffler/KnitMuffler";
+import RoughVisualNovelMaker from "./2_RoughVisualNovelMaker/RoughVisualNovelMaker";
 import { WorkItem } from "./Work";
 
 export const works: WorkItem[] = [
@@ -24,5 +25,20 @@ export const works: WorkItem[] = [
     content: <KnitMuffler />,
     thumbnail: "/playground/knit-muffler.png",
     path: "/knit-muffler",
+  },
+  {
+    id: 2,
+    title: "비주얼 노벨 메이커",
+    description: `캐릭터와 배경 이미지를 업로드하고, 컷마다 등장 캐릭터·발화자·대사를 설정해 간단한 비주얼 노벨을 만들 수 있는 도구입니다.
+
+🖼️ 자산 등록: 캐릭터(이름 + 이미지)와 배경 이미지를 자유롭게 추가할 수 있습니다. 자산은 편집 중에도 추가 가능합니다.
+
+✂️ 컷 편집: 컷마다 배경 선택, 등장 캐릭터 선택, 발화자(캐릭터 또는 나레이션) 지정, 대사 입력이 가능합니다.
+
+▶️ 재생 모드: 완성된 비주얼 노벨을 순서대로 감상할 수 있습니다. 클릭 또는 키보드로 컷을 넘길 수 있습니다.`,
+    period: "2026.04.20 - ",
+    platforms: ["pc", "mobile"],
+    content: <RoughVisualNovelMaker />,
+    path: "/rough-visual-novel-maker",
   },
 ];
