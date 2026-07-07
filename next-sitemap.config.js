@@ -1,6 +1,6 @@
 /** @type {import('next-sitemap').IConfig} */
 module.exports = {
-  siteUrl: process.env.SITE_URL || "https://example.com",
+  siteUrl: process.env.SITE_URL || "https://amaran-th-interactive-portfolio.vercel.app",
   generateRobotsTxt: false,
   // Use transform to dynamically filter paths
   // Exclude portfolio internal sections and root
