@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { deleteBlob, deleteBlobs, loadBlobUrls, saveBlob } from "./imageStore";
 import { AudioTrack, AudioTrackType, Background, Character, Cut } from "./types";
 
@@ -73,25 +73,25 @@ function saveMeta(
 
 export function useVNStore(slotId: string) {
   const storageKey = `rough-vn-slot-${slotId}`;
-  const initialMeta = useRef(loadMeta(storageKey));
+  const [initialMeta] = useState(() => loadMeta(storageKey));
 
   const [characters, setCharacters] = useState<Character[]>(
     () =>
-      initialMeta.current?.characters.map((c) => ({
+      initialMeta?.characters.map((c) => ({
         ...c,
         images: c.images.map((img) => ({ ...img, imageUrl: "" })),
       })) ?? [],
   );
   const [backgrounds, setBackgrounds] = useState<Background[]>(
-    () => initialMeta.current?.backgrounds.map((bg) => ({ ...bg, imageUrl: "" })) ?? [],
+    () => initialMeta?.backgrounds.map((bg) => ({ ...bg, imageUrl: "" })) ?? [],
   );
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>(
-    () => initialMeta.current?.audioTracks.map((a) => ({ ...a, audioUrl: "" })) ?? [],
+    () => initialMeta?.audioTracks.map((a) => ({ ...a, audioUrl: "" })) ?? [],
   );
   const [cuts, setCuts] = useState<Cut[]>(
     () =>
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      initialMeta.current?.cuts.map((c: any) => ({
+      initialMeta?.cuts.map((c: any) => ({
         ...c,
         textEffect: c.textEffect ?? ("default" as const),
         bgmId: c.bgmId ?? null,
@@ -102,7 +102,7 @@ export function useVNStore(slotId: string) {
 
   // Restore blob URLs from IDB on mount
   useEffect(() => {
-    const meta = initialMeta.current;
+    const meta = initialMeta;
     const imageIds = [
       ...(meta?.characters.flatMap((c) => c.images.map((img) => img.id)) ?? []),
       ...(meta?.backgrounds.map((bg) => bg.id) ?? []),
