@@ -2,9 +2,8 @@ import GoalsPassport from "@/app/(portfolio)/playground/_sections/Works/4_GoalsP
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "올해의 영수증",
-  description:
-    "올해의 목표와 하위 항목을 관리하고, 달성 현황을 감열지 영수증으로 출력해보세요. 달성할수록 결제액(TOTAL PAID)이 쌓입니다.",
+  title: "2026 중간 결산",
+  description: "올해의 목표 달성 현황을 나만의 영수증으로 만들어보세요~!",
 };
 
 export default function GoalsPassportPage() {
