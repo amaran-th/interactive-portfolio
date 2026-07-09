@@ -51,7 +51,7 @@ export const engineeringEntries: EngineeringEntry[] = [
     date: "2026.04.19",
     tags: ["performance", "virtual-scroll", "text-measurement", "reflow"],
     problem:
-      "Pretext가 기존 DOM 접근 방식(scrollHeight, getBoundingClientRect)과 비교해 어떤 이점을 가지는가?",
+      "Pretext가 기존 DOM 접근 방식(scrollHeight, getBoundingClientRect)과 비교해 어떤 이점이 있는가?",
     approach: [
       "Case 1: 1,000개 텍스트 높이 측정 — DOM 접근 / Batching로 최적화된 DOM 접근 / Pretext 세 방식의 레이아웃 리플로우 횟수 비교",
       "Case 2: 3,000개 항목 가상 스크롤에서 임의 인덱스로 점프 — Native 구현(ResizeObserver 보정) / @tanstack/react-virtual / Pretext 세 구현의 점프 정확도 비교",
