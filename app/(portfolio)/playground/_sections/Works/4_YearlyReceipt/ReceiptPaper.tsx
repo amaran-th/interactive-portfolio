@@ -1,4 +1,4 @@
-import { Goal, PassportStyle } from "./types";
+import { Goal, ReceiptStyle } from "./types";
 import { computeReceipt, formatWon, GOALS_YEAR } from "./utils";
 
 /** 상·하단 톱니 절취선용 clip-path (감열지 느낌) */
@@ -33,7 +33,7 @@ const CLASSIC: Theme = {
   dashed: "border-neutral-400",
   dotted: "border-neutral-300",
   gaugeInk: "text-neutral-800",
-  gaugeTrack: "text-neutral-300",
+  gaugeTrack: "text-neutral-400",
   strong: "text-neutral-900",
 };
 
@@ -44,7 +44,7 @@ const DARK: Theme = {
   dashed: "border-[#5a5148]",
   dotted: "border-[#4a4239]",
   gaugeInk: "text-[#e8b04a]",
-  gaugeTrack: "text-[#4a4239]",
+  gaugeTrack: "text-[#5a5148]",
   strong: "text-[#f3c869]",
 };
 
@@ -56,7 +56,7 @@ function Divider({ t }: { t: Theme }) {
 
 interface ReceiptPaperProps {
   goals: Goal[];
-  style: PassportStyle;
+  style: ReceiptStyle;
   settledAt: string;
   title?: string;
   /** 종이 요소에 덧붙일 클래스 (너비 등) */
@@ -83,12 +83,12 @@ export default function ReceiptPaper({
         clipPath: tornClip,
         filter: "drop-shadow(0 8px 16px rgba(90,70,40,0.28))",
       }}
-      className={`w-full px-6 py-7 font-mono text-[13px] leading-relaxed ${t.paper} ${t.ink} ${className}`}
+      className={`w-full px-6 pt-10 pb-12 font-mono text-[13px] leading-relaxed ${t.paper} ${t.ink} ${className}`}
     >
       {/* 헤더 */}
       <div className="text-center">
         <p className="text-[15px] font-bold tracking-wide">
-          {title ?? `${GOALS_YEAR} 중간 결산`}
+          {title ?? `${GOALS_YEAR} Mid-Year Recap`}
         </p>
         <p className={`mt-1 text-[11px] ${t.muted}`}>{settledAt}</p>
       </div>
@@ -101,7 +101,7 @@ export default function ReceiptPaper({
           등록된 목표가 없어요
         </p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="flex flex-col gap-5">
           {lines.map(({ goal, items, paid, checked, total }) => (
             <li key={goal.id}>
               <div className="flex items-baseline justify-between gap-2">

@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AlertTriangle,
   BookOpen,
   Check,
   ChevronDown,
@@ -16,17 +15,17 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Dispatch, SetStateAction, useRef, useState } from "react";
-import { Goal, ItemKind, PassportState, PassportStyle } from "./types";
+import { Goal, ItemKind, ReceiptState, ReceiptStyle } from "./types";
 import { GOALS_YEAR, itemDone, newId, newItem } from "./utils";
 
 interface EditViewProps {
-  state: PassportState;
-  setState: Dispatch<SetStateAction<PassportState>>;
+  state: ReceiptState;
+  setState: Dispatch<SetStateAction<ReceiptState>>;
   onOpen: () => void;
 }
 
 const STYLE_OPTIONS: {
-  value: PassportStyle;
+  value: ReceiptStyle;
   label: string;
   icon: LucideIcon;
 }[] = [
@@ -156,7 +155,7 @@ export default function EditView({ state, setState, onOpen }: EditViewProps) {
   const updateGoals = (updater: (goals: Goal[]) => Goal[]) =>
     setState((prev) => ({ ...prev, goals: updater(prev.goals) }));
 
-  const setStyle = (value: PassportStyle) =>
+  const setStyle = (value: ReceiptStyle) =>
     setState((prev) => ({ ...prev, style: value }));
 
   const addGoal = () =>
@@ -250,7 +249,7 @@ export default function EditView({ state, setState, onOpen }: EditViewProps) {
       {/* 헤더 */}
       <header className="flex flex-col border-b-2 border-dashed border-[#e2d3ba] px-5 py-4 items-center justify-between">
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#a99a7d]">
-          ~2026 중간 정산~
+          ~{GOALS_YEAR} 중간 정산~
         </p>
         <div className="mt-0.5 flex items-baseline gap-2">
           <span className="text-lg font-bold text-[#4a4038]">
@@ -302,13 +301,6 @@ export default function EditView({ state, setState, onOpen }: EditViewProps) {
                 이미지로 저장할 수 있어요.
               </li>
             </ol>
-            <p className="mt-2 flex items-start gap-1 pt-1 text-[11px] leading-relaxed text-[#ff4c4c]">
-              <AlertTriangle
-                className="mt-0.5 size-3 shrink-0"
-                strokeWidth={2.5}
-              />
-              인쇄한 내용은 익명으로 저장되며, 제작자가 조회할 수 있어요.
-            </p>
           </>
         )}
       </div>

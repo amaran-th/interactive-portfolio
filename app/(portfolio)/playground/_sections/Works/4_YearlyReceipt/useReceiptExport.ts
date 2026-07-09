@@ -12,13 +12,13 @@ const EXPORT_BG = "#efe6d3";
  * 영수증 DOM을 PNG로 캡처하고, 바깥에 여백을 둘러 다운로드한다.
  * KnitMuffler `useResultExport.ts`와 동일한 html-to-image + 캔버스 패딩 패턴.
  */
-export function usePassportExport(year: string) {
-  const passportCaptureRef = useRef<HTMLDivElement>(null);
+export function useReceiptExport(year: string) {
+  const receiptCaptureRef = useRef<HTMLDivElement>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = useCallback(async () => {
     if (typeof window === "undefined" || isSaving) return;
-    const el = passportCaptureRef.current;
+    const el = receiptCaptureRef.current;
     if (!el) return;
 
     setIsSaving(true);
@@ -68,7 +68,7 @@ export function usePassportExport(year: string) {
       ctx.drawImage(image, EXPORT_PADDING, EXPORT_PADDING);
 
       const link = document.createElement("a");
-      link.download = `${year || "goals"}-passport.png`;
+      link.download = `${year || "goals"}-receipt.png`;
       link.href = canvas.toDataURL("image/png");
       link.click();
     } finally {
@@ -76,5 +76,5 @@ export function usePassportExport(year: string) {
     }
   }, [isSaving, year]);
 
-  return { passportCaptureRef, isSaving, handleSave };
+  return { receiptCaptureRef, isSaving, handleSave };
 }

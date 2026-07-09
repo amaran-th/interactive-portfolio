@@ -2,12 +2,12 @@
 
 import { Download, Pencil } from "lucide-react";
 import ReceiptPaper from "./ReceiptPaper";
-import { PassportState } from "./types";
-import { usePassportExport } from "./usePassportExport";
+import { ReceiptState } from "./types";
+import { useReceiptExport } from "./useReceiptExport";
 import { GOALS_YEAR } from "./utils";
 
-interface PassportViewProps {
-  state: PassportState;
+interface ReceiptViewProps {
+  state: ReceiptState;
   settledAt: string;
   onEdit: () => void;
 }
@@ -15,14 +15,14 @@ interface PassportViewProps {
 /** 다 뽑힌 뒤 슬릿과 영수증 사이 벌어지는 여백(px) */
 const PRINT_GAP = 48;
 
-export default function PassportView({
+export default function ReceiptView({
   state,
   settledAt,
   onEdit,
-}: PassportViewProps) {
+}: ReceiptViewProps) {
   const { goals, style } = state;
-  const { passportCaptureRef, isSaving, handleSave } =
-    usePassportExport(GOALS_YEAR);
+  const { receiptCaptureRef, isSaving, handleSave } =
+    useReceiptExport(GOALS_YEAR);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto bg-[#efe6d3] px-4 py-6">
@@ -52,7 +52,7 @@ export default function PassportView({
             paddingBottom(PRINT_GAP)만큼 clip 영역을 넓혀 내려간 종이가 잘리지 않게 한다. */}
         <div className="overflow-hidden" style={{ paddingBottom: PRINT_GAP }}>
           <div
-            ref={passportCaptureRef}
+            ref={receiptCaptureRef}
             key={settledAt}
             style={{
               animation: "gr-print 2.1s cubic-bezier(0.22,1,0.36,1) both",
@@ -63,10 +63,13 @@ export default function PassportView({
         </div>
       </div>
 
+      {/* 늘어나는 여백: 영수증이 짧아도 버튼이 항상 화면 하단에 붙도록 함 */}
+      <div className="min-h-6 flex-1" />
+
       {/* 액션 버튼 */}
       <div
         data-html-to-image-ignore="true"
-        className="mt-6 flex flex-wrap items-center justify-center gap-3"
+        className="flex flex-wrap items-center justify-center gap-3"
       >
         <button
           onClick={handleSave}

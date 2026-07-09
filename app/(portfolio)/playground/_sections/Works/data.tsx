@@ -1,7 +1,7 @@
 import KnitMuffler from "./1_KnitMuffler/KnitMuffler";
 import RoughVisualNovelMaker from "./2_RoughVisualNovelMaker/RoughVisualNovelMaker";
 import StellarForge from "./3_StellarForge/StellarForge";
-import GoalsPassport from "./4_GoalsPassport/GoalsPassport";
+import YearlyReceipt from "./4_YearlyReceipt/YearlyReceipt";
 import { WorkItem } from "./Work";
 
 export const works: WorkItem[] = [
@@ -83,9 +83,9 @@ export const works: WorkItem[] = [
 
   특징:
   - 입력한 목표는 자동 저장되어 새로고침 후에도 유지됩니다.`,
-    period: "2026.07.05 - ",
+    period: "2026.07.05 - 07.10",
     platforms: [{ type: "mobile", specialized: true }, { type: "pc" }],
-    content: <GoalsPassport />,
+    content: <YearlyReceipt />,
     thumbnail: "/playground/yearly-receipt.png",
     path: "/yearly-receipt",
   },

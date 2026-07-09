@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import EditView from "./EditView";
-import { logPrintRecord } from "./logPrint";
-import PassportView from "./PassportView";
+import ReceiptView from "./ReceiptView";
 import { useGoalsStorage } from "./useGoalsStorage";
 
-type Mode = "edit" | "passport";
+type Mode = "edit" | "receipt";
 
 function formatSettledAt(date: Date): string {
   return date.toLocaleDateString("ko-KR", {
@@ -16,7 +15,7 @@ function formatSettledAt(date: Date): string {
   });
 }
 
-export default function GoalsPassport() {
+export default function YearlyReceipt() {
   const { state, setState, hydrated } = useGoalsStorage();
   // 모드는 저장하지 않음 — 새로고침 시 항상 편집 모드로 시작
   const [mode, setMode] = useState<Mode>("edit");
@@ -25,8 +24,7 @@ export default function GoalsPassport() {
   const handleOpen = () => {
     const now = formatSettledAt(new Date());
     setSettledAt(now);
-    logPrintRecord(state, now); // 구글 시트에 익명 기록 (fire-and-forget)
-    setMode("passport");
+    setMode("receipt");
   };
 
   return (
@@ -35,7 +33,7 @@ export default function GoalsPassport() {
       {!hydrated ? null : mode === "edit" ? (
         <EditView state={state} setState={setState} onOpen={handleOpen} />
       ) : (
-        <PassportView
+        <ReceiptView
           state={state}
           settledAt={settledAt}
           onEdit={() => setMode("edit")}

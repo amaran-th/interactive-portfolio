@@ -1,7 +1,7 @@
 import { ChecklistItem, ItemKind, Goal } from "./types";
 
-/** 결산 연도 (하드코딩) */
-export const GOALS_YEAR = "2026";
+/** 결산 연도 (현재 연도 기준) */
+export const GOALS_YEAR = String(new Date().getFullYear());
 
 /** 하위 항목 1칸의 정가 (진행률·습관은 달성 비율만큼 부분 결제) */
 export const ITEM_PRICE = 10_000;

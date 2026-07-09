@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Goal, PassportState, PassportStyle } from "./types";
+import { Goal, ReceiptState, ReceiptStyle } from "./types";
 import { newId, normalizeItem } from "./utils";
 
-const STORAGE_KEY = "goals-passport-state";
+const STORAGE_KEY = "yearly-receipt-state";
 
-function defaultState(): PassportState {
+function defaultState(): ReceiptState {
   return { goals: [], style: "classic" };
 }
 
@@ -19,12 +19,12 @@ function normalizeGoal(raw: Partial<Goal> | undefined): Goal {
   };
 }
 
-function loadState(): PassportState {
+function loadState(): ReceiptState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultState();
-    const parsed = JSON.parse(raw) as Partial<PassportState>;
-    const style: PassportStyle =
+    const parsed = JSON.parse(raw) as Partial<ReceiptState>;
+    const style: ReceiptStyle =
       parsed.style === "dark" ? "dark" : "classic";
     return {
       goals: Array.isArray(parsed.goals)
@@ -38,7 +38,7 @@ function loadState(): PassportState {
 }
 
 export function useGoalsStorage() {
-  const [state, setState] = useState<PassportState>(defaultState);
+  const [state, setState] = useState<ReceiptState>(defaultState);
   const [hydrated, setHydrated] = useState(false);
 
   // 최초 방문/파싱 실패 시 기본값으로 초기화 (모드는 저장하지 않음)

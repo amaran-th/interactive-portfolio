@@ -16,9 +16,9 @@ export type Goal = {
   items: ChecklistItem[]; // 하위 항목들
 };
 
-export type PassportStyle = "classic" | "dark";
+export type ReceiptStyle = "classic" | "dark";
 
-export type PassportState = {
+export type ReceiptState = {
   goals: Goal[];
-  style: PassportStyle; // 기본값: "classic"
+  style: ReceiptStyle; // 기본값: "classic"
 };
