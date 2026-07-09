@@ -42,7 +42,13 @@ function fmt(n: number): string {
     x /= 1000;
     i++;
   }
-  return (x < 10 ? x.toFixed(2) : x < 100 ? x.toFixed(1) : Math.floor(x).toString()) + u[i];
+  return (
+    (x < 10
+      ? x.toFixed(2)
+      : x < 100
+        ? x.toFixed(1)
+        : Math.floor(x).toString()) + u[i]
+  );
 }
 
 const colorOf = (sym: string) =>
@@ -67,7 +73,10 @@ export default function StellarForge() {
     tap();
     const id = Date.now() + Math.random();
     setFloats((f) => [...f, { id, x: 28 + Math.random() * 44 }]);
-    window.setTimeout(() => setFloats((f) => f.filter((z) => z.id !== id)), 750);
+    window.setTimeout(
+      () => setFloats((f) => f.filter((z) => z.id !== id)),
+      750,
+    );
   };
 
   return (
@@ -89,7 +98,7 @@ export default function StellarForge() {
             <div>
               <h1 className="flex items-center gap-1.5 text-base font-bold tracking-tight">
                 <Sparkles className="h-4 w-4 text-indigo-300" />
-                별의 연금술
+                별들은 굉장한 빛메이커이다
               </h1>
               <p className="text-[10px] text-indigo-200/50">
                 세대 #{s.generation} · 실시간 항성 시뮬레이션
@@ -283,7 +292,8 @@ export default function StellarForge() {
             </p>
             <p className="mt-1 text-sm text-indigo-100/85">
               {s.reason === "iron" ? "철 코어 붕괴" : "중력 붕괴"} ·{" "}
-              {s.fate === "bh" ? "블랙홀" : "중성자별"} 탄생 (~{fmt(s.solarMass ?? 0)} M☉)
+              {s.fate === "bh" ? "블랙홀" : "중성자별"} 탄생 (~
+              {fmt(s.solarMass ?? 0)} M☉)
             </p>
             <p className="mt-1 text-[11px] text-white/45">
               중원소를 우주로 흩뿌리고 새 성운에서 다시 태어납니다…
@@ -323,8 +333,7 @@ export default function StellarForge() {
 
 function StabilityBar({ value, ignited }: { value: number; ignited: boolean }) {
   const pct = Math.round(value * 100);
-  const color =
-    value > 0.5 ? "#34d399" : value > 0.2 ? "#fbbf24" : "#fb7185";
+  const color = value > 0.5 ? "#34d399" : value > 0.2 ? "#fbbf24" : "#fb7185";
   return (
     <div>
       <div className="mb-0.5 flex items-center justify-between text-[10px]">
@@ -393,10 +402,15 @@ function ResChip({
     >
       <span
         className="h-2 w-2 rounded-full"
-        style={{ background: colorOf(sym), boxShadow: `0 0 6px ${colorOf(sym)}` }}
+        style={{
+          background: colorOf(sym),
+          boxShadow: `0 0 6px ${colorOf(sym)}`,
+        }}
       />
       <span className="text-[11px] font-semibold">{sym}</span>
-      <span className="text-[11px] tabular-nums text-white/55">{fmt(amount)}</span>
+      <span className="text-[11px] tabular-nums text-white/55">
+        {fmt(amount)}
+      </span>
     </div>
   );
 }
@@ -437,7 +451,8 @@ function InfoPanel({
       >
         <div className="mb-3 flex items-center justify-between">
           <h3 className="flex items-center gap-1.5 text-base font-bold">
-            <Sparkles className="h-4 w-4 text-indigo-300" />항성 시뮬레이션
+            <Sparkles className="h-4 w-4 text-indigo-300" />
+            항성 시뮬레이션
           </h3>
           <button
             onClick={onClose}
@@ -448,9 +463,9 @@ function InfoPanel({
         </div>
         <p className="mb-3 text-[13px] leading-relaxed text-indigo-100/70">
           별은 <b>중력</b>과 <b>융합이 내는 복사압</b>의 줄다리기로 버팁니다.
-          성운을 탭해 수소를 모으고 반응로를 지어 융합을 유지하세요. 융합
-          출력이 중력을 못 따라가면 <b>안정도</b>가 떨어지고 별이 수축합니다.
-          속도 업그레이드는 없습니다 — 반응로를 <b>많이</b> 지으세요.
+          성운을 탭해 수소를 모으고 반응로를 지어 융합을 유지하세요. 융합 출력이
+          중력을 못 따라가면 <b>안정도</b>가 떨어지고 별이 수축합니다. 속도
+          업그레이드는 없습니다 — 반응로를 <b>많이</b> 지으세요.
         </p>
         <p className="mb-3 text-[13px] leading-relaxed text-indigo-100/70">
           별은 헬륨이 생기는 순간부터 <b>주계열성</b>이 되고, 헬륨 연소부터

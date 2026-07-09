@@ -177,15 +177,23 @@ export default function WorkModal({
                     <div className="flex flex-wrap gap-2">
                       {selected.platforms.map((platform) => (
                         <span
-                          key={platform}
-                          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-sm text-gray-200"
+                          key={platform.type}
+                          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
+                            platform.specialized
+                              ? "border-white/80 bg-white font-medium text-gray-900"
+                              : "border-white/10 bg-black/20 text-gray-200"
+                          }`}
                         >
-                          {platform === "mobile" ? (
-                            <Smartphone className="h-4 w-4 text-gray-500" />
+                          {platform.type === "mobile" ? (
+                            <Smartphone
+                              className={`h-4 w-4 ${platform.specialized ? "text-gray-700" : "text-gray-500"}`}
+                            />
                           ) : (
-                            <Monitor className="h-4 w-4 text-gray-500" />
+                            <Monitor
+                              className={`h-4 w-4 ${platform.specialized ? "text-gray-700" : "text-gray-500"}`}
+                            />
                           )}
-                          {platform === "mobile" ? "모바일" : "PC"}
+                          {platform.type === "mobile" ? "모바일" : "PC"}
                         </span>
                       ))}
                     </div>

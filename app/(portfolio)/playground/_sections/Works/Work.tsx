@@ -8,7 +8,7 @@ export interface WorkItem {
   title: string;
   description: string;
   period?: string;
-  platforms?: ("mobile" | "pc")[];
+  platforms?: { type: "mobile" | "pc"; specialized?: boolean }[];
   skills?: { icon: string | null; name: string }[];
   thumbnail?: string;
   content: React.ReactNode;
