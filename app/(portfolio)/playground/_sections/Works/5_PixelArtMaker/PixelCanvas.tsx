@@ -246,27 +246,22 @@ export default function PixelCanvas({
     [tool, width, height, activeColorIndex, pixels, selectionMask, toGridPoint, plotPoint, render, onSelectionChange],
   );
 
+  // 맨 앞에서 drawingRef를 한 번만 검사·소비하도록 통일한다 — pointerup 처리 후 브라우저가
+  // 뒤이어 보내는 lostpointercapture(그리고 handlePointerCancel의 재사용)가 같은 제스처를
+  // 두 번 커밋하지 않도록 이 함수 자체를 멱등하게 만든다.
   const handlePointerUp = useCallback(() => {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+
     if (tool === "select") {
       shapeStartRef.current = null;
-      drawingRef.current = false;
-      return;
-    }
-    if (tool === "move") {
-      lastPointRef.current = null;
-      drawingRef.current = false;
-      onStrokeEnd(workingRef.current);
       return;
     }
     if (tool === "line" || tool === "rect" || tool === "circle") {
-      if (!shapeStartRef.current) return;
       shapeStartRef.current = null;
-      drawingRef.current = false;
       onStrokeEnd(workingRef.current);
       return;
     }
-    if (!drawingRef.current) return;
-    drawingRef.current = false;
     lastPointRef.current = null;
     onStrokeEnd(workingRef.current);
   }, [tool, onStrokeEnd]);
@@ -278,13 +273,9 @@ export default function PixelCanvas({
   }, []);
 
   // 스타일러스 호버 취소, 시스템 제스처 등으로 pointerup 없이 스트로크가 끊길 때 안전하게 커밋한다.
-  const handlePointerCancel = useCallback(() => {
-    if (!drawingRef.current) return;
-    drawingRef.current = false;
-    lastPointRef.current = null;
-    shapeStartRef.current = null;
-    onStrokeEnd(workingRef.current);
-  }, [onStrokeEnd]);
+  // handlePointerUp과 도구별 분기가 완전히 같아야 하고, 위쪽의 drawingRef 가드 덕분에 pointerup
+  // 이후 뒤늦게 발생하는 lostpointercapture에 대해서도 안전하게(중복 커밋 없이) 재사용할 수 있다.
+  const handlePointerCancel = handlePointerUp;
 
   return (
     <canvas
