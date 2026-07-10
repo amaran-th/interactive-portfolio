@@ -2,6 +2,7 @@
 
 import { House } from "lucide-react";
 import { useCallback, useState } from "react";
+import { useUnsavedChangesWarning } from "../_shared/useUnsavedChangesWarning";
 import AssetUploader from "./AssetUploader";
 import EditorScreen from "./EditorScreen";
 import HomeScreen from "./HomeScreen";
@@ -29,7 +30,12 @@ function VNMakerWithSlot({
 
   const hasWork =
     store.cuts.length > 1 ||
-    store.cuts.some((c) => c.text || c.visibleCharacterIds.length > 0 || c.backgroundId);
+    store.cuts.some((c) => c.text || c.visibleCharacterIds.length > 0 || c.backgroundId) ||
+    store.characters.length > 0 ||
+    store.backgrounds.length > 0 ||
+    store.audioTracks.length > 0;
+
+  useUnsavedChangesWarning(hasWork);
 
   const handleBack = useCallback(() => {
     onBack(store.cuts.length, store.characters.length);
