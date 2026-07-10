@@ -9,8 +9,10 @@ import {
   mirrorPoints,
   rectOutlinePoints,
   setPixel,
+  wandMask,
 } from "./pixelGrid";
 import { MirrorMode, Tool } from "./types";
+import { moveSelection } from "./useSelection";
 
 const CELL_SIZE = 16;
 
@@ -22,6 +24,8 @@ export default function PixelCanvas({
   tool,
   mirror,
   activeColorIndex,
+  selectionMask,
+  onSelectionChange,
   onStrokeEnd,
   onPickColor,
 }: {
@@ -32,6 +36,8 @@ export default function PixelCanvas({
   tool: Tool;
   mirror: MirrorMode;
   activeColorIndex: number;
+  selectionMask: Set<number> | null;
+  onSelectionChange: (mask: Set<number> | null) => void;
   onStrokeEnd: (next: number[]) => void;
   onPickColor: (colorIndex: number) => void;
 }) {
@@ -133,6 +139,23 @@ export default function PixelCanvas({
         return;
       }
 
+      if (tool === "wand") {
+        onSelectionChange(wandMask(workingRef.current, width, height, point.x, point.y));
+        return;
+      }
+
+      if (tool === "select") {
+        shapeStartRef.current = point;
+        drawingRef.current = true;
+        return;
+      }
+
+      if (tool === "move" && selectionMask) {
+        lastPointRef.current = point;
+        drawingRef.current = true;
+        return;
+      }
+
       if (tool === "line" || tool === "rect" || tool === "circle") {
         drawingRef.current = true;
         shapeStartRef.current = point;
@@ -148,12 +171,42 @@ export default function PixelCanvas({
         render(next);
       }
     },
-    [tool, width, height, activeColorIndex, toGridPoint, plotPoint, render, onStrokeEnd, onPickColor],
+    [tool, width, height, activeColorIndex, selectionMask, toGridPoint, plotPoint, render, onStrokeEnd, onPickColor, onSelectionChange],
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
       if (!drawingRef.current) return;
+
+      if (tool === "select" && shapeStartRef.current) {
+        const point = toGridPoint(e);
+        if (!point) return;
+        const start = shapeStartRef.current;
+        const minX = Math.min(start.x, point.x);
+        const maxX = Math.max(start.x, point.x);
+        const minY = Math.min(start.y, point.y);
+        const maxY = Math.max(start.y, point.y);
+        const next = new Set<number>();
+        for (let y = minY; y <= maxY; y++) {
+          for (let x = minX; x <= maxX; x++) next.add(y * width + x);
+        }
+        onSelectionChange(next);
+        return;
+      }
+
+      if (tool === "move" && selectionMask && lastPointRef.current) {
+        const point = toGridPoint(e);
+        if (!point) return;
+        const dx = point.x - lastPointRef.current.x;
+        const dy = point.y - lastPointRef.current.y;
+        if (dx === 0 && dy === 0) return;
+        const result = moveSelection(workingRef.current, width, height, selectionMask, dx, dy);
+        workingRef.current = result.pixels;
+        onSelectionChange(result.mask);
+        lastPointRef.current = point;
+        render(result.pixels);
+        return;
+      }
 
       if (tool === "line" || tool === "rect" || tool === "circle") {
         const point = toGridPoint(e);
@@ -190,10 +243,21 @@ export default function PixelCanvas({
       workingRef.current = next;
       render(next);
     },
-    [tool, width, height, activeColorIndex, pixels, toGridPoint, plotPoint, render],
+    [tool, width, height, activeColorIndex, pixels, selectionMask, toGridPoint, plotPoint, render, onSelectionChange],
   );
 
   const handlePointerUp = useCallback(() => {
+    if (tool === "select") {
+      shapeStartRef.current = null;
+      drawingRef.current = false;
+      return;
+    }
+    if (tool === "move") {
+      lastPointRef.current = null;
+      drawingRef.current = false;
+      onStrokeEnd(workingRef.current);
+      return;
+    }
     if (tool === "line" || tool === "rect" || tool === "circle") {
       if (!shapeStartRef.current) return;
       shapeStartRef.current = null;
