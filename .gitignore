@@ -45,3 +45,6 @@ next-env.d.ts
 
 .claude
 daily-note
+
+# subagent-driven-development scratch (progress ledger, briefs, reports)
+.superpowers/
