@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/pretext", "/gpu-rotation", "/knit-muffler", "/rough-visual-novel-maker", "/stellar-forge", "/yearly-receipt", "/sitemap.xml", "/sitemap-0.xml"],
+        allow: ["/pretext", "/gpu-rotation", "/knit-muffler", "/visual-novel-studio", "/stellar-forge", "/yearly-receipt", "/sitemap.xml", "/sitemap-0.xml"],
         disallow: ["/"],
       },
     ],

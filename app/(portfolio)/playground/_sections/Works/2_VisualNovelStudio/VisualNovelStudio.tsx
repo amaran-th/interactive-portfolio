@@ -126,7 +126,7 @@ function VNMakerWithSlot({
   );
 }
 
-export default function RoughVisualNovelMaker() {
+export default function VisualNovelStudio() {
   const { slots, createSlot, deleteSlot, updateSlotMeta } = useSlots();
   const [activeSlot, setActiveSlot] = useState<SlotMeta | null>(null);
   const [initialPhase, setInitialPhase] = useState<SlotPhase>("setup");

@@ -1,5 +1,5 @@
 import KnitMuffler from "./1_KnitMuffler/KnitMuffler";
-import RoughVisualNovelMaker from "./2_RoughVisualNovelMaker/RoughVisualNovelMaker";
+import VisualNovelStudio from "./2_VisualNovelStudio/VisualNovelStudio";
 import StellarForge from "./3_StellarForge/StellarForge";
 import YearlyReceipt from "./4_YearlyReceipt/YearlyReceipt";
 import { WorkItem } from "./Work";
@@ -33,7 +33,7 @@ export const works: WorkItem[] = [
   },
   {
     id: 2,
-    title: "비주얼 노벨 메이커",
+    title: "비주얼 노벨 스튜디오",
     description: `캐릭터와 배경 이미지를 업로드하고, 컷마다 등장 캐릭터·발화자·대사를 설정해 간단한 비주얼 노벨을 만들 수 있는 도구입니다.
 
   🖼️ 자산 등록: 캐릭터(이름 + 이미지)와 배경 이미지를 편집 중에도 자유롭게 추가할 수 있습니다.
@@ -43,9 +43,9 @@ export const works: WorkItem[] = [
   ▶️ 재생 모드: 완성된 비주얼 노벨을 순서대로 감상합니다. 클릭 또는 키보드로 컷을 넘길 수 있습니다.`,
     period: "2026.04.20 - ",
     platforms: [{ type: "pc", specialized: true }, { type: "mobile" }],
-    content: <RoughVisualNovelMaker />,
-    thumbnail: "/playground/visual-novel-maker.png",
-    path: "/rough-visual-novel-maker",
+    content: <VisualNovelStudio />,
+    thumbnail: "/playground/visual-novel-studio.png",
+    path: "/visual-novel-studio",
   },
   {
     id: 3,

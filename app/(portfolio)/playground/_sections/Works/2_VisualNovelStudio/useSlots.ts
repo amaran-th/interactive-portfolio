@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-const SLOTS_KEY = "rough-vn-slots";
+const SLOTS_KEY = "vn-studio-slots";
 
 export type SlotMeta = {
   id: string;
@@ -43,7 +43,7 @@ export function useSlots() {
   }, []);
 
   const deleteSlot = useCallback((slotId: string) => {
-    localStorage.removeItem(`rough-vn-slot-${slotId}`);
+    localStorage.removeItem(`vn-studio-slot-${slotId}`);
     setSlots((prev) => prev.filter((s) => s.id !== slotId));
   }, []);
 

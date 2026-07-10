@@ -72,7 +72,7 @@ function saveMeta(
 }
 
 export function useVNStore(slotId: string) {
-  const storageKey = `rough-vn-slot-${slotId}`;
+  const storageKey = `vn-studio-slot-${slotId}`;
   const [initialMeta] = useState(() => loadMeta(storageKey));
 
   const [characters, setCharacters] = useState<Character[]>(

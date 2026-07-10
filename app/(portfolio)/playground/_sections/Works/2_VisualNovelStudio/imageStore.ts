@@ -1,4 +1,4 @@
-const DB_NAME = "rough-vn-images";
+const DB_NAME = "vn-studio-images";
 const STORE = "images";
 
 function openDB(): Promise<IDBDatabase> {
