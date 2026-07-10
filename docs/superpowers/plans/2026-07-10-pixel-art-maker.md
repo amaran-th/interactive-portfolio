@@ -401,6 +401,8 @@ git commit -m "feat: 픽셀아트 메이커 그리드 순수 함수 추가"
 
 - [ ] **Step 1: `useCanvasHistory.ts` 작성**
 
+`canUndo`/`canRedo`는 렌더 중에 `ref.current`를 읽지 않도록 별도 `useState`로 관리한다(이 프로젝트의 `react-hooks/refs` lint 규칙이 렌더 중 ref 읽기를 금지함) — 스택을 변경하는 각 콜백 안에서만 `.current.length`를 읽어 state로 반영한다.
+
 ```typescript
 import { useCallback, useRef, useState } from "react";
 
@@ -408,6 +410,8 @@ const HISTORY_LIMIT = 50;
 
 export function useCanvasHistory(initial: number[]) {
   const [present, setPresent] = useState(initial);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   const undoStack = useRef<number[][]>([]);
   const redoStack = useRef<number[][]>([]);
 
@@ -417,6 +421,8 @@ export function useCanvasHistory(initial: number[]) {
       if (undoStack.current.length > HISTORY_LIMIT) undoStack.current.shift();
       redoStack.current = [];
       setPresent(next);
+      setCanUndo(true);
+      setCanRedo(false);
     },
     [present],
   );
@@ -426,6 +432,8 @@ export function useCanvasHistory(initial: number[]) {
     if (!prev) return;
     redoStack.current.push(present);
     setPresent(prev);
+    setCanUndo(undoStack.current.length > 0);
+    setCanRedo(true);
   }, [present]);
 
   const redo = useCallback(() => {
@@ -433,23 +441,19 @@ export function useCanvasHistory(initial: number[]) {
     if (!next) return;
     undoStack.current.push(present);
     setPresent(next);
+    setCanUndo(true);
+    setCanRedo(redoStack.current.length > 0);
   }, [present]);
 
   const reset = useCallback((next: number[]) => {
     undoStack.current = [];
     redoStack.current = [];
     setPresent(next);
+    setCanUndo(false);
+    setCanRedo(false);
   }, []);
 
-  return {
-    present,
-    push,
-    undo,
-    redo,
-    reset,
-    canUndo: undoStack.current.length > 0,
-    canRedo: redoStack.current.length > 0,
-  };
+  return { present, push, undo, redo, reset, canUndo, canRedo };
 }
 ```
 
