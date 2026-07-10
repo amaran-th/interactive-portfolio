@@ -1730,10 +1730,13 @@ export default function Editor({
 
   const history = useCanvasHistory(doc?.pixels ?? []);
   const selection = useSelection();
+  // 픽셀 편집이 아닌 변경(이름 변경, 팔레트 추가/제거)도 "저장 안 한 변경사항"으로 잡기 위한 별도 플래그.
+  // history.canUndo만으로는 이 두 경우를 놓친다.
+  const [hasMetaEdits, setHasMetaEdits] = useState(false);
 
   useEffect(() => {
-    onDirtyChange(history.canUndo);
-  }, [history.canUndo, onDirtyChange]);
+    onDirtyChange(history.canUndo || hasMetaEdits);
+  }, [history.canUndo, hasMetaEdits, onDirtyChange]);
 
   const handleCreate = useCallback(
     (width: number, height: number) => {
@@ -1742,6 +1745,7 @@ export default function Editor({
       setName(fresh.name);
       history.reset(fresh.pixels);
       setNeedsSize(false);
+      setHasMetaEdits(false);
     },
     [history],
   );
@@ -1759,6 +1763,7 @@ export default function Editor({
     savePixelArt(toSave);
     setDoc(toSave);
     history.reset(toSave.pixels);
+    setHasMetaEdits(false);
   }, [doc, name, history]);
 
   useKeyboardShortcuts({
@@ -1778,10 +1783,12 @@ export default function Editor({
 
   const handleAddColor = useCallback((hex: string) => {
     setDoc((d) => (d ? { ...d, palette: [...d.palette, hex] } : d));
+    setHasMetaEdits(true);
   }, []);
 
   const handleRemoveColor = useCallback((index: number) => {
     setDoc((d) => (d ? { ...d, palette: d.palette.filter((_, i) => i !== index) } : d));
+    setHasMetaEdits(true);
   }, []);
 
   const handlePickColor = useCallback((colorIndex: number) => {
@@ -1805,7 +1812,10 @@ export default function Editor({
         </button>
         <input
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            setHasMetaEdits(true);
+          }}
           className="flex-1 bg-transparent text-sm font-semibold text-white outline-none"
         />
         <button onClick={handleSave} className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-950">
