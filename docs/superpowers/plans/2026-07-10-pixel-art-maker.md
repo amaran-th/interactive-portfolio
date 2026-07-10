@@ -602,9 +602,11 @@ export default function PixelCanvas({
 
       if (tool === "bucket") {
         const next = floodFill(workingRef.current, width, height, point.x, point.y, activeColorIndex);
-        workingRef.current = next;
-        render(next);
-        onStrokeEnd(next);
+        if (next !== workingRef.current) {
+          workingRef.current = next;
+          render(next);
+          onStrokeEnd(next);
+        }
         return;
       }
 
@@ -651,6 +653,14 @@ export default function PixelCanvas({
     setZoom((z) => Math.min(8, Math.max(1, z + (e.deltaY < 0 ? 1 : -1))));
   }, []);
 
+  // 스타일러스 호버 취소, 시스템 제스처 등으로 pointerup 없이 스트로크가 끊길 때 안전하게 커밋한다.
+  const handlePointerCancel = useCallback(() => {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    lastPointRef.current = null;
+    onStrokeEnd(workingRef.current);
+  }, [onStrokeEnd]);
+
   return (
     <canvas
       ref={canvasRef}
@@ -659,6 +669,8 @@ export default function PixelCanvas({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onLostPointerCapture={handlePointerCancel}
       onWheel={handleWheel}
     />
   );
@@ -828,9 +840,11 @@ export default function PixelCanvas({
 
       if (tool === "bucket") {
         const next = floodFill(workingRef.current, width, height, point.x, point.y, activeColorIndex);
-        workingRef.current = next;
-        render(next);
-        onStrokeEnd(next);
+        if (next !== workingRef.current) {
+          workingRef.current = next;
+          render(next);
+          onStrokeEnd(next);
+        }
         return;
       }
 
@@ -914,6 +928,15 @@ export default function PixelCanvas({
     setZoom((z) => Math.min(8, Math.max(1, z + (e.deltaY < 0 ? 1 : -1))));
   }, []);
 
+  // 스타일러스 호버 취소, 시스템 제스처 등으로 pointerup 없이 스트로크가 끊길 때 안전하게 커밋한다.
+  const handlePointerCancel = useCallback(() => {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    lastPointRef.current = null;
+    shapeStartRef.current = null;
+    onStrokeEnd(workingRef.current);
+  }, [onStrokeEnd]);
+
   return (
     <canvas
       ref={canvasRef}
@@ -922,6 +945,8 @@ export default function PixelCanvas({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onLostPointerCapture={handlePointerCancel}
       onWheel={handleWheel}
     />
   );
@@ -1174,9 +1199,11 @@ export default function PixelCanvas({
 
       if (tool === "bucket") {
         const next = floodFill(workingRef.current, width, height, point.x, point.y, activeColorIndex);
-        workingRef.current = next;
-        render(next);
-        onStrokeEnd(next);
+        if (next !== workingRef.current) {
+          workingRef.current = next;
+          render(next);
+          onStrokeEnd(next);
+        }
         return;
       }
 
@@ -1318,6 +1345,15 @@ export default function PixelCanvas({
     setZoom((z) => Math.min(8, Math.max(1, z + (e.deltaY < 0 ? 1 : -1))));
   }, []);
 
+  // 스타일러스 호버 취소, 시스템 제스처 등으로 pointerup 없이 스트로크가 끊길 때 안전하게 커밋한다.
+  const handlePointerCancel = useCallback(() => {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    lastPointRef.current = null;
+    shapeStartRef.current = null;
+    onStrokeEnd(workingRef.current);
+  }, [onStrokeEnd]);
+
   return (
     <canvas
       ref={canvasRef}
@@ -1326,6 +1362,8 @@ export default function PixelCanvas({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onLostPointerCapture={handlePointerCancel}
       onWheel={handleWheel}
     />
   );
