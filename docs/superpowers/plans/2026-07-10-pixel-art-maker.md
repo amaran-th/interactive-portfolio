@@ -2686,7 +2686,7 @@ export default function Desktop({
                   { label: "PNG로 내보내기", onClick: () => exportAsPNG(art) },
                   { label: "SVG로 내보내기", onClick: () => exportAsSVG(art) },
                   { label: "JSON으로 내보내기", onClick: () => exportAsJSON(art) },
-                  { label: "JPG로 내보내기", onClick: () => exportAsJPG(art) },
+                  { label: "JPG로 내보내기 (손실 압축)", onClick: () => exportAsJPG(art) },
                   {
                     label: "복제",
                     onClick: () => {
