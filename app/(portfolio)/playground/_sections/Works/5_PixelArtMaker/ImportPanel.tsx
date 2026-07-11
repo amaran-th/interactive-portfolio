@@ -16,6 +16,7 @@ export default function ImportPanel({
   const [antiAlias, setAntiAlias] = useState(false);
   const [maxColors, setMaxColors] = useState(8);
   const [imageEl, setImageEl] = useState<HTMLImageElement | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
   const runPixelate = useCallback(
     (img: HTMLImageElement, size: number, aa: boolean, colors: number) => {
@@ -33,7 +34,10 @@ export default function ImportPanel({
         setImageEl(img);
         runPixelate(img, pixelSize, antiAlias, maxColors);
       };
-      img.src = URL.createObjectURL(file);
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      const url = URL.createObjectURL(file);
+      objectUrlRef.current = url;
+      img.src = url;
     },
     [pixelSize, antiAlias, maxColors, runPixelate],
   );
@@ -103,8 +107,7 @@ export default function ImportPanel({
             {preview.palette.map((color, i) => (
               <button
                 key={i}
-                title="다른 색상 버튼을 눌러 이 색과 병합"
-                onClick={() => setPreview((p) => (p ? { ...p, palette: p.palette } : p))}
+                title="더블클릭하면 다음 색상과 병합됩니다"
                 onDoubleClick={() => preview.palette.length > 1 && handleMergeClick(i, (i + 1) % preview.palette.length)}
                 className="h-5 w-5 rounded border border-white/20"
                 style={{ backgroundColor: color }}

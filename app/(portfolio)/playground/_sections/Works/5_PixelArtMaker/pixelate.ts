@@ -53,6 +53,7 @@ function colorDistance(a: string, b: string): number {
 }
 
 // 팔레트가 maxColors를 넘으면, 가장 가까운 색 쌍부터 순서대로 병합해 개수를 줄인다.
+// curPalette.length > 1 가드: maxColors가 0 이하로 들어와도 무한루프에 빠지지 않는다(더 합칠 색이 없으면 멈춘다).
 export function quantizeColors(
   palette: string[],
   pixels: number[],
@@ -61,7 +62,7 @@ export function quantizeColors(
   let curPalette = palette.slice();
   let curPixels = pixels.slice();
 
-  while (curPalette.length > maxColors) {
+  while (curPalette.length > maxColors && curPalette.length > 1) {
     let bestPair: [number, number] = [0, 1];
     let bestDist = Infinity;
     for (let i = 0; i < curPalette.length; i++) {
@@ -82,16 +83,18 @@ export function quantizeColors(
 }
 
 // indexB를 indexA로 합치고, 팔레트에서 indexB를 제거하며 뒤 인덱스를 당긴다.
+// indexA가 indexB보다 뒤에 있으면(indexA > indexB) indexB 제거로 인해 indexA 자신의 위치도 하나 당겨지므로,
+// "합쳐진 색이 가리켜야 할 최종 인덱스"(targetIndex)를 별도로 계산해 그 값으로 통일한다.
 export function mergeColors(
   palette: string[],
   pixels: number[],
   indexA: number,
   indexB: number,
 ): { palette: string[]; pixels: number[] } {
+  const targetIndex = indexA > indexB ? indexA - 1 : indexA;
   const nextPixels = pixels.map((p) => {
-    if (p === indexB) return indexA;
-    if (p > indexB) return p - 1;
-    return p;
+    if (p === indexB) return targetIndex;
+    return p > indexB ? p - 1 : p;
   });
   const nextPalette = palette.filter((_, i) => i !== indexB);
   return { palette: nextPalette, pixels: nextPixels };
