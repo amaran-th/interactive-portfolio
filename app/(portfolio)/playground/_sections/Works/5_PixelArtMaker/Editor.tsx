@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { getPixelArt, PixelArt, savePixelArt, uid } from "../_shared/assetLibrary";
 import NewCanvasDialog from "./NewCanvasDialog";
 import PalettePanel from "./PalettePanel";
+import ImportPanel from "./ImportPanel";
 import PixelCanvas from "./PixelCanvas";
 import Toolbar from "./Toolbar";
 import { useCanvasHistory } from "./useCanvasHistory";
@@ -153,6 +154,19 @@ export default function Editor({
             onSelect={setActiveColorIndex}
             onAddColor={handleAddColor}
             onRemoveColor={handleRemoveColor}
+          />
+          <ImportPanel
+            onConfirm={(imported) => {
+              setDoc((d) =>
+                d
+                  ? { ...d, width: imported.width, height: imported.height, palette: imported.palette }
+                  : d,
+              );
+              history.reset(imported.pixels);
+              // history.reset은 canUndo를 false로 되돌리므로, import로 들어온 미저장 상태를
+              // 놓치지 않도록 hasMetaEdits를 직접 true로 세운다(폭/높이/팔레트가 바뀐 실질적 편집).
+              setHasMetaEdits(true);
+            }}
           />
         </div>
         <div className="flex flex-1 items-center justify-center">
