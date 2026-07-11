@@ -84,8 +84,21 @@ export default function PixelCanvas({
         ctx.lineTo(width * scale, y * scale);
         ctx.stroke();
       }
+      // 선택 영역을 시각적으로 표시한다 — select/wand 도구로 선택해도 화면에
+      // 아무 표시가 없어 무엇이 선택됐는지 알 수 없었다(최종 whole-branch 리뷰에서 발견).
+      if (selectionMask && selectionMask.size > 0) {
+        ctx.fillStyle = "rgba(96, 165, 250, 0.35)";
+        ctx.strokeStyle = "rgba(96, 165, 250, 0.9)";
+        ctx.lineWidth = 1;
+        selectionMask.forEach((i) => {
+          const x = i % width;
+          const y = Math.floor(i / width);
+          ctx.fillRect(x * scale, y * scale, scale, scale);
+          ctx.strokeRect(x * scale + 0.5, y * scale + 0.5, scale - 1, scale - 1);
+        });
+      }
     },
-    [width, height, palette, zoom],
+    [width, height, palette, zoom, selectionMask],
   );
 
   useEffect(() => {

@@ -88,6 +88,18 @@ export default function Desktop({
     (art: PixelArt, e: React.PointerEvent) => {
       e.stopPropagation();
       if (e.button !== 0) return;
+
+      // Ctrl/Cmd/Shift+클릭은 드래그를 시작하지 않고 개별 아이콘만 선택 집합에 추가/제외한다.
+      if (e.ctrlKey || e.metaKey || e.shiftKey) {
+        setSelected((prev) => {
+          const next = new Set(prev);
+          if (next.has(art.id)) next.delete(art.id);
+          else next.add(art.id);
+          return next;
+        });
+        return;
+      }
+
       const group = selected.has(art.id) ? Array.from(selected) : [art.id];
       if (!selected.has(art.id)) setSelected(new Set([art.id]));
 
