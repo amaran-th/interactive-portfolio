@@ -1,7 +1,7 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   deletePixelArt,
   duplicatePixelArt,
@@ -30,6 +30,7 @@ export default function Desktop({
   const [menu, setMenu] = useState<Menu>(null);
   const [pendingDelete, setPendingDelete] = useState<string[] | null>(null);
   const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(() => {
     const list = listPixelArt();
@@ -48,19 +49,28 @@ export default function Desktop({
 
   const startBoxSelect = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return;
-    const x0 = e.clientX;
-    const y0 = e.clientY;
+    // 아이콘은 컨테이너(position: relative) 기준 절대좌표(top/left)로 배치되므로,
+    // 박스 선택 좌표도 뷰포트 기준(clientX/Y)이 아니라 컨테이너 기준으로 변환해야
+    // 페이지 안에 여백/스크롤이 있어도 실제 아이콘 위치와 정확히 맞아떨어진다.
+    const rect = containerRef.current?.getBoundingClientRect();
+    const offsetX = rect?.left ?? 0;
+    const offsetY = rect?.top ?? 0;
+    const x0 = e.clientX - offsetX;
+    const y0 = e.clientY - offsetY;
     setBox({ x0, y0, x1: x0, y1: y0 });
     setSelected(new Set());
 
-    const move = (ev: PointerEvent) => setBox({ x0, y0, x1: ev.clientX, y1: ev.clientY });
+    const move = (ev: PointerEvent) =>
+      setBox({ x0, y0, x1: ev.clientX - offsetX, y1: ev.clientY - offsetY });
     const up = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
-      const minX = Math.min(x0, ev.clientX);
-      const maxX = Math.max(x0, ev.clientX);
-      const minY = Math.min(y0, ev.clientY);
-      const maxY = Math.max(y0, ev.clientY);
+      const curX = ev.clientX - offsetX;
+      const curY = ev.clientY - offsetY;
+      const minX = Math.min(x0, curX);
+      const maxX = Math.max(x0, curX);
+      const minY = Math.min(y0, curY);
+      const maxY = Math.max(y0, curY);
       const next = new Set<string>();
       for (const art of items) {
         const p = positions[art.id];
@@ -127,6 +137,7 @@ export default function Desktop({
 
   return (
     <div
+      ref={containerRef}
       className="relative h-full w-full overflow-hidden bg-gray-950"
       onPointerDown={startBoxSelect}
       onContextMenu={(e) => {
@@ -187,7 +198,7 @@ export default function Desktop({
 
       {box && (
         <div
-          className="pointer-events-none fixed border border-white/40 bg-white/10"
+          className="pointer-events-none absolute border border-white/40 bg-white/10"
           style={{
             left: Math.min(box.x0, box.x1),
             top: Math.min(box.y0, box.y1),
