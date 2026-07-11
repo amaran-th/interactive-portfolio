@@ -13,6 +13,7 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useSelection } from "./useSelection";
 import { createGrid, getPixel } from "./pixelGrid";
 import { MirrorMode, Tool } from "./types";
+import { exportAsJPG, exportAsJSON, exportAsPNG, exportAsSVG } from "./exportPixelArt";
 
 function blankDoc(width: number, height: number): PixelArt {
   return {
@@ -135,6 +136,12 @@ export default function Editor({
         <button onClick={handleSave} className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-950">
           <Save className="h-3.5 w-3.5" /> 저장
         </button>
+        <div className="flex gap-1">
+          <button onClick={() => doc && exportAsPNG({ ...doc, pixels: history.present })} className="rounded-lg bg-white/10 px-2 py-1.5 text-[10px] text-white">PNG</button>
+          <button onClick={() => doc && exportAsSVG({ ...doc, pixels: history.present })} className="rounded-lg bg-white/10 px-2 py-1.5 text-[10px] text-white">SVG</button>
+          <button onClick={() => doc && exportAsJSON({ ...doc, pixels: history.present })} className="rounded-lg bg-white/10 px-2 py-1.5 text-[10px] text-white">JSON</button>
+          <button onClick={() => doc && exportAsJPG({ ...doc, pixels: history.present })} className="rounded-lg bg-white/10 px-2 py-1.5 text-[10px] text-white">JPG</button>
+        </div>
       </div>
       <div className="flex flex-1 gap-4 overflow-auto p-4">
         <div className="flex flex-col gap-3">
