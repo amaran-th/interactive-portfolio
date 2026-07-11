@@ -2281,7 +2281,13 @@ import { exportAsJPG, exportAsJSON, exportAsPNG, exportAsSVG } from "./exportPix
           <button onClick={() => doc && exportAsPNG({ ...doc, pixels: history.present })} className="rounded-lg bg-white/10 px-2 py-1.5 text-[10px] text-white">PNG</button>
           <button onClick={() => doc && exportAsSVG({ ...doc, pixels: history.present })} className="rounded-lg bg-white/10 px-2 py-1.5 text-[10px] text-white">SVG</button>
           <button onClick={() => doc && exportAsJSON({ ...doc, pixels: history.present })} className="rounded-lg bg-white/10 px-2 py-1.5 text-[10px] text-white">JSON</button>
-          <button onClick={() => doc && exportAsJPG({ ...doc, pixels: history.present })} className="rounded-lg bg-white/10 px-2 py-1.5 text-[10px] text-white">JPG</button>
+          <button
+            onClick={() => doc && exportAsJPG({ ...doc, pixels: history.present })}
+            title="JPG는 손실 압축이라 팔레트 색상 경계가 흐려질 수 있습니다"
+            className="rounded-lg bg-white/10 px-2 py-1.5 text-[10px] text-white"
+          >
+            JPG
+          </button>
         </div>
 ```
 
