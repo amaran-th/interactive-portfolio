@@ -2169,6 +2169,9 @@ import ImportPanel from "./ImportPanel";
                   : d,
               );
               history.reset(imported.pixels);
+              // history.reset은 canUndo를 false로 되돌리므로, import로 들어온 미저장 상태를
+              // 놓치지 않도록 hasMetaEdits를 직접 true로 세운다(폭/높이/팔레트가 바뀐 실질적 편집).
+              setHasMetaEdits(true);
             }}
           />
 ```
@@ -2180,7 +2183,7 @@ Run: `npm run lint && npx tsc --noEmit -p .`
 - [ ] **Step 3: commit**
 
 ```bash
-git add app/\(portfolio\)/playground/_sections/Works/5_PixelArtMaker/Editor.tsx
+git add "app/(portfolio)/playground/_sections/Works/5_PixelArtMaker/Editor.tsx"
 git commit -m "feat: 편집기에 이미지 import 패널 연결"
 ```
 
@@ -2289,7 +2292,7 @@ Run: `npm run lint && npx tsc --noEmit -p .`
 - [ ] **Step 4: commit**
 
 ```bash
-git add app/\(portfolio\)/playground/_sections/Works/5_PixelArtMaker/exportPixelArt.ts app/\(portfolio\)/playground/_sections/Works/5_PixelArtMaker/Editor.tsx
+git add "app/(portfolio)/playground/_sections/Works/5_PixelArtMaker/exportPixelArt.ts" "app/(portfolio)/playground/_sections/Works/5_PixelArtMaker/Editor.tsx"
 git commit -m "feat: PNG/SVG/JSON/JPG 내보내기 추가"
 ```
 
@@ -2733,7 +2736,7 @@ Expected: 오류 없음
 - [ ] **Step 7: commit**
 
 ```bash
-git add app/\(portfolio\)/playground/_sections/Works/5_PixelArtMaker/useDesktopLayout.ts app/\(portfolio\)/playground/_sections/Works/5_PixelArtMaker/DesktopIcon.tsx app/\(portfolio\)/playground/_sections/Works/5_PixelArtMaker/ContextMenu.tsx app/\(portfolio\)/playground/_sections/Works/5_PixelArtMaker/ConfirmDialog.tsx app/\(portfolio\)/playground/_sections/Works/5_PixelArtMaker/Desktop.tsx
+git add "app/(portfolio)/playground/_sections/Works/5_PixelArtMaker/useDesktopLayout.ts" "app/(portfolio)/playground/_sections/Works/5_PixelArtMaker/DesktopIcon.tsx" "app/(portfolio)/playground/_sections/Works/5_PixelArtMaker/ContextMenu.tsx" "app/(portfolio)/playground/_sections/Works/5_PixelArtMaker/ConfirmDialog.tsx" "app/(portfolio)/playground/_sections/Works/5_PixelArtMaker/Desktop.tsx"
 git commit -m "feat: 데스크탑 홈 화면(아이콘, 다중선택, 우클릭 메뉴, 휴지통) 추가"
 ```
 
@@ -2883,7 +2886,7 @@ Run: `npm run dev`
 - [ ] **Step 6: commit**
 
 ```bash
-git add app/\(portfolio\)/playground/_sections/Works/5_PixelArtMaker/PixelArtMaker.tsx app/\(services\)/pixel-art-maker/page.tsx app/\(portfolio\)/playground/_sections/Works/data.tsx
+git add "app/(portfolio)/playground/_sections/Works/5_PixelArtMaker/PixelArtMaker.tsx" "app/(services)/pixel-art-maker/page.tsx" "app/(portfolio)/playground/_sections/Works/data.tsx"
 git commit -m "feat: 픽셀아트 메이커 라우트 및 Works 등록"
 ```
 
