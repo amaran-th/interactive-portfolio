@@ -136,7 +136,7 @@ export default function ColorWheel({
           onPointerCancel={handleWheelUp}
         />
         <div
-          className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
+          className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_0_2px_#ffffff,0_1px_3px_rgba(0,0,0,0.35)]"
           style={{ left: markerX, top: markerY, backgroundColor: activeHex }}
         />
       </div>
