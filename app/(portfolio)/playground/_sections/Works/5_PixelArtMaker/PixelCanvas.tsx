@@ -47,10 +47,18 @@ export default function PixelCanvas({
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const shapeStartRef = useRef<{ x: number; y: number } | null>(null);
   const drawingRef = useRef(false);
+  // selectionMask 프롭은 React state를 거쳐 비동기로 갱신되므로, 빠른 연속 pointermove
+  // 동안 오래된(stale) 값을 참조해 move 드래그가 잘못된 위치를 지우는 문제(자취 남음)가
+  // 있었다. workingRef와 같은 패턴으로 항상 최신 값을 담는 ref를 별도로 둔다.
+  const selectionMaskRef = useRef<Set<number> | null>(selectionMask);
 
   useEffect(() => {
     workingRef.current = pixels;
   }, [pixels]);
+
+  useEffect(() => {
+    selectionMaskRef.current = selectionMask;
+  }, [selectionMask]);
 
   const render = useCallback(
     (data: number[]) => {
@@ -86,11 +94,13 @@ export default function PixelCanvas({
       }
       // 선택 영역을 시각적으로 표시한다 — select/wand 도구로 선택해도 화면에
       // 아무 표시가 없어 무엇이 선택됐는지 알 수 없었다(최종 whole-branch 리뷰에서 발견).
-      if (selectionMask && selectionMask.size > 0) {
+      // ref에서 읽어 move 드래그 중 빠른 pointermove 연속 호출에서도 항상 최신 마스크를 그린다.
+      const mask = selectionMaskRef.current;
+      if (mask && mask.size > 0) {
         ctx.fillStyle = "rgba(96, 165, 250, 0.35)";
         ctx.strokeStyle = "rgba(96, 165, 250, 0.9)";
         ctx.lineWidth = 1;
-        selectionMask.forEach((i) => {
+        mask.forEach((i) => {
           const x = i % width;
           const y = Math.floor(i / width);
           ctx.fillRect(x * scale, y * scale, scale, scale);
@@ -98,12 +108,12 @@ export default function PixelCanvas({
         });
       }
     },
-    [width, height, palette, zoom, selectionMask],
+    [width, height, palette, zoom],
   );
 
   useEffect(() => {
     render(pixels);
-  }, [pixels, render]);
+  }, [pixels, selectionMask, render]);
 
   const toGridPoint = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -163,7 +173,7 @@ export default function PixelCanvas({
         return;
       }
 
-      if (tool === "move" && selectionMask) {
+      if (tool === "move" && selectionMaskRef.current) {
         lastPointRef.current = point;
         drawingRef.current = true;
         return;
@@ -184,7 +194,7 @@ export default function PixelCanvas({
         render(next);
       }
     },
-    [tool, width, height, activeColorIndex, selectionMask, toGridPoint, plotPoint, render, onStrokeEnd, onPickColor, onSelectionChange],
+    [tool, width, height, activeColorIndex, toGridPoint, plotPoint, render, onStrokeEnd, onPickColor, onSelectionChange],
   );
 
   const handlePointerMove = useCallback(
@@ -207,14 +217,17 @@ export default function PixelCanvas({
         return;
       }
 
-      if (tool === "move" && selectionMask && lastPointRef.current) {
+      if (tool === "move" && selectionMaskRef.current && lastPointRef.current) {
         const point = toGridPoint(e);
         if (!point) return;
         const dx = point.x - lastPointRef.current.x;
         const dy = point.y - lastPointRef.current.y;
         if (dx === 0 && dy === 0) return;
-        const result = moveSelection(workingRef.current, width, height, selectionMask, dx, dy);
+        const result = moveSelection(workingRef.current, width, height, selectionMaskRef.current, dx, dy);
         workingRef.current = result.pixels;
+        // ref를 먼저 동기 갱신해 바로 다음 pointermove(React state가 아직 반영되기 전)도
+        // 항상 최신 마스크를 기준으로 계산하도록 한다.
+        selectionMaskRef.current = result.mask;
         onSelectionChange(result.mask);
         lastPointRef.current = point;
         render(result.pixels);
@@ -256,7 +269,7 @@ export default function PixelCanvas({
       workingRef.current = next;
       render(next);
     },
-    [tool, width, height, activeColorIndex, pixels, selectionMask, toGridPoint, plotPoint, render, onSelectionChange],
+    [tool, width, height, activeColorIndex, pixels, toGridPoint, plotPoint, render, onSelectionChange],
   );
 
   // 맨 앞에서 drawingRef를 한 번만 검사·소비하도록 통일한다 — pointerup 처리 후 브라우저가
