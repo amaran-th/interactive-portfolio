@@ -18,11 +18,11 @@ import { exportAsJPG, exportAsJSON, exportAsPNG, exportAsSVG } from "./exportPix
 import { CANVAS_PRESETS, MAX_PALETTE_COLORS, MirrorMode, Tool } from "./types";
 import { getWallpaper, saveWallpaper, WALLPAPER_ID, WALLPAPER_NAME } from "./wallpaper";
 
-// choice: "편집기" 런처로 들어와 무엇을 할지 고르는 단계
-// size: 새 캔버스 크기를 고르는 단계
-// existing: 저장된 작품 중 하나를 골라 여는 단계
-// ready: 실제 편집 화면
-type StartStep = "choice" | "size" | "existing" | "ready";
+// 클립스튜디오처럼 여러 파일을 탭으로 동시에 열어둘 수 있다. 활성 탭의 실제
+// 편집 상태(doc/history/이름/hasMetaEdits)만 살아있는 hook 상태로 유지하고,
+// 비활성 탭은 이 스냅샷 형태로만 보관한다(전환 시 되돌리기 스택은 초기화되지만
+// 그림 내용은 그대로 보존된다).
+type Tab = { doc: PixelArt; hasMetaEdits: boolean };
 
 function blankDoc(width: number, height: number): PixelArt {
   return {
@@ -36,9 +36,6 @@ function blankDoc(width: number, height: number): PixelArt {
   };
 }
 
-// 크기 선택 전에도 편집창 자체(툴바·캔버스 영역)가 그 뒤에 보여야
-// 크기 선택 다이얼로그가 "편집창 위에 뜬 모달"처럼 느껴진다 — 그래서
-// 아직 크기를 고르지 않았어도 임시 draft 캔버스를 미리 만들어 둔다.
 function resolveInitialDoc(docId: string | null): { doc: PixelArt; found: boolean } {
   if (docId === WALLPAPER_ID) return { doc: getWallpaper(), found: true };
   if (docId) {
@@ -48,37 +45,38 @@ function resolveInitialDoc(docId: string | null): { doc: PixelArt; found: boolea
   return { doc: blankDoc(CANVAS_PRESETS[0].width, CANVAS_PRESETS[0].height), found: false };
 }
 
-function resolveInitialStep(found: boolean, startMode: "direct" | "choice"): StartStep {
-  if (found) return "ready";
-  return startMode === "choice" ? "choice" : "size";
-}
-
 export default function Editor({
   docId,
-  startMode = "direct",
+  startMode = "empty",
   onDirtyChange,
   onExit,
   closing,
 }: {
   docId: string | null;
-  startMode?: "direct" | "choice";
+  // newCanvas: 편집창을 열자마자 새 캔버스 크기 선택 모달을 띄운다(데스크탑의
+  // "새로 만들기" 바로가기). empty: 탭 없이 빈 화면으로 연다("편집기" 아이콘).
+  // docId가 있으면(기존 파일을 직접 연 경우) 둘 다 무시되고 그 파일이 탭 하나로 열린다.
+  startMode?: "newCanvas" | "empty";
   onDirtyChange: (dirty: boolean) => void;
   onExit: () => void;
   closing: boolean;
 }) {
   const [initial] = useState(() => resolveInitialDoc(docId));
+  const [tabs, setTabs] = useState<Tab[]>(() => (initial.found ? [{ doc: initial.doc, hasMetaEdits: false }] : []));
+  const [activeTabIndex, setActiveTabIndex] = useState(() => (initial.found ? 0 : -1));
   const [doc, setDoc] = useState<PixelArt>(initial.doc);
-  const [step, setStep] = useState<StartStep>(() => resolveInitialStep(initial.found, startMode));
-  const [wantsAutoImport, setWantsAutoImport] = useState(false);
+  const [name, setName] = useState(initial.doc.name);
+  const [activeColorIndex, setActiveColorIndex] = useState(0);
+  const [hasMetaEdits, setHasMetaEdits] = useState(false);
   const [tool, setTool] = useState<Tool>("pencil");
   const [mirror, setMirror] = useState<MirrorMode>("none");
-  const [activeColorIndex, setActiveColorIndex] = useState(0);
   const [showGrid, setShowGrid] = useState(true);
   const [brushSize, setBrushSize] = useState(1);
-  const [name, setName] = useState(initial.doc.name);
-  const [hasMetaEdits, setHasMetaEdits] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
   const [resizingCanvas, setResizingCanvas] = useState(false);
+  const [showNewCanvasDialog, setShowNewCanvasDialog] = useState(!initial.found && startMode === "newCanvas");
+  const [showOpenDialog, setShowOpenDialog] = useState(false);
+  const [wantsAutoImport, setWantsAutoImport] = useState(false);
   const isWallpaper = doc.id === WALLPAPER_ID;
   // 편집창이 데스크탑 위에 떠오르며 열리는 애니메이션 — 마운트 직후 한 프레임 뒤에
   // true로 바뀌면서 transition이 자연스럽게 재생된다(처음부터 true면 트랜지션 없이
@@ -93,35 +91,102 @@ export default function Editor({
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  // 열린 모든 탭 중 하나라도 저장되지 않은 변경이 있으면 창을 닫을 때 경고한다.
+  // 활성 탭은 라이브 상태(history.canUndo/hasMetaEdits)로, 비활성 탭은 마지막으로
+  // 스냅샷에 저장해 둔 hasMetaEdits 플래그로 판단한다.
   useEffect(() => {
-    onDirtyChange(history.canUndo || hasMetaEdits);
-  }, [history.canUndo, hasMetaEdits, onDirtyChange]);
+    const anyDirty = tabs.some((t, i) => (i === activeTabIndex ? history.canUndo || hasMetaEdits : t.hasMetaEdits));
+    onDirtyChange(anyDirty);
+  }, [tabs, activeTabIndex, history.canUndo, hasMetaEdits, onDirtyChange]);
 
-  const handleCreate = useCallback(
-    (width: number, height: number, newName: string) => {
-      const fresh = { ...blankDoc(width, height), name: newName };
-      setDoc(fresh);
-      setName(fresh.name);
-      history.reset(fresh.pixels);
-      setStep("ready");
-      setHasMetaEdits(false);
+  // 다른 탭으로 전환하거나 탭을 닫기 전에, 지금 활성 탭의 라이브 편집 상태를
+  // tabs 배열의 스냅샷으로 반영한다 — 안 그러면 방금까지 그리던 내용을 잃는다.
+  // 되돌리기 스택(history)까지는 스냅샷에 담지 않으므로 이후 그 탭으로 돌아오면
+  // 되돌리기 이력은 비어 있다(그림 내용 자체는 그대로 보존).
+  const syncActiveTabSnapshot = useCallback(
+    (list: Tab[]): Tab[] => {
+      if (activeTabIndex < 0) return list;
+      return list.map((t, i) =>
+        i === activeTabIndex
+          ? { doc: { ...doc, name, pixels: history.present }, hasMetaEdits: hasMetaEdits || history.canUndo }
+          : t,
+      );
+    },
+    [activeTabIndex, doc, name, history, hasMetaEdits],
+  );
+
+  const loadTab = useCallback(
+    (tab: Tab, index: number) => {
+      setDoc(tab.doc);
+      setName(tab.doc.name);
+      history.reset(tab.doc.pixels);
+      setActiveColorIndex(0);
+      setHasMetaEdits(tab.hasMetaEdits);
+      setActiveTabIndex(index);
     },
     [history],
   );
 
-  // "편집기" 런처의 "기존 픽셀 수정하기" 단계에서 목록의 항목을 고르면, 아직 아무것도
-  // 그리지 않은 상태이므로(선택 화면 단계라 history/doc이 비어있는 draft뿐) 같은
-  // 마운트 안에서 안전하게 doc/이름/히스토리를 그 항목 것으로 다시 채운다.
+  const switchToTab = useCallback(
+    (index: number) => {
+      if (index === activeTabIndex || index < 0 || index >= tabs.length) return;
+      const synced = syncActiveTabSnapshot(tabs);
+      setTabs(synced);
+      loadTab(synced[index], index);
+    },
+    [activeTabIndex, tabs, syncActiveTabSnapshot, loadTab],
+  );
+
+  const openNewTab = useCallback(
+    (newDoc: PixelArt, options?: { autoImport?: boolean }) => {
+      const synced = syncActiveTabSnapshot(tabs);
+      const newIndex = synced.length;
+      setTabs([...synced, { doc: newDoc, hasMetaEdits: false }]);
+      loadTab({ doc: newDoc, hasMetaEdits: false }, newIndex);
+      setWantsAutoImport(!!options?.autoImport);
+    },
+    [tabs, syncActiveTabSnapshot, loadTab],
+  );
+
+  const closeTab = useCallback(
+    (index: number) => {
+      const remaining = tabs.filter((_, i) => i !== index);
+      setTabs(remaining);
+      if (index === activeTabIndex) {
+        if (remaining.length === 0) {
+          setActiveTabIndex(-1);
+        } else {
+          const nextIndex = Math.min(index, remaining.length - 1);
+          loadTab(remaining[nextIndex], nextIndex);
+        }
+      } else if (index < activeTabIndex) {
+        setActiveTabIndex((i) => i - 1);
+      }
+    },
+    [tabs, activeTabIndex, loadTab],
+  );
+
+  const handleCreate = useCallback(
+    (width: number, height: number, newName: string) => {
+      const fresh = { ...blankDoc(width, height), name: newName };
+      openNewTab(fresh);
+      setShowNewCanvasDialog(false);
+    },
+    [openNewTab],
+  );
+
+  // 이미 열려 있는 탭이면 새로 추가하지 않고 그 탭으로 전환한다.
   const handleOpenExisting = useCallback(
     (art: PixelArt) => {
-      setDoc(art);
-      setName(art.name);
-      history.reset(art.pixels);
-      setActiveColorIndex(0);
-      setStep("ready");
-      setHasMetaEdits(false);
+      const existingIndex = tabs.findIndex((t) => t.doc.id === art.id);
+      if (existingIndex >= 0) {
+        if (existingIndex !== activeTabIndex) switchToTab(existingIndex);
+      } else {
+        openNewTab(art);
+      }
+      setShowOpenDialog(false);
     },
-    [history],
+    [tabs, activeTabIndex, switchToTab, openNewTab],
   );
 
   const handleStrokeEnd = useCallback(
@@ -132,6 +197,7 @@ export default function Editor({
   );
 
   const handleSave = useCallback(() => {
+    if (activeTabIndex < 0) return;
     // 배경화면은 이름이 고정("배경화면")이고 일반 픽셀아트 목록이 아닌
     // 별도 저장소(wallpaper.ts)에 저장된다.
     const toSave: PixelArt = { ...doc, name: isWallpaper ? WALLPAPER_NAME : name, pixels: history.present };
@@ -140,11 +206,12 @@ export default function Editor({
     setDoc(toSave);
     history.reset(toSave.pixels);
     setHasMetaEdits(false);
-  }, [doc, name, history, isWallpaper]);
+  }, [activeTabIndex, doc, name, history, isWallpaper]);
 
   // 다른 이름으로 저장 — 원본(배경화면이라도)은 건드리지 않고 새 id로 일반
   // 픽셀아트 목록에 별도 항목을 만든 뒤, 이후 편집은 그 새 사본을 대상으로 한다.
   const handleSaveAs = useCallback(() => {
+    if (activeTabIndex < 0) return;
     const newName = window.prompt("다른 이름으로 저장", isWallpaper ? WALLPAPER_NAME : name);
     if (!newName) return;
     const toSave: PixelArt = { ...doc, id: uid(), name: newName, pixels: history.present, createdAt: Date.now() };
@@ -153,7 +220,8 @@ export default function Editor({
     setName(newName);
     history.reset(toSave.pixels);
     setHasMetaEdits(false);
-  }, [doc, name, history, isWallpaper]);
+    setTabs((prev) => prev.map((t, i) => (i === activeTabIndex ? { doc: toSave, hasMetaEdits: false } : t)));
+  }, [activeTabIndex, doc, name, history, isWallpaper]);
 
   // 캔버스 크기 수정 — 그림을 다시 늘리거나 줄이지 않고 경계만 바꾼다(왼쪽 위
   // 기준으로 자르거나 투명하게 늘림). 팔레트·이름 등 다른 속성은 그대로 둔다.
@@ -252,47 +320,65 @@ export default function Editor({
   const openFileMenu = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
+      const noActiveTab = activeTabIndex < 0;
       setMenuAnchor({
         x: rect.left,
         y: rect.bottom,
         items: [
-          { label: "저장", onClick: handleSave },
-          { label: "다른 이름으로 저장", onClick: handleSaveAs },
-          { label: "PNG로 내보내기", onClick: () => exportAsPNG({ ...doc, pixels: history.present }) },
-          { label: "SVG로 내보내기", onClick: () => exportAsSVG({ ...doc, pixels: history.present }) },
-          { label: "JSON으로 내보내기", onClick: () => exportAsJSON({ ...doc, pixels: history.present }) },
+          { label: "새로 만들기", onClick: () => setShowNewCanvasDialog(true) },
+          { label: "열기", onClick: () => setShowOpenDialog(true) },
+          { label: "저장", onClick: handleSave, disabled: noActiveTab },
+          { label: "다른 이름으로 저장", onClick: handleSaveAs, disabled: noActiveTab },
+          {
+            label: "PNG로 내보내기",
+            onClick: () => exportAsPNG({ ...doc, pixels: history.present }),
+            disabled: noActiveTab,
+          },
+          {
+            label: "SVG로 내보내기",
+            onClick: () => exportAsSVG({ ...doc, pixels: history.present }),
+            disabled: noActiveTab,
+          },
+          {
+            label: "JSON으로 내보내기",
+            onClick: () => exportAsJSON({ ...doc, pixels: history.present }),
+            disabled: noActiveTab,
+          },
           {
             label: "JPG로 내보내기 (손실 압축)",
             onClick: () => exportAsJPG({ ...doc, pixels: history.present }),
+            disabled: noActiveTab,
           },
         ],
       });
     },
-    [doc, history, handleSave, handleSaveAs],
+    [doc, history, handleSave, handleSaveAs, activeTabIndex],
   );
 
   const openEditMenu = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
+      const noActiveTab = activeTabIndex < 0;
       setMenuAnchor({
         x: rect.left,
         y: rect.bottom,
         items: [
-          { label: "실행취소", onClick: history.undo, disabled: !history.canUndo },
-          { label: "다시실행", onClick: history.redo, disabled: !history.canRedo },
-          { label: "복사", onClick: () => selection.copy(history.present, doc.width) },
-          { label: "캔버스 크기 수정", onClick: () => setResizingCanvas(true) },
+          { label: "실행취소", onClick: history.undo, disabled: noActiveTab || !history.canUndo },
+          { label: "다시실행", onClick: history.redo, disabled: noActiveTab || !history.canRedo },
+          { label: "복사", onClick: () => selection.copy(history.present, doc.width), disabled: noActiveTab },
+          { label: "캔버스 크기 수정", onClick: () => setResizingCanvas(true), disabled: noActiveTab },
           {
             label: "붙여넣기",
             onClick: () => {
               const next = selection.paste(history.present, doc.width, doc.height, 0, 0);
               history.push(next);
             },
+            disabled: noActiveTab,
           },
         ],
       });
     },
-    [doc, history, selection],
+    [doc, history, selection, activeTabIndex],
   );
 
   return (
@@ -303,16 +389,20 @@ export default function Editor({
     >
       {/* 제목표시줄 */}
       <div className="flex items-center gap-2 bg-gray-50 px-3 py-2">
-        <input
-          value={isWallpaper ? WALLPAPER_NAME : name}
-          readOnly={isWallpaper}
-          onChange={(e) => {
-            if (isWallpaper) return;
-            setName(e.target.value);
-            setHasMetaEdits(true);
-          }}
-          className={`flex-1 bg-transparent text-sm font-semibold text-gray-900 outline-none ${isWallpaper ? "cursor-default" : ""}`}
-        />
+        {activeTabIndex >= 0 ? (
+          <input
+            value={isWallpaper ? WALLPAPER_NAME : name}
+            readOnly={isWallpaper}
+            onChange={(e) => {
+              if (isWallpaper) return;
+              setName(e.target.value);
+              setHasMetaEdits(true);
+            }}
+            className={`flex-1 bg-transparent text-sm font-semibold text-gray-900 outline-none ${isWallpaper ? "cursor-default" : ""}`}
+          />
+        ) : (
+          <span className="flex-1 text-sm font-semibold text-gray-400">편집기</span>
+        )}
         <button
           onClick={onExit}
           title="닫기"
@@ -332,104 +422,114 @@ export default function Editor({
         </button>
       </div>
 
+      {/* 탭 바 — 클립스튜디오처럼 여러 파일을 동시에 열어두고 전환한다 */}
+      {tabs.length > 0 && (
+        <div className="flex items-center gap-0.5 overflow-x-auto bg-gray-50 px-2 py-1 shadow-sm">
+          {tabs.map((tab, i) => (
+            <div
+              key={tab.doc.id}
+              onClick={() => switchToTab(i)}
+              className={`flex shrink-0 cursor-pointer items-center gap-1.5 px-2.5 py-1 text-xs ${
+                i === activeTabIndex ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:bg-gray-100"
+              }`}
+            >
+              <span className="max-w-[100px] truncate">{i === activeTabIndex ? name : tab.doc.name}</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeTab(i);
+                }}
+                className="flex h-3.5 w-3.5 items-center justify-center text-gray-400 hover:text-gray-900"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {menuAnchor && (
         <ContextMenu x={menuAnchor.x} y={menuAnchor.y} items={menuAnchor.items} onClose={() => setMenuAnchor(null)} />
       )}
-      <div className="flex flex-1 gap-4 overflow-auto p-4">
-        <div className="flex flex-col gap-3">
-          <Toolbar
-            tool={tool}
-            onToolChange={setTool}
-            mirror={mirror}
-            onMirrorChange={setMirror}
-            canUndo={history.canUndo}
-            canRedo={history.canRedo}
-            onUndo={history.undo}
-            onRedo={history.redo}
-            showGrid={showGrid}
-            onToggleGrid={() => setShowGrid((g) => !g)}
-            brushSize={brushSize}
-            onBrushSizeChange={setBrushSize}
-            onSave={handleSave}
-          />
-          <ColorWheel
-            palette={palette}
-            activeColorIndex={activeColorIndex}
-            onSelect={setActiveColorIndex}
-            onChangeActiveColor={handleChangeActiveColor}
-            onAddColor={handleAddColor}
-            onRemoveColor={handleRemoveColor}
-            tool={tool}
-            onToolChange={setTool}
-          />
-          <ImportPanel
-            autoOpen={wantsAutoImport}
-            onConfirm={(imported) => {
-              setDoc((d) => ({ ...d, width: imported.width, height: imported.height, palette: imported.palette }));
-              history.reset(imported.pixels);
-              setHasMetaEdits(true);
-            }}
-          />
-        </div>
-        <div className="flex flex-1 items-center justify-center">
-          <PixelCanvas
-            width={doc.width}
-            height={doc.height}
-            palette={palette}
-            pixels={history.present}
-            tool={tool}
-            mirror={mirror}
-            activeColorIndex={activeColorIndex}
-            selectionMask={selection.mask}
-            showGrid={showGrid}
-            brushSize={brushSize}
-            onSelectionChange={selection.setMask}
-            onStrokeEnd={handleStrokeEnd}
-            onPickColor={handlePickColor}
-          />
-        </div>
-      </div>
 
-      {/* "편집기" 런처: 무엇을 할지 고르는 첫 단계 */}
-      {step === "choice" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="w-72 bg-white p-4 shadow-xl">
-            <h2 className="mb-3 text-sm font-semibold text-gray-900">편집기</h2>
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={() => setStep("size")}
-                className="bg-gray-50 px-3 py-2 text-left text-sm text-gray-700 hover:bg-violet-50"
-              >
-                새로 만들기
-              </button>
-              <button
-                onClick={() => setStep("existing")}
-                className="bg-gray-50 px-3 py-2 text-left text-sm text-gray-700 hover:bg-violet-50"
-              >
-                기존 픽셀 수정하기
-              </button>
-              <button
-                onClick={() => {
-                  setWantsAutoImport(true);
-                  setStep("ready");
-                }}
-                className="bg-gray-50 px-3 py-2 text-left text-sm text-gray-700 hover:bg-violet-50"
-              >
-                이미지로 불러오기
-              </button>
-            </div>
-            <button onClick={onExit} className="mt-3 w-full py-2 text-xs text-gray-400 hover:text-gray-900">
-              취소
-            </button>
+      {activeTabIndex >= 0 ? (
+        <div className="flex flex-1 gap-4 overflow-auto p-4">
+          <div className="flex flex-col gap-3">
+            <Toolbar
+              tool={tool}
+              onToolChange={setTool}
+              mirror={mirror}
+              onMirrorChange={setMirror}
+              canUndo={history.canUndo}
+              canRedo={history.canRedo}
+              onUndo={history.undo}
+              onRedo={history.redo}
+              showGrid={showGrid}
+              onToggleGrid={() => setShowGrid((g) => !g)}
+              brushSize={brushSize}
+              onBrushSizeChange={setBrushSize}
+              onSave={handleSave}
+            />
+            <ColorWheel
+              palette={palette}
+              activeColorIndex={activeColorIndex}
+              onSelect={setActiveColorIndex}
+              onChangeActiveColor={handleChangeActiveColor}
+              onAddColor={handleAddColor}
+              onRemoveColor={handleRemoveColor}
+              tool={tool}
+              onToolChange={setTool}
+            />
+            <ImportPanel
+              autoOpen={wantsAutoImport}
+              onConfirm={(imported) => {
+                setDoc((d) => ({ ...d, width: imported.width, height: imported.height, palette: imported.palette }));
+                history.reset(imported.pixels);
+                setHasMetaEdits(true);
+              }}
+            />
           </div>
+          <div className="flex flex-1 items-center justify-center">
+            <PixelCanvas
+              width={doc.width}
+              height={doc.height}
+              palette={palette}
+              pixels={history.present}
+              tool={tool}
+              mirror={mirror}
+              activeColorIndex={activeColorIndex}
+              selectionMask={selection.mask}
+              showGrid={showGrid}
+              brushSize={brushSize}
+              onSelectionChange={selection.setMask}
+              onStrokeEnd={handleStrokeEnd}
+              onPickColor={handlePickColor}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
+          <p className="text-sm text-gray-400">열린 파일이 없습니다</p>
+          <p className="text-xs text-gray-300">파일 메뉴에서 새로 만들기 또는 열기를 선택하세요</p>
         </div>
       )}
 
-      {/* 저장된 작품 중 하나를 골라 연다 */}
-      {step === "existing" && (
+      {showNewCanvasDialog && (
+        <NewCanvasDialog
+          onSelect={handleCreate}
+          onImportImage={() => {
+            const fresh = blankDoc(CANVAS_PRESETS[0].width, CANVAS_PRESETS[0].height);
+            openNewTab(fresh, { autoImport: true });
+            setShowNewCanvasDialog(false);
+          }}
+          onCancel={() => setShowNewCanvasDialog(false)}
+        />
+      )}
+
+      {showOpenDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="flex max-h-96 w-72 flex-col bg-white p-4 shadow-xl">
-            <h2 className="mb-3 text-sm font-semibold text-gray-900">기존 픽셀 수정하기</h2>
+            <h2 className="mb-3 text-sm font-semibold text-gray-900">열기</h2>
             {listPixelArt().length === 0 ? (
               <p className="text-xs text-gray-400">저장된 작품이 없습니다.</p>
             ) : (
@@ -445,26 +545,11 @@ export default function Editor({
                 ))}
               </div>
             )}
-            <button onClick={() => setStep("choice")} className="mt-3 w-full py-2 text-xs text-gray-400 hover:text-gray-900">
-              뒤로
+            <button onClick={() => setShowOpenDialog(false)} className="mt-3 w-full py-2 text-xs text-gray-400 hover:text-gray-900">
+              취소
             </button>
           </div>
         </div>
-      )}
-
-      {/* 새 캔버스 크기 선택 — 화면 전체를 대체하는 별도 화면이 아니라 편집창 자체
-          위에 뜨는 모달이다(바로 뒤에 draft 캔버스가 보인다). "편집기" 런처를 거쳐
-          왔으면 취소 시 선택 화면으로 되돌아가고, 데스크탑의 "새로 만들기" 바로가기로
-          왔으면(startMode가 "choice"가 아님) 취소 시 편집창을 완전히 닫는다. */}
-      {step === "size" && (
-        <NewCanvasDialog
-          onSelect={handleCreate}
-          onImportImage={() => {
-            setWantsAutoImport(true);
-            setStep("ready");
-          }}
-          onCancel={() => (startMode === "choice" ? setStep("choice") : onExit())}
-        />
       )}
 
       {resizingCanvas && (

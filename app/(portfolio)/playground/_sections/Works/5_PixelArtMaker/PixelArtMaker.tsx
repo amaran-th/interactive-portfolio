@@ -8,7 +8,7 @@ import { monaFont } from "./fonts";
 
 type Screen =
   | { view: "desktop" }
-  | { view: "editor"; docId: string | null; startMode: "direct" | "choice" };
+  | { view: "editor"; docId: string | null; startMode: "newCanvas" | "empty" };
 
 // 편집창이 닫힐 때 재생하는 축소·페이드 애니메이션 시간(ms) — Editor.tsx의
 // transition-all duration-200과 동일하게 맞춰야 애니메이션이 끝나기 전에
@@ -32,7 +32,7 @@ export default function PixelArtMaker() {
     };
   }, []);
 
-  const openEditor = useCallback((docId: string | null, startMode: "direct" | "choice" = "direct") => {
+  const openEditor = useCallback((docId: string | null, startMode: "newCanvas" | "empty" = "newCanvas") => {
     if (closeTimeoutRef.current) {
       clearTimeout(closeTimeoutRef.current);
       closeTimeoutRef.current = null;
@@ -63,7 +63,7 @@ export default function PixelArtMaker() {
         refreshSignal={refreshSignal}
         onOpen={(id) => openEditor(id)}
         onCreate={() => openEditor(null)}
-        onOpenLauncher={() => openEditor(null, "choice")}
+        onOpenLauncher={() => openEditor(null, "empty")}
       />
       {screen.view === "editor" && (
         <Editor
