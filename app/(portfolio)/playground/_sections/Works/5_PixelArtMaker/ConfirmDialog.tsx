@@ -10,14 +10,14 @@ export default function ConfirmDialog({
   onCancel: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="w-72 rounded-xl border border-white/10 bg-gray-950 p-4">
-        <p className="mb-4 text-sm text-white">{message}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="w-72 bg-white p-4 shadow-xl">
+        <p className="mb-4 text-sm text-gray-900">{message}</p>
         <div className="flex justify-end gap-2">
-          <button onClick={onCancel} className="rounded-lg px-3 py-1.5 text-xs text-gray-400 hover:text-white">
+          <button onClick={onCancel} className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-900">
             취소
           </button>
-          <button onClick={onConfirm} className="rounded-lg bg-red-500/90 px-3 py-1.5 text-xs font-semibold text-white">
+          <button onClick={onConfirm} className="bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600">
             삭제
           </button>
         </div>

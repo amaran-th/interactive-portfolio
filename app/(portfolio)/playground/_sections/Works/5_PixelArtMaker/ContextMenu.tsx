@@ -26,11 +26,7 @@ export default function ContextMenu({
   }, [onClose]);
 
   return (
-    <div
-      ref={ref}
-      style={{ left: x, top: y }}
-      className="fixed z-50 w-40 overflow-hidden rounded-lg border border-white/10 bg-gray-900 py-1 shadow-xl"
-    >
+    <div ref={ref} style={{ left: x, top: y }} className="fixed z-50 w-40 overflow-hidden bg-white py-1 shadow-xl">
       {items.map((item) => (
         <button
           key={item.label}
@@ -38,7 +34,7 @@ export default function ContextMenu({
             item.onClick();
             onClose();
           }}
-          className="block w-full px-3 py-1.5 text-left text-xs text-gray-200 hover:bg-white/10"
+          className="block w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-violet-50"
         >
           {item.label}
         </button>

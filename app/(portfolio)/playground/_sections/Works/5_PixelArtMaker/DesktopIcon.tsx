@@ -45,13 +45,13 @@ export default function DesktopIcon({
   return (
     <div
       style={{ left: x, top: y, position: "absolute" }}
-      className={`flex w-20 flex-col items-center gap-1 rounded-lg p-2 ${selected ? "bg-white/15" : "hover:bg-white/5"}`}
+      className={`flex w-20 flex-col items-center gap-1 p-2 ${selected ? "bg-violet-100" : "hover:bg-gray-100"}`}
       onPointerDown={onPointerDownIcon}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
     >
-      <canvas ref={canvasRef} className="rounded border border-white/10" style={{ imageRendering: "pixelated" }} />
-      <span className="w-full truncate text-center text-[10px] text-gray-300">{art.name}</span>
+      <canvas ref={canvasRef} className="shadow-sm" style={{ imageRendering: "pixelated" }} />
+      <span className="w-full truncate text-center text-[10px] text-gray-600">{art.name}</span>
     </div>
   );
 }
