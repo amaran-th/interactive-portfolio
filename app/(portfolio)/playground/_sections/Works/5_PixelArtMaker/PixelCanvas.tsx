@@ -30,6 +30,7 @@ export default function PixelCanvas({
   onSelectionChange,
   onStrokeEnd,
   onPickColor,
+  onZoomChange,
 }: {
   width: number;
   height: number;
@@ -44,9 +45,14 @@ export default function PixelCanvas({
   onSelectionChange: (mask: Set<number> | null) => void;
   onStrokeEnd: (next: number[]) => void;
   onPickColor: (colorIndex: number) => void;
+  onZoomChange?: (zoom: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [zoom, setZoom] = useState(1);
+
+  useEffect(() => {
+    onZoomChange?.(zoom);
+  }, [zoom, onZoomChange]);
   const workingRef = useRef<number[]>(pixels);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const shapeStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -320,10 +326,19 @@ export default function PixelCanvas({
     onStrokeEnd(workingRef.current);
   }, [tool, onStrokeEnd]);
 
-  const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
-    if (!e.ctrlKey) return;
-    e.preventDefault();
-    setZoom((z) => Math.min(8, Math.max(1, z + (e.deltaY < 0 ? 1 : -1))));
+  // React의 onWheel은 리스너를 passive로 등록해 e.preventDefault()가 조용히
+  // 무시된다 — Ctrl+스크롤로 캔버스만 확대하려 해도 브라우저의 페이지 확대가
+  // 함께 발동했다. addEventListener를 { passive: false }로 직접 붙여야 막힌다.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const handler = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setZoom((z) => Math.min(8, Math.max(1, z + (e.deltaY < 0 ? 1 : -1))));
+    };
+    canvas.addEventListener("wheel", handler, { passive: false });
+    return () => canvas.removeEventListener("wheel", handler);
   }, []);
 
   // 스타일러스 호버 취소, 시스템 제스처 등으로 pointerup 없이 스트로크가 끊길 때 안전하게 커밋한다.
@@ -341,7 +356,6 @@ export default function PixelCanvas({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
       onLostPointerCapture={handlePointerCancel}
-      onWheel={handleWheel}
     />
   );
 }

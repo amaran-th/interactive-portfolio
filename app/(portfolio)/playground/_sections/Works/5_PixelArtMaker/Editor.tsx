@@ -113,6 +113,9 @@ export default function Editor({
   const [mirror, setMirror] = useState<MirrorMode>("none");
   const [showGrid, setShowGrid] = useState(true);
   const [brushSize, setBrushSize] = useState(1);
+  // PixelCanvas가 Ctrl+스크롤로 자체 관리하는 확대 배율 — 뷰포트 좌측 하단에
+  // 표시만 하기 위해 값을 그대로 올려받는다.
+  const [canvasZoom, setCanvasZoom] = useState(1);
   const [menuAnchor, setMenuAnchor] = useState<{
     x: number;
     y: number;
@@ -755,7 +758,7 @@ export default function Editor({
               }}
             />
           </div>
-          <div className="flex flex-1 items-center justify-center">
+          <div className="relative flex flex-1 items-center justify-center overflow-auto">
             <PixelCanvas
               width={doc.width}
               height={doc.height}
@@ -770,7 +773,11 @@ export default function Editor({
               onSelectionChange={selection.setMask}
               onStrokeEnd={handleStrokeEnd}
               onPickColor={handlePickColor}
+              onZoomChange={setCanvasZoom}
             />
+            <div className="absolute bottom-2 left-2 bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
+              {canvasZoom}x
+            </div>
           </div>
         </div>
       ) : (
