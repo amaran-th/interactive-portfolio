@@ -15,6 +15,7 @@ export default function ImportPanel({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [pixelSize, setPixelSize] = useState(32);
   const [antiAlias, setAntiAlias] = useState(false);
   const [maxColors, setMaxColors] = useState(8);
@@ -78,6 +79,16 @@ export default function ImportPanel({
     }
   }, [handleFile]);
 
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      setIsDragOver(false);
+      const file = e.dataTransfer.files?.[0];
+      if (file && file.type.startsWith("image/")) handleFile(file);
+    },
+    [handleFile],
+  );
+
   const handleOptionChange = useCallback(
     (size: number, aa: boolean, colors: number) => {
       setPixelSize(size);
@@ -110,19 +121,32 @@ export default function ImportPanel({
   return (
     <div className="flex flex-col gap-3 bg-white p-3 shadow-md">
       <p className="text-xs font-semibold text-gray-500">이미지를 픽셀아트로 변환</p>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-        className="text-xs text-gray-600"
-      />
-      <button
-        onClick={handlePasteFromClipboard}
-        className="bg-gray-100 py-1.5 text-[10px] text-gray-600 hover:bg-gray-200"
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragOver(true);
+        }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={handleDrop}
+        className={`flex flex-col gap-2 p-2 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)] transition-colors ${
+          isDragOver ? "bg-violet-50" : "bg-gray-50"
+        }`}
       >
-        클립보드에서 붙여넣기
-      </button>
+        <p className="text-center text-[10px] text-gray-400">이미지를 여기로 드래그하거나 파일을 선택하세요</p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+          className="text-xs text-gray-600"
+        />
+        <button
+          onClick={handlePasteFromClipboard}
+          className="bg-gray-100 py-1.5 text-[10px] text-gray-600 hover:bg-gray-200"
+        >
+          클립보드에서 붙여넣기
+        </button>
+      </div>
 
       {preview && (
         <>
