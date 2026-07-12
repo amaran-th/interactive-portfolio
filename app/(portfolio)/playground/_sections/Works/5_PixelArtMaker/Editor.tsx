@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Save, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { getPixelArt, listPixelArt, PixelArt, savePixelArt, uid } from "../_shared/assetLibrary";
 import ColorWheel from "./ColorWheel";
@@ -401,6 +401,15 @@ export default function Editor({
         ) : (
           <span className="flex-1 text-sm font-semibold text-gray-400">편집기</span>
         )}
+        {activeTabIndex >= 0 && (
+          <button
+            onClick={handleSave}
+            title="저장"
+            className="flex h-6 w-6 items-center justify-center bg-violet-500 text-white hover:bg-violet-600"
+          >
+            <Save className="h-3.5 w-3.5" />
+          </button>
+        )}
         <button
           onClick={onExit}
           title="닫기"
@@ -466,7 +475,6 @@ export default function Editor({
               onToggleGrid={() => setShowGrid((g) => !g)}
               brushSize={brushSize}
               onBrushSizeChange={setBrushSize}
-              onSave={handleSave}
             />
             <ColorWheel
               palette={palette}

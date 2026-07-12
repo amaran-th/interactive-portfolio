@@ -1,6 +1,6 @@
 "use client";
 
-import { Circle, Copy, Eraser, Grid3x3, Minus, MousePointer2, Move, Paintbrush, PaintBucket, Redo2, Save, Square, Undo2, Wand2 } from "lucide-react";
+import { Circle, Copy, Eraser, Grid3x3, Minus, MousePointer2, Move, Paintbrush, PaintBucket, Redo2, Square, Undo2, Wand2 } from "lucide-react";
 import { isMacPlatform } from "./platform";
 import { MirrorMode, Tool } from "./types";
 
@@ -46,7 +46,6 @@ export default function Toolbar({
   onToggleGrid,
   brushSize,
   onBrushSizeChange,
-  onSave,
 }: {
   tool: Tool;
   onToolChange: (tool: Tool) => void;
@@ -60,7 +59,6 @@ export default function Toolbar({
   onToggleGrid: () => void;
   brushSize: number;
   onBrushSizeChange: (size: number) => void;
-  onSave: () => void;
 }) {
   const mod = isMacPlatform() ? "⌘" : "Ctrl+";
 
@@ -104,14 +102,6 @@ export default function Toolbar({
           ))}
         </div>
       </div>
-
-      <button
-        onClick={onSave}
-        title={`저장 (${mod}S)`}
-        className="flex items-center justify-center gap-1.5 bg-violet-500 py-1.5 text-xs font-semibold text-white hover:bg-violet-600"
-      >
-        <Save className="h-3.5 w-3.5" /> 저장
-      </button>
 
       <div className="flex items-center gap-1.5">
         <button onClick={onUndo} disabled={!canUndo} className="flex h-7 w-7 items-center justify-center bg-gray-100 text-gray-600 disabled:opacity-30">
