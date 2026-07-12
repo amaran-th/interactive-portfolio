@@ -1,10 +1,21 @@
 "use client";
 
+import { Pipette } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { hexToRgb, hsvToRgb, rgbToHex, rgbToHsv } from "./hsv";
-import { MAX_PALETTE_COLORS } from "./types";
+import { hexToRgba, hsvToRgb, rgbaToHex, rgbToHsv } from "./hsv";
+import { MAX_PALETTE_COLORS, Tool } from "./types";
 
-const WHEEL_SIZE = 120;
+const SQUARE_SIZE = 120;
+
+function clamp01(n: number): number {
+  return Math.max(0, Math.min(1, n));
+}
+
+// 트랙(색상/알파 슬라이더) 위 pointer 좌표를 0~1 값으로 환산한다.
+function trackValue(clientX: number, rect: DOMRect): number {
+  if (rect.width === 0) return 0;
+  return clamp01((clientX - rect.left) / rect.width);
+}
 
 export default function ColorWheel({
   palette,
@@ -13,6 +24,8 @@ export default function ColorWheel({
   onChangeActiveColor,
   onAddColor,
   onRemoveColor,
+  tool,
+  onToolChange,
 }: {
   palette: string[];
   activeColorIndex: number;
@@ -20,38 +33,55 @@ export default function ColorWheel({
   onChangeActiveColor: (hex: string) => void;
   onAddColor: (hex: string) => void;
   onRemoveColor: (index: number) => void;
+  tool: Tool;
+  onToolChange: (tool: Tool) => void;
 }) {
-  const wheelRef = useRef<HTMLCanvasElement>(null);
-  const draggingWheelRef = useRef(false);
+  const squareRef = useRef<HTMLCanvasElement>(null);
+  const draggingRef = useRef<"square" | "hue" | "alpha" | null>(null);
+  const hueTrackRef = useRef<HTMLDivElement>(null);
+  const alphaTrackRef = useRef<HTMLDivElement>(null);
   const activeHex = palette[activeColorIndex] ?? "#000000";
-  const [hsv, setHsv] = useState<[number, number, number]>(() => rgbToHsv(...hexToRgb(activeHex)));
+  const activeHexRef = useRef(activeHex);
+  const [hsva, setHsva] = useState<[number, number, number, number]>(() => {
+    const [r, g, b, a] = hexToRgba(activeHex);
+    return [...rgbToHsv(r, g, b), a];
+  });
 
-  // 활성 색상이 바뀌면(스와치 클릭, 스포이트 등) 색상환도 그 색의 H/S/V로 동기화한다.
+  // 매 렌더 후 최신 activeHex를 ref에 반영한다(렌더 도중 ref를 직접 쓰면 안 되므로
+  // effect에서 갱신). 아래 activeColorIndex 동기화 effect가 항상 최신 값을 읽도록
+  // 이 effect가 먼저 선언돼 있어야 한다(effect는 선언 순서대로 실행된다).
   useEffect(() => {
-    setHsv(rgbToHsv(...hexToRgb(activeHex)));
-  }, [activeHex]);
+    activeHexRef.current = activeHex;
+  });
 
-  const drawWheel = useCallback((value: number) => {
-    const canvas = wheelRef.current;
+  // 스와치를 바꿔 선택했을 때(클릭, 스포이트 등)만 컨트롤을 그 색의 H/S/V/A로
+  // 동기화한다. activeHex가 아니라 activeColorIndex에만 의존해야 한다 — 슬라이더를
+  // 드래그해 같은 스와치의 색을 계속 바꾸는 동안에는 hex→rgb→hsv 왕복 변환에서
+  // 생기는 반올림 오차가 매 커밋마다 누적돼(특히 hue는 채도가 낮을수록 아주
+  // 작은 rgb 반올림에도 크게 흔들린다) 드래그 중 색상이 제멋대로 튀는 버그가 있었다.
+  useEffect(() => {
+    const [r, g, b, a] = hexToRgba(activeHexRef.current);
+    setHsva([...rgbToHsv(r, g, b), a]);
+  }, [activeColorIndex]);
+
+  const [hue, sat, val, alpha] = hsva;
+  const opaqueRgb = hsvToRgb(hue, sat, val);
+
+  // SV 정사각형 — 가로축 채도(왼쪽 0 → 오른쪽 1), 세로축 명도(위 1 → 아래 0).
+  // 색상(hue)은 아래 슬라이더가 정하고, 정사각형은 그 hue의 채도·명도 평면만 그린다.
+  const drawSquare = useCallback((h: number) => {
+    const canvas = squareRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const size = WHEEL_SIZE;
-    const cx = size / 2;
-    const cy = size / 2;
-    const radius = size / 2;
+    const size = SQUARE_SIZE;
     const imageData = ctx.createImageData(size, size);
     for (let y = 0; y < size; y++) {
+      const v = 1 - y / (size - 1);
       for (let x = 0; x < size; x++) {
-        const dx = x - cx + 0.5;
-        const dy = y - cy + 0.5;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        const s = x / (size - 1);
+        const [r, g, b] = hsvToRgb(h, s, v);
         const i = (y * size + x) * 4;
-        if (dist > radius) continue; // 알파 0(투명) 유지
-        const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-        const hue = (angle + 360) % 360;
-        const sat = Math.min(1, dist / radius);
-        const [r, g, b] = hsvToRgb(hue, sat, value);
         imageData.data[i] = r;
         imageData.data[i + 1] = g;
         imageData.data[i + 2] = b;
@@ -62,92 +92,184 @@ export default function ColorWheel({
   }, []);
 
   useEffect(() => {
-    drawWheel(hsv[2]);
-  }, [hsv, drawWheel]);
+    drawSquare(hue);
+  }, [hue, drawSquare]);
 
-  const applyWheelPoint = useCallback(
+  const commit = useCallback(
+    (next: [number, number, number, number]) => {
+      setHsva(next);
+      const [r, g, b] = hsvToRgb(next[0], next[1], next[2]);
+      onChangeActiveColor(rgbaToHex(r, g, b, next[3]));
+    },
+    [onChangeActiveColor],
+  );
+
+  const applySquarePoint = useCallback(
     (clientX: number, clientY: number) => {
-      const canvas = wheelRef.current;
+      const canvas = squareRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const dx = clientX - cx;
-      const dy = clientY - cy;
-      const radius = rect.width / 2;
-      const dist = Math.min(radius, Math.sqrt(dx * dx + dy * dy));
-      const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-      const hue = (angle + 360) % 360;
-      const sat = radius === 0 ? 0 : dist / radius;
-      const nextHsv: [number, number, number] = [hue, sat, hsv[2]];
-      setHsv(nextHsv);
-      onChangeActiveColor(rgbToHex(...hsvToRgb(...nextHsv)));
+      const s = clamp01((clientX - rect.left) / rect.width);
+      const v = clamp01(1 - (clientY - rect.top) / rect.height);
+      commit([hue, s, v, alpha]);
     },
-    [hsv, onChangeActiveColor],
+    [hue, alpha, commit],
   );
 
-  const handleWheelDown = useCallback(
+  const handleSquareDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
-      draggingWheelRef.current = true;
-      wheelRef.current?.setPointerCapture(e.pointerId);
-      applyWheelPoint(e.clientX, e.clientY);
+      draggingRef.current = "square";
+      squareRef.current?.setPointerCapture(e.pointerId);
+      applySquarePoint(e.clientX, e.clientY);
     },
-    [applyWheelPoint],
+    [applySquarePoint],
   );
 
-  const handleWheelMove = useCallback(
+  const handleSquareMove = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
-      if (!draggingWheelRef.current) return;
-      applyWheelPoint(e.clientX, e.clientY);
+      if (draggingRef.current !== "square") return;
+      applySquarePoint(e.clientX, e.clientY);
     },
-    [applyWheelPoint],
+    [applySquarePoint],
   );
 
-  const handleWheelUp = useCallback(() => {
-    draggingWheelRef.current = false;
+  const applyHuePoint = useCallback(
+    (clientX: number) => {
+      const track = hueTrackRef.current;
+      if (!track) return;
+      const t = trackValue(clientX, track.getBoundingClientRect());
+      commit([t * 360, sat, val, alpha]);
+    },
+    [sat, val, alpha, commit],
+  );
+
+  const handleHueDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      draggingRef.current = "hue";
+      hueTrackRef.current?.setPointerCapture(e.pointerId);
+      applyHuePoint(e.clientX);
+    },
+    [applyHuePoint],
+  );
+
+  const handleHueMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (draggingRef.current !== "hue") return;
+      applyHuePoint(e.clientX);
+    },
+    [applyHuePoint],
+  );
+
+  const applyAlphaPoint = useCallback(
+    (clientX: number) => {
+      const track = alphaTrackRef.current;
+      if (!track) return;
+      const t = trackValue(clientX, track.getBoundingClientRect());
+      commit([hue, sat, val, t]);
+    },
+    [hue, sat, val, commit],
+  );
+
+  const handleAlphaDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      draggingRef.current = "alpha";
+      alphaTrackRef.current?.setPointerCapture(e.pointerId);
+      applyAlphaPoint(e.clientX);
+    },
+    [applyAlphaPoint],
+  );
+
+  const handleAlphaMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (draggingRef.current !== "alpha") return;
+      applyAlphaPoint(e.clientX);
+    },
+    [applyAlphaPoint],
+  );
+
+  const handleDragEnd = useCallback(() => {
+    draggingRef.current = null;
   }, []);
 
-  const handleValueChange = useCallback(
-    (v: number) => {
-      const nextHsv: [number, number, number] = [hsv[0], hsv[1], v];
-      setHsv(nextHsv);
-      onChangeActiveColor(rgbToHex(...hsvToRgb(...nextHsv)));
-    },
-    [hsv, onChangeActiveColor],
-  );
-
-  const markerRadius = (WHEEL_SIZE / 2) * hsv[1];
-  const markerX = WHEEL_SIZE / 2 + Math.cos((hsv[0] * Math.PI) / 180) * markerRadius;
-  const markerY = WHEEL_SIZE / 2 + Math.sin((hsv[0] * Math.PI) / 180) * markerRadius;
-
   const isFull = palette.length >= MAX_PALETTE_COLORS;
+  const markerX = sat * SQUARE_SIZE;
+  const markerY = (1 - val) * SQUARE_SIZE;
+  const opaqueHex = `rgb(${opaqueRgb[0]}, ${opaqueRgb[1]}, ${opaqueRgb[2]})`;
 
   return (
     <div className="flex flex-col gap-3 bg-white p-3 shadow-md">
-      <div className="relative mx-auto" style={{ width: WHEEL_SIZE, height: WHEEL_SIZE }}>
+      <div className="relative" style={{ width: SQUARE_SIZE, height: SQUARE_SIZE }}>
         <canvas
-          ref={wheelRef}
-          width={WHEEL_SIZE}
-          height={WHEEL_SIZE}
-          className="cursor-crosshair touch-none rounded-full"
-          onPointerDown={handleWheelDown}
-          onPointerMove={handleWheelMove}
-          onPointerUp={handleWheelUp}
-          onPointerCancel={handleWheelUp}
+          ref={squareRef}
+          width={SQUARE_SIZE}
+          height={SQUARE_SIZE}
+          className="cursor-crosshair touch-none shadow-sm"
+          onPointerDown={handleSquareDown}
+          onPointerMove={handleSquareMove}
+          onPointerUp={handleDragEnd}
+          onPointerCancel={handleDragEnd}
         />
         <div
           className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_0_2px_#ffffff,0_1px_3px_rgba(0,0,0,0.35)]"
-          style={{ left: markerX, top: markerY, backgroundColor: activeHex }}
+          style={{ left: markerX, top: markerY, backgroundColor: opaqueHex }}
         />
       </div>
-      <input
-        type="range"
-        min={0}
-        max={100}
-        value={Math.round(hsv[2] * 100)}
-        onChange={(e) => handleValueChange(Number(e.target.value) / 100)}
-        className="w-full"
-      />
+
+      {/* 색상(hue) 슬라이더 */}
+      <div
+        ref={hueTrackRef}
+        onPointerDown={handleHueDown}
+        onPointerMove={handleHueMove}
+        onPointerUp={handleDragEnd}
+        onPointerCancel={handleDragEnd}
+        className="relative h-3.5 w-full cursor-pointer touch-none shadow-sm"
+        style={{
+          background:
+            "linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
+        }}
+      >
+        <div
+          className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_0_2px_#ffffff,0_1px_3px_rgba(0,0,0,0.35)]"
+          style={{ left: `${(hue / 360) * 100}%`, backgroundColor: opaqueHex }}
+        />
+      </div>
+
+      {/* 스포이트 + 알파(투명도) 슬라이더 */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onToolChange("eyedropper")}
+          title="스포이트 (I)"
+          className={`flex h-7 w-7 shrink-0 items-center justify-center transition-colors ${
+            tool === "eyedropper" ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          <Pipette className="h-4 w-4" />
+        </button>
+        <div
+          ref={alphaTrackRef}
+          onPointerDown={handleAlphaDown}
+          onPointerMove={handleAlphaMove}
+          onPointerUp={handleDragEnd}
+          onPointerCancel={handleDragEnd}
+          className="relative h-3.5 flex-1 cursor-pointer touch-none shadow-sm"
+          style={{
+            backgroundImage:
+              "linear-gradient(45deg, #d4d4d8 25%, transparent 25%), linear-gradient(-45deg, #d4d4d8 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d4d4d8 75%), linear-gradient(-45deg, transparent 75%, #d4d4d8 75%)",
+            backgroundSize: "8px 8px",
+            backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0px",
+          }}
+        >
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ background: `linear-gradient(to right, transparent, ${opaqueHex})` }}
+          />
+          <div
+            className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_0_2px_#ffffff,0_1px_3px_rgba(0,0,0,0.35)]"
+            style={{ left: `${alpha * 100}%`, backgroundColor: opaqueHex }}
+          />
+        </div>
+      </div>
+
       <p className="text-xs font-semibold text-gray-500">
         팔레트 ({palette.length}/{MAX_PALETTE_COLORS})
       </p>
@@ -164,8 +286,8 @@ export default function ColorWheel({
         ))}
         <button
           disabled={isFull}
-          onClick={() => onAddColor(rgbToHex(...hsvToRgb(...hsv)))}
-          title={isFull ? "팔레트가 가득 찼습니다" : "현재 색상환 값을 새 스와치로 추가"}
+          onClick={() => onAddColor(rgbaToHex(...opaqueRgb, alpha))}
+          title={isFull ? "팔레트가 가득 찼습니다" : "현재 값을 새 스와치로 추가"}
           className="flex h-6 w-6 items-center justify-center bg-gray-100 text-xs text-gray-500 shadow-sm disabled:opacity-30"
         >
           +

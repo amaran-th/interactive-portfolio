@@ -1,4 +1,5 @@
 import { PixelArt } from "../_shared/assetLibrary";
+import { hexToRgba, rgbToHex } from "./hsv";
 
 function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -50,7 +51,11 @@ export function exportAsSVG(doc: PixelArt): void {
     for (let x = 0; x < doc.width; x++) {
       const colorIndex = doc.pixels[y * doc.width + x];
       if (colorIndex < 0) continue;
-      rects.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="${doc.palette[colorIndex]}"/>`);
+      // SVG의 fill 속성은 8자리(#rrggbbaa) hex를 신뢰성 있게 지원하지 않는 뷰어가
+      // 있어, 알파가 있으면 fill-opacity로 분리해 내보낸다.
+      const [r, g, b, a] = hexToRgba(doc.palette[colorIndex] ?? "#ff00ff");
+      const opacity = a < 1 ? ` fill-opacity="${a.toFixed(3)}"` : "";
+      rects.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="${rgbToHex(r, g, b)}"${opacity}/>`);
     }
   }
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${doc.width} ${doc.height}" shape-rendering="crispEdges">${rects.join("")}</svg>`;

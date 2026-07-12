@@ -219,6 +219,8 @@ export default function Editor({
             onChangeActiveColor={handleChangeActiveColor}
             onAddColor={handleAddColor}
             onRemoveColor={handleRemoveColor}
+            tool={tool}
+            onToolChange={setTool}
           />
           <ImportPanel
             onConfirm={(imported) => {

@@ -8,6 +8,25 @@ export function rgbToHex(r: number, g: number, b: number): string {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
+// #rrggbb 또는 #rrggbbaa 모두 읽는다 — 알파 자리가 없으면 완전 불투명(1)으로 취급한다.
+export function hexToRgba(hex: string): [number, number, number, number] {
+  const [r, g, b] = hexToRgb(hex);
+  const clean = hex.replace("#", "");
+  const a = clean.length >= 8 ? parseInt(clean.slice(6, 8), 16) / 255 : 1;
+  return [r, g, b, a];
+}
+
+// 완전 불투명(a=1)일 때는 기존 6자리 hex를 그대로 유지해 저장된 작품과의
+// 하위 호환을 지킨다 — 투명도가 실제로 쓰일 때만 8자리(#rrggbbaa)로 확장한다.
+export function rgbaToHex(r: number, g: number, b: number, a: number): string {
+  const base = rgbToHex(r, g, b);
+  if (a >= 1) return base;
+  const alphaHex = Math.max(0, Math.min(255, Math.round(a * 255)))
+    .toString(16)
+    .padStart(2, "0");
+  return `${base}${alphaHex}`;
+}
+
 // h: 0-360, s: 0-1, v: 0-1 -> [r, g, b] 각 0-255
 export function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
   const c = v * s;

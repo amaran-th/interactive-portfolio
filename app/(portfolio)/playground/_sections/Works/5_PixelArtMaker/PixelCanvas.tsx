@@ -163,7 +163,19 @@ export default function PixelCanvas({
       }
 
       if (tool === "wand") {
-        onSelectionChange(wandMask(workingRef.current, width, height, point.x, point.y));
+        const clicked = wandMask(workingRef.current, width, height, point.x, point.y);
+        const current = selectionMaskRef.current;
+        // Shift = 기존 선택 영역에 추가, Alt/Option = 기존 선택 영역에서 제외.
+        // 두 키 다 없으면 기존과 동일하게 새로 선택한 영역으로 완전히 대체한다.
+        if (e.shiftKey && current) {
+          onSelectionChange(new Set([...current, ...clicked]));
+        } else if (e.altKey && current) {
+          const next = new Set(current);
+          for (const i of clicked) next.delete(i);
+          onSelectionChange(next);
+        } else {
+          onSelectionChange(clicked);
+        }
         return;
       }
 
