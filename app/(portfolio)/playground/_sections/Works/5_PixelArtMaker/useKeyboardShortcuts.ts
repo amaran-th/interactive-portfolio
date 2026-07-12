@@ -7,6 +7,8 @@ const TOOL_KEYS: Record<string, Tool> = {
   g: "bucket",
   i: "eyedropper",
   u: "line",
+  r: "rect",
+  o: "circle",
   m: "select",
   v: "move",
   w: "wand",

@@ -73,6 +73,7 @@ export default function Editor({
   const [mirror, setMirror] = useState<MirrorMode>("none");
   const [activeColorIndex, setActiveColorIndex] = useState(0);
   const [showGrid, setShowGrid] = useState(true);
+  const [brushSize, setBrushSize] = useState(1);
   const [name, setName] = useState(initial.doc.name);
   const [hasMetaEdits, setHasMetaEdits] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
@@ -318,6 +319,8 @@ export default function Editor({
             onRedo={history.redo}
             showGrid={showGrid}
             onToggleGrid={() => setShowGrid((g) => !g)}
+            brushSize={brushSize}
+            onBrushSizeChange={setBrushSize}
           />
           <ColorWheel
             palette={palette}
@@ -349,6 +352,7 @@ export default function Editor({
             activeColorIndex={activeColorIndex}
             selectionMask={selection.mask}
             showGrid={showGrid}
+            brushSize={brushSize}
             onSelectionChange={selection.setMask}
             onStrokeEnd={handleStrokeEnd}
             onPickColor={handlePickColor}

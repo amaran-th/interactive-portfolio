@@ -26,6 +26,7 @@ export default function PixelCanvas({
   activeColorIndex,
   selectionMask,
   showGrid,
+  brushSize,
   onSelectionChange,
   onStrokeEnd,
   onPickColor,
@@ -39,6 +40,7 @@ export default function PixelCanvas({
   activeColorIndex: number;
   selectionMask: Set<number> | null;
   showGrid: boolean;
+  brushSize: number;
   onSelectionChange: (mask: Set<number> | null) => void;
   onStrokeEnd: (next: number[]) => void;
   onPickColor: (colorIndex: number) => void;
@@ -135,12 +137,22 @@ export default function PixelCanvas({
   const plotPoint = useCallback(
     (data: number[], x: number, y: number, colorIndex: number) => {
       let next = data;
-      for (const p of mirrorPoints(width, height, mirror, x, y)) {
-        next = setPixel(next, width, p.x, p.y, colorIndex);
+      // 브러시 크기만큼 (x,y) 중심의 정사각 블록으로 확장한 뒤 각 칸을 미러링한다.
+      // brushSize=1이면 기존과 동일하게 점 하나만 찍는다.
+      const half = Math.floor(brushSize / 2);
+      for (let dy = 0; dy < brushSize; dy++) {
+        for (let dx = 0; dx < brushSize; dx++) {
+          const bx = x - half + dx;
+          const by = y - half + dy;
+          if (bx < 0 || by < 0 || bx >= width || by >= height) continue;
+          for (const p of mirrorPoints(width, height, mirror, bx, by)) {
+            next = setPixel(next, width, p.x, p.y, colorIndex);
+          }
+        }
       }
       return next;
     },
-    [width, height, mirror],
+    [width, height, mirror, brushSize],
   );
 
   const handlePointerDown = useCallback(

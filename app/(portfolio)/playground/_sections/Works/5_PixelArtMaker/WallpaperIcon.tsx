@@ -20,12 +20,16 @@ export default function WallpaperIcon({ art }: { art: PixelArt }) {
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
     const scale = size / Math.max(art.width, art.height);
+    // 배경화면은 정사각형이 아닌 경우가 많아(예: 16:9) 긴 축만 꽉 채우면 짧은
+    // 축 쪽에 빈 공간이 남는다 — 그 여백을 가운데로 정렬한다.
+    const offsetX = (size - art.width * scale) / 2;
+    const offsetY = (size - art.height * scale) / 2;
     for (let py = 0; py < art.height; py++) {
       for (let px = 0; px < art.width; px++) {
         const colorIndex = art.pixels[py * art.width + px];
         if (colorIndex < 0) continue;
         ctx.fillStyle = art.palette[colorIndex] ?? "#ffffff";
-        ctx.fillRect(px * scale, py * scale, scale, scale);
+        ctx.fillRect(px * scale + offsetX, py * scale + offsetY, scale, scale);
       }
     }
   }, [art]);
