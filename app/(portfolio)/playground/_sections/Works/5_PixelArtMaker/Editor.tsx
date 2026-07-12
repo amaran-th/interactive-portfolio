@@ -437,8 +437,8 @@ export default function Editor({
         mounted && !closing ? "scale-100 opacity-100" : "scale-95 opacity-0"
       }`}
     >
-      {/* 제목표시줄 */}
-      <div className="flex items-center gap-2 bg-gray-50 px-3 py-2">
+      {/* 제목표시줄 — 메뉴 바·캔버스 영역의 무채색 배경과 구분되도록 바이올렛 톤을 준다. */}
+      <div className="flex items-center gap-2 bg-violet-100 px-3 py-2">
         {activeTabIndex >= 0 ? (
           <input
             value={isWallpaper ? WALLPAPER_NAME : name}
