@@ -17,18 +17,23 @@ import TrashIcon from "./TrashIcon";
 import { exportAsJPG, exportAsJSON, exportAsPNG, exportAsSVG } from "./exportPixelArt";
 import {
   getIconPosition,
-  getTrashPosition,
+  getStoredPosition,
   removeIconPositions,
   resetDesktopLayout,
   setIconPosition,
-  setTrashPosition,
 } from "./useDesktopLayout";
 
 type Menu = { x: number; y: number; items: ContextMenuItem[] } | null;
 
-// 아이콘/휴지통의 대략적인 폭·높이(box-select 히트박스와 동일 기준) — 창 크기가
+// 아이콘/휴지통/포맷의 대략적인 폭·높이(box-select 히트박스와 동일 기준) — 창 크기가
 // 줄어들 때 이 크기만큼의 여유를 두고 컨테이너 안쪽으로 위치를 당겨온다.
 const ICON_FOOTPRINT = 80;
+
+// 일반 픽셀아트 항목이 아닌 시스템 아이콘들 — 다중 선택·박스 선택·휴지통 삭제
+// 대상에서 제외되고, 저장된 위치가 없을 때는 그리드 기본값 대신 CSS 코너 배치를 쓴다.
+const TRASH_ID = "__trash__";
+const FORMAT_ID = "__format__";
+const SPECIAL_ICON_IDS = [TRASH_ID, FORMAT_ID] as const;
 
 export default function Desktop({
   refreshSignal,
@@ -47,14 +52,12 @@ export default function Desktop({
   const [pendingFormat, setPendingFormat] = useState(false);
   const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [trashHover, setTrashHover] = useState(false);
-  const [trashPos, setTrashPos] = useState<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const trashRef = useRef<HTMLDivElement>(null);
-  // 휴지통 자체를 드래그하는 동안에는 pointerup이 트래시 위에서 발생해도
-  // handleTrashDrop(아이콘을 놓아 삭제하는 동작)이 아니라 위치 이동으로 처리해야 한다.
-  const trashDraggingRef = useRef(false);
+  // 특수 아이콘(트래시/포맷) 자체를 드래그하는 동안에는 pointerup이 그 위에서
+  // 발생해도(예: 휴지통 위로 아이콘을 놓는 삭제 동작) 위치 이동으로만 처리해야 한다.
+  const draggingSpecialRef = useRef<string | null>(null);
 
-  // 창 크기가 줄어들었을 때 아이콘/휴지통이 보이는 영역 밖으로 나가지 않도록
+  // 창 크기가 줄어들었을 때 아이콘/휴지통/포맷이 보이는 영역 밖으로 나가지 않도록
   // 컨테이너의 현재 실제 크기 기준으로 좌표를 안쪽으로 당겨온다.
   const clampToContainer = useCallback((pos: { x: number; y: number }) => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -66,12 +69,6 @@ export default function Desktop({
     };
   }, []);
 
-  useEffect(() => {
-    const stored = getTrashPosition();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTrashPos(stored ? clampToContainer(stored) : stored);
-  }, [clampToContainer]);
-
   const refresh = useCallback(() => {
     const list = listPixelArt();
     setItems(list);
@@ -79,6 +76,13 @@ export default function Desktop({
     list.forEach((art, i) => {
       pos[art.id] = clampToContainer(getIconPosition(art.id, i));
     });
+    // 특수 아이콘은 아직 옮긴 적이 없으면(저장된 위치 없음) positions에 아예 넣지
+    // 않는다 — 렌더링에서 이 경우 CSS 코너 클래스(bottom-4 right-4 등)로 기본
+    // 배치하고, 첫 드래그 시점에 실제 화면 위치를 시작점으로 삼는다.
+    for (const id of SPECIAL_ICON_IDS) {
+      const stored = getStoredPosition(id);
+      if (stored) pos[id] = clampToContainer(stored);
+    }
     setPositions(pos);
   }, [clampToContainer]);
 
@@ -90,7 +94,7 @@ export default function Desktop({
     // 저장소를 다시 읽어온다(그러지 않으면 방금 저장한 작품이 반영되지 않는다).
   }, [refresh, refreshSignal]);
 
-  // 창 크기 변경 시 화면 밖으로 나간 아이콘/휴지통을 안쪽으로 보정해 보여준다.
+  // 창 크기 변경 시 화면 밖으로 나간 아이콘/휴지통/포맷을 안쪽으로 보정해 보여준다.
   // 저장된 원래 위치(localStorage)는 건드리지 않고 매번 그 값을 다시 읽어 현재
   // 창 크기로 클램프만 하므로, 창을 다시 키우면 원래 위치로 돌아온다 — 이미
   // 클램프된 state 값을 또 클램프하면 창을 키워도 좁아진 위치에 그대로 고정되는
@@ -102,11 +106,11 @@ export default function Desktop({
         items.forEach((art, i) => {
           next[art.id] = clampToContainer(getIconPosition(art.id, i));
         });
+        for (const id of SPECIAL_ICON_IDS) {
+          const stored = getStoredPosition(id);
+          if (stored) next[id] = clampToContainer(stored);
+        }
         return next;
-      });
-      setTrashPos(() => {
-        const stored = getTrashPosition();
-        return stored ? clampToContainer(stored) : stored;
       });
     };
     window.addEventListener("resize", handleResize);
@@ -151,28 +155,51 @@ export default function Desktop({
     [items, positions],
   );
 
+  // 일반 픽셀아트 아이콘과 트래시/포맷 같은 특수 아이콘이 모두 이 함수 하나로
+  // 드래그된다 — "이 창에 들어가는 모든 파일의 시각적 인터랙션은 동일해야" 하므로
+  // 별도 구현을 두지 않는다. 다중 선택·Ctrl/Shift 토글은 일반 아이콘에만 적용된다.
   const startIconDrag = useCallback(
-    (art: PixelArt, e: React.PointerEvent) => {
+    (id: string, e: React.PointerEvent) => {
       e.stopPropagation();
       if (e.button !== 0) return;
+      const isSpecial = (SPECIAL_ICON_IDS as readonly string[]).includes(id);
 
-      // Ctrl/Cmd/Shift+클릭은 드래그를 시작하지 않고 다중 선택 집합만 토글한다.
-      if (e.ctrlKey || e.metaKey || e.shiftKey) {
+      if (!isSpecial && (e.ctrlKey || e.metaKey || e.shiftKey)) {
         setSelected((prev) => {
           const next = new Set(prev);
-          if (next.has(art.id)) next.delete(art.id);
-          else next.add(art.id);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
           return next;
         });
         return;
       }
 
-      const group = selected.has(art.id) ? Array.from(selected) : [art.id];
-      if (!selected.has(art.id)) setSelected(new Set([art.id]));
+      if (isSpecial) {
+        draggingSpecialRef.current = id;
+        // 드래그 중에는 휴지통이 마우스 아래에서 움직이면서 pointerenter/leave가
+        // 반복 발생해 열림/닫힘 그림이 깜빡였다 — 드래그 시작 시 고정으로 닫힘
+        // 상태로 되돌리고, 드래그 중 hover 갱신을 막는다(아래 hover 핸들러 참조).
+        if (id === TRASH_ID) setTrashHover(false);
+      }
+
+      const group = !isSpecial && selected.has(id) ? Array.from(selected) : [id];
+      if (!isSpecial && !selected.has(id)) setSelected(new Set([id]));
+
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      const offsetX = containerRect?.left ?? 0;
+      const offsetY = containerRect?.top ?? 0;
+      // 아직 저장된 위치가 없는 아이콘(트래시/포맷의 기본 코너 배치)은 지금 실제
+      // 화면에 보이는 위치를 컨테이너 기준 좌표로 환산해 드래그 시작점으로 삼는다
+      // — 그래야 첫 드래그에서 위치가 갑자기 튀지 않는다.
+      const startPositions = group.map((gid) => {
+        const existing = positions[gid];
+        if (existing) return { id: gid, ...existing };
+        const rect = e.currentTarget.getBoundingClientRect();
+        return { id: gid, x: rect.left - offsetX, y: rect.top - offsetY };
+      });
 
       const startX = e.clientX;
       const startY = e.clientY;
-      const startPositions = group.map((id) => ({ id, ...positions[id] }));
 
       const move = (ev: PointerEvent) => {
         const dx = ev.clientX - startX;
@@ -186,6 +213,7 @@ export default function Desktop({
       const up = () => {
         window.removeEventListener("pointermove", move);
         window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
         setPositions((prev) => {
           for (const sp of startPositions) {
             const p = prev[sp.id];
@@ -193,64 +221,20 @@ export default function Desktop({
           }
           return prev;
         });
+        if (isSpecial) draggingSpecialRef.current = null;
       };
       window.addEventListener("pointermove", move);
       window.addEventListener("pointerup", up);
+      // 시스템 제스처 등으로 pointerup 없이 드래그가 끊기면 draggingSpecialRef가
+      // 계속 채워진 채로 남으므로 pointercancel도 같이 처리한다.
+      window.addEventListener("pointercancel", up);
     },
     [selected, positions],
   );
 
-  const startTrashDrag = useCallback(
-    (e: React.PointerEvent) => {
-      if (e.button !== 0) return;
-      e.stopPropagation();
-      trashDraggingRef.current = true;
-      // 드래그 중에는 휴지통이 마우스 아래에서 움직이면서 pointerenter/leave가
-      // 반복 발생해 열림/닫힘 그림(OPEN_GRID/CLOSED_GRID)이 깜빡였다 — 드래그
-      // 시작 시 고정으로 닫힘 상태로 되돌리고, 드래그 중 hover 갱신을 막는다.
-      setTrashHover(false);
-
-      const containerRect = containerRef.current?.getBoundingClientRect();
-      const offsetX = containerRect?.left ?? 0;
-      const offsetY = containerRect?.top ?? 0;
-      // 아직 한 번도 옮긴 적이 없으면(trashPos === null) 현재 화면상 위치(기본 우하단)를
-      // 컨테이너 기준 좌표로 환산해 드래그 시작점으로 삼는다 — 그래야 첫 드래그에서
-      // 위치가 갑자기 튀지 않는다.
-      const origin =
-        trashPos ??
-        (() => {
-          const trashRect = trashRef.current?.getBoundingClientRect();
-          return { x: (trashRect?.left ?? 0) - offsetX, y: (trashRect?.top ?? 0) - offsetY };
-        })();
-
-      const startX = e.clientX;
-      const startY = e.clientY;
-
-      const move = (ev: PointerEvent) => {
-        setTrashPos({ x: origin.x + (ev.clientX - startX), y: origin.y + (ev.clientY - startY) });
-      };
-      const up = () => {
-        window.removeEventListener("pointermove", move);
-        window.removeEventListener("pointerup", up);
-        window.removeEventListener("pointercancel", up);
-        setTrashPos((cur) => {
-          if (cur) setTrashPosition(cur.x, cur.y);
-          return cur;
-        });
-        trashDraggingRef.current = false;
-      };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", up);
-      // 시스템 제스처 등으로 pointerup 없이 드래그가 끊기면 trashDraggingRef가
-      // true로 남아 휴지통이 계속 비활성 상태로 고정되므로 pointercancel도 같이 처리한다.
-      window.addEventListener("pointercancel", up);
-    },
-    [trashPos],
-  );
-
   const handleTrashDrop = useCallback(() => {
     setTrashHover(false);
-    if (trashDraggingRef.current) return;
+    if (draggingSpecialRef.current === TRASH_ID) return;
     if (selected.size === 0) return;
     setPendingDelete(Array.from(selected));
   }, [selected]);
@@ -268,10 +252,16 @@ export default function Desktop({
     resetAllPixelArt();
     resetDesktopLayout();
     setSelected(new Set());
-    setTrashPos(null);
     setPendingFormat(false);
     refresh();
   }, [refresh]);
+
+  // 시스템 아이콘(트래시/포맷)은 이름 변경·삭제가 불가능하다는 걸 명시적으로
+  // 보여주기 위해 비활성화된 상태로라도 항목을 그대로 노출한다.
+  const systemIconMenuItems: ContextMenuItem[] = [
+    { label: "이름 바꾸기", onClick: () => {}, disabled: true },
+    { label: "삭제", onClick: () => {}, disabled: true },
+  ];
 
   return (
     <div
@@ -297,7 +287,7 @@ export default function Desktop({
             x={p.x}
             y={p.y}
             selected={selected.has(art.id)}
-            onPointerDownIcon={(e) => startIconDrag(art, e)}
+            onPointerDownIcon={(e) => startIconDrag(art.id, e)}
             onDoubleClick={() => onOpen(art.id)}
             onContextMenu={(e) => {
               e.preventDefault();
@@ -347,13 +337,17 @@ export default function Desktop({
       )}
 
       <div
-        ref={trashRef}
-        onPointerDown={startTrashDrag}
-        onPointerEnter={() => !trashDraggingRef.current && setTrashHover(true)}
-        onPointerLeave={() => !trashDraggingRef.current && setTrashHover(false)}
+        onPointerDown={(e) => startIconDrag(TRASH_ID, e)}
+        onPointerEnter={() => draggingSpecialRef.current !== TRASH_ID && setTrashHover(true)}
+        onPointerLeave={() => draggingSpecialRef.current !== TRASH_ID && setTrashHover(false)}
         onPointerUp={handleTrashDrop}
-        className={`absolute flex w-20 flex-col items-center gap-1 p-2 ${trashPos ? "" : "bottom-4 right-4"}`}
-        style={trashPos ? { left: trashPos.x, top: trashPos.y } : undefined}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
+        }}
+        className={`absolute flex w-20 flex-col items-center gap-1 p-2 ${positions[TRASH_ID] ? "" : "bottom-4 right-4"}`}
+        style={positions[TRASH_ID] ? { left: positions[TRASH_ID].x, top: positions[TRASH_ID].y } : undefined}
         title="선택한 아이콘을 여기로 드래그해 삭제 · 드래그해서 위치 이동 가능"
       >
         <TrashIcon active={trashHover} />
@@ -361,10 +355,16 @@ export default function Desktop({
       </div>
 
       <div
-        onPointerDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => startIconDrag(FORMAT_ID, e)}
         onDoubleClick={() => setPendingFormat(true)}
-        className="absolute bottom-4 left-4 flex w-20 flex-col items-center gap-1 p-2 hover:bg-gray-100"
-        title="더블클릭하면 이 프로젝트의 저장된 모든 작품과 배치를 초기화합니다"
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
+        }}
+        className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-gray-100 ${positions[FORMAT_ID] ? "" : "bottom-4 left-4"}`}
+        style={positions[FORMAT_ID] ? { left: positions[FORMAT_ID].x, top: positions[FORMAT_ID].y } : undefined}
+        title="더블클릭하면 이 프로젝트의 저장된 모든 작품과 배치를 초기화합니다 · 드래그해서 위치 이동 가능"
       >
         <FormatIcon />
         <span className="w-full truncate text-center text-[10px] text-gray-600">포맷</span>

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-export type ContextMenuItem = { label: string; onClick: () => void };
+export type ContextMenuItem = { label: string; onClick: () => void; disabled?: boolean };
 
 export default function ContextMenu({
   x,
@@ -30,11 +30,15 @@ export default function ContextMenu({
       {items.map((item) => (
         <button
           key={item.label}
+          disabled={item.disabled}
           onClick={() => {
+            if (item.disabled) return;
             item.onClick();
             onClose();
           }}
-          className="block w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-violet-50"
+          className={`block w-full px-3 py-1.5 text-left text-xs ${
+            item.disabled ? "cursor-not-allowed text-gray-300" : "text-gray-700 hover:bg-violet-50"
+          }`}
         >
           {item.label}
         </button>
