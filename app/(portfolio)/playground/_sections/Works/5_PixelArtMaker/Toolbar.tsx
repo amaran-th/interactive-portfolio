@@ -1,6 +1,6 @@
 "use client";
 
-import { Circle, Copy, Eraser, Minus, MousePointer2, Move, Paintbrush, PaintBucket, Redo2, Square, Undo2, Wand2 } from "lucide-react";
+import { Circle, Copy, Eraser, Grid3x3, Minus, MousePointer2, Move, Paintbrush, PaintBucket, Redo2, Square, Undo2, Wand2 } from "lucide-react";
 import { MirrorMode, Tool } from "./types";
 
 // 스포이트는 색상 패널(ColorWheel) 쪽으로 옮겨서 여기서는 다루지 않는다.
@@ -35,6 +35,8 @@ export default function Toolbar({
   canRedo,
   onUndo,
   onRedo,
+  showGrid,
+  onToggleGrid,
 }: {
   tool: Tool;
   onToolChange: (tool: Tool) => void;
@@ -44,6 +46,8 @@ export default function Toolbar({
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
+  showGrid: boolean;
+  onToggleGrid: () => void;
 }) {
   return (
     <div className="flex flex-col gap-3 bg-white p-3 shadow-md">
@@ -72,6 +76,13 @@ export default function Toolbar({
         </button>
         <button onClick={onRedo} disabled={!canRedo} className="flex h-7 w-7 items-center justify-center bg-gray-100 text-gray-600 disabled:opacity-30">
           <Redo2 className="h-4 w-4" />
+        </button>
+        <button
+          onClick={onToggleGrid}
+          title="격자 표시 (기본 켜짐)"
+          className={`flex h-7 w-7 items-center justify-center ${showGrid ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600"}`}
+        >
+          <Grid3x3 className="h-4 w-4" />
         </button>
         <div className="ml-auto flex gap-1 text-[10px] text-gray-500">
           {(["none", "horizontal", "vertical", "both"] as MirrorMode[]).map((m) => (

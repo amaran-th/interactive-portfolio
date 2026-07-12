@@ -1,52 +1,34 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { PixelArt } from "../_shared/assetLibrary";
 
-const SIZE = 48;
-const GRID = 8;
-
-// 8x8 픽셀 그리드로 그린 액자 속 풍경(배경화면) 아이콘.
-// 0=투명, 1=액자 테두리, 2=하늘, 3=해, 4=산
-const GRID_DATA = [
-  [1, 1, 1, 1, 1, 1, 1, 1],
-  [1, 2, 2, 2, 2, 2, 2, 1],
-  [1, 2, 2, 2, 3, 2, 2, 1],
-  [1, 2, 2, 2, 2, 2, 2, 1],
-  [1, 2, 2, 4, 2, 2, 2, 1],
-  [1, 2, 4, 4, 4, 2, 2, 1],
-  [1, 4, 4, 4, 4, 4, 2, 1],
-  [1, 1, 1, 1, 1, 1, 1, 1],
-];
-
-const COLORS: Record<number, string> = {
-  1: "#27272a",
-  2: "#e4e4e7",
-  3: "#8b5cf6",
-  4: "#a1a1aa",
-};
-
-export default function WallpaperIcon() {
+// DesktopIcon.tsx와 동일한 방식으로 실제 배경화면 픽셀 데이터를 그대로
+// 축소해 그린다 — 고정된 그림(액자·풍경 아이콘)을 쓰면 실제 배경화면과
+// 달라 보이고, 그 고정 그림 자체의 윤곽선이 이 프로젝트의 "테두리 없음"
+// 원칙에 어긋나는 시각적 테두리처럼 보였다.
+export default function WallpaperIcon({ art }: { art: PixelArt }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.width = SIZE;
-    canvas.height = SIZE;
+    const size = 48;
+    canvas.width = size;
+    canvas.height = size;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, SIZE, SIZE);
-    const cell = SIZE / GRID;
-    for (let y = 0; y < GRID; y++) {
-      for (let x = 0; x < GRID; x++) {
-        const v = GRID_DATA[y][x];
-        if (v === 0) continue;
-        ctx.fillStyle = COLORS[v];
-        ctx.fillRect(x * cell, y * cell, cell, cell);
+    const scale = size / Math.max(art.width, art.height);
+    for (let py = 0; py < art.height; py++) {
+      for (let px = 0; px < art.width; px++) {
+        const colorIndex = art.pixels[py * art.width + px];
+        if (colorIndex < 0) continue;
+        ctx.fillStyle = art.palette[colorIndex] ?? "#ffffff";
+        ctx.fillRect(px * scale, py * scale, scale, scale);
       }
     }
-  }, []);
+  }, [art]);
 
   return <canvas ref={canvasRef} className="shadow-sm" style={{ imageRendering: "pixelated" }} />;
 }

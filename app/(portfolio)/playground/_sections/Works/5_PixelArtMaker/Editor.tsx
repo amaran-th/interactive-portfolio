@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getPixelArt, listPixelArt, PixelArt, savePixelArt, uid } from "../_shared/assetLibrary";
 import ColorWheel from "./ColorWheel";
 import ContextMenu, { ContextMenuItem } from "./ContextMenu";
@@ -14,7 +14,7 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useSelection } from "./useSelection";
 import { createGrid, getPixel } from "./pixelGrid";
 import { exportAsJPG, exportAsJSON, exportAsPNG, exportAsSVG } from "./exportPixelArt";
-import { CANVAS_PRESETS, MirrorMode, Tool } from "./types";
+import { CANVAS_PRESETS, MAX_PALETTE_COLORS, MirrorMode, Tool } from "./types";
 import { getWallpaper, saveWallpaper, WALLPAPER_ID, WALLPAPER_NAME } from "./wallpaper";
 
 // choice: "편집기" 런처로 들어와 무엇을 할지 고르는 단계
@@ -72,6 +72,7 @@ export default function Editor({
   const [tool, setTool] = useState<Tool>("pencil");
   const [mirror, setMirror] = useState<MirrorMode>("none");
   const [activeColorIndex, setActiveColorIndex] = useState(0);
+  const [showGrid, setShowGrid] = useState(true);
   const [name, setName] = useState(initial.doc.name);
   const [hasMetaEdits, setHasMetaEdits] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
@@ -180,10 +181,28 @@ export default function Editor({
     [palette],
   );
 
-  // 색상환을 조작하면 현재 활성 팔레트 스와치 자체의 값을 실시간으로 갱신한다
-  // (새 색을 "추가"하는 게 아니라 지금 선택된 색을 "수정"하는 것이 기본 동작).
+  // 캔버스에서 지금 실제로 쓰이고 있는 팔레트 인덱스 집합 — history.present가
+  // 바뀔 때만(그림을 그리거나 되돌릴 때) 다시 계산되고, 색상환을 드래그하는
+  // 동안에는 다시 계산되지 않는다(그림 자체는 안 바뀌므로).
+  const usedColorIndices = useMemo(() => new Set(history.present), [history.present]);
+
+  // 색상환을 조작하면 원칙적으로 현재 활성 팔레트 스와치의 값을 실시간으로 갱신한다
+  // (새 색을 "추가"하는 게 아니라 지금 선택된 색을 "수정"하는 것이 기본 동작) — 단,
+  // 그 스와치로 이미 칠해진 픽셀이 하나라도 있으면 그 픽셀들까지 몰래 같이 바뀌어
+  // 버리므로, 이 경우에는 기존 스와치를 그대로 두고 새 스와치를 만들어 활성 색상을
+  // 그쪽으로 옮긴다. 아직 아무것도 칠하지 않은 스와치를 다듬는 동안에는 계속
+  // 제자리에서 수정되고(핸들이 여러 번 호출돼도 새로 만든 스와치는 아직 미사용
+  // 상태이므로 다시 분기되지 않는다), 팔레트가 가득 찼을 때는 분기할 자리가 없어
+  // 어쩔 수 없이 기존 동작(제자리 수정)으로 되돌아간다.
   const handleChangeActiveColor = useCallback(
     (hex: string) => {
+      if (usedColorIndices.has(activeColorIndex) && palette.length < MAX_PALETTE_COLORS) {
+        const newIndex = palette.length;
+        setDoc((d) => ({ ...d, palette: [...d.palette, hex] }));
+        setActiveColorIndex(newIndex);
+        setHasMetaEdits(true);
+        return;
+      }
       setDoc((d) => {
         const nextPalette = d.palette.slice();
         nextPalette[activeColorIndex] = hex;
@@ -191,7 +210,7 @@ export default function Editor({
       });
       setHasMetaEdits(true);
     },
-    [activeColorIndex],
+    [activeColorIndex, usedColorIndices, palette.length],
   );
 
   const handlePickColor = useCallback((colorIndex: number) => {
@@ -297,6 +316,8 @@ export default function Editor({
             canRedo={history.canRedo}
             onUndo={history.undo}
             onRedo={history.redo}
+            showGrid={showGrid}
+            onToggleGrid={() => setShowGrid((g) => !g)}
           />
           <ColorWheel
             palette={palette}
@@ -327,6 +348,7 @@ export default function Editor({
             mirror={mirror}
             activeColorIndex={activeColorIndex}
             selectionMask={selection.mask}
+            showGrid={showGrid}
             onSelectionChange={selection.setMask}
             onStrokeEnd={handleStrokeEnd}
             onPickColor={handlePickColor}

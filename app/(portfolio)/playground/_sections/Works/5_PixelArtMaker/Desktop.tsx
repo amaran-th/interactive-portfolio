@@ -394,7 +394,7 @@ export default function Desktop({
         style={positions[WALLPAPER_ID] ? { left: positions[WALLPAPER_ID].x, top: positions[WALLPAPER_ID].y } : undefined}
         title="더블클릭하면 배경화면을 편집합니다 · 드래그해서 위치 이동 가능"
       >
-        <WallpaperIcon />
+        <WallpaperIcon art={wallpaper} />
         <span className="w-full truncate text-center text-[10px] text-gray-600">배경화면</span>
       </div>
 

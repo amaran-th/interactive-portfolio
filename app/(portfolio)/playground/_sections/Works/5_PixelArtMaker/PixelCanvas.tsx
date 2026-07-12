@@ -25,6 +25,7 @@ export default function PixelCanvas({
   mirror,
   activeColorIndex,
   selectionMask,
+  showGrid,
   onSelectionChange,
   onStrokeEnd,
   onPickColor,
@@ -37,6 +38,7 @@ export default function PixelCanvas({
   mirror: MirrorMode;
   activeColorIndex: number;
   selectionMask: Set<number> | null;
+  showGrid: boolean;
   onSelectionChange: (mask: Set<number> | null) => void;
   onStrokeEnd: (next: number[]) => void;
   onPickColor: (colorIndex: number) => void;
@@ -79,18 +81,20 @@ export default function PixelCanvas({
           ctx.fillRect(x * scale, y * scale, scale, scale);
         }
       }
-      ctx.strokeStyle = "rgba(0,0,0,0.08)";
-      for (let x = 0; x <= width; x++) {
-        ctx.beginPath();
-        ctx.moveTo(x * scale, 0);
-        ctx.lineTo(x * scale, height * scale);
-        ctx.stroke();
-      }
-      for (let y = 0; y <= height; y++) {
-        ctx.beginPath();
-        ctx.moveTo(0, y * scale);
-        ctx.lineTo(width * scale, y * scale);
-        ctx.stroke();
+      if (showGrid) {
+        ctx.strokeStyle = "rgba(0,0,0,0.08)";
+        for (let x = 0; x <= width; x++) {
+          ctx.beginPath();
+          ctx.moveTo(x * scale, 0);
+          ctx.lineTo(x * scale, height * scale);
+          ctx.stroke();
+        }
+        for (let y = 0; y <= height; y++) {
+          ctx.beginPath();
+          ctx.moveTo(0, y * scale);
+          ctx.lineTo(width * scale, y * scale);
+          ctx.stroke();
+        }
       }
       // 선택 영역을 시각적으로 표시한다 — select/wand 도구로 선택해도 화면에
       // 아무 표시가 없어 무엇이 선택됐는지 알 수 없었다(최종 whole-branch 리뷰에서 발견).
@@ -108,7 +112,7 @@ export default function PixelCanvas({
         });
       }
     },
-    [width, height, palette, zoom],
+    [width, height, palette, zoom, showGrid],
   );
 
   useEffect(() => {
