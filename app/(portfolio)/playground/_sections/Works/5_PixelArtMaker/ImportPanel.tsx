@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { mergeColors, pixelateImage, quantizeColors } from "./pixelate";
+import { mergeColors, pixelateImage, quantizeColors, resamplePixelGrid } from "./pixelate";
+import { CANVAS_PRESETS } from "./types";
 
 type Preview = { width: number; height: number; palette: string[]; pixels: number[] };
 
@@ -17,6 +18,10 @@ export default function ImportPanel({
   const [pixelSize, setPixelSize] = useState(32);
   const [antiAlias, setAntiAlias] = useState(false);
   const [maxColors, setMaxColors] = useState(8);
+  // null = 픽셀 해상도(pixelSize)를 그대로 최종 캔버스 크기로 쓴다. 값이 있으면
+  // 그 규격으로 확대/축소해 배치한다 — "변환할 대상 비트 규격"(pixelSize)과
+  // "실제 캔버스 크기"를 독립적으로 고를 수 있게 하는 게 이 상태의 목적이다.
+  const [canvasPreset, setCanvasPreset] = useState<{ width: number; height: number } | null>(null);
   const [imageEl, setImageEl] = useState<HTMLImageElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const autoOpenedRef = useRef(false);
@@ -54,6 +59,25 @@ export default function ImportPanel({
     [pixelSize, antiAlias, maxColors, runPixelate],
   );
 
+  // 클립보드에 복사된 이미지(스크린샷, 다른 앱에서 복사한 그림 등)를 바로 가져온다.
+  // Clipboard API 미지원/권한 거부 환경에서는 조용히 무시한다(이 프로젝트의 기존
+  // localStorage 저장 실패 처리와 같은 관례 — 토스트 UI가 없는 이 앱에서 새 알림
+  // 체계를 따로 만들지 않는다).
+  const handlePasteFromClipboard = useCallback(async () => {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const imageType = item.types.find((t) => t.startsWith("image/"));
+        if (!imageType) continue;
+        const blob = await item.getType(imageType);
+        handleFile(new File([blob], "clipboard-image", { type: imageType }));
+        return;
+      }
+    } catch {
+      // 클립보드 접근 실패 — 무시(사용자가 파일 선택으로 대신 진행할 수 있음)
+    }
+  }, [handleFile]);
+
   const handleOptionChange = useCallback(
     (size: number, aa: boolean, colors: number) => {
       setPixelSize(size);
@@ -73,6 +97,16 @@ export default function ImportPanel({
     [preview],
   );
 
+  const handleConfirm = useCallback(() => {
+    if (!preview) return;
+    if (!canvasPreset || (canvasPreset.width === preview.width && canvasPreset.height === preview.height)) {
+      onConfirm(preview);
+      return;
+    }
+    const pixels = resamplePixelGrid(preview.pixels, preview.width, preview.height, canvasPreset.width, canvasPreset.height);
+    onConfirm({ width: canvasPreset.width, height: canvasPreset.height, palette: preview.palette, pixels });
+  }, [preview, canvasPreset, onConfirm]);
+
   return (
     <div className="flex flex-col gap-3 bg-white p-3 shadow-md">
       <p className="text-xs font-semibold text-gray-500">이미지를 픽셀아트로 변환</p>
@@ -83,11 +117,17 @@ export default function ImportPanel({
         onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
         className="text-xs text-gray-600"
       />
+      <button
+        onClick={handlePasteFromClipboard}
+        className="bg-gray-100 py-1.5 text-[10px] text-gray-600 hover:bg-gray-200"
+      >
+        클립보드에서 붙여넣기
+      </button>
 
       {preview && (
         <>
           <label className="flex items-center justify-between text-xs text-gray-600">
-            픽셀 크기
+            픽셀 해상도(비트 규격)
             <input
               type="range"
               min={8}
@@ -114,6 +154,28 @@ export default function ImportPanel({
               onChange={(e) => handleOptionChange(pixelSize, antiAlias, Number(e.target.value))}
             />
           </label>
+          <label className="flex items-center justify-between text-xs text-gray-600">
+            캔버스 크기
+            <select
+              value={canvasPreset ? `${canvasPreset.width}x${canvasPreset.height}` : "same"}
+              onChange={(e) => {
+                if (e.target.value === "same") {
+                  setCanvasPreset(null);
+                  return;
+                }
+                const preset = CANVAS_PRESETS.find((p) => `${p.width}x${p.height}` === e.target.value);
+                if (preset) setCanvasPreset({ width: preset.width, height: preset.height });
+              }}
+              className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600"
+            >
+              <option value="same">픽셀 해상도와 동일</option>
+              {CANVAS_PRESETS.map((p) => (
+                <option key={p.label} value={`${p.width}x${p.height}`}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <div className="flex flex-wrap gap-1">
             {preview.palette.map((color, i) => (
@@ -127,10 +189,7 @@ export default function ImportPanel({
             ))}
           </div>
 
-          <button
-            onClick={() => onConfirm(preview)}
-            className="bg-violet-500 py-2 text-xs font-semibold text-white hover:bg-violet-600"
-          >
+          <button onClick={handleConfirm} className="bg-violet-500 py-2 text-xs font-semibold text-white hover:bg-violet-600">
             가져오기
           </button>
         </>

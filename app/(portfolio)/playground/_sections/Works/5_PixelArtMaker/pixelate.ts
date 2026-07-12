@@ -99,3 +99,26 @@ export function mergeColors(
   const nextPalette = palette.filter((_, i) => i !== indexB);
   return { palette: nextPalette, pixels: nextPixels };
 }
+
+// srcWidth x srcHeight 픽셀 그리드를 dstWidth x dstHeight로 최근접 이웃 방식으로
+// 재배치한다. 이미지를 픽셀아트로 변환할 때 "픽셀 해상도"(비트 규격, 몇 칸으로
+// 샘플링할지)와 "실제 캔버스 크기"(최종 결과물의 격자 크기)를 독립적으로 정할 수
+// 있게 해준다 — dst가 src보다 크면 한 칸이 여러 칸으로 확대(블록화)되고, 작으면
+// 축소된다. 어느 조합이든 동작하는 범용 구현이라 정수 배수가 아니어도 괜찮다.
+export function resamplePixelGrid(
+  pixels: number[],
+  srcWidth: number,
+  srcHeight: number,
+  dstWidth: number,
+  dstHeight: number,
+): number[] {
+  const next = new Array<number>(dstWidth * dstHeight);
+  for (let y = 0; y < dstHeight; y++) {
+    const sy = Math.min(srcHeight - 1, Math.floor((y * srcHeight) / dstHeight));
+    for (let x = 0; x < dstWidth; x++) {
+      const sx = Math.min(srcWidth - 1, Math.floor((x * srcWidth) / dstWidth));
+      next[y * dstWidth + x] = pixels[sy * srcWidth + sx];
+    }
+  }
+  return next;
+}
