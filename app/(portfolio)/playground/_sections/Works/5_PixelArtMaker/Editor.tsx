@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getPixelArt, listPixelArt, PixelArt, savePixelArt, uid } from "../_shared/assetLibrary";
 import ColorWheel from "./ColorWheel";
 import ContextMenu, { ContextMenuItem } from "./ContextMenu";
@@ -15,7 +15,7 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useSelection } from "./useSelection";
 import { createGrid, getPixel, resizeGrid } from "./pixelGrid";
 import { exportAsJPG, exportAsJSON, exportAsPNG, exportAsSVG } from "./exportPixelArt";
-import { CANVAS_PRESETS, MAX_PALETTE_COLORS, MirrorMode, Tool } from "./types";
+import { CANVAS_PRESETS, MirrorMode, Tool } from "./types";
 import { getWallpaper, saveWallpaper, WALLPAPER_ID, WALLPAPER_NAME } from "./wallpaper";
 
 // 클립스튜디오처럼 여러 파일을 탭으로 동시에 열어둘 수 있다. 활성 탭의 실제
@@ -24,13 +24,27 @@ import { getWallpaper, saveWallpaper, WALLPAPER_ID, WALLPAPER_NAME } from "./wal
 // 그림 내용은 그대로 보존된다).
 type Tab = { doc: PixelArt; hasMetaEdits: boolean };
 
+// 새 캔버스의 기본 팔레트 — 흰색·검은색과 색상환을 고르게 덮는 원색 8개, 총 10개.
+const DEFAULT_PALETTE = [
+  "#ffffff",
+  "#000000",
+  "#ff0000",
+  "#ff8800",
+  "#ffee00",
+  "#22cc44",
+  "#00bcd4",
+  "#2266ff",
+  "#8833ee",
+  "#ee3399",
+];
+
 function blankDoc(width: number, height: number): PixelArt {
   return {
     id: uid(),
     name: "제목 없음",
     width,
     height,
-    palette: ["#ffffff", "#000000"],
+    palette: [...DEFAULT_PALETTE],
     pixels: createGrid(width, height),
     createdAt: Date.now(),
   };
@@ -278,28 +292,12 @@ export default function Editor({
     [palette],
   );
 
-  // 캔버스에서 지금 실제로 쓰이고 있는 팔레트 인덱스 집합 — history.present가
-  // 바뀔 때만(그림을 그리거나 되돌릴 때) 다시 계산되고, 색상환을 드래그하는
-  // 동안에는 다시 계산되지 않는다(그림 자체는 안 바뀌므로).
-  const usedColorIndices = useMemo(() => new Set(history.present), [history.present]);
-
-  // 색상환을 조작하면 원칙적으로 현재 활성 팔레트 스와치의 값을 실시간으로 갱신한다
-  // (새 색을 "추가"하는 게 아니라 지금 선택된 색을 "수정"하는 것이 기본 동작) — 단,
-  // 그 스와치로 이미 칠해진 픽셀이 하나라도 있으면 그 픽셀들까지 몰래 같이 바뀌어
-  // 버리므로, 이 경우에는 기존 스와치를 그대로 두고 새 스와치를 만들어 활성 색상을
-  // 그쪽으로 옮긴다. 아직 아무것도 칠하지 않은 스와치를 다듬는 동안에는 계속
-  // 제자리에서 수정되고(핸들이 여러 번 호출돼도 새로 만든 스와치는 아직 미사용
-  // 상태이므로 다시 분기되지 않는다), 팔레트가 가득 찼을 때는 분기할 자리가 없어
-  // 어쩔 수 없이 기존 동작(제자리 수정)으로 되돌아간다.
+  // 색상환을 조작하면 현재 활성 팔레트 스와치 자체의 값을 실시간으로 갱신한다
+  // (새 색을 "추가"하는 게 아니라 지금 선택된 색을 "수정"하는 것이 기본 동작) —
+  // 이미 그 색으로 칠한 픽셀이 있어도 함께 바뀐다. 한때 새 스와치로 분기시키는
+  // 방식을 시도했지만 사용해보니 불편하다는 피드백을 받아 되돌렸다.
   const handleChangeActiveColor = useCallback(
     (hex: string) => {
-      if (usedColorIndices.has(activeColorIndex) && palette.length < MAX_PALETTE_COLORS) {
-        const newIndex = palette.length;
-        setDoc((d) => ({ ...d, palette: [...d.palette, hex] }));
-        setActiveColorIndex(newIndex);
-        setHasMetaEdits(true);
-        return;
-      }
       setDoc((d) => {
         const nextPalette = d.palette.slice();
         nextPalette[activeColorIndex] = hex;
@@ -307,7 +305,7 @@ export default function Editor({
       });
       setHasMetaEdits(true);
     },
-    [activeColorIndex, usedColorIndices, palette.length],
+    [activeColorIndex],
   );
 
   const handlePickColor = useCallback((colorIndex: number) => {
