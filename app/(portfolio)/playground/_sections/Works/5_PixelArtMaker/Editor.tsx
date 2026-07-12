@@ -388,24 +388,14 @@ export default function Editor({
           { label: "저장", onClick: handleSave, disabled: noActiveTab },
           { label: "다른 이름으로 저장", onClick: handleSaveAs, disabled: noActiveTab },
           {
-            label: "PNG로 내보내기",
-            onClick: () => exportAsPNG({ ...doc, pixels: history.present }),
+            label: "내보내기",
             disabled: noActiveTab,
-          },
-          {
-            label: "SVG로 내보내기",
-            onClick: () => exportAsSVG({ ...doc, pixels: history.present }),
-            disabled: noActiveTab,
-          },
-          {
-            label: "JSON으로 내보내기",
-            onClick: () => exportAsJSON({ ...doc, pixels: history.present }),
-            disabled: noActiveTab,
-          },
-          {
-            label: "JPG로 내보내기 (손실 압축)",
-            onClick: () => exportAsJPG({ ...doc, pixels: history.present }),
-            disabled: noActiveTab,
+            submenu: [
+              { label: "PNG", onClick: () => exportAsPNG({ ...doc, pixels: history.present }) },
+              { label: "SVG", onClick: () => exportAsSVG({ ...doc, pixels: history.present }) },
+              { label: "JSON", onClick: () => exportAsJSON({ ...doc, pixels: history.present }) },
+              { label: "JPG (손실 압축)", onClick: () => exportAsJPG({ ...doc, pixels: history.present }) },
+            ],
           },
         ],
       });
