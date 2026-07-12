@@ -360,6 +360,11 @@ export default function Desktop({
                       refresh();
                     },
                   },
+                  {
+                    label: "삭제",
+                    danger: true,
+                    onClick: () => setPendingDelete([art.id]),
+                  },
                 ],
               });
             }}
