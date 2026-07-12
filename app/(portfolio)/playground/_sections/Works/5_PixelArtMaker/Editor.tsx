@@ -588,11 +588,11 @@ export default function Editor({
         <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
           <p className="text-sm text-gray-400">열린 파일이 없습니다</p>
           <p className="text-xs text-gray-300">
-            <button onClick={() => setShowNewCanvasDialog(true)} className="text-violet-400 underline-offset-2 hover:text-violet-500 hover:underline">
+            <button onClick={() => setShowNewCanvasDialog(true)} className="text-violet-400 underline underline-offset-2 hover:text-violet-500">
               새로 만들기
             </button>
             {" 또는 "}
-            <button onClick={() => setShowOpenDialog(true)} className="text-violet-400 underline-offset-2 hover:text-violet-500 hover:underline">
+            <button onClick={() => setShowOpenDialog(true)} className="text-violet-400 underline underline-offset-2 hover:text-violet-500">
               열기
             </button>
             를 선택하세요
