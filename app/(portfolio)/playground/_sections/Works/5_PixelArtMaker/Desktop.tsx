@@ -7,16 +7,19 @@ import {
   listPixelArt,
   PixelArt,
   renamePixelArt,
+  resetAllPixelArt,
 } from "../_shared/assetLibrary";
 import ConfirmDialog from "./ConfirmDialog";
 import ContextMenu, { ContextMenuItem } from "./ContextMenu";
 import DesktopIcon from "./DesktopIcon";
+import FormatIcon from "./FormatIcon";
 import TrashIcon from "./TrashIcon";
 import { exportAsJPG, exportAsJSON, exportAsPNG, exportAsSVG } from "./exportPixelArt";
 import {
   getIconPosition,
   getTrashPosition,
   removeIconPositions,
+  resetDesktopLayout,
   setIconPosition,
   setTrashPosition,
 } from "./useDesktopLayout";
@@ -39,6 +42,7 @@ export default function Desktop({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState<Menu>(null);
   const [pendingDelete, setPendingDelete] = useState<string[] | null>(null);
+  const [pendingFormat, setPendingFormat] = useState(false);
   const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [trashHover, setTrashHover] = useState(false);
   const [trashPos, setTrashPos] = useState<{ x: number; y: number } | null>(null);
@@ -251,6 +255,15 @@ export default function Desktop({
     refresh();
   }, [pendingDelete, refresh]);
 
+  const confirmFormat = useCallback(() => {
+    resetAllPixelArt();
+    resetDesktopLayout();
+    setSelected(new Set());
+    setTrashPos(null);
+    setPendingFormat(false);
+    refresh();
+  }, [refresh]);
+
   return (
     <div
       ref={containerRef}
@@ -338,12 +351,29 @@ export default function Desktop({
         <span className="w-full truncate text-center text-[10px] text-gray-600">휴지통</span>
       </div>
 
+      <div
+        onPointerDown={(e) => e.stopPropagation()}
+        onDoubleClick={() => setPendingFormat(true)}
+        className="absolute bottom-4 left-4 flex w-20 flex-col items-center gap-1 p-2 hover:bg-gray-100"
+        title="더블클릭하면 이 프로젝트의 저장된 모든 작품과 배치를 초기화합니다"
+      >
+        <FormatIcon />
+        <span className="w-full truncate text-center text-[10px] text-gray-600">포맷</span>
+      </div>
+
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
       {pendingDelete && (
         <ConfirmDialog
           message={`${pendingDelete.length}개 항목을 삭제하시겠습니까?`}
           onConfirm={confirmDelete}
           onCancel={() => setPendingDelete(null)}
+        />
+      )}
+      {pendingFormat && (
+        <ConfirmDialog
+          message="저장된 모든 픽셀아트와 아이콘 배치를 초기화합니다. 되돌릴 수 없습니다. 계속할까요?"
+          onConfirm={confirmFormat}
+          onCancel={() => setPendingFormat(false)}
         />
       )}
     </div>

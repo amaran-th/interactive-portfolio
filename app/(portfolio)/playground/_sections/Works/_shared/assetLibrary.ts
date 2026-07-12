@@ -84,6 +84,13 @@ export function deletePixelArt(ids: string[]): void {
   saveLibrary(lib);
 }
 
+// 픽셀아트 메이커 전용 초기화 — 같은 라이브러리를 공유하는 beatPatterns는 건드리지 않는다.
+export function resetAllPixelArt(): void {
+  const lib = loadLibrary();
+  lib.pixelArt = [];
+  saveLibrary(lib);
+}
+
 export function duplicatePixelArt(id: string): PixelArt | undefined {
   const lib = loadLibrary();
   const item = lib.pixelArt.find((p) => p.id === id);

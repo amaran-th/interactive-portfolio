@@ -59,3 +59,10 @@ export function setTrashPosition(x: number, y: number): void {
     localStorage.setItem(TRASH_KEY, JSON.stringify({ x, y }));
   } catch {}
 }
+
+export function resetDesktopLayout(): void {
+  try {
+    localStorage.removeItem(LAYOUT_KEY);
+    localStorage.removeItem(TRASH_KEY);
+  } catch {}
+}
