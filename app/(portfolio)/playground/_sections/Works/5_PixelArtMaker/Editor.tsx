@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { getPixelArt, PixelArt, savePixelArt, uid } from "../_shared/assetLibrary";
+import { getPixelArt, listPixelArt, PixelArt, savePixelArt, uid } from "../_shared/assetLibrary";
 import ColorWheel from "./ColorWheel";
 import ContextMenu, { ContextMenuItem } from "./ContextMenu";
 import ImportPanel from "./ImportPanel";
@@ -16,6 +16,12 @@ import { createGrid, getPixel } from "./pixelGrid";
 import { exportAsJPG, exportAsJSON, exportAsPNG, exportAsSVG } from "./exportPixelArt";
 import { CANVAS_PRESETS, MirrorMode, Tool } from "./types";
 import { getWallpaper, saveWallpaper, WALLPAPER_ID, WALLPAPER_NAME } from "./wallpaper";
+
+// choice: "편집기" 런처로 들어와 무엇을 할지 고르는 단계
+// size: 새 캔버스 크기를 고르는 단계
+// existing: 저장된 작품 중 하나를 골라 여는 단계
+// ready: 실제 편집 화면
+type StartStep = "choice" | "size" | "existing" | "ready";
 
 function blankDoc(width: number, height: number): PixelArt {
   return {
@@ -32,29 +38,37 @@ function blankDoc(width: number, height: number): PixelArt {
 // 크기 선택 전에도 편집창 자체(툴바·캔버스 영역)가 그 뒤에 보여야
 // 크기 선택 다이얼로그가 "편집창 위에 뜬 모달"처럼 느껴진다 — 그래서
 // 아직 크기를 고르지 않았어도 임시 draft 캔버스를 미리 만들어 둔다.
-function resolveInitialDoc(docId: string | null): { doc: PixelArt; needsSize: boolean } {
-  if (docId === WALLPAPER_ID) return { doc: getWallpaper(), needsSize: false };
+function resolveInitialDoc(docId: string | null): { doc: PixelArt; found: boolean } {
+  if (docId === WALLPAPER_ID) return { doc: getWallpaper(), found: true };
   if (docId) {
     const existing = getPixelArt(docId);
-    if (existing) return { doc: existing, needsSize: false };
+    if (existing) return { doc: existing, found: true };
   }
-  return { doc: blankDoc(CANVAS_PRESETS[0].width, CANVAS_PRESETS[0].height), needsSize: true };
+  return { doc: blankDoc(CANVAS_PRESETS[0].width, CANVAS_PRESETS[0].height), found: false };
+}
+
+function resolveInitialStep(found: boolean, startMode: "direct" | "choice"): StartStep {
+  if (found) return "ready";
+  return startMode === "choice" ? "choice" : "size";
 }
 
 export default function Editor({
   docId,
+  startMode = "direct",
   onDirtyChange,
   onExit,
   closing,
 }: {
   docId: string | null;
+  startMode?: "direct" | "choice";
   onDirtyChange: (dirty: boolean) => void;
   onExit: () => void;
   closing: boolean;
 }) {
   const [initial] = useState(() => resolveInitialDoc(docId));
   const [doc, setDoc] = useState<PixelArt>(initial.doc);
-  const [needsSize, setNeedsSize] = useState(initial.needsSize);
+  const [step, setStep] = useState<StartStep>(() => resolveInitialStep(initial.found, startMode));
+  const [wantsAutoImport, setWantsAutoImport] = useState(false);
   const [tool, setTool] = useState<Tool>("pencil");
   const [mirror, setMirror] = useState<MirrorMode>("none");
   const [activeColorIndex, setActiveColorIndex] = useState(0);
@@ -85,7 +99,22 @@ export default function Editor({
       setDoc(fresh);
       setName(fresh.name);
       history.reset(fresh.pixels);
-      setNeedsSize(false);
+      setStep("ready");
+      setHasMetaEdits(false);
+    },
+    [history],
+  );
+
+  // "편집기" 런처의 "기존 픽셀 수정하기" 단계에서 목록의 항목을 고르면, 아직 아무것도
+  // 그리지 않은 상태이므로(선택 화면 단계라 history/doc이 비어있는 draft뿐) 같은
+  // 마운트 안에서 안전하게 doc/이름/히스토리를 그 항목 것으로 다시 채운다.
+  const handleOpenExisting = useCallback(
+    (art: PixelArt) => {
+      setDoc(art);
+      setName(art.name);
+      history.reset(art.pixels);
+      setActiveColorIndex(0);
+      setStep("ready");
       setHasMetaEdits(false);
     },
     [history],
@@ -280,6 +309,7 @@ export default function Editor({
             onToolChange={setTool}
           />
           <ImportPanel
+            autoOpen={wantsAutoImport}
             onConfirm={(imported) => {
               setDoc((d) => ({ ...d, width: imported.width, height: imported.height, palette: imported.palette }));
               history.reset(imported.pixels);
@@ -304,9 +334,78 @@ export default function Editor({
         </div>
       </div>
 
-      {/* 새 캔버스 크기 선택 — 화면 전체를 대체하는 별도 화면이 아니라
-          편집창 자체 위에 뜨는 모달이다(바로 뒤에 draft 캔버스가 보인다). */}
-      {needsSize && <NewCanvasDialog onSelect={handleCreate} onCancel={onExit} />}
+      {/* "편집기" 런처: 무엇을 할지 고르는 첫 단계 */}
+      {step === "choice" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="w-72 bg-white p-4 shadow-xl">
+            <h2 className="mb-3 text-sm font-semibold text-gray-900">편집기</h2>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => setStep("size")}
+                className="bg-gray-50 px-3 py-2 text-left text-sm text-gray-700 hover:bg-violet-50"
+              >
+                새로 만들기
+              </button>
+              <button
+                onClick={() => setStep("existing")}
+                className="bg-gray-50 px-3 py-2 text-left text-sm text-gray-700 hover:bg-violet-50"
+              >
+                기존 픽셀 수정하기
+              </button>
+              <button
+                onClick={() => {
+                  setWantsAutoImport(true);
+                  setStep("ready");
+                }}
+                className="bg-gray-50 px-3 py-2 text-left text-sm text-gray-700 hover:bg-violet-50"
+              >
+                이미지로 불러오기
+              </button>
+            </div>
+            <button onClick={onExit} className="mt-3 w-full py-2 text-xs text-gray-400 hover:text-gray-900">
+              취소
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 저장된 작품 중 하나를 골라 연다 */}
+      {step === "existing" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="flex max-h-96 w-72 flex-col bg-white p-4 shadow-xl">
+            <h2 className="mb-3 text-sm font-semibold text-gray-900">기존 픽셀 수정하기</h2>
+            {listPixelArt().length === 0 ? (
+              <p className="text-xs text-gray-400">저장된 작품이 없습니다.</p>
+            ) : (
+              <div className="flex flex-col gap-1 overflow-auto">
+                {listPixelArt().map((art) => (
+                  <button
+                    key={art.id}
+                    onClick={() => handleOpenExisting(art)}
+                    className="bg-gray-50 px-3 py-2 text-left text-sm text-gray-700 hover:bg-violet-50"
+                  >
+                    {art.name} <span className="text-gray-400">({art.width}×{art.height})</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button onClick={() => setStep("choice")} className="mt-3 w-full py-2 text-xs text-gray-400 hover:text-gray-900">
+              뒤로
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 새 캔버스 크기 선택 — 화면 전체를 대체하는 별도 화면이 아니라 편집창 자체
+          위에 뜨는 모달이다(바로 뒤에 draft 캔버스가 보인다). "편집기" 런처를 거쳐
+          왔으면 취소 시 선택 화면으로 되돌아가고, 데스크탑의 "새로 만들기" 바로가기로
+          왔으면(startMode가 "choice"가 아님) 취소 시 편집창을 완전히 닫는다. */}
+      {step === "size" && (
+        <NewCanvasDialog
+          onSelect={handleCreate}
+          onCancel={() => (startMode === "choice" ? setStep("choice") : onExit())}
+        />
+      )}
     </div>
   );
 }

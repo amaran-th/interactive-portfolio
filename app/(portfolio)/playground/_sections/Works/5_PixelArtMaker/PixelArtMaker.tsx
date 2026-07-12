@@ -6,7 +6,9 @@ import Desktop from "./Desktop";
 import Editor from "./Editor";
 import { monaFont } from "./fonts";
 
-type Screen = { view: "desktop" } | { view: "editor"; docId: string | null };
+type Screen =
+  | { view: "desktop" }
+  | { view: "editor"; docId: string | null; startMode: "direct" | "choice" };
 
 // 편집창이 닫힐 때 재생하는 축소·페이드 애니메이션 시간(ms) — Editor.tsx의
 // transition-all duration-200과 동일하게 맞춰야 애니메이션이 끝나기 전에
@@ -30,14 +32,14 @@ export default function PixelArtMaker() {
     };
   }, []);
 
-  const openEditor = useCallback((docId: string | null) => {
+  const openEditor = useCallback((docId: string | null, startMode: "direct" | "choice" = "direct") => {
     if (closeTimeoutRef.current) {
       clearTimeout(closeTimeoutRef.current);
       closeTimeoutRef.current = null;
     }
     setIsDirty(false);
     setClosing(false);
-    setScreen({ view: "editor", docId });
+    setScreen({ view: "editor", docId, startMode });
   }, []);
 
   // 즉시 화면을 desktop으로 바꾸지 않고, 먼저 편집창이 축소·페이드되며 닫히는
@@ -57,9 +59,20 @@ export default function PixelArtMaker() {
 
   return (
     <div className={`${monaFont.className} relative h-full w-full overflow-hidden`}>
-      <Desktop refreshSignal={refreshSignal} onOpen={(id) => openEditor(id)} onCreate={() => openEditor(null)} />
+      <Desktop
+        refreshSignal={refreshSignal}
+        onOpen={(id) => openEditor(id)}
+        onCreate={() => openEditor(null)}
+        onOpenLauncher={() => openEditor(null, "choice")}
+      />
       {screen.view === "editor" && (
-        <Editor docId={screen.docId} onDirtyChange={setIsDirty} onExit={closeEditor} closing={closing} />
+        <Editor
+          docId={screen.docId}
+          startMode={screen.startMode}
+          onDirtyChange={setIsDirty}
+          onExit={closeEditor}
+          closing={closing}
+        />
       )}
     </div>
   );

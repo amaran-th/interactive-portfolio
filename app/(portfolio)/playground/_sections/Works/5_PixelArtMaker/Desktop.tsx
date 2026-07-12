@@ -13,6 +13,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import ContextMenu, { ContextMenuItem } from "./ContextMenu";
 import DesktopIcon from "./DesktopIcon";
 import FormatIcon from "./FormatIcon";
+import LauncherIcon from "./LauncherIcon";
 import TrashIcon from "./TrashIcon";
 import WallpaperBackground from "./WallpaperBackground";
 import WallpaperIcon from "./WallpaperIcon";
@@ -28,24 +29,27 @@ import { getWallpaper, resetWallpaper, WALLPAPER_ID } from "./wallpaper";
 
 type Menu = { x: number; y: number; items: ContextMenuItem[] } | null;
 
-// 아이콘/휴지통/포맷/배경화면의 대략적인 폭·높이(box-select 히트박스와 동일 기준) —
-// 창 크기가 줄어들 때 이 크기만큼의 여유를 두고 컨테이너 안쪽으로 위치를 당겨온다.
+// 아이콘/휴지통/포맷/배경화면/편집기의 대략적인 폭·높이(box-select 히트박스와 동일
+// 기준) — 창 크기가 줄어들 때 이 크기만큼의 여유를 두고 컨테이너 안쪽으로 위치를 당겨온다.
 const ICON_FOOTPRINT = 80;
 
 // 일반 픽셀아트 항목이 아닌 시스템 아이콘들 — 다중 선택·박스 선택·휴지통 삭제
 // 대상에서 제외되고, 저장된 위치가 없을 때는 그리드 기본값 대신 CSS 코너 배치를 쓴다.
 const TRASH_ID = "__trash__";
 const FORMAT_ID = "__format__";
-const SPECIAL_ICON_IDS = [TRASH_ID, FORMAT_ID, WALLPAPER_ID] as const;
+const LAUNCHER_ID = "__editor_launcher__";
+const SPECIAL_ICON_IDS = [TRASH_ID, FORMAT_ID, WALLPAPER_ID, LAUNCHER_ID] as const;
 
 export default function Desktop({
   refreshSignal,
   onOpen,
   onCreate,
+  onOpenLauncher,
 }: {
   refreshSignal: number;
   onOpen: (id: string) => void;
   onCreate: () => void;
+  onOpenLauncher: () => void;
 }) {
   const [items, setItems] = useState<PixelArt[]>([]);
   const [wallpaper, setWallpaper] = useState<PixelArt>(() => getWallpaper());
@@ -392,6 +396,22 @@ export default function Desktop({
       >
         <WallpaperIcon />
         <span className="w-full truncate text-center text-[10px] text-gray-600">배경화면</span>
+      </div>
+
+      <div
+        onPointerDown={(e) => startIconDrag(LAUNCHER_ID, e)}
+        onDoubleClick={onOpenLauncher}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
+        }}
+        className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-gray-100 ${positions[LAUNCHER_ID] ? "" : "top-4 left-4"}`}
+        style={positions[LAUNCHER_ID] ? { left: positions[LAUNCHER_ID].x, top: positions[LAUNCHER_ID].y } : undefined}
+        title="더블클릭하면 새로 만들기·기존 파일 열기·이미지 불러오기를 선택할 수 있습니다 · 드래그해서 위치 이동 가능"
+      >
+        <LauncherIcon />
+        <span className="w-full truncate text-center text-[10px] text-gray-600">편집기</span>
       </div>
 
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}

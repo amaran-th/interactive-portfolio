@@ -1,14 +1,16 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { mergeColors, pixelateImage, quantizeColors } from "./pixelate";
 
 type Preview = { width: number; height: number; palette: string[]; pixels: number[] };
 
 export default function ImportPanel({
   onConfirm,
+  autoOpen,
 }: {
   onConfirm: (doc: Preview) => void;
+  autoOpen?: boolean;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -17,6 +19,16 @@ export default function ImportPanel({
   const [maxColors, setMaxColors] = useState(8);
   const [imageEl, setImageEl] = useState<HTMLImageElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const autoOpenedRef = useRef(false);
+
+  // "편집기" 런처에서 "이미지로 불러오기"로 시작한 경우, 편집창이 뜨자마자 파일
+  // 선택 창을 자동으로 띄운다 — 한 번만 열리도록 ref로 가드한다.
+  useEffect(() => {
+    if (autoOpen && !autoOpenedRef.current) {
+      autoOpenedRef.current = true;
+      fileInputRef.current?.click();
+    }
+  }, [autoOpen]);
 
   const runPixelate = useCallback(
     (img: HTMLImageElement, size: number, aa: boolean, colors: number) => {
