@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { mergeColors, pixelateImage, quantizeColors, resamplePixelGrid } from "./pixelate";
+import { mergeColors, pixelateImage, quantizeColors, reducePaletteFast, resamplePixelGrid } from "./pixelate";
 import { CANVAS_PRESETS } from "./types";
 
 type Preview = { width: number; height: number; palette: string[]; pixels: number[] };
@@ -39,7 +39,10 @@ export default function ImportPanel({
   const runPixelate = useCallback(
     (img: HTMLImageElement, size: number, aa: boolean, colors: number) => {
       const raw = pixelateImage(img, size, size, aa);
-      const quantized = quantizeColors(raw.palette, raw.pixels, colors);
+      // 사진처럼 원본 색이 아주 다양한 이미지는 quantizeColors의 정밀한(느린) 병합에
+      // 넘기기 전에 먼저 빠르게 후보 수를 줄여야 브라우저가 멈추지 않는다.
+      const capped = reducePaletteFast(raw.palette, raw.pixels, 256);
+      const quantized = quantizeColors(capped.palette, capped.pixels, colors);
       setPreview({ width: raw.width, height: raw.height, palette: quantized.palette, pixels: quantized.pixels });
     },
     [],

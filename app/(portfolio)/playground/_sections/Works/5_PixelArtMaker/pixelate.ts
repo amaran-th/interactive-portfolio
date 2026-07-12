@@ -52,6 +52,47 @@ function colorDistance(a: string, b: string): number {
   return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
 }
 
+// 사진처럼 색이 아주 다양한 이미지는 원본 팔레트가 수천~수만 색에 달할 수 있다.
+// quantizeColors의 정확한 최근접 쌍 병합은 반복마다 모든 쌍을 훑어 가장 가까운
+// 쌍을 찾으므로(반복당 O(색상수^2), 총 O(색상수^3)) — 팔레트가 크면 브라우저가
+// 멈추거나 탭이 죽는다. 정밀 병합에 넘기기 전에, RGB 채널을 성글게 반올림해
+// O(색상수) 한 번의 패스로 후보 수를 targetMax 이하로 빠르게 줄여둔다. 대표색은
+// 각 버킷에서 처음 만난 원본 색을 그대로 쓴다 — 어차피 quantizeColors가 이어서
+// 정밀하게 병합하므로 추가 평균 계산은 불필요하다.
+export function reducePaletteFast(
+  palette: string[],
+  pixels: number[],
+  targetMax: number,
+): { palette: string[]; pixels: number[] } {
+  if (palette.length <= targetMax) return { palette, pixels };
+
+  let step = 8;
+  let newPalette: string[] = [];
+  let mapping: number[] = [];
+
+  while (step <= 128) {
+    const bucketOf = new Map<string, number>();
+    newPalette = [];
+    mapping = new Array(palette.length);
+    for (let i = 0; i < palette.length; i++) {
+      const [r, g, b] = hexToRgb(palette[i]);
+      const key = `${Math.round(r / step)}_${Math.round(g / step)}_${Math.round(b / step)}`;
+      let idx = bucketOf.get(key);
+      if (idx === undefined) {
+        idx = newPalette.length;
+        newPalette.push(palette[i]);
+        bucketOf.set(key, idx);
+      }
+      mapping[i] = idx;
+    }
+    if (newPalette.length <= targetMax) break;
+    step *= 2;
+  }
+
+  const nextPixels = pixels.map((p) => (p < 0 ? -1 : mapping[p]));
+  return { palette: newPalette, pixels: nextPixels };
+}
+
 // 팔레트가 maxColors를 넘으면, 가장 가까운 색 쌍부터 순서대로 병합해 개수를 줄인다.
 // curPalette.length > 1 가드: maxColors가 0 이하로 들어와도 무한루프에 빠지지 않는다(더 합칠 색이 없으면 멈춘다).
 export function quantizeColors(
