@@ -81,34 +81,28 @@ export default function Desktop({
     refresh();
   }, [refresh]);
 
-  // 창 크기 변경 시 현재 화면 밖으로 나간 아이콘/휴지통을 안쪽으로 재배치하고,
-  // 다음에도 그 위치를 기억하도록 저장한다(기존 드래그 종료 시 저장 방식과 동일).
+  // 창 크기 변경 시 화면 밖으로 나간 아이콘/휴지통을 안쪽으로 보정해 보여준다.
+  // 저장된 원래 위치(localStorage)는 건드리지 않고 매번 그 값을 다시 읽어 현재
+  // 창 크기로 클램프만 하므로, 창을 다시 키우면 원래 위치로 돌아온다 — 이미
+  // 클램프된 state 값을 또 클램프하면 창을 키워도 좁아진 위치에 그대로 고정되는
+  // 문제가 있었다. 위치가 실제로 바뀌는 건 드래그로 옮길 때뿐이다.
   useEffect(() => {
     const handleResize = () => {
-      setPositions((prev) => {
-        let changed = false;
-        const next: typeof prev = {};
-        for (const [id, p] of Object.entries(prev)) {
-          const c = clampToContainer(p);
-          next[id] = c;
-          if (c.x !== p.x || c.y !== p.y) {
-            changed = true;
-            setIconPosition(id, c.x, c.y);
-          }
-        }
-        return changed ? next : prev;
+      setPositions(() => {
+        const next: Record<string, { x: number; y: number }> = {};
+        items.forEach((art, i) => {
+          next[art.id] = clampToContainer(getIconPosition(art.id, i));
+        });
+        return next;
       });
-      setTrashPos((prev) => {
-        if (!prev) return prev;
-        const c = clampToContainer(prev);
-        if (c.x === prev.x && c.y === prev.y) return prev;
-        setTrashPosition(c.x, c.y);
-        return c;
+      setTrashPos(() => {
+        const stored = getTrashPosition();
+        return stored ? clampToContainer(stored) : stored;
       });
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [clampToContainer]);
+  }, [items, clampToContainer]);
 
   const startBoxSelect = useCallback(
     (e: React.PointerEvent) => {
