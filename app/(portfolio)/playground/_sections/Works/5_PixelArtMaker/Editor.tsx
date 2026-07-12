@@ -725,14 +725,33 @@ export default function Editor({
             <ImportPanel
               autoOpen={wantsAutoImport}
               onConfirm={(imported) => {
-                setDoc((d) => ({
-                  ...d,
+                // wantsAutoImport가 true인 경우는 "새로 만들기 → 이미지로
+                // 불러오기"로 방금 만든, 아직 아무것도 그리지 않은 빈 캔버스다 —
+                // 그 자리에 그대로 불러온 이미지 크기로 채운다.
+                if (wantsAutoImport) {
+                  setDoc((d) => ({
+                    ...d,
+                    width: imported.width,
+                    height: imported.height,
+                    palette: imported.palette,
+                  }));
+                  history.reset(imported.pixels);
+                  setHasMetaEdits(true);
+                  setWantsAutoImport(false);
+                  return;
+                }
+                // 그 외에는 지금 열려 있던(이미 그려뒀을 수 있는) 캔버스를 건드리지
+                // 않고, 불러온 이미지를 새 탭으로 연다 — 이미지 불러오기가 편집
+                // 중인 캔버스의 크기를 바꾸지 않아야 한다.
+                openNewTab({
+                  id: uid(),
+                  name: "제목 없음",
                   width: imported.width,
                   height: imported.height,
                   palette: imported.palette,
-                }));
-                history.reset(imported.pixels);
-                setHasMetaEdits(true);
+                  pixels: imported.pixels,
+                  createdAt: Date.now(),
+                });
               }}
             />
           </div>
