@@ -700,7 +700,7 @@ export default function Editor({
 
       {activeTabIndex >= 0 ? (
         <div className="flex flex-1 gap-4 overflow-auto p-4">
-          <div className="flex w-72 shrink-0 flex-col gap-3">
+          <div className="flex w-60 shrink-0 flex-col gap-3">
             <Toolbar
               tool={tool}
               onToolChange={setTool}
