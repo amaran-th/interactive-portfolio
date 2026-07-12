@@ -27,8 +27,11 @@ export function getIconPosition(id: string, fallbackIndex: number, containerWidt
   const layout = loadLayout();
   if (layout[id]) return layout[id];
   const perRow = containerWidth ? Math.max(1, Math.floor(containerWidth / GRID_STEP)) : 6;
-  const col = fallbackIndex % perRow;
-  const row = Math.floor(fallbackIndex / perRow);
+  // 왼쪽 위 첫 칸(col 0, row 0)은 "편집기" 아이콘의 고정 코너 자리와 겹치므로
+  // 한 칸 건너뛰고 시작한다.
+  const shiftedIndex = fallbackIndex + 1;
+  const col = shiftedIndex % perRow;
+  const row = Math.floor(shiftedIndex / perRow);
   return { x: col * GRID_STEP + 16, y: row * GRID_STEP + 16 };
 }
 

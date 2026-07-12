@@ -60,6 +60,7 @@ export default function Desktop({
   const [pendingFormat, setPendingFormat] = useState(false);
   const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [trashHover, setTrashHover] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
   const [fittedSize, setFittedSize] = useState<{ width: number; height: number } | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -328,8 +329,15 @@ export default function Desktop({
             x={p.x}
             y={p.y}
             selected={selected.has(art.id)}
+            editing={renamingId === art.id}
             onPointerDownIcon={(e) => startIconDrag(art.id, e)}
             onDoubleClick={() => onOpen(art.id)}
+            onRenameConfirm={(next) => {
+              renamePixelArt(art.id, next);
+              setRenamingId(null);
+              refresh();
+            }}
+            onRenameCancel={() => setRenamingId(null)}
             onContextMenu={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -339,13 +347,7 @@ export default function Desktop({
                 items: [
                   {
                     label: "이름 바꾸기",
-                    onClick: () => {
-                      const next = window.prompt("새 이름", art.name);
-                      if (next) {
-                        renamePixelArt(art.id, next);
-                        refresh();
-                      }
-                    },
+                    onClick: () => setRenamingId(art.id),
                   },
                   { label: "PNG로 내보내기", onClick: () => exportAsPNG(art) },
                   { label: "SVG로 내보내기", onClick: () => exportAsSVG(art) },

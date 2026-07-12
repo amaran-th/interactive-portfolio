@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PixelArt } from "../_shared/assetLibrary";
 
 export default function DesktopIcon({
@@ -8,19 +8,39 @@ export default function DesktopIcon({
   x,
   y,
   selected,
+  editing,
   onPointerDownIcon,
   onDoubleClick,
   onContextMenu,
+  onRenameConfirm,
+  onRenameCancel,
 }: {
   art: PixelArt;
   x: number;
   y: number;
   selected: boolean;
+  editing: boolean;
   onPointerDownIcon: (e: React.PointerEvent) => void;
   onDoubleClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
+  onRenameConfirm: (name: string) => void;
+  onRenameCancel: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [draftName, setDraftName] = useState(art.name);
+
+  useEffect(() => {
+    if (!editing) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDraftName(art.name);
+    // 다음 프레임에 포커스+전체 선택 — 실제 OS 아이콘 이름을 고칠 때와 동일한 느낌.
+    const id = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [editing, art.name]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -46,16 +66,37 @@ export default function DesktopIcon({
     }
   }, [art]);
 
+  const commitRename = () => {
+    const trimmed = draftName.trim();
+    if (trimmed) onRenameConfirm(trimmed);
+    else onRenameCancel();
+  };
+
   return (
     <div
       style={{ left: x, top: y, position: "absolute" }}
       className={`flex w-20 flex-col items-center gap-1 p-2 ${selected ? "bg-violet-100" : "hover:bg-gray-100"}`}
-      onPointerDown={onPointerDownIcon}
-      onDoubleClick={onDoubleClick}
-      onContextMenu={onContextMenu}
+      onPointerDown={editing ? undefined : onPointerDownIcon}
+      onDoubleClick={editing ? undefined : onDoubleClick}
+      onContextMenu={editing ? undefined : onContextMenu}
     >
       <canvas ref={canvasRef} className="shadow-sm" style={{ imageRendering: "pixelated" }} />
-      <span className="w-full truncate text-center text-[10px] text-gray-600">{art.name}</span>
+      {editing ? (
+        <input
+          ref={inputRef}
+          value={draftName}
+          onChange={(e) => setDraftName(e.target.value)}
+          onPointerDown={(e) => e.stopPropagation()}
+          onBlur={commitRename}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitRename();
+            else if (e.key === "Escape") onRenameCancel();
+          }}
+          className="w-full bg-white text-center text-[10px] text-gray-900 shadow-[0_0_0_1px_#8b5cf6] outline-none"
+        />
+      ) : (
+        <span className="w-full truncate text-center text-[10px] text-gray-600">{art.name}</span>
+      )}
     </div>
   );
 }
