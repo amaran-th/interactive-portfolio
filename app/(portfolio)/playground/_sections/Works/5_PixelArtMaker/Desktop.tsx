@@ -23,6 +23,10 @@ import {
 
 type Menu = { x: number; y: number; items: ContextMenuItem[] } | null;
 
+// 아이콘/휴지통의 대략적인 폭·높이(box-select 히트박스와 동일 기준) — 창 크기가
+// 줄어들 때 이 크기만큼의 여유를 두고 컨테이너 안쪽으로 위치를 당겨온다.
+const ICON_FOOTPRINT = 80;
+
 export default function Desktop({
   onOpen,
   onCreate,
@@ -44,25 +48,67 @@ export default function Desktop({
   // handleTrashDrop(아이콘을 놓아 삭제하는 동작)이 아니라 위치 이동으로 처리해야 한다.
   const trashDraggingRef = useRef(false);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTrashPos(getTrashPosition());
+  // 창 크기가 줄어들었을 때 아이콘/휴지통이 보이는 영역 밖으로 나가지 않도록
+  // 컨테이너의 현재 실제 크기 기준으로 좌표를 안쪽으로 당겨온다.
+  const clampToContainer = useCallback((pos: { x: number; y: number }) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const maxX = Math.max(0, (rect?.width ?? 0) - ICON_FOOTPRINT);
+    const maxY = Math.max(0, (rect?.height ?? 0) - ICON_FOOTPRINT);
+    return {
+      x: Math.min(Math.max(pos.x, 0), maxX),
+      y: Math.min(Math.max(pos.y, 0), maxY),
+    };
   }, []);
+
+  useEffect(() => {
+    const stored = getTrashPosition();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTrashPos(stored ? clampToContainer(stored) : stored);
+  }, [clampToContainer]);
 
   const refresh = useCallback(() => {
     const list = listPixelArt();
     setItems(list);
     const pos: Record<string, { x: number; y: number }> = {};
     list.forEach((art, i) => {
-      pos[art.id] = getIconPosition(art.id, i);
+      pos[art.id] = clampToContainer(getIconPosition(art.id, i));
     });
     setPositions(pos);
-  }, []);
+  }, [clampToContainer]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
+
+  // 창 크기 변경 시 현재 화면 밖으로 나간 아이콘/휴지통을 안쪽으로 재배치하고,
+  // 다음에도 그 위치를 기억하도록 저장한다(기존 드래그 종료 시 저장 방식과 동일).
+  useEffect(() => {
+    const handleResize = () => {
+      setPositions((prev) => {
+        let changed = false;
+        const next: typeof prev = {};
+        for (const [id, p] of Object.entries(prev)) {
+          const c = clampToContainer(p);
+          next[id] = c;
+          if (c.x !== p.x || c.y !== p.y) {
+            changed = true;
+            setIconPosition(id, c.x, c.y);
+          }
+        }
+        return changed ? next : prev;
+      });
+      setTrashPos((prev) => {
+        if (!prev) return prev;
+        const c = clampToContainer(prev);
+        if (c.x === prev.x && c.y === prev.y) return prev;
+        setTrashPosition(c.x, c.y);
+        return c;
+      });
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [clampToContainer]);
 
   const startBoxSelect = useCallback(
     (e: React.PointerEvent) => {
