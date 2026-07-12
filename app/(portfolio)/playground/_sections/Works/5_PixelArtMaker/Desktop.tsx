@@ -13,7 +13,13 @@ import ContextMenu, { ContextMenuItem } from "./ContextMenu";
 import DesktopIcon from "./DesktopIcon";
 import TrashIcon from "./TrashIcon";
 import { exportAsJPG, exportAsJSON, exportAsPNG, exportAsSVG } from "./exportPixelArt";
-import { getIconPosition, removeIconPositions, setIconPosition } from "./useDesktopLayout";
+import {
+  getIconPosition,
+  getTrashPosition,
+  removeIconPositions,
+  setIconPosition,
+  setTrashPosition,
+} from "./useDesktopLayout";
 
 type Menu = { x: number; y: number; items: ContextMenuItem[] } | null;
 
@@ -31,7 +37,17 @@ export default function Desktop({
   const [pendingDelete, setPendingDelete] = useState<string[] | null>(null);
   const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [trashHover, setTrashHover] = useState(false);
+  const [trashPos, setTrashPos] = useState<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const trashRef = useRef<HTMLDivElement>(null);
+  // 휴지통 자체를 드래그하는 동안에는 pointerup이 트래시 위에서 발생해도
+  // handleTrashDrop(아이콘을 놓아 삭제하는 동작)이 아니라 위치 이동으로 처리해야 한다.
+  const trashDraggingRef = useRef(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTrashPos(getTrashPosition());
+  }, []);
 
   const refresh = useCallback(() => {
     const list = listPixelArt();
@@ -135,8 +151,49 @@ export default function Desktop({
     [selected, positions],
   );
 
+  const startTrashDrag = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      trashDraggingRef.current = true;
+
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      const offsetX = containerRect?.left ?? 0;
+      const offsetY = containerRect?.top ?? 0;
+      // 아직 한 번도 옮긴 적이 없으면(trashPos === null) 현재 화면상 위치(기본 우하단)를
+      // 컨테이너 기준 좌표로 환산해 드래그 시작점으로 삼는다 — 그래야 첫 드래그에서
+      // 위치가 갑자기 튀지 않는다.
+      const origin =
+        trashPos ??
+        (() => {
+          const trashRect = trashRef.current?.getBoundingClientRect();
+          return { x: (trashRect?.left ?? 0) - offsetX, y: (trashRect?.top ?? 0) - offsetY };
+        })();
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+
+      const move = (ev: PointerEvent) => {
+        setTrashPos({ x: origin.x + (ev.clientX - startX), y: origin.y + (ev.clientY - startY) });
+      };
+      const up = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        setTrashPos((cur) => {
+          if (cur) setTrashPosition(cur.x, cur.y);
+          return cur;
+        });
+        trashDraggingRef.current = false;
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    },
+    [trashPos],
+  );
+
   const handleTrashDrop = useCallback(() => {
     setTrashHover(false);
+    if (trashDraggingRef.current) return;
     if (selected.size === 0) return;
     setPendingDelete(Array.from(selected));
   }, [selected]);
@@ -224,13 +281,17 @@ export default function Desktop({
       )}
 
       <div
+        ref={trashRef}
+        onPointerDown={startTrashDrag}
         onPointerEnter={() => setTrashHover(true)}
         onPointerLeave={() => setTrashHover(false)}
         onPointerUp={handleTrashDrop}
-        className="absolute bottom-4 right-4"
-        title="선택한 아이콘을 여기로 드래그해 삭제"
+        className={`absolute flex w-20 flex-col items-center gap-1 p-2 ${trashPos ? "" : "bottom-4 right-4"}`}
+        style={trashPos ? { left: trashPos.x, top: trashPos.y } : undefined}
+        title="선택한 아이콘을 여기로 드래그해 삭제 · 드래그해서 위치 이동 가능"
       >
         <TrashIcon active={trashHover} />
+        <span className="w-full truncate text-center text-[10px] text-gray-600">휴지통</span>
       </div>
 
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}

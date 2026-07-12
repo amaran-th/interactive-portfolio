@@ -41,3 +41,21 @@ export function removeIconPositions(ids: string[]): void {
   for (const id of ids) delete layout[id];
   saveLayout(layout);
 }
+
+const TRASH_KEY = "pixel-art-desktop-trash-position";
+
+export function getTrashPosition(): Position | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(TRASH_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setTrashPosition(x: number, y: number): void {
+  try {
+    localStorage.setItem(TRASH_KEY, JSON.stringify({ x, y }));
+  } catch {}
+}
