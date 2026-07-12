@@ -4,6 +4,22 @@ export function createGrid(width: number, height: number): number[] {
   return new Array(width * height).fill(-1);
 }
 
+// "캔버스 크기 수정"은 그림을 다시 샘플링(확대·축소)하는 게 아니라 경계만 바꾼다
+// (왼쪽 위를 기준으로 자르거나 투명하게 늘린다) — 이미지 가져오기의
+// resamplePixelGrid(비율 재배치)와는 다른, 실제 캔버스 도구들의 일반적인
+// "캔버스 크기" 동작이다.
+export function resizeGrid(pixels: number[], oldWidth: number, oldHeight: number, newWidth: number, newHeight: number): number[] {
+  const next = createGrid(newWidth, newHeight);
+  const copyWidth = Math.min(oldWidth, newWidth);
+  const copyHeight = Math.min(oldHeight, newHeight);
+  for (let y = 0; y < copyHeight; y++) {
+    for (let x = 0; x < copyWidth; x++) {
+      next[idx(newWidth, x, y)] = pixels[idx(oldWidth, x, y)];
+    }
+  }
+  return next;
+}
+
 export function idx(width: number, x: number, y: number): number {
   return y * width + x;
 }

@@ -8,11 +8,12 @@ import ContextMenu, { ContextMenuItem } from "./ContextMenu";
 import ImportPanel from "./ImportPanel";
 import NewCanvasDialog from "./NewCanvasDialog";
 import PixelCanvas from "./PixelCanvas";
+import ResizeCanvasDialog from "./ResizeCanvasDialog";
 import Toolbar from "./Toolbar";
 import { useCanvasHistory } from "./useCanvasHistory";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useSelection } from "./useSelection";
-import { createGrid, getPixel } from "./pixelGrid";
+import { createGrid, getPixel, resizeGrid } from "./pixelGrid";
 import { exportAsJPG, exportAsJSON, exportAsPNG, exportAsSVG } from "./exportPixelArt";
 import { CANVAS_PRESETS, MAX_PALETTE_COLORS, MirrorMode, Tool } from "./types";
 import { getWallpaper, saveWallpaper, WALLPAPER_ID, WALLPAPER_NAME } from "./wallpaper";
@@ -77,6 +78,7 @@ export default function Editor({
   const [name, setName] = useState(initial.doc.name);
   const [hasMetaEdits, setHasMetaEdits] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+  const [resizingCanvas, setResizingCanvas] = useState(false);
   const isWallpaper = doc.id === WALLPAPER_ID;
   // 편집창이 데스크탑 위에 떠오르며 열리는 애니메이션 — 마운트 직후 한 프레임 뒤에
   // true로 바뀌면서 transition이 자연스럽게 재생된다(처음부터 true면 트랜지션 없이
@@ -96,8 +98,8 @@ export default function Editor({
   }, [history.canUndo, hasMetaEdits, onDirtyChange]);
 
   const handleCreate = useCallback(
-    (width: number, height: number) => {
-      const fresh = blankDoc(width, height);
+    (width: number, height: number, newName: string) => {
+      const fresh = { ...blankDoc(width, height), name: newName };
       setDoc(fresh);
       setName(fresh.name);
       history.reset(fresh.pixels);
@@ -139,6 +141,32 @@ export default function Editor({
     history.reset(toSave.pixels);
     setHasMetaEdits(false);
   }, [doc, name, history, isWallpaper]);
+
+  // 다른 이름으로 저장 — 원본(배경화면이라도)은 건드리지 않고 새 id로 일반
+  // 픽셀아트 목록에 별도 항목을 만든 뒤, 이후 편집은 그 새 사본을 대상으로 한다.
+  const handleSaveAs = useCallback(() => {
+    const newName = window.prompt("다른 이름으로 저장", isWallpaper ? WALLPAPER_NAME : name);
+    if (!newName) return;
+    const toSave: PixelArt = { ...doc, id: uid(), name: newName, pixels: history.present, createdAt: Date.now() };
+    savePixelArt(toSave);
+    setDoc(toSave);
+    setName(newName);
+    history.reset(toSave.pixels);
+    setHasMetaEdits(false);
+  }, [doc, name, history, isWallpaper]);
+
+  // 캔버스 크기 수정 — 그림을 다시 늘리거나 줄이지 않고 경계만 바꾼다(왼쪽 위
+  // 기준으로 자르거나 투명하게 늘림). 팔레트·이름 등 다른 속성은 그대로 둔다.
+  const handleResizeCanvas = useCallback(
+    (newWidth: number, newHeight: number) => {
+      const resized = resizeGrid(history.present, doc.width, doc.height, newWidth, newHeight);
+      setDoc((d) => ({ ...d, width: newWidth, height: newHeight }));
+      history.reset(resized);
+      setResizingCanvas(false);
+      setHasMetaEdits(true);
+    },
+    [doc.width, doc.height, history],
+  );
 
   useKeyboardShortcuts({
     onToolChange: setTool,
@@ -229,6 +257,7 @@ export default function Editor({
         y: rect.bottom,
         items: [
           { label: "저장", onClick: handleSave },
+          { label: "다른 이름으로 저장", onClick: handleSaveAs },
           { label: "PNG로 내보내기", onClick: () => exportAsPNG({ ...doc, pixels: history.present }) },
           { label: "SVG로 내보내기", onClick: () => exportAsSVG({ ...doc, pixels: history.present }) },
           { label: "JSON으로 내보내기", onClick: () => exportAsJSON({ ...doc, pixels: history.present }) },
@@ -236,11 +265,10 @@ export default function Editor({
             label: "JPG로 내보내기 (손실 압축)",
             onClick: () => exportAsJPG({ ...doc, pixels: history.present }),
           },
-          { label: "닫기", onClick: onExit },
         ],
       });
     },
-    [doc, history, handleSave, onExit],
+    [doc, history, handleSave, handleSaveAs],
   );
 
   const openEditMenu = useCallback(
@@ -253,6 +281,7 @@ export default function Editor({
           { label: "실행취소", onClick: history.undo, disabled: !history.canUndo },
           { label: "다시실행", onClick: history.redo, disabled: !history.canRedo },
           { label: "복사", onClick: () => selection.copy(history.present, doc.width) },
+          { label: "캔버스 크기 수정", onClick: () => setResizingCanvas(true) },
           {
             label: "붙여넣기",
             onClick: () => {
@@ -430,7 +459,20 @@ export default function Editor({
       {step === "size" && (
         <NewCanvasDialog
           onSelect={handleCreate}
+          onImportImage={() => {
+            setWantsAutoImport(true);
+            setStep("ready");
+          }}
           onCancel={() => (startMode === "choice" ? setStep("choice") : onExit())}
+        />
+      )}
+
+      {resizingCanvas && (
+        <ResizeCanvasDialog
+          width={doc.width}
+          height={doc.height}
+          onConfirm={handleResizeCanvas}
+          onCancel={() => setResizingCanvas(false)}
         />
       )}
     </div>
