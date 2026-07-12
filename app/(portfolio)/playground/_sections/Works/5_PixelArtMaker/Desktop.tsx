@@ -227,6 +227,7 @@ export default function Desktop({
       const up = () => {
         window.removeEventListener("pointermove", move);
         window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
         setTrashPos((cur) => {
           if (cur) setTrashPosition(cur.x, cur.y);
           return cur;
@@ -235,6 +236,9 @@ export default function Desktop({
       };
       window.addEventListener("pointermove", move);
       window.addEventListener("pointerup", up);
+      // 시스템 제스처 등으로 pointerup 없이 드래그가 끊기면 trashDraggingRef가
+      // true로 남아 휴지통이 계속 비활성 상태로 고정되므로 pointercancel도 같이 처리한다.
+      window.addEventListener("pointercancel", up);
     },
     [trashPos],
   );

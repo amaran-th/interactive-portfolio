@@ -104,10 +104,22 @@ export default function Editor({
     [palette],
   );
 
-  const handleRemoveColor = useCallback((index: number) => {
-    setDoc((d) => (d ? { ...d, palette: d.palette.filter((_, i) => i !== index) } : d));
-    setHasMetaEdits(true);
-  }, []);
+  const handleRemoveColor = useCallback(
+    (index: number) => {
+      setDoc((d) => (d ? { ...d, palette: d.palette.filter((_, i) => i !== index) } : d));
+      // 제거된 색보다 뒤에 있던 활성 인덱스는 한 칸씩 당겨오고, 배열 끝을 넘어가면
+      // 새 마지막 인덱스로 당겨온다 — 그대로 두면 활성 인덱스가 배열 밖을 가리켜
+      // 색상환이 엉뚱한 색(기본 검정)을 편집하는 상태가 됐다.
+      setActiveColorIndex((ai) => {
+        const newLength = palette.length - 1;
+        if (newLength <= 0) return 0;
+        if (index < ai) return ai - 1;
+        return Math.min(ai, newLength - 1);
+      });
+      setHasMetaEdits(true);
+    },
+    [palette],
+  );
 
   // 색상환을 조작하면 현재 활성 팔레트 스와치 자체의 값을 실시간으로 갱신한다
   // (새 색을 "추가"하는 게 아니라 지금 선택된 색을 "수정"하는 것이 기본 동작).
