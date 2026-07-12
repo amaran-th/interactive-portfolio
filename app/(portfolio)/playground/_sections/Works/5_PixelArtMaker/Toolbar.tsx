@@ -65,43 +65,47 @@ export default function Toolbar({
   return (
     <div className="flex flex-col gap-3 bg-white p-3 shadow-md">
       {TOOL_GROUPS.map((group) => (
-        <div key={group.label} className="flex flex-col gap-1.5">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{group.label}</p>
-          <div className="grid grid-cols-5 gap-1.5">
-            {group.tools.map(({ tool: t, icon: Icon, label, key }) => (
-              <button
-                key={t}
-                onClick={() => onToolChange(t)}
-                title={`${label} (${key})`}
-                className={`flex h-10 w-9 flex-col items-center justify-center gap-0.5 transition-colors ${
-                  tool === t ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                <span className="text-[8px] leading-none">{key}</span>
-              </button>
-            ))}
+        <div key={group.label} className="contents">
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{group.label}</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {group.tools.map(({ tool: t, icon: Icon, label, key }) => (
+                <button
+                  key={t}
+                  onClick={() => onToolChange(t)}
+                  title={`${label} (${key})`}
+                  className={`flex h-10 w-9 flex-col items-center justify-center gap-0.5 transition-colors ${
+                    tool === t ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span className="text-[8px] leading-none">{key}</span>
+                </button>
+              ))}
+            </div>
           </div>
+
+          {group.label === "그리기" && (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">브러시 크기</p>
+              <div className="flex gap-1">
+                {BRUSH_SIZES.map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => onBrushSizeChange(size)}
+                    title={`${size}px 브러시`}
+                    className={`flex-1 py-1 text-[10px] ${
+                      brushSize === size ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ))}
-
-      <div className="flex flex-col gap-1.5">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">브러시 크기</p>
-        <div className="flex gap-1">
-          {BRUSH_SIZES.map((size) => (
-            <button
-              key={size}
-              onClick={() => onBrushSizeChange(size)}
-              title={`${size}px 브러시`}
-              className={`flex-1 py-1 text-[10px] ${
-                brushSize === size ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              {size}
-            </button>
-          ))}
-        </div>
-      </div>
 
       <div className="flex items-center gap-1.5">
         <button onClick={onUndo} disabled={!canUndo} className="flex h-7 w-7 items-center justify-center bg-gray-100 text-gray-600 disabled:opacity-30">
