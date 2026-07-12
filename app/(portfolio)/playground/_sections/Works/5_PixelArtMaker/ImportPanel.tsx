@@ -62,19 +62,19 @@ export default function ImportPanel({
   );
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-white/5 p-3">
-      <p className="text-xs font-semibold text-gray-400">이미지를 픽셀아트로 변환</p>
+    <div className="flex flex-col gap-3 bg-white p-3 shadow-md">
+      <p className="text-xs font-semibold text-gray-500">이미지를 픽셀아트로 변환</p>
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
         onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-        className="text-xs text-gray-300"
+        className="text-xs text-gray-600"
       />
 
       {preview && (
         <>
-          <label className="flex items-center justify-between text-xs text-gray-300">
+          <label className="flex items-center justify-between text-xs text-gray-600">
             픽셀 크기
             <input
               type="range"
@@ -84,7 +84,7 @@ export default function ImportPanel({
               onChange={(e) => handleOptionChange(Number(e.target.value), antiAlias, maxColors)}
             />
           </label>
-          <label className="flex items-center justify-between text-xs text-gray-300">
+          <label className="flex items-center justify-between text-xs text-gray-600">
             안티에일리어싱
             <input
               type="checkbox"
@@ -92,7 +92,7 @@ export default function ImportPanel({
               onChange={(e) => handleOptionChange(pixelSize, e.target.checked, maxColors)}
             />
           </label>
-          <label className="flex items-center justify-between text-xs text-gray-300">
+          <label className="flex items-center justify-between text-xs text-gray-600">
             대표 색상 개수
             <input
               type="range"
@@ -109,7 +109,7 @@ export default function ImportPanel({
                 key={i}
                 title="더블클릭하면 다음 색상과 병합됩니다"
                 onDoubleClick={() => preview.palette.length > 1 && handleMergeClick(i, (i + 1) % preview.palette.length)}
-                className="h-5 w-5 rounded border border-white/20"
+                className="h-5 w-5 ring-1 ring-black/10"
                 style={{ backgroundColor: color }}
               />
             ))}
@@ -117,7 +117,7 @@ export default function ImportPanel({
 
           <button
             onClick={() => onConfirm(preview)}
-            className="rounded-lg bg-white py-2 text-xs font-semibold text-gray-950"
+            className="bg-violet-500 py-2 text-xs font-semibold text-white hover:bg-violet-600"
           >
             가져오기
           </button>

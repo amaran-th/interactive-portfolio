@@ -36,15 +36,15 @@ export default function Toolbar({
   onRedo: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-white/5 p-3">
+    <div className="flex flex-col gap-3 bg-white p-3 shadow-md">
       <div className="grid grid-cols-5 gap-1.5">
         {TOOLS.map(({ tool: t, icon: Icon, label, key }) => (
           <button
             key={t}
             onClick={() => onToolChange(t)}
             title={`${label} (${key})`}
-            className={`flex h-8 w-8 items-center justify-center rounded transition-colors ${
-              tool === t ? "bg-white text-gray-950" : "bg-white/5 text-gray-300 hover:bg-white/10"
+            className={`flex h-8 w-8 items-center justify-center transition-colors ${
+              tool === t ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
             <Icon className="h-4 w-4" />
@@ -52,25 +52,25 @@ export default function Toolbar({
         ))}
       </div>
       <div className="flex items-center gap-1.5">
-        <button onClick={onUndo} disabled={!canUndo} className="flex h-7 w-7 items-center justify-center rounded bg-white/5 text-gray-300 disabled:opacity-30">
+        <button onClick={onUndo} disabled={!canUndo} className="flex h-7 w-7 items-center justify-center bg-gray-100 text-gray-600 disabled:opacity-30">
           <Undo2 className="h-4 w-4" />
         </button>
-        <button onClick={onRedo} disabled={!canRedo} className="flex h-7 w-7 items-center justify-center rounded bg-white/5 text-gray-300 disabled:opacity-30">
+        <button onClick={onRedo} disabled={!canRedo} className="flex h-7 w-7 items-center justify-center bg-gray-100 text-gray-600 disabled:opacity-30">
           <Redo2 className="h-4 w-4" />
         </button>
-        <div className="ml-auto flex gap-1 text-[10px] text-gray-400">
+        <div className="ml-auto flex gap-1 text-[10px] text-gray-500">
           {(["none", "horizontal", "vertical", "both"] as MirrorMode[]).map((m) => (
             <button
               key={m}
               onClick={() => onMirrorChange(m)}
-              className={`rounded px-1.5 py-1 ${mirror === m ? "bg-white text-gray-950" : "bg-white/5"}`}
+              className={`px-1.5 py-1 ${mirror === m ? "bg-violet-500 text-white" : "bg-gray-100"}`}
             >
               {m === "none" ? "미러 없음" : m === "horizontal" ? "좌우" : m === "vertical" ? "상하" : "좌우상하"}
             </button>
           ))}
         </div>
       </div>
-      <p className="flex items-center gap-1 text-[10px] text-gray-500">
+      <p className="flex items-center gap-1 text-[10px] text-gray-400">
         <Copy className="h-3 w-3" /> Ctrl+C/V 복사·붙여넣기 · Ctrl+Z/Y 실행취소·다시실행
       </p>
     </div>
