@@ -19,6 +19,7 @@ export function useKeyboardShortcuts({
   onCopy,
   onPaste,
   onMirrorToggle,
+  onSave,
 }: {
   onToolChange: (tool: Tool) => void;
   onUndo: () => void;
@@ -26,6 +27,7 @@ export function useKeyboardShortcuts({
   onCopy: () => void;
   onPaste: () => void;
   onMirrorToggle: (mode: MirrorMode) => void;
+  onSave?: () => void;
 }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -51,6 +53,11 @@ export function useKeyboardShortcuts({
         onPaste();
         return;
       }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        onSave?.();
+        return;
+      }
       if (e.shiftKey && e.key.toLowerCase() === "h") {
         onMirrorToggle("horizontal");
         return;
@@ -64,5 +71,5 @@ export function useKeyboardShortcuts({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onToolChange, onUndo, onRedo, onCopy, onPaste, onMirrorToggle]);
+  }, [onToolChange, onUndo, onRedo, onCopy, onPaste, onMirrorToggle, onSave]);
 }

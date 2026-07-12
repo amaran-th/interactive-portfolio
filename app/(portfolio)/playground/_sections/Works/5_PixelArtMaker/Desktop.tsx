@@ -14,6 +14,8 @@ import ContextMenu, { ContextMenuItem } from "./ContextMenu";
 import DesktopIcon from "./DesktopIcon";
 import FormatIcon from "./FormatIcon";
 import TrashIcon from "./TrashIcon";
+import WallpaperBackground from "./WallpaperBackground";
+import WallpaperIcon from "./WallpaperIcon";
 import { exportAsJPG, exportAsJSON, exportAsPNG, exportAsSVG } from "./exportPixelArt";
 import {
   getIconPosition,
@@ -22,18 +24,19 @@ import {
   resetDesktopLayout,
   setIconPosition,
 } from "./useDesktopLayout";
+import { getWallpaper, resetWallpaper, WALLPAPER_ID } from "./wallpaper";
 
 type Menu = { x: number; y: number; items: ContextMenuItem[] } | null;
 
-// 아이콘/휴지통/포맷의 대략적인 폭·높이(box-select 히트박스와 동일 기준) — 창 크기가
-// 줄어들 때 이 크기만큼의 여유를 두고 컨테이너 안쪽으로 위치를 당겨온다.
+// 아이콘/휴지통/포맷/배경화면의 대략적인 폭·높이(box-select 히트박스와 동일 기준) —
+// 창 크기가 줄어들 때 이 크기만큼의 여유를 두고 컨테이너 안쪽으로 위치를 당겨온다.
 const ICON_FOOTPRINT = 80;
 
 // 일반 픽셀아트 항목이 아닌 시스템 아이콘들 — 다중 선택·박스 선택·휴지통 삭제
 // 대상에서 제외되고, 저장된 위치가 없을 때는 그리드 기본값 대신 CSS 코너 배치를 쓴다.
 const TRASH_ID = "__trash__";
 const FORMAT_ID = "__format__";
-const SPECIAL_ICON_IDS = [TRASH_ID, FORMAT_ID] as const;
+const SPECIAL_ICON_IDS = [TRASH_ID, FORMAT_ID, WALLPAPER_ID] as const;
 
 export default function Desktop({
   refreshSignal,
@@ -45,6 +48,7 @@ export default function Desktop({
   onCreate: () => void;
 }) {
   const [items, setItems] = useState<PixelArt[]>([]);
+  const [wallpaper, setWallpaper] = useState<PixelArt>(() => getWallpaper());
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState<Menu>(null);
@@ -72,6 +76,7 @@ export default function Desktop({
   const refresh = useCallback(() => {
     const list = listPixelArt();
     setItems(list);
+    setWallpaper(getWallpaper());
     const pos: Record<string, { x: number; y: number }> = {};
     list.forEach((art, i) => {
       pos[art.id] = clampToContainer(getIconPosition(art.id, i));
@@ -251,6 +256,7 @@ export default function Desktop({
   const confirmFormat = useCallback(() => {
     resetAllPixelArt();
     resetDesktopLayout();
+    resetWallpaper();
     setSelected(new Set());
     setPendingFormat(false);
     refresh();
@@ -277,6 +283,8 @@ export default function Desktop({
         });
       }}
     >
+      <WallpaperBackground art={wallpaper} />
+
       {items.map((art) => {
         const p = positions[art.id];
         if (!p) return null;
@@ -368,6 +376,22 @@ export default function Desktop({
       >
         <FormatIcon />
         <span className="w-full truncate text-center text-[10px] text-gray-600">포맷</span>
+      </div>
+
+      <div
+        onPointerDown={(e) => startIconDrag(WALLPAPER_ID, e)}
+        onDoubleClick={() => onOpen(WALLPAPER_ID)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
+        }}
+        className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-gray-100 ${positions[WALLPAPER_ID] ? "" : "top-4 right-4"}`}
+        style={positions[WALLPAPER_ID] ? { left: positions[WALLPAPER_ID].x, top: positions[WALLPAPER_ID].y } : undefined}
+        title="더블클릭하면 배경화면을 편집합니다 · 드래그해서 위치 이동 가능"
+      >
+        <WallpaperIcon />
+        <span className="w-full truncate text-center text-[10px] text-gray-600">배경화면</span>
       </div>
 
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
