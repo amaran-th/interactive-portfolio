@@ -106,9 +106,10 @@ export default function Desktop({
     const list = listPixelArt();
     setItems(list);
     setWallpaper(getWallpaper());
+    const containerWidth = containerRef.current?.getBoundingClientRect().width;
     const pos: Record<string, { x: number; y: number }> = {};
     list.forEach((art, i) => {
-      pos[art.id] = clampToContainer(getIconPosition(art.id, i));
+      pos[art.id] = clampToContainer(getIconPosition(art.id, i, containerWidth));
     });
     // 특수 아이콘은 아직 옮긴 적이 없으면(저장된 위치 없음) positions에 아예 넣지
     // 않는다 — 렌더링에서 이 경우 CSS 코너 클래스(bottom-4 right-4 등)로 기본
@@ -135,10 +136,11 @@ export default function Desktop({
   // 문제가 있었다. 위치가 실제로 바뀌는 건 드래그로 옮길 때뿐이다.
   useEffect(() => {
     const handleResize = () => {
+      const containerWidth = containerRef.current?.getBoundingClientRect().width;
       setPositions(() => {
         const next: Record<string, { x: number; y: number }> = {};
         items.forEach((art, i) => {
-          next[art.id] = clampToContainer(getIconPosition(art.id, i));
+          next[art.id] = clampToContainer(getIconPosition(art.id, i, containerWidth));
         });
         for (const id of SPECIAL_ICON_IDS) {
           const stored = getStoredPosition(id);

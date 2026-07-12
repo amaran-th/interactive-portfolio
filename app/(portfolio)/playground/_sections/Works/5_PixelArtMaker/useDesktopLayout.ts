@@ -19,10 +19,14 @@ function saveLayout(layout: Record<string, Position>) {
   } catch {}
 }
 
-export function getIconPosition(id: string, fallbackIndex: number): Position {
+// containerWidth를 넘기면 실제 데스크탑 폭에 맞춰 한 줄에 들어갈 열 수를 계산한다
+// — 배경화면 비율에 맞춰 데스크탑이 레터박스로 좁아질 수 있는데, 고정 6열 기준으로
+// 배치하면 좁아진 실제 폭을 넘어서는 아이콘들이 전부 같은 클램프 위치로 밀려나
+// 서로 겹쳐 보이는 문제가 있었다.
+export function getIconPosition(id: string, fallbackIndex: number, containerWidth?: number): Position {
   const layout = loadLayout();
   if (layout[id]) return layout[id];
-  const perRow = 6;
+  const perRow = containerWidth ? Math.max(1, Math.floor(containerWidth / GRID_STEP)) : 6;
   const col = fallbackIndex % perRow;
   const row = Math.floor(fallbackIndex / perRow);
   return { x: col * GRID_STEP + 16, y: row * GRID_STEP + 16 };
