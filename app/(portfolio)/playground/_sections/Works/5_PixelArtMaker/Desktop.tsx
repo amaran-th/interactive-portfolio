@@ -51,6 +51,8 @@ export default function Desktop({
   const startBoxSelect = useCallback(
     (e: React.PointerEvent) => {
       if (e.button !== 0) return;
+      // 아이콘 위치는 컨테이너 기준 좌표인데 pointer 이벤트는 뷰포트 기준 좌표라
+      // 오프셋 보정 없이 비교하면 실제 화면 위치와 어긋나는 버그가 있었다.
       const rect = containerRef.current?.getBoundingClientRect();
       const offsetX = rect?.left ?? 0;
       const offsetY = rect?.top ?? 0;
@@ -89,6 +91,7 @@ export default function Desktop({
       e.stopPropagation();
       if (e.button !== 0) return;
 
+      // Ctrl/Cmd/Shift+클릭은 드래그를 시작하지 않고 다중 선택 집합만 토글한다.
       if (e.ctrlKey || e.metaKey || e.shiftKey) {
         setSelected((prev) => {
           const next = new Set(prev);
