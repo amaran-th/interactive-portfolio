@@ -156,6 +156,10 @@ export default function Desktop({
       if (e.button !== 0) return;
       e.stopPropagation();
       trashDraggingRef.current = true;
+      // 드래그 중에는 휴지통이 마우스 아래에서 움직이면서 pointerenter/leave가
+      // 반복 발생해 열림/닫힘 그림(OPEN_GRID/CLOSED_GRID)이 깜빡였다 — 드래그
+      // 시작 시 고정으로 닫힘 상태로 되돌리고, 드래그 중 hover 갱신을 막는다.
+      setTrashHover(false);
 
       const containerRect = containerRef.current?.getBoundingClientRect();
       const offsetX = containerRect?.left ?? 0;
@@ -283,8 +287,8 @@ export default function Desktop({
       <div
         ref={trashRef}
         onPointerDown={startTrashDrag}
-        onPointerEnter={() => setTrashHover(true)}
-        onPointerLeave={() => setTrashHover(false)}
+        onPointerEnter={() => !trashDraggingRef.current && setTrashHover(true)}
+        onPointerLeave={() => !trashDraggingRef.current && setTrashHover(false)}
         onPointerUp={handleTrashDrop}
         className={`absolute flex w-20 flex-col items-center gap-1 p-2 ${trashPos ? "" : "bottom-4 right-4"}`}
         style={trashPos ? { left: trashPos.x, top: trashPos.y } : undefined}

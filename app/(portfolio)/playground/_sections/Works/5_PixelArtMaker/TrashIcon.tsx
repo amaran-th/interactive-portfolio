@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-const SIZE = 40;
+const SIZE = 48;
 const GRID = 8;
 
 // 8x8 픽셀 그리드. 0=투명, 1=외곽선, 2=몸통 채우기, 3=뚜껑 손잡이
