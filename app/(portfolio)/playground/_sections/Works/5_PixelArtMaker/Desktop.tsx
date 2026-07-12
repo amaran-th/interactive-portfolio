@@ -31,9 +31,11 @@ type Menu = { x: number; y: number; items: ContextMenuItem[] } | null;
 const ICON_FOOTPRINT = 80;
 
 export default function Desktop({
+  refreshSignal,
   onOpen,
   onCreate,
 }: {
+  refreshSignal: number;
   onOpen: (id: string) => void;
   onCreate: () => void;
 }) {
@@ -83,7 +85,10 @@ export default function Desktop({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
-  }, [refresh]);
+    // refreshSignal: 편집창이 이제 desktop 위에 겹쳐 뜨는 방식이라 desktop이 더 이상
+    // 화면 전환마다 재마운트되지 않는다 — 편집창을 닫을 때마다 이 값이 바뀌어
+    // 저장소를 다시 읽어온다(그러지 않으면 방금 저장한 작품이 반영되지 않는다).
+  }, [refresh, refreshSignal]);
 
   // 창 크기 변경 시 화면 밖으로 나간 아이콘/휴지통을 안쪽으로 보정해 보여준다.
   // 저장된 원래 위치(localStorage)는 건드리지 않고 매번 그 값을 다시 읽어 현재
