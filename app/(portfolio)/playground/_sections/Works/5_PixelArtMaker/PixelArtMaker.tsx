@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useUnsavedChangesWarning } from "../_shared/useUnsavedChangesWarning";
 import Desktop from "./Desktop";
 import Editor from "./Editor";
+import { monaFont } from "./fonts";
 
 type Screen = { view: "desktop" } | { view: "editor"; docId: string | null };
 
@@ -22,9 +23,13 @@ export default function PixelArtMaker() {
     setScreen({ view: "desktop" });
   }, []);
 
-  if (screen.view === "editor") {
-    return <Editor docId={screen.docId} onDirtyChange={setIsDirty} onExit={closeEditor} />;
-  }
-
-  return <Desktop onOpen={(id) => openEditor(id)} onCreate={() => openEditor(null)} />;
+  return (
+    <div className={`${monaFont.className} h-full w-full`}>
+      {screen.view === "editor" ? (
+        <Editor docId={screen.docId} onDirtyChange={setIsDirty} onExit={closeEditor} />
+      ) : (
+        <Desktop onOpen={(id) => openEditor(id)} onCreate={() => openEditor(null)} />
+      )}
+    </div>
+  );
 }

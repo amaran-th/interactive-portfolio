@@ -29,10 +29,8 @@ export const metadata: Metadata = {
 
 export default function PixelArtMakerPage() {
   return (
-    <main className="flex h-dvh justify-center overflow-hidden">
-      <div className="h-full w-full max-w-4xl">
-        <PixelArtMaker />
-      </div>
+    <main className="h-dvh w-full overflow-hidden">
+      <PixelArtMaker />
     </main>
   );
 }
