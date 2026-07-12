@@ -405,7 +405,7 @@ export default function Desktop({
           e.stopPropagation();
           setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
         }}
-        className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-gray-100 ${positions[FORMAT_ID] ? "" : "bottom-4 left-4"}`}
+        className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-black/5 ${positions[FORMAT_ID] ? "" : "bottom-4 left-4"}`}
         style={positions[FORMAT_ID] ? { left: positions[FORMAT_ID].x, top: positions[FORMAT_ID].y } : undefined}
         title="더블클릭하면 이 프로젝트의 저장된 모든 작품과 배치를 초기화합니다 · 드래그해서 위치 이동 가능"
       >
@@ -421,7 +421,7 @@ export default function Desktop({
           e.stopPropagation();
           setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
         }}
-        className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-gray-100 ${positions[WALLPAPER_ID] ? "" : "top-4 right-4"}`}
+        className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-black/5 ${positions[WALLPAPER_ID] ? "" : "top-4 right-4"}`}
         style={positions[WALLPAPER_ID] ? { left: positions[WALLPAPER_ID].x, top: positions[WALLPAPER_ID].y } : undefined}
         title="더블클릭하면 배경화면을 편집합니다 · 드래그해서 위치 이동 가능"
       >
@@ -437,7 +437,7 @@ export default function Desktop({
           e.stopPropagation();
           setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
         }}
-        className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-gray-100 ${positions[LAUNCHER_ID] ? "" : "top-4 left-4"}`}
+        className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-black/5 ${positions[LAUNCHER_ID] ? "" : "top-4 left-4"}`}
         style={positions[LAUNCHER_ID] ? { left: positions[LAUNCHER_ID].x, top: positions[LAUNCHER_ID].y } : undefined}
         title="더블클릭하면 새로 만들기·기존 파일 열기·이미지 불러오기를 선택할 수 있습니다 · 드래그해서 위치 이동 가능"
       >

@@ -75,7 +75,7 @@ export default function DesktopIcon({
   return (
     <div
       style={{ left: x, top: y, position: "absolute" }}
-      className={`flex w-20 flex-col items-center gap-1 p-2 ${selected ? "bg-violet-100" : "hover:bg-gray-100"}`}
+      className={`flex w-20 flex-col items-center gap-1 p-2 ${selected ? "bg-violet-500/15" : "hover:bg-black/5"}`}
       onPointerDown={editing ? undefined : onPointerDownIcon}
       onDoubleClick={editing ? undefined : onDoubleClick}
       onContextMenu={editing ? undefined : onContextMenu}
