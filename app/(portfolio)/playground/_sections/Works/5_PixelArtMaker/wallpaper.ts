@@ -1,5 +1,5 @@
 import { createGrid } from "./pixelGrid";
-import { PixelArt } from "../_shared/assetLibrary";
+import { packPixels, PixelArt, unpackPixels } from "../_shared/assetLibrary";
 
 const WALLPAPER_KEY = "pixel-art-desktop-wallpaper";
 
@@ -35,19 +35,25 @@ export function getWallpaper(): PixelArt {
   if (typeof window === "undefined") return defaultWallpaper();
   try {
     const raw = localStorage.getItem(WALLPAPER_KEY);
-    if (raw) return JSON.parse(raw) as PixelArt;
+    if (raw) {
+      const parsed = JSON.parse(raw) as Omit<PixelArt, "pixels"> & { pixels: string | number[] };
+      return { ...parsed, pixels: unpackPixels(parsed.pixels) };
+    }
   } catch {}
   const fresh = defaultWallpaper();
   saveWallpaper(fresh);
   return fresh;
 }
 
-export function saveWallpaper(art: PixelArt): void {
+export function saveWallpaper(art: PixelArt): boolean {
   // id·name은 항상 고정값으로 강제한다 — 편집기에서 실수로라도 바뀌지 않도록.
   const locked: PixelArt = { ...art, id: WALLPAPER_ID, name: WALLPAPER_NAME };
   try {
-    localStorage.setItem(WALLPAPER_KEY, JSON.stringify(locked));
-  } catch {}
+    localStorage.setItem(WALLPAPER_KEY, JSON.stringify({ ...locked, pixels: packPixels(locked.pixels) }));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function resetWallpaper(): void {

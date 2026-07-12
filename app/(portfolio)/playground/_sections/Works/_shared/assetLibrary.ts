@@ -10,6 +10,29 @@ export type PixelArt = {
   createdAt: number;
 };
 
+// 픽셀 배열을 그대로 JSON.stringify하면 픽셀당 콤마+최대 3자(예: "-1,")가 붙어
+// localStorage 용량을 낭비한다 — 팔레트 인덱스(0~35, MAX_PALETTE_COLORS보다 넉넉한
+// 여유)를 36진수 한 글자로, 투명(-1)은 구분자 없이 "." 한 글자로 압축해 저장한다.
+// 픽셀당 1글자로 고정되므로 원래 배열 대비 대략 2~3배 더 작다. 저장된 원본은 항상
+// 문자열이지만, 이 포맷을 도입하기 전에 저장된 값은 그대로 숫자 배열일 수 있어
+// unpackPixels에서 둘 다 받아들인다(하위 호환).
+const TRANSPARENT_CHAR = ".";
+
+export function packPixels(pixels: number[]): string {
+  return pixels.map((v) => (v < 0 ? TRANSPARENT_CHAR : v.toString(36))).join("");
+}
+
+export function unpackPixels(packed: string | number[]): number[] {
+  if (Array.isArray(packed)) return packed;
+  const out = new Array<number>(packed.length);
+  for (let i = 0; i < packed.length; i++) {
+    out[i] = packed[i] === TRANSPARENT_CHAR ? -1 : parseInt(packed[i], 36);
+  }
+  return out;
+}
+
+type StoredPixelArt = Omit<PixelArt, "pixels"> & { pixels: string | number[] };
+
 export type BeatTrack = {
   wave: "square" | "triangle" | "noise";
   steps: (string | null)[];
@@ -38,9 +61,9 @@ function loadLibrary(): AssetLibrary {
   try {
     const raw = localStorage.getItem(LIBRARY_KEY);
     if (!raw) return { pixelArt: [], beatPatterns: [] };
-    const parsed = JSON.parse(raw) as Partial<AssetLibrary>;
+    const parsed = JSON.parse(raw) as Partial<{ pixelArt: StoredPixelArt[]; beatPatterns: BeatPattern[] }>;
     return {
-      pixelArt: parsed.pixelArt ?? [],
+      pixelArt: (parsed.pixelArt ?? []).map((p) => ({ ...p, pixels: unpackPixels(p.pixels) })),
       beatPatterns: parsed.beatPatterns ?? [],
     };
   } catch {
@@ -48,10 +71,17 @@ function loadLibrary(): AssetLibrary {
   }
 }
 
-function saveLibrary(lib: AssetLibrary) {
+function saveLibrary(lib: AssetLibrary): boolean {
   try {
-    localStorage.setItem(LIBRARY_KEY, JSON.stringify(lib));
-  } catch {}
+    const stored: { pixelArt: StoredPixelArt[]; beatPatterns: BeatPattern[] } = {
+      pixelArt: lib.pixelArt.map((p) => ({ ...p, pixels: packPixels(p.pixels) })),
+      beatPatterns: lib.beatPatterns,
+    };
+    localStorage.setItem(LIBRARY_KEY, JSON.stringify(stored));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function listPixelArt(): PixelArt[] {
@@ -62,12 +92,12 @@ export function getPixelArt(id: string): PixelArt | undefined {
   return loadLibrary().pixelArt.find((p) => p.id === id);
 }
 
-export function savePixelArt(art: PixelArt): void {
+export function savePixelArt(art: PixelArt): boolean {
   const lib = loadLibrary();
   const idx = lib.pixelArt.findIndex((p) => p.id === art.id);
   if (idx >= 0) lib.pixelArt[idx] = art;
   else lib.pixelArt.push(art);
-  saveLibrary(lib);
+  return saveLibrary(lib);
 }
 
 export function renamePixelArt(id: string, name: string): void {

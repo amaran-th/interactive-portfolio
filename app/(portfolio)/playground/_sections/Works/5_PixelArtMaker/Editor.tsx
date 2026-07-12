@@ -2,22 +2,38 @@
 
 import { Save, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getPixelArt, listPixelArt, PixelArt, savePixelArt, uid } from "../_shared/assetLibrary";
+import {
+  getPixelArt,
+  listPixelArt,
+  PixelArt,
+  savePixelArt,
+  uid,
+} from "../_shared/assetLibrary";
 import ColorWheel from "./ColorWheel";
 import ConfirmDialog from "./ConfirmDialog";
 import ContextMenu, { ContextMenuItem } from "./ContextMenu";
+import {
+  exportAsJPG,
+  exportAsJSON,
+  exportAsPNG,
+  exportAsSVG,
+} from "./exportPixelArt";
 import ImportPanel from "./ImportPanel";
 import NewCanvasDialog from "./NewCanvasDialog";
 import PixelCanvas from "./PixelCanvas";
+import { createGrid, getPixel, resizeGrid } from "./pixelGrid";
 import ResizeCanvasDialog from "./ResizeCanvasDialog";
 import Toolbar from "./Toolbar";
+import { CANVAS_PRESETS, MirrorMode, Tool } from "./types";
 import { useCanvasHistory } from "./useCanvasHistory";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useSelection } from "./useSelection";
-import { createGrid, getPixel, resizeGrid } from "./pixelGrid";
-import { exportAsJPG, exportAsJSON, exportAsPNG, exportAsSVG } from "./exportPixelArt";
-import { CANVAS_PRESETS, MirrorMode, Tool } from "./types";
-import { getWallpaper, saveWallpaper, WALLPAPER_ID, WALLPAPER_NAME } from "./wallpaper";
+import {
+  getWallpaper,
+  saveWallpaper,
+  WALLPAPER_ID,
+  WALLPAPER_NAME,
+} from "./wallpaper";
 
 // 클립스튜디오처럼 여러 파일을 탭으로 동시에 열어둘 수 있다. 활성 탭의 실제
 // 편집 상태(doc/history/이름/hasMetaEdits)만 살아있는 hook 상태로 유지하고,
@@ -51,13 +67,19 @@ function blankDoc(width: number, height: number): PixelArt {
   };
 }
 
-function resolveInitialDoc(docId: string | null): { doc: PixelArt; found: boolean } {
+function resolveInitialDoc(docId: string | null): {
+  doc: PixelArt;
+  found: boolean;
+} {
   if (docId === WALLPAPER_ID) return { doc: getWallpaper(), found: true };
   if (docId) {
     const existing = getPixelArt(docId);
     if (existing) return { doc: existing, found: true };
   }
-  return { doc: blankDoc(CANVAS_PRESETS[0].width, CANVAS_PRESETS[0].height), found: false };
+  return {
+    doc: blankDoc(CANVAS_PRESETS[0].width, CANVAS_PRESETS[0].height),
+    found: false,
+  };
 }
 
 export default function Editor({
@@ -77,8 +99,12 @@ export default function Editor({
   closing: boolean;
 }) {
   const [initial] = useState(() => resolveInitialDoc(docId));
-  const [tabs, setTabs] = useState<Tab[]>(() => (initial.found ? [{ doc: initial.doc, hasMetaEdits: false }] : []));
-  const [activeTabIndex, setActiveTabIndex] = useState(() => (initial.found ? 0 : -1));
+  const [tabs, setTabs] = useState<Tab[]>(() =>
+    initial.found ? [{ doc: initial.doc, hasMetaEdits: false }] : [],
+  );
+  const [activeTabIndex, setActiveTabIndex] = useState(() =>
+    initial.found ? 0 : -1,
+  );
   const [doc, setDoc] = useState<PixelArt>(initial.doc);
   const [name, setName] = useState(initial.doc.name);
   const [activeColorIndex, setActiveColorIndex] = useState(0);
@@ -87,18 +113,40 @@ export default function Editor({
   const [mirror, setMirror] = useState<MirrorMode>("none");
   const [showGrid, setShowGrid] = useState(true);
   const [brushSize, setBrushSize] = useState(1);
-  const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<{
+    x: number;
+    y: number;
+    items: ContextMenuItem[];
+  } | null>(null);
   // 편집창 루트에 transform(scale)이 걸려 있어 position:fixed인 ContextMenu의
   // 좌표 기준점이 뷰포트가 아니라 이 루트가 된다 — 메뉴 좌표를 뷰포트 기준이
   // 아니라 이 루트 기준 상대좌표로 계산해야 편집창이 letterbox로 작아지거나
   // 가운데 정렬돼도 메뉴가 버튼 바로 아래에 정확히 뜬다.
   const rootRef = useRef<HTMLDivElement>(null);
   const [resizingCanvas, setResizingCanvas] = useState(false);
-  const [showNewCanvasDialog, setShowNewCanvasDialog] = useState(!initial.found && startMode === "newCanvas");
+  const [showNewCanvasDialog, setShowNewCanvasDialog] = useState(
+    !initial.found && startMode === "newCanvas",
+  );
   const [showOpenDialog, setShowOpenDialog] = useState(false);
   const [wantsAutoImport, setWantsAutoImport] = useState(false);
-  const [pendingCloseTabIndex, setPendingCloseTabIndex] = useState<number | null>(null);
+  const [pendingCloseTabIndex, setPendingCloseTabIndex] = useState<
+    number | null
+  >(null);
   const [pendingExit, setPendingExit] = useState(false);
+  // localStorage 용량 초과 등으로 저장이 실패해도 이 앱은 토스트 UI가 없어
+  // 조용히 묻히기 쉽다 — 제목표시줄에 잠깐 빨간 문구로 알려준다.
+  const [saveError, setSaveError] = useState(false);
+  const saveErrorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flagSaveError = useCallback(() => {
+    setSaveError(true);
+    if (saveErrorTimeoutRef.current) clearTimeout(saveErrorTimeoutRef.current);
+    saveErrorTimeoutRef.current = setTimeout(() => setSaveError(false), 4000);
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (saveErrorTimeoutRef.current) clearTimeout(saveErrorTimeoutRef.current);
+    };
+  }, []);
   const isWallpaper = doc.id === WALLPAPER_ID;
   // 편집창이 데스크탑 위에 떠오르며 열리는 애니메이션 — 마운트 직후 한 프레임 뒤에
   // true로 바뀌면서 transition이 자연스럽게 재생된다(처음부터 true면 트랜지션 없이
@@ -117,7 +165,9 @@ export default function Editor({
   // 활성 탭은 라이브 상태(history.canUndo/hasMetaEdits)로, 비활성 탭은 마지막으로
   // 스냅샷에 저장해 둔 hasMetaEdits 플래그로 판단한다.
   useEffect(() => {
-    const anyDirty = tabs.some((t, i) => (i === activeTabIndex ? history.canUndo || hasMetaEdits : t.hasMetaEdits));
+    const anyDirty = tabs.some((t, i) =>
+      i === activeTabIndex ? history.canUndo || hasMetaEdits : t.hasMetaEdits,
+    );
     onDirtyChange(anyDirty);
   }, [tabs, activeTabIndex, history.canUndo, hasMetaEdits, onDirtyChange]);
 
@@ -130,7 +180,10 @@ export default function Editor({
       if (activeTabIndex < 0) return list;
       return list.map((t, i) =>
         i === activeTabIndex
-          ? { doc: { ...doc, name, pixels: history.present }, hasMetaEdits: hasMetaEdits || history.canUndo }
+          ? {
+              doc: { ...doc, name, pixels: history.present },
+              hasMetaEdits: hasMetaEdits || history.canUndo,
+            }
           : t,
       );
     },
@@ -222,34 +275,64 @@ export default function Editor({
     if (activeTabIndex < 0) return;
     // 배경화면은 이름이 고정("배경화면")이고 일반 픽셀아트 목록이 아닌
     // 별도 저장소(wallpaper.ts)에 저장된다.
-    const toSave: PixelArt = { ...doc, name: isWallpaper ? WALLPAPER_NAME : name, pixels: history.present };
-    if (isWallpaper) saveWallpaper(toSave);
-    else savePixelArt(toSave);
+    const toSave: PixelArt = {
+      ...doc,
+      name: isWallpaper ? WALLPAPER_NAME : name,
+      pixels: history.present,
+    };
+    const ok = isWallpaper ? saveWallpaper(toSave) : savePixelArt(toSave);
+    if (!ok) {
+      flagSaveError();
+      return;
+    }
     setDoc(toSave);
     history.reset(toSave.pixels);
     setHasMetaEdits(false);
-  }, [activeTabIndex, doc, name, history, isWallpaper]);
+  }, [activeTabIndex, doc, name, history, isWallpaper, flagSaveError]);
 
   // 다른 이름으로 저장 — 원본(배경화면이라도)은 건드리지 않고 새 id로 일반
   // 픽셀아트 목록에 별도 항목을 만든 뒤, 이후 편집은 그 새 사본을 대상으로 한다.
   const handleSaveAs = useCallback(() => {
     if (activeTabIndex < 0) return;
-    const newName = window.prompt("다른 이름으로 저장", isWallpaper ? WALLPAPER_NAME : name);
+    const newName = window.prompt(
+      "다른 이름으로 저장",
+      isWallpaper ? WALLPAPER_NAME : name,
+    );
     if (!newName) return;
-    const toSave: PixelArt = { ...doc, id: uid(), name: newName, pixels: history.present, createdAt: Date.now() };
-    savePixelArt(toSave);
+    const toSave: PixelArt = {
+      ...doc,
+      id: uid(),
+      name: newName,
+      pixels: history.present,
+      createdAt: Date.now(),
+    };
+    const ok = savePixelArt(toSave);
+    if (!ok) {
+      flagSaveError();
+      return;
+    }
     setDoc(toSave);
     setName(newName);
     history.reset(toSave.pixels);
     setHasMetaEdits(false);
-    setTabs((prev) => prev.map((t, i) => (i === activeTabIndex ? { doc: toSave, hasMetaEdits: false } : t)));
-  }, [activeTabIndex, doc, name, history, isWallpaper]);
+    setTabs((prev) =>
+      prev.map((t, i) =>
+        i === activeTabIndex ? { doc: toSave, hasMetaEdits: false } : t,
+      ),
+    );
+  }, [activeTabIndex, doc, name, history, isWallpaper, flagSaveError]);
 
   // 캔버스 크기 수정 — 그림을 다시 늘리거나 줄이지 않고 경계만 바꾼다(왼쪽 위
   // 기준으로 자르거나 투명하게 늘림). 팔레트·이름 등 다른 속성은 그대로 둔다.
   const handleResizeCanvas = useCallback(
     (newWidth: number, newHeight: number) => {
-      const resized = resizeGrid(history.present, doc.width, doc.height, newWidth, newHeight);
+      const resized = resizeGrid(
+        history.present,
+        doc.width,
+        doc.height,
+        newWidth,
+        newHeight,
+      );
       setDoc((d) => ({ ...d, width: newWidth, height: newHeight }));
       history.reset(resized);
       setResizingCanvas(false);
@@ -261,7 +344,10 @@ export default function Editor({
   // 활성 탭은 라이브 상태(history.canUndo/hasMetaEdits)로, 비활성 탭은 마지막
   // 전환 시점에 스냅샷에 저장해 둔 hasMetaEdits로 저장되지 않은 변경이 있는지 본다.
   const isTabDirty = useCallback(
-    (index: number) => (index === activeTabIndex ? history.canUndo || hasMetaEdits : (tabs[index]?.hasMetaEdits ?? false)),
+    (index: number) =>
+      index === activeTabIndex
+        ? history.canUndo || hasMetaEdits
+        : (tabs[index]?.hasMetaEdits ?? false),
     [activeTabIndex, history.canUndo, hasMetaEdits, tabs],
   );
 
@@ -277,12 +363,17 @@ export default function Editor({
 
   // 비활성 탭은 doc/history가 스냅샷으로만 존재하므로, 활성 탭의 handleSave와
   // 별도로 스냅샷을 직접 저장하는 경로가 필요하다.
-  const saveTabSnapshot = useCallback((tab: Tab) => {
-    const isWp = tab.doc.id === WALLPAPER_ID;
-    const toSave: PixelArt = isWp ? { ...tab.doc, name: WALLPAPER_NAME } : tab.doc;
-    if (isWp) saveWallpaper(toSave);
-    else savePixelArt(toSave);
-  }, []);
+  const saveTabSnapshot = useCallback(
+    (tab: Tab) => {
+      const isWp = tab.doc.id === WALLPAPER_ID;
+      const toSave: PixelArt = isWp
+        ? { ...tab.doc, name: WALLPAPER_NAME }
+        : tab.doc;
+      const ok = isWp ? saveWallpaper(toSave) : savePixelArt(toSave);
+      if (!ok) flagSaveError();
+    },
+    [flagSaveError],
+  );
 
   const handleCloseSave = useCallback(() => {
     if (pendingCloseTabIndex === null) return;
@@ -291,7 +382,14 @@ export default function Editor({
     else saveTabSnapshot(tabs[index]);
     setPendingCloseTabIndex(null);
     closeTab(index);
-  }, [pendingCloseTabIndex, activeTabIndex, tabs, saveTabSnapshot, closeTab, handleSave]);
+  }, [
+    pendingCloseTabIndex,
+    activeTabIndex,
+    tabs,
+    saveTabSnapshot,
+    closeTab,
+    handleSave,
+  ]);
 
   const handleCloseDiscard = useCallback(() => {
     if (pendingCloseTabIndex === null) return;
@@ -315,7 +413,13 @@ export default function Editor({
     onRedo: history.redo,
     onCopy: () => selection.copy(history.present, doc.width),
     onPaste: () => {
-      const next = selection.paste(history.present, doc.width, doc.height, 0, 0);
+      const next = selection.paste(
+        history.present,
+        doc.width,
+        doc.height,
+        0,
+        0,
+      );
       history.push(next);
     },
     onMirrorToggle: setMirror,
@@ -336,7 +440,10 @@ export default function Editor({
 
   const handleRemoveColor = useCallback(
     (index: number) => {
-      setDoc((d) => ({ ...d, palette: d.palette.filter((_, i) => i !== index) }));
+      setDoc((d) => ({
+        ...d,
+        palette: d.palette.filter((_, i) => i !== index),
+      }));
       // 제거된 색보다 뒤에 있던 활성 인덱스는 한 칸씩 당겨오고, 배열 끝을 넘어가면
       // 새 마지막 인덱스로 당겨온다 — 그대로 두면 활성 인덱스가 배열 밖을 가리켜
       // 색상환이 엉뚱한 색(기본 검정)을 편집하는 상태가 됐다.
@@ -386,15 +493,32 @@ export default function Editor({
           { label: "새로 만들기", onClick: () => setShowNewCanvasDialog(true) },
           { label: "열기", onClick: () => setShowOpenDialog(true) },
           { label: "저장", onClick: handleSave, disabled: noActiveTab },
-          { label: "다른 이름으로 저장", onClick: handleSaveAs, disabled: noActiveTab },
+          {
+            label: "다른 이름으로 저장",
+            onClick: handleSaveAs,
+            disabled: noActiveTab,
+          },
           {
             label: "내보내기",
             disabled: noActiveTab,
             submenu: [
-              { label: "PNG", onClick: () => exportAsPNG({ ...doc, pixels: history.present }) },
-              { label: "SVG", onClick: () => exportAsSVG({ ...doc, pixels: history.present }) },
-              { label: "JSON", onClick: () => exportAsJSON({ ...doc, pixels: history.present }) },
-              { label: "JPG (손실 압축)", onClick: () => exportAsJPG({ ...doc, pixels: history.present }) },
+              {
+                label: "PNG",
+                onClick: () => exportAsPNG({ ...doc, pixels: history.present }),
+              },
+              {
+                label: "SVG",
+                onClick: () => exportAsSVG({ ...doc, pixels: history.present }),
+              },
+              {
+                label: "JSON",
+                onClick: () =>
+                  exportAsJSON({ ...doc, pixels: history.present }),
+              },
+              {
+                label: "JPG (손실 압축)",
+                onClick: () => exportAsJPG({ ...doc, pixels: history.present }),
+              },
             ],
           },
         ],
@@ -412,14 +536,36 @@ export default function Editor({
         x: rect.left - (rootRect?.left ?? 0),
         y: rect.bottom - (rootRect?.top ?? 0),
         items: [
-          { label: "실행취소", onClick: history.undo, disabled: noActiveTab || !history.canUndo },
-          { label: "다시실행", onClick: history.redo, disabled: noActiveTab || !history.canRedo },
-          { label: "복사", onClick: () => selection.copy(history.present, doc.width), disabled: noActiveTab },
-          { label: "캔버스 크기 수정", onClick: () => setResizingCanvas(true), disabled: noActiveTab },
+          {
+            label: "실행취소",
+            onClick: history.undo,
+            disabled: noActiveTab || !history.canUndo,
+          },
+          {
+            label: "다시실행",
+            onClick: history.redo,
+            disabled: noActiveTab || !history.canRedo,
+          },
+          {
+            label: "복사",
+            onClick: () => selection.copy(history.present, doc.width),
+            disabled: noActiveTab,
+          },
+          {
+            label: "캔버스 크기 수정",
+            onClick: () => setResizingCanvas(true),
+            disabled: noActiveTab,
+          },
           {
             label: "붙여넣기",
             onClick: () => {
-              const next = selection.paste(history.present, doc.width, doc.height, 0, 0);
+              const next = selection.paste(
+                history.present,
+                doc.width,
+                doc.height,
+                0,
+                0,
+              );
               history.push(next);
             },
             disabled: noActiveTab,
@@ -433,7 +579,7 @@ export default function Editor({
   return (
     <div
       ref={rootRef}
-      className={`relative flex h-full w-full flex-col bg-white text-gray-900 shadow-2xl transition-all duration-200 ease-out ${
+      className={`relative flex h-full w-full flex-col bg-white text-gray-900 transition-all duration-200 ease-out ${
         mounted && !closing ? "scale-100 opacity-100" : "scale-95 opacity-0"
       }`}
     >
@@ -451,8 +597,11 @@ export default function Editor({
             className={`flex-1 bg-transparent text-sm font-semibold text-gray-900 outline-none ${isWallpaper ? "cursor-default" : ""}`}
           />
         ) : (
-          <span className="flex-1 text-sm font-semibold text-gray-400">편집기</span>
+          <span className="flex-1 text-sm font-semibold text-gray-400">
+            편집기
+          </span>
         )}
+        {saveError && <span className="text-[10px] font-semibold text-red-500">저장 실패</span>}
         {activeTabIndex >= 0 && (
           <button
             onClick={handleSave}
@@ -473,10 +622,16 @@ export default function Editor({
 
       {/* 메뉴 바 */}
       <div className="flex items-center gap-0.5 bg-white px-2 py-1 shadow-sm">
-        <button onClick={openFileMenu} className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100">
+        <button
+          onClick={openFileMenu}
+          className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
+        >
           파일
         </button>
-        <button onClick={openEditMenu} className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100">
+        <button
+          onClick={openEditMenu}
+          className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
+        >
           편집
         </button>
       </div>
@@ -489,15 +644,22 @@ export default function Editor({
               key={tab.doc.id}
               onClick={() => switchToTab(i)}
               className={`group flex shrink-0 cursor-pointer items-center gap-1.5 px-2.5 py-1 text-xs ${
-                i === activeTabIndex ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:bg-gray-100"
+                i === activeTabIndex
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:bg-gray-100"
               }`}
             >
-              <span className="max-w-[100px] truncate">{i === activeTabIndex ? name : tab.doc.name}</span>
+              <span className="max-w-[100px] truncate">
+                {i === activeTabIndex ? name : tab.doc.name}
+              </span>
               {/* 클립스튜디오처럼: 저장되지 않은 변경이 있으면 닫기(X) 대신 원형
                   점을 보여주고, 탭에 마우스를 올렸을 때만 X로 바뀌어 닫을 수 있다. */}
               {isTabDirty(i) ? (
                 <span className="relative flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-                  <span className="h-1.5 w-1.5 rounded-full bg-gray-500 group-hover:hidden" title="저장되지 않은 변경 사항" />
+                  <span
+                    className="h-1.5 w-1.5 rounded-full bg-gray-500 group-hover:hidden"
+                    title="저장되지 않은 변경 사항"
+                  />
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -525,7 +687,12 @@ export default function Editor({
       )}
 
       {menuAnchor && (
-        <ContextMenu x={menuAnchor.x} y={menuAnchor.y} items={menuAnchor.items} onClose={() => setMenuAnchor(null)} />
+        <ContextMenu
+          x={menuAnchor.x}
+          y={menuAnchor.y}
+          items={menuAnchor.items}
+          onClose={() => setMenuAnchor(null)}
+        />
       )}
 
       {activeTabIndex >= 0 ? (
@@ -558,7 +725,12 @@ export default function Editor({
             <ImportPanel
               autoOpen={wantsAutoImport}
               onConfirm={(imported) => {
-                setDoc((d) => ({ ...d, width: imported.width, height: imported.height, palette: imported.palette }));
+                setDoc((d) => ({
+                  ...d,
+                  width: imported.width,
+                  height: imported.height,
+                  palette: imported.palette,
+                }));
                 history.reset(imported.pixels);
                 setHasMetaEdits(true);
               }}
@@ -586,11 +758,17 @@ export default function Editor({
         <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
           <p className="text-sm text-gray-400">열린 파일이 없습니다</p>
           <p className="text-xs text-gray-300">
-            <button onClick={() => setShowNewCanvasDialog(true)} className="text-violet-400 underline underline-offset-2 hover:text-violet-500">
+            <button
+              onClick={() => setShowNewCanvasDialog(true)}
+              className="text-violet-400 underline underline-offset-2 hover:text-violet-500"
+            >
               새로 만들기
             </button>
             {" 또는 "}
-            <button onClick={() => setShowOpenDialog(true)} className="text-violet-400 underline underline-offset-2 hover:text-violet-500">
+            <button
+              onClick={() => setShowOpenDialog(true)}
+              className="text-violet-400 underline underline-offset-2 hover:text-violet-500"
+            >
               열기
             </button>
             를 선택하세요
@@ -602,7 +780,10 @@ export default function Editor({
         <NewCanvasDialog
           onSelect={handleCreate}
           onImportImage={() => {
-            const fresh = blankDoc(CANVAS_PRESETS[0].width, CANVAS_PRESETS[0].height);
+            const fresh = blankDoc(
+              CANVAS_PRESETS[0].width,
+              CANVAS_PRESETS[0].height,
+            );
             openNewTab(fresh, { autoImport: true });
             setShowNewCanvasDialog(false);
           }}
@@ -624,12 +805,18 @@ export default function Editor({
                     onClick={() => handleOpenExisting(art)}
                     className="bg-gray-50 px-3 py-2 text-left text-sm text-gray-700 hover:bg-violet-50"
                   >
-                    {art.name} <span className="text-gray-400">({art.width}×{art.height})</span>
+                    {art.name}{" "}
+                    <span className="text-gray-400">
+                      ({art.width}×{art.height})
+                    </span>
                   </button>
                 ))}
               </div>
             )}
-            <button onClick={() => setShowOpenDialog(false)} className="mt-3 w-full py-2 text-xs text-gray-400 hover:text-gray-900">
+            <button
+              onClick={() => setShowOpenDialog(false)}
+              className="mt-3 w-full py-2 text-xs text-gray-400 hover:text-gray-900"
+            >
               취소
             </button>
           </div>
@@ -651,8 +838,11 @@ export default function Editor({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="w-72 bg-white p-4 shadow-xl">
             <p className="mb-4 text-sm text-gray-900">
-              &ldquo;{pendingCloseTabIndex === activeTabIndex ? name : tabs[pendingCloseTabIndex]?.doc.name}&rdquo;에 저장되지
-              않은 변경 사항이 있습니다. 저장할까요?
+              &ldquo;
+              {pendingCloseTabIndex === activeTabIndex
+                ? name
+                : tabs[pendingCloseTabIndex]?.doc.name}
+              &rdquo;에 저장되지 않은 변경 사항이 있습니다. 저장할까요?
             </p>
             <div className="flex flex-col gap-1.5">
               <button
