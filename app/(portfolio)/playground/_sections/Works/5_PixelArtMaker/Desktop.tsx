@@ -60,6 +60,8 @@ export default function Desktop({
   const [pendingFormat, setPendingFormat] = useState(false);
   const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [trashHover, setTrashHover] = useState(false);
+  const [fittedSize, setFittedSize] = useState<{ width: number; height: number } | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // 특수 아이콘(트래시/포맷) 자체를 드래그하는 동안에는 pointerup이 그 위에서
   // 발생해도(예: 휴지통 위로 아이콘을 놓는 삭제 동작) 위치 이동으로만 처리해야 한다.
@@ -76,6 +78,29 @@ export default function Desktop({
       y: Math.min(Math.max(pos.y, 0), maxY),
     };
   }, []);
+
+  // 데스크탑 자체의 가로세로 비율을 배경화면 이미지 비율에 맞춘다 — 뷰포트를
+  // 꽉 채우도록 배경화면을 늘리거나 자르는 대신, 데스크탑을 배경화면 비율의
+  // 상자로 만들어 가능한 공간 안에 최대한 크게(letterbox) 가운데 정렬한다.
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    const ratio = wallpaper.width / wallpaper.height;
+    const compute = () => {
+      const rect = wrapper.getBoundingClientRect();
+      let w = rect.width;
+      let h = w / ratio;
+      if (h > rect.height) {
+        h = rect.height;
+        w = h * ratio;
+      }
+      setFittedSize({ width: w, height: h });
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(wrapper);
+    return () => ro.disconnect();
+  }, [wallpaper.width, wallpaper.height]);
 
   const refresh = useCallback(() => {
     const list = listPixelArt();
@@ -274,9 +299,11 @@ export default function Desktop({
   ];
 
   return (
+    <div ref={wrapperRef} className="flex h-full w-full items-center justify-center overflow-hidden bg-gray-100">
     <div
       ref={containerRef}
-      className="relative h-full w-full select-none overflow-hidden bg-white"
+      className="relative select-none overflow-hidden bg-white"
+      style={fittedSize ? { width: fittedSize.width, height: fittedSize.height } : { width: "100%", height: "100%" }}
       onPointerDown={startBoxSelect}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -429,6 +456,7 @@ export default function Desktop({
           onCancel={() => setPendingFormat(false)}
         />
       )}
+    </div>
     </div>
   );
 }
