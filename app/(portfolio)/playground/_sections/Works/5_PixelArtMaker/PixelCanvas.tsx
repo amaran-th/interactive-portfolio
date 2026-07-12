@@ -79,7 +79,7 @@ export default function PixelCanvas({
           ctx.fillRect(x * scale, y * scale, scale, scale);
         }
       }
-      ctx.strokeStyle = "rgba(255,255,255,0.06)";
+      ctx.strokeStyle = "rgba(0,0,0,0.08)";
       for (let x = 0; x <= width; x++) {
         ctx.beginPath();
         ctx.moveTo(x * scale, 0);
@@ -97,8 +97,8 @@ export default function PixelCanvas({
       // ref에서 읽어 move 드래그 중 빠른 pointermove 연속 호출에서도 항상 최신 마스크를 그린다.
       const mask = selectionMaskRef.current;
       if (mask && mask.size > 0) {
-        ctx.fillStyle = "rgba(96, 165, 250, 0.35)";
-        ctx.strokeStyle = "rgba(96, 165, 250, 0.9)";
+        ctx.fillStyle = "rgba(139, 92, 246, 0.3)";
+        ctx.strokeStyle = "rgba(139, 92, 246, 0.9)";
         ctx.lineWidth = 1;
         mask.forEach((i) => {
           const x = i % width;
@@ -306,7 +306,7 @@ export default function PixelCanvas({
   return (
     <canvas
       ref={canvasRef}
-      className="cursor-crosshair touch-none rounded-lg border border-white/10"
+      className="cursor-crosshair touch-none shadow-md"
       style={{ imageRendering: "pixelated" }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
