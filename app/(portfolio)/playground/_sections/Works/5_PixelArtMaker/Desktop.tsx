@@ -45,11 +45,13 @@ export default function Desktop({
   onOpen,
   onCreate,
   onOpenLauncher,
+  onFittedSizeChange,
 }: {
   refreshSignal: number;
   onOpen: (id: string) => void;
   onCreate: () => void;
   onOpenLauncher: () => void;
+  onFittedSizeChange?: (size: { width: number; height: number }) => void;
 }) {
   const [items, setItems] = useState<PixelArt[]>([]);
   const [wallpaper, setWallpaper] = useState<PixelArt>(() => getWallpaper());
@@ -96,12 +98,13 @@ export default function Desktop({
         w = h * ratio;
       }
       setFittedSize({ width: w, height: h });
+      onFittedSizeChange?.({ width: w, height: h });
     };
     compute();
     const ro = new ResizeObserver(compute);
     ro.observe(wrapper);
     return () => ro.disconnect();
-  }, [wallpaper.width, wallpaper.height]);
+  }, [wallpaper.width, wallpaper.height, onFittedSizeChange]);
 
   const refresh = useCallback(() => {
     const list = listPixelArt();

@@ -31,6 +31,10 @@ export default function PixelArtMaker() {
   const [screen, setScreen] = useState<Screen>({ view: "desktop" });
   const [closing, setClosing] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  // 편집창도 데스크탑(배경화면)과 같은 letterbox 상자 크기를 쓰도록 Desktop이
+  // 계산한 fittedSize를 그대로 물려받는다 — 그래야 편집창이 뷰포트 전체가 아니라
+  // 배경화면 컨테이너와 정확히 같은 크기·비율로 뜬다.
+  const [fittedSize, setFittedSize] = useState<{ width: number; height: number } | null>(null);
   // desktop이 이제 편집창 아래 계속 마운트된 채로 남아있어(더 이상 화면 전환마다
   // 다시 마운트되지 않음) 편집창을 닫을 때 이 값을 올려 desktop이 저장소를 다시
   // 읽도록 한다 — 안 그러면 저장한 새 작품이 데스크탑에 반영되지 않는다.
@@ -86,15 +90,23 @@ export default function PixelArtMaker() {
         onOpen={(id) => openEditor(id)}
         onCreate={() => openEditor(null)}
         onOpenLauncher={() => openEditor(null, "empty")}
+        onFittedSizeChange={setFittedSize}
       />
       {screen.view === "editor" && (
-        <Editor
-          docId={screen.docId}
-          startMode={screen.startMode}
-          onDirtyChange={setIsDirty}
-          onExit={closeEditor}
-          closing={closing}
-        />
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+          <div
+            className="pointer-events-auto h-full w-full"
+            style={fittedSize ? { width: fittedSize.width, height: fittedSize.height } : undefined}
+          >
+            <Editor
+              docId={screen.docId}
+              startMode={screen.startMode}
+              onDirtyChange={setIsDirty}
+              onExit={closeEditor}
+              closing={closing}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

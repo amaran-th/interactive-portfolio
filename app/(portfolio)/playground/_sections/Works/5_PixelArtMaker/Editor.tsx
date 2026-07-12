@@ -1,7 +1,7 @@
 "use client";
 
 import { Save, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getPixelArt, listPixelArt, PixelArt, savePixelArt, uid } from "../_shared/assetLibrary";
 import ColorWheel from "./ColorWheel";
 import ConfirmDialog from "./ConfirmDialog";
@@ -88,6 +88,11 @@ export default function Editor({
   const [showGrid, setShowGrid] = useState(true);
   const [brushSize, setBrushSize] = useState(1);
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+  // 편집창 루트에 transform(scale)이 걸려 있어 position:fixed인 ContextMenu의
+  // 좌표 기준점이 뷰포트가 아니라 이 루트가 된다 — 메뉴 좌표를 뷰포트 기준이
+  // 아니라 이 루트 기준 상대좌표로 계산해야 편집창이 letterbox로 작아지거나
+  // 가운데 정렬돼도 메뉴가 버튼 바로 아래에 정확히 뜬다.
+  const rootRef = useRef<HTMLDivElement>(null);
   const [resizingCanvas, setResizingCanvas] = useState(false);
   const [showNewCanvasDialog, setShowNewCanvasDialog] = useState(!initial.found && startMode === "newCanvas");
   const [showOpenDialog, setShowOpenDialog] = useState(false);
@@ -372,10 +377,11 @@ export default function Editor({
   const openFileMenu = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
+      const rootRect = rootRef.current?.getBoundingClientRect();
       const noActiveTab = activeTabIndex < 0;
       setMenuAnchor({
-        x: rect.left,
-        y: rect.bottom,
+        x: rect.left - (rootRect?.left ?? 0),
+        y: rect.bottom - (rootRect?.top ?? 0),
         items: [
           { label: "새로 만들기", onClick: () => setShowNewCanvasDialog(true) },
           { label: "열기", onClick: () => setShowOpenDialog(true) },
@@ -410,10 +416,11 @@ export default function Editor({
   const openEditMenu = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
+      const rootRect = rootRef.current?.getBoundingClientRect();
       const noActiveTab = activeTabIndex < 0;
       setMenuAnchor({
-        x: rect.left,
-        y: rect.bottom,
+        x: rect.left - (rootRect?.left ?? 0),
+        y: rect.bottom - (rootRect?.top ?? 0),
         items: [
           { label: "실행취소", onClick: history.undo, disabled: noActiveTab || !history.canUndo },
           { label: "다시실행", onClick: history.redo, disabled: noActiveTab || !history.canRedo },
@@ -435,7 +442,8 @@ export default function Editor({
 
   return (
     <div
-      className={`absolute inset-0 z-20 flex h-full flex-col bg-white text-gray-900 shadow-2xl transition-all duration-200 ease-out ${
+      ref={rootRef}
+      className={`relative flex h-full w-full flex-col bg-white text-gray-900 shadow-2xl transition-all duration-200 ease-out ${
         mounted && !closing ? "scale-100 opacity-100" : "scale-95 opacity-0"
       }`}
     >
