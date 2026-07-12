@@ -133,8 +133,11 @@ export default function Toolbar({
           ))}
         </div>
       </div>
-      <p className="flex items-center gap-1 text-[10px] text-gray-400">
-        <Copy className="h-3 w-3" /> {mod}C/{mod}V 복사·붙여넣기 · {mod}Z/{mod}Y 실행취소·다시실행 · {mod}S 저장
+      <p className="flex items-start gap-1 text-[10px] text-gray-400">
+        <Copy className="h-3 w-3 shrink-0 translate-y-0.5" />
+        <span className="min-w-0">
+          {mod}C/{mod}V 복사·붙여넣기 · {mod}Z/{mod}Y 실행취소·다시실행 · {mod}S 저장
+        </span>
       </p>
     </div>
   );
