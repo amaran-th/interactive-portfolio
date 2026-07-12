@@ -3,17 +3,17 @@
 import { ArrowLeft, Save } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getPixelArt, PixelArt, savePixelArt, uid } from "../_shared/assetLibrary";
-import NewCanvasDialog from "./NewCanvasDialog";
-import PalettePanel from "./PalettePanel";
+import ColorWheel from "./ColorWheel";
 import ImportPanel from "./ImportPanel";
+import NewCanvasDialog from "./NewCanvasDialog";
 import PixelCanvas from "./PixelCanvas";
 import Toolbar from "./Toolbar";
 import { useCanvasHistory } from "./useCanvasHistory";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useSelection } from "./useSelection";
 import { createGrid, getPixel } from "./pixelGrid";
-import { MirrorMode, Tool } from "./types";
 import { exportAsJPG, exportAsJSON, exportAsPNG, exportAsSVG } from "./exportPixelArt";
+import { MirrorMode, Tool } from "./types";
 
 function blankDoc(width: number, height: number): PixelArt {
   return {
@@ -42,12 +42,10 @@ export default function Editor({
   const [mirror, setMirror] = useState<MirrorMode>("none");
   const [activeColorIndex, setActiveColorIndex] = useState(0);
   const [name, setName] = useState(doc?.name ?? "제목 없음");
+  const [hasMetaEdits, setHasMetaEdits] = useState(false);
 
   const history = useCanvasHistory(doc?.pixels ?? []);
   const selection = useSelection();
-  // 픽셀 편집이 아닌 변경(이름 변경, 팔레트 추가/제거)도 "저장 안 한 변경사항"으로 잡기 위한 별도 플래그.
-  // history.canUndo만으로는 이 두 경우를 놓친다.
-  const [hasMetaEdits, setHasMetaEdits] = useState(false);
 
   useEffect(() => {
     onDirtyChange(history.canUndo || hasMetaEdits);
@@ -96,33 +94,48 @@ export default function Editor({
 
   const palette = useMemo(() => doc?.palette ?? [], [doc]);
 
-  const handleAddColor = useCallback((hex: string) => {
-    setDoc((d) => (d ? { ...d, palette: [...d.palette, hex] } : d));
-    setHasMetaEdits(true);
-  }, []);
+  const handleAddColor = useCallback(
+    (hex: string) => {
+      const newIndex = palette.length;
+      setDoc((d) => (d ? { ...d, palette: [...d.palette, hex] } : d));
+      setActiveColorIndex(newIndex);
+      setHasMetaEdits(true);
+    },
+    [palette],
+  );
 
   const handleRemoveColor = useCallback((index: number) => {
     setDoc((d) => (d ? { ...d, palette: d.palette.filter((_, i) => i !== index) } : d));
     setHasMetaEdits(true);
   }, []);
 
+  // 색상환을 조작하면 현재 활성 팔레트 스와치 자체의 값을 실시간으로 갱신한다
+  // (새 색을 "추가"하는 게 아니라 지금 선택된 색을 "수정"하는 것이 기본 동작).
+  const handleChangeActiveColor = useCallback(
+    (hex: string) => {
+      setDoc((d) => {
+        if (!d) return d;
+        const nextPalette = d.palette.slice();
+        nextPalette[activeColorIndex] = hex;
+        return { ...d, palette: nextPalette };
+      });
+      setHasMetaEdits(true);
+    },
+    [activeColorIndex],
+  );
+
   const handlePickColor = useCallback((colorIndex: number) => {
     setActiveColorIndex(colorIndex);
   }, []);
 
   if (needsSize || !doc) {
-    return (
-      <NewCanvasDialog
-        onSelect={handleCreate}
-        onCancel={onExit}
-      />
-    );
+    return <NewCanvasDialog onSelect={handleCreate} onCancel={onExit} />;
   }
 
   return (
-    <div className="flex h-full flex-col bg-gray-950 text-white">
-      <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
-        <button onClick={onExit} className="rounded-full p-2 text-gray-500 hover:bg-white/8 hover:text-white">
+    <div className="flex h-full flex-col bg-white text-gray-900">
+      <div className="flex items-center gap-2 bg-gray-50 px-4 py-3">
+        <button onClick={onExit} className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-900">
           <ArrowLeft className="h-4 w-4" />
         </button>
         <input
@@ -131,19 +144,25 @@ export default function Editor({
             setName(e.target.value);
             setHasMetaEdits(true);
           }}
-          className="flex-1 bg-transparent text-sm font-semibold text-white outline-none"
+          className="flex-1 bg-transparent text-sm font-semibold text-gray-900 outline-none"
         />
-        <button onClick={handleSave} className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-950">
+        <button onClick={handleSave} className="flex items-center gap-1.5 bg-violet-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-600">
           <Save className="h-3.5 w-3.5" /> 저장
         </button>
         <div className="flex gap-1">
-          <button onClick={() => doc && exportAsPNG({ ...doc, pixels: history.present })} className="rounded-lg bg-white/10 px-2 py-1.5 text-[10px] text-white">PNG</button>
-          <button onClick={() => doc && exportAsSVG({ ...doc, pixels: history.present })} className="rounded-lg bg-white/10 px-2 py-1.5 text-[10px] text-white">SVG</button>
-          <button onClick={() => doc && exportAsJSON({ ...doc, pixels: history.present })} className="rounded-lg bg-white/10 px-2 py-1.5 text-[10px] text-white">JSON</button>
+          <button onClick={() => doc && exportAsPNG({ ...doc, pixels: history.present })} className="bg-gray-100 px-2 py-1.5 text-[10px] text-gray-600 hover:bg-gray-200">
+            PNG
+          </button>
+          <button onClick={() => doc && exportAsSVG({ ...doc, pixels: history.present })} className="bg-gray-100 px-2 py-1.5 text-[10px] text-gray-600 hover:bg-gray-200">
+            SVG
+          </button>
+          <button onClick={() => doc && exportAsJSON({ ...doc, pixels: history.present })} className="bg-gray-100 px-2 py-1.5 text-[10px] text-gray-600 hover:bg-gray-200">
+            JSON
+          </button>
           <button
             onClick={() => doc && exportAsJPG({ ...doc, pixels: history.present })}
             title="JPG는 손실 압축이라 팔레트 색상 경계가 흐려질 수 있습니다"
-            className="rounded-lg bg-white/10 px-2 py-1.5 text-[10px] text-white"
+            className="bg-gray-100 px-2 py-1.5 text-[10px] text-gray-600 hover:bg-gray-200"
           >
             JPG
           </button>
@@ -161,10 +180,11 @@ export default function Editor({
             onUndo={history.undo}
             onRedo={history.redo}
           />
-          <PalettePanel
+          <ColorWheel
             palette={palette}
             activeColorIndex={activeColorIndex}
             onSelect={setActiveColorIndex}
+            onChangeActiveColor={handleChangeActiveColor}
             onAddColor={handleAddColor}
             onRemoveColor={handleRemoveColor}
           />
@@ -176,8 +196,6 @@ export default function Editor({
                   : d,
               );
               history.reset(imported.pixels);
-              // history.reset은 canUndo를 false로 되돌리므로, import로 들어온 미저장 상태를
-              // 놓치지 않도록 hasMetaEdits를 직접 true로 세운다(폭/높이/팔레트가 바뀐 실질적 편집).
               setHasMetaEdits(true);
             }}
           />
