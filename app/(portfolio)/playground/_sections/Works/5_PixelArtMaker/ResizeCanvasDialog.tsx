@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MAX_CANVAS_SIZE } from "./types";
 
 export default function ResizeCanvasDialog({
   width,
@@ -29,9 +30,9 @@ export default function ResizeCanvasDialog({
             <input
               type="number"
               min={1}
-              max={512}
+              max={MAX_CANVAS_SIZE}
               value={w}
-              onChange={(e) => setW(Math.max(1, Math.min(512, Number(e.target.value) || 1)))}
+              onChange={(e) => setW(Math.max(1, Math.min(MAX_CANVAS_SIZE, Number(e.target.value) || 1)))}
               className="w-full bg-gray-50 px-2 py-1.5 text-sm text-gray-700"
             />
           </label>
@@ -40,9 +41,9 @@ export default function ResizeCanvasDialog({
             <input
               type="number"
               min={1}
-              max={512}
+              max={MAX_CANVAS_SIZE}
               value={h}
-              onChange={(e) => setH(Math.max(1, Math.min(512, Number(e.target.value) || 1)))}
+              onChange={(e) => setH(Math.max(1, Math.min(MAX_CANVAS_SIZE, Number(e.target.value) || 1)))}
               className="w-full bg-gray-50 px-2 py-1.5 text-sm text-gray-700"
             />
           </label>
