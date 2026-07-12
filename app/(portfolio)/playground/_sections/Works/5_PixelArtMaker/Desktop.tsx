@@ -266,7 +266,7 @@ export default function Desktop({
   return (
     <div
       ref={containerRef}
-      className="relative h-full w-full overflow-hidden bg-white"
+      className="relative h-full w-full select-none overflow-hidden bg-white"
       onPointerDown={startBoxSelect}
       onContextMenu={(e) => {
         e.preventDefault();
