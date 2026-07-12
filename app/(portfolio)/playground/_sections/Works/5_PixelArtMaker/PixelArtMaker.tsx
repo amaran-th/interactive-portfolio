@@ -15,6 +15,18 @@ type Screen =
 // 화면(desktop)으로 바로 전환돼 버리지 않는다.
 const CLOSE_ANIM_MS = 200;
 
+// 편집기가 켜진 상태로 바로 접속할 수 있도록 하는 쿼리스트링 — 열려있을 때
+// URL에 반영해두면 그 주소를 새로고침하거나 공유해도 같은 상태로 열린다.
+const EDITOR_QUERY_PARAM = "editor";
+const EDITOR_QUERY_VALUE = "on";
+
+function setEditorQueryParam(on: boolean) {
+  const url = new URL(window.location.href);
+  if (on) url.searchParams.set(EDITOR_QUERY_PARAM, EDITOR_QUERY_VALUE);
+  else url.searchParams.delete(EDITOR_QUERY_PARAM);
+  window.history.replaceState(null, "", url);
+}
+
 export default function PixelArtMaker() {
   const [screen, setScreen] = useState<Screen>({ view: "desktop" });
   const [closing, setClosing] = useState(false);
@@ -40,6 +52,15 @@ export default function PixelArtMaker() {
     setIsDirty(false);
     setClosing(false);
     setScreen({ view: "editor", docId, startMode });
+    setEditorQueryParam(true);
+  }, []);
+
+  // 처음 들어왔을 때 쿼리스트링에 편집기가 켜져있어야 한다고 표시돼 있으면
+  // (예: ?editor=on) 데스크탑을 거치지 않고 곧바로 빈 편집창을 연다.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get(EDITOR_QUERY_PARAM) === EDITOR_QUERY_VALUE) openEditor(null, "empty");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 즉시 화면을 desktop으로 바꾸지 않고, 먼저 편집창이 축소·페이드되며 닫히는
@@ -49,6 +70,7 @@ export default function PixelArtMaker() {
   const closeEditor = useCallback(() => {
     setIsDirty(false);
     setClosing(true);
+    setEditorQueryParam(false);
     closeTimeoutRef.current = setTimeout(() => {
       setScreen({ view: "desktop" });
       setClosing(false);
