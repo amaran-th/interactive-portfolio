@@ -321,6 +321,7 @@ export default function Editor({
             onToggleGrid={() => setShowGrid((g) => !g)}
             brushSize={brushSize}
             onBrushSizeChange={setBrushSize}
+            onSave={handleSave}
           />
           <ColorWheel
             palette={palette}
