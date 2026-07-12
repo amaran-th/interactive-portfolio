@@ -302,7 +302,7 @@ export default function Desktop({
   ];
 
   return (
-    <div ref={wrapperRef} className="flex h-full w-full items-center justify-center overflow-hidden bg-gray-100">
+    <div ref={wrapperRef} className="flex h-full w-full items-center justify-center overflow-hidden bg-white">
     <div
       ref={containerRef}
       className="relative select-none overflow-hidden bg-white"

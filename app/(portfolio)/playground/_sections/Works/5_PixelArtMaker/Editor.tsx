@@ -4,6 +4,7 @@ import { Save, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { getPixelArt, listPixelArt, PixelArt, savePixelArt, uid } from "../_shared/assetLibrary";
 import ColorWheel from "./ColorWheel";
+import ConfirmDialog from "./ConfirmDialog";
 import ContextMenu, { ContextMenuItem } from "./ContextMenu";
 import ImportPanel from "./ImportPanel";
 import NewCanvasDialog from "./NewCanvasDialog";
@@ -91,6 +92,8 @@ export default function Editor({
   const [showNewCanvasDialog, setShowNewCanvasDialog] = useState(!initial.found && startMode === "newCanvas");
   const [showOpenDialog, setShowOpenDialog] = useState(false);
   const [wantsAutoImport, setWantsAutoImport] = useState(false);
+  const [pendingCloseTabIndex, setPendingCloseTabIndex] = useState<number | null>(null);
+  const [pendingExit, setPendingExit] = useState(false);
   const isWallpaper = doc.id === WALLPAPER_ID;
   // 편집창이 데스크탑 위에 떠오르며 열리는 애니메이션 — 마운트 직후 한 프레임 뒤에
   // true로 바뀌면서 transition이 자연스럽게 재생된다(처음부터 true면 트랜지션 없이
@@ -249,6 +252,57 @@ export default function Editor({
     },
     [doc.width, doc.height, history],
   );
+
+  // 활성 탭은 라이브 상태(history.canUndo/hasMetaEdits)로, 비활성 탭은 마지막
+  // 전환 시점에 스냅샷에 저장해 둔 hasMetaEdits로 저장되지 않은 변경이 있는지 본다.
+  const isTabDirty = useCallback(
+    (index: number) => (index === activeTabIndex ? history.canUndo || hasMetaEdits : (tabs[index]?.hasMetaEdits ?? false)),
+    [activeTabIndex, history.canUndo, hasMetaEdits, tabs],
+  );
+
+  // 탭을 직접 닫을 때(X 클릭)는 즉시 닫지 않고, 저장되지 않은 변경이 있으면
+  // 클립스튜디오처럼 저장/저장 안 함/취소를 먼저 묻는다.
+  const requestCloseTab = useCallback(
+    (index: number) => {
+      if (isTabDirty(index)) setPendingCloseTabIndex(index);
+      else closeTab(index);
+    },
+    [isTabDirty, closeTab],
+  );
+
+  // 비활성 탭은 doc/history가 스냅샷으로만 존재하므로, 활성 탭의 handleSave와
+  // 별도로 스냅샷을 직접 저장하는 경로가 필요하다.
+  const saveTabSnapshot = useCallback((tab: Tab) => {
+    const isWp = tab.doc.id === WALLPAPER_ID;
+    const toSave: PixelArt = isWp ? { ...tab.doc, name: WALLPAPER_NAME } : tab.doc;
+    if (isWp) saveWallpaper(toSave);
+    else savePixelArt(toSave);
+  }, []);
+
+  const handleCloseSave = useCallback(() => {
+    if (pendingCloseTabIndex === null) return;
+    const index = pendingCloseTabIndex;
+    if (index === activeTabIndex) handleSave();
+    else saveTabSnapshot(tabs[index]);
+    setPendingCloseTabIndex(null);
+    closeTab(index);
+  }, [pendingCloseTabIndex, activeTabIndex, tabs, saveTabSnapshot, closeTab, handleSave]);
+
+  const handleCloseDiscard = useCallback(() => {
+    if (pendingCloseTabIndex === null) return;
+    const index = pendingCloseTabIndex;
+    setPendingCloseTabIndex(null);
+    closeTab(index);
+  }, [pendingCloseTabIndex, closeTab]);
+
+  // 제목표시줄의 닫기(X) — 열린 탭 중 하나라도 저장되지 않은 변경이 있으면
+  // 편집창 전체를 닫기 전에 한 번 더 확인한다(브라우저 beforeunload 경고와는
+  // 별개로, 이 앱 안에서 편집창만 닫는 경우를 잡아준다).
+  const handleExitClick = useCallback(() => {
+    const anyDirty = tabs.some((_, i) => isTabDirty(i));
+    if (anyDirty) setPendingExit(true);
+    else onExit();
+  }, [tabs, isTabDirty, onExit]);
 
   useKeyboardShortcuts({
     onToolChange: setTool,
@@ -411,7 +465,7 @@ export default function Editor({
           </button>
         )}
         <button
-          onClick={onExit}
+          onClick={handleExitClick}
           title="닫기"
           className="flex h-6 w-6 items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500"
         >
@@ -436,20 +490,37 @@ export default function Editor({
             <div
               key={tab.doc.id}
               onClick={() => switchToTab(i)}
-              className={`flex shrink-0 cursor-pointer items-center gap-1.5 px-2.5 py-1 text-xs ${
+              className={`group flex shrink-0 cursor-pointer items-center gap-1.5 px-2.5 py-1 text-xs ${
                 i === activeTabIndex ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:bg-gray-100"
               }`}
             >
               <span className="max-w-[100px] truncate">{i === activeTabIndex ? name : tab.doc.name}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeTab(i);
-                }}
-                className="flex h-3.5 w-3.5 items-center justify-center text-gray-400 hover:text-gray-900"
-              >
-                <X className="h-3 w-3" />
-              </button>
+              {/* 클립스튜디오처럼: 저장되지 않은 변경이 있으면 닫기(X) 대신 원형
+                  점을 보여주고, 탭에 마우스를 올렸을 때만 X로 바뀌어 닫을 수 있다. */}
+              {isTabDirty(i) ? (
+                <span className="relative flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                  <span className="h-1.5 w-1.5 rounded-full bg-gray-500 group-hover:hidden" title="저장되지 않은 변경 사항" />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      requestCloseTab(i);
+                    }}
+                    className="hidden h-3.5 w-3.5 items-center justify-center text-gray-400 hover:text-gray-900 group-hover:flex"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    requestCloseTab(i);
+                  }}
+                  className="flex h-3.5 w-3.5 shrink-0 items-center justify-center text-gray-400 hover:text-gray-900"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -564,6 +635,52 @@ export default function Editor({
           height={doc.height}
           onConfirm={handleResizeCanvas}
           onCancel={() => setResizingCanvas(false)}
+        />
+      )}
+
+      {/* 탭을 닫을 때 저장되지 않은 변경이 있으면 저장/저장 안 함/취소를 묻는다
+          (클립스튜디오처럼). ConfirmDialog는 버튼이 2개뿐이라 여기서는 직접 만든다. */}
+      {pendingCloseTabIndex !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="w-72 bg-white p-4 shadow-xl">
+            <p className="mb-4 text-sm text-gray-900">
+              &ldquo;{pendingCloseTabIndex === activeTabIndex ? name : tabs[pendingCloseTabIndex]?.doc.name}&rdquo;에 저장되지
+              않은 변경 사항이 있습니다. 저장할까요?
+            </p>
+            <div className="flex flex-col gap-1.5">
+              <button
+                onClick={handleCloseSave}
+                className="bg-violet-500 py-2 text-xs font-semibold text-white hover:bg-violet-600"
+              >
+                저장
+              </button>
+              <button
+                onClick={handleCloseDiscard}
+                className="bg-gray-100 py-2 text-xs text-gray-700 hover:bg-gray-200"
+              >
+                저장 안 함
+              </button>
+              <button
+                onClick={() => setPendingCloseTabIndex(null)}
+                className="py-2 text-xs text-gray-400 hover:text-gray-900"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 편집창 전체를 닫을 때도(제목표시줄 X) 열린 탭 중 저장되지 않은 게 있으면
+          한 번 더 확인한다. */}
+      {pendingExit && (
+        <ConfirmDialog
+          message="저장되지 않은 변경 사항이 있습니다. 닫으시겠습니까?"
+          onConfirm={() => {
+            setPendingExit(false);
+            onExit();
+          }}
+          onCancel={() => setPendingExit(false)}
         />
       )}
     </div>
