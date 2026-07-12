@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Save, X } from "lucide-react";
+import { Save, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getPixelArt,
@@ -116,10 +116,6 @@ export default function Editor({
   // PixelCanvas가 Ctrl+스크롤로 자체 관리하는 확대 배율 — 뷰포트 좌측 하단에
   // 표시만 하기 위해 값을 그대로 올려받는다.
   const [canvasZoom, setCanvasZoom] = useState(1);
-  // 이미지 불러오기 패널은 그림을 그리는 동안 거의 안 쓰면서 세로 공간을 가장
-  // 많이 차지해 기본은 접어둔다 — "새로 만들기 → 이미지로 불러오기"로 들어온
-  // 경우(wantsAutoImport)만 자동으로 펼친다.
-  const [showImportPanel, setShowImportPanel] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<{
     x: number;
     y: number;
@@ -226,7 +222,6 @@ export default function Editor({
       setTabs([...synced, { doc: newDoc, hasMetaEdits: false }]);
       loadTab({ doc: newDoc, hasMetaEdits: false }, newIndex);
       setWantsAutoImport(!!options?.autoImport);
-      if (options?.autoImport) setShowImportPanel(true);
     },
     [tabs, syncActiveTabSnapshot, loadTab],
   );
@@ -705,78 +700,31 @@ export default function Editor({
 
       {activeTabIndex >= 0 ? (
         <div className="flex flex-1 gap-4 overflow-auto p-4">
-          <div className="flex shrink-0 flex-col gap-3">
-            <div className="flex gap-3">
-              <Toolbar
-                tool={tool}
-                onToolChange={setTool}
-                mirror={mirror}
-                onMirrorChange={setMirror}
-                canUndo={history.canUndo}
-                canRedo={history.canRedo}
-                onUndo={history.undo}
-                onRedo={history.redo}
-                showGrid={showGrid}
-                onToggleGrid={() => setShowGrid((g) => !g)}
-                brushSize={brushSize}
-                onBrushSizeChange={setBrushSize}
-              />
-              <ColorWheel
-                palette={palette}
-                activeColorIndex={activeColorIndex}
-                onSelect={setActiveColorIndex}
-                onChangeActiveColor={handleChangeActiveColor}
-                onAddColor={handleAddColor}
-                onRemoveColor={handleRemoveColor}
-                tool={tool}
-                onToolChange={setTool}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <button
-                onClick={() => setShowImportPanel((v) => !v)}
-                className="flex items-center justify-between bg-white px-3 py-2 text-xs font-semibold text-gray-500 shadow-md hover:bg-gray-50"
-              >
-                이미지 불러오기
-                <ChevronDown
-                  className={`h-3.5 w-3.5 transition-transform ${showImportPanel ? "rotate-180" : ""}`}
-                />
-              </button>
-              {showImportPanel && (
-                <ImportPanel
-                  autoOpen={wantsAutoImport}
-                  onConfirm={(imported) => {
-                    // wantsAutoImport가 true인 경우는 "새로 만들기 → 이미지로
-                    // 불러오기"로 방금 만든, 아직 아무것도 그리지 않은 빈 캔버스다 —
-                    // 그 자리에 그대로 불러온 이미지 크기로 채운다.
-                    if (wantsAutoImport) {
-                      setDoc((d) => ({
-                        ...d,
-                        width: imported.width,
-                        height: imported.height,
-                        palette: imported.palette,
-                      }));
-                      history.reset(imported.pixels);
-                      setHasMetaEdits(true);
-                      setWantsAutoImport(false);
-                      return;
-                    }
-                    // 그 외에는 지금 열려 있던(이미 그려뒀을 수 있는) 캔버스를 건드리지
-                    // 않고, 불러온 이미지를 새 탭으로 연다 — 이미지 불러오기가 편집
-                    // 중인 캔버스의 크기를 바꾸지 않아야 한다.
-                    openNewTab({
-                      id: uid(),
-                      name: "제목 없음",
-                      width: imported.width,
-                      height: imported.height,
-                      palette: imported.palette,
-                      pixels: imported.pixels,
-                      createdAt: Date.now(),
-                    });
-                  }}
-                />
-              )}
-            </div>
+          <div className="flex w-56 shrink-0 flex-col gap-3">
+            <Toolbar
+              tool={tool}
+              onToolChange={setTool}
+              mirror={mirror}
+              onMirrorChange={setMirror}
+              canUndo={history.canUndo}
+              canRedo={history.canRedo}
+              onUndo={history.undo}
+              onRedo={history.redo}
+              showGrid={showGrid}
+              onToggleGrid={() => setShowGrid((g) => !g)}
+              brushSize={brushSize}
+              onBrushSizeChange={setBrushSize}
+            />
+            <ColorWheel
+              palette={palette}
+              activeColorIndex={activeColorIndex}
+              onSelect={setActiveColorIndex}
+              onChangeActiveColor={handleChangeActiveColor}
+              onAddColor={handleAddColor}
+              onRemoveColor={handleRemoveColor}
+              tool={tool}
+              onToolChange={setTool}
+            />
           </div>
           <div className="relative flex flex-1 items-center justify-center overflow-auto">
             <PixelCanvas
@@ -798,6 +746,40 @@ export default function Editor({
             <div className="absolute bottom-2 left-2 bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
               {canvasZoom}x
             </div>
+          </div>
+          <div className="w-60 shrink-0">
+            <ImportPanel
+              autoOpen={wantsAutoImport}
+              onConfirm={(imported) => {
+                // wantsAutoImport가 true인 경우는 "새로 만들기 → 이미지로
+                // 불러오기"로 방금 만든, 아직 아무것도 그리지 않은 빈 캔버스다 —
+                // 그 자리에 그대로 불러온 이미지 크기로 채운다.
+                if (wantsAutoImport) {
+                  setDoc((d) => ({
+                    ...d,
+                    width: imported.width,
+                    height: imported.height,
+                    palette: imported.palette,
+                  }));
+                  history.reset(imported.pixels);
+                  setHasMetaEdits(true);
+                  setWantsAutoImport(false);
+                  return;
+                }
+                // 그 외에는 지금 열려 있던(이미 그려뒀을 수 있는) 캔버스를 건드리지
+                // 않고, 불러온 이미지를 새 탭으로 연다 — 이미지 불러오기가 편집
+                // 중인 캔버스의 크기를 바꾸지 않아야 한다.
+                openNewTab({
+                  id: uid(),
+                  name: "제목 없음",
+                  width: imported.width,
+                  height: imported.height,
+                  palette: imported.palette,
+                  pixels: imported.pixels,
+                  createdAt: Date.now(),
+                });
+              }}
+            />
           </div>
         </div>
       ) : (

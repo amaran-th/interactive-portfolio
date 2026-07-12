@@ -154,14 +154,17 @@ export default function ImportPanel({
       {preview && (
         <>
           <label className="flex items-center justify-between text-xs text-gray-600">
-            픽셀 해상도(비트 규격)
-            <input
-              type="range"
-              min={8}
-              max={128}
-              value={pixelSize}
-              onChange={(e) => handleOptionChange(Number(e.target.value), antiAlias, maxColors)}
-            />
+            <span>픽셀 해상도(비트 규격)</span>
+            <span className="flex items-center gap-1.5">
+              <input
+                type="range"
+                min={8}
+                max={128}
+                value={pixelSize}
+                onChange={(e) => handleOptionChange(Number(e.target.value), antiAlias, maxColors)}
+              />
+              <span className="w-9 text-right text-[10px] tabular-nums text-gray-400">{pixelSize}px</span>
+            </span>
           </label>
           <label className="flex items-center justify-between text-xs text-gray-600">
             안티에일리어싱
@@ -172,14 +175,17 @@ export default function ImportPanel({
             />
           </label>
           <label className="flex items-center justify-between text-xs text-gray-600">
-            대표 색상 개수
-            <input
-              type="range"
-              min={2}
-              max={16}
-              value={maxColors}
-              onChange={(e) => handleOptionChange(pixelSize, antiAlias, Number(e.target.value))}
-            />
+            <span>대표 색상 개수</span>
+            <span className="flex items-center gap-1.5">
+              <input
+                type="range"
+                min={2}
+                max={16}
+                value={maxColors}
+                onChange={(e) => handleOptionChange(pixelSize, antiAlias, Number(e.target.value))}
+              />
+              <span className="w-5 text-right text-[10px] tabular-nums text-gray-400">{maxColors}</span>
+            </span>
           </label>
           <label className="flex items-center justify-between text-xs text-gray-600">
             캔버스 크기

@@ -33,6 +33,11 @@ const TOOL_GROUPS: { label: string; tools: { tool: Tool; icon: typeof Paintbrush
 
 const BRUSH_SIZES = [1, 2, 3, 4];
 
+// 브러시 크기는 실제로 점을 찍는 도구(plotPoint를 쓰는)에만 의미가 있다 —
+// 채우기는 floodFill로 영역 전체를 칠하고, 스포이트·선택·이동·자동 선택은
+// 애초에 픽셀을 그리지 않으므로 브러시 크기와 무관하다.
+const BRUSH_SIZE_TOOLS: Tool[] = ["pencil", "eraser", "line", "rect", "circle"];
+
 export default function Toolbar({
   tool,
   onToolChange,
@@ -68,13 +73,13 @@ export default function Toolbar({
         <div key={group.label} className="contents">
           <div className="flex flex-col gap-1.5">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{group.label}</p>
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-5 gap-1">
               {group.tools.map(({ tool: t, icon: Icon, label, key }) => (
                 <button
                   key={t}
                   onClick={() => onToolChange(t)}
                   title={`${label} (${key})`}
-                  className={`flex h-10 w-9 flex-col items-center justify-center gap-0.5 transition-colors ${
+                  className={`flex h-9 w-8 flex-col items-center justify-center gap-0.5 transition-colors ${
                     tool === t ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
@@ -92,9 +97,10 @@ export default function Toolbar({
                 {BRUSH_SIZES.map((size) => (
                   <button
                     key={size}
+                    disabled={!BRUSH_SIZE_TOOLS.includes(tool)}
                     onClick={() => onBrushSizeChange(size)}
                     title={`${size}px 브러시`}
-                    className={`flex-1 py-1 text-[10px] ${
+                    className={`flex-1 py-1 text-[10px] disabled:opacity-30 ${
                       brushSize === size ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     }`}
                   >
