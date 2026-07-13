@@ -8,7 +8,9 @@ export type Tool =
   | "circle"
   | "select"
   | "move"
-  | "wand";
+  | "wand"
+  | "text"
+  | "gradient";
 
 export type MirrorMode = "none" | "horizontal" | "vertical" | "both";
 

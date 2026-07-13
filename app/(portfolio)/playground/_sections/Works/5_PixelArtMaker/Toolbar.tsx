@@ -1,6 +1,6 @@
 "use client";
 
-import { Circle, Copy, Eraser, Grid3x3, Minus, MousePointer2, Move, Paintbrush, PaintBucket, Redo2, Square, SquareX, Undo2, Wand2 } from "lucide-react";
+import { Blend, Circle, Copy, Eraser, Grid3x3, Minus, MousePointer2, Move, Paintbrush, PaintBucket, Redo2, Square, SquareX, Type, Undo2, Wand2 } from "lucide-react";
 import { isMacPlatform } from "./platform";
 import { MirrorMode, Tool } from "./types";
 
@@ -19,6 +19,8 @@ const TOOL_GROUPS: { label: string; tools: { tool: Tool; icon: typeof Paintbrush
       { tool: "line", icon: Minus, label: "직선", key: "U" },
       { tool: "rect", icon: Square, label: "사각형", key: "R" },
       { tool: "circle", icon: Circle, label: "원", key: "O" },
+      { tool: "text", icon: Type, label: "텍스트", key: "T" },
+      { tool: "gradient", icon: Blend, label: "그라데이션", key: "D" },
     ],
   },
   {

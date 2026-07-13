@@ -26,6 +26,8 @@ export default function ColorWheel({
   onRemoveColor,
   tool,
   onToolChange,
+  secondaryColorIndex,
+  onSelectSecondary,
 }: {
   palette: string[];
   activeColorIndex: number;
@@ -35,6 +37,9 @@ export default function ColorWheel({
   onRemoveColor: (index: number) => void;
   tool: Tool;
   onToolChange: (tool: Tool) => void;
+  // 그라데이션 끝 색상 — MS페인트의 보조 색상과 같은 개념. -1이면 투명.
+  secondaryColorIndex: number;
+  onSelectSecondary: (index: number) => void;
 }) {
   const squareRef = useRef<HTMLCanvasElement>(null);
   const draggingRef = useRef<"square" | "hue" | "alpha" | null>(null);
@@ -294,10 +299,18 @@ export default function ColorWheel({
             key={index}
             onClick={() => onSelect(index)}
             onDoubleClick={() => onRemoveColor(index)}
-            title={`${color} — 더블클릭으로 제거`}
-            className={`h-6 w-6 ${index === activeColorIndex ? "ring-2 ring-violet-500" : "ring-1 ring-black/10"}`}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              onSelectSecondary(index);
+            }}
+            title={`${color} — 클릭: 선택 · 더블클릭: 제거 · 우클릭: 그라데이션 끝 색상으로 지정`}
+            className={`relative h-6 w-6 ${index === activeColorIndex ? "ring-2 ring-violet-500" : "ring-1 ring-black/10"}`}
             style={{ backgroundColor: color }}
-          />
+          >
+            {index === secondaryColorIndex && (
+              <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-white shadow-[0_0_0_1px_#8b5cf6]" />
+            )}
+          </button>
         ))}
         <button
           disabled={isFull}
@@ -308,6 +321,27 @@ export default function ColorWheel({
           className="flex h-6 w-6 items-center justify-center bg-gray-100 text-xs text-gray-500 shadow-sm disabled:opacity-30"
         >
           +
+        </button>
+      </div>
+
+      <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+        <span>그라데이션 끝</span>
+        <div
+          className="h-4 w-4 shrink-0 shadow-[0_0_0_1px_rgba(0,0,0,0.15)]"
+          style={
+            secondaryColorIndex >= 0
+              ? { backgroundColor: palette[secondaryColorIndex] }
+              : {
+                  backgroundImage:
+                    "linear-gradient(45deg, #d4d4d8 25%, transparent 25%), linear-gradient(-45deg, #d4d4d8 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d4d4d8 75%), linear-gradient(-45deg, transparent 75%, #d4d4d8 75%)",
+                  backgroundSize: "6px 6px",
+                  backgroundPosition: "0 0, 0 3px, 3px -3px, -3px 0px",
+                }
+          }
+        />
+        <span className="text-gray-400">(스와치 우클릭으로 지정)</span>
+        <button onClick={() => onSelectSecondary(-1)} className="ml-auto text-violet-500 hover:underline">
+          투명으로
         </button>
       </div>
     </div>

@@ -19,11 +19,14 @@ import {
   exportAsPNG,
   exportAsSVG,
 } from "./exportPixelArt";
+import { applyGradient } from "./gradientFill";
 import ImportPanel from "./ImportPanel";
 import NewCanvasDialog from "./NewCanvasDialog";
 import PixelCanvas from "./PixelCanvas";
 import { createGrid, getPixel, resizeGrid } from "./pixelGrid";
 import ResizeCanvasDialog from "./ResizeCanvasDialog";
+import { rasterizeText } from "./textStamp";
+import TextToolPopup from "./TextToolPopup";
 import Toolbar from "./Toolbar";
 import { CANVAS_PRESETS, MirrorMode, Tool } from "./types";
 import { useCanvasHistory } from "./useCanvasHistory";
@@ -118,6 +121,11 @@ export default function Editor({
   const [showGrid, setShowGrid] = useState(true);
   const [brushSize, setBrushSize] = useState(1);
   const [filledShapes, setFilledShapes] = useState(false);
+  // 그라데이션 도구의 끝 색상 — 팔레트 인덱스, -1이면 투명. MS페인트의
+  // 주/보조 색상과 같은 개념으로 팔레트 스와치를 우클릭하면 바뀐다.
+  const [secondaryColorIndex, setSecondaryColorIndex] = useState(-1);
+  // 텍스트 도구로 캔버스를 클릭하면 그 그리드 좌표에 팝업을 띄운다.
+  const [textPopup, setTextPopup] = useState<{ x: number; y: number } | null>(null);
   // PixelCanvas가 Ctrl+스크롤로 자체 관리하는 확대 배율 — 뷰포트 좌측 하단에
   // 표시만 하기 위해 값을 그대로 올려받는다.
   const [canvasZoom, setCanvasZoom] = useState(1);
@@ -289,6 +297,50 @@ export default function Editor({
   const handleClearCanvas = useCallback(() => {
     history.push(createGrid(doc.width, doc.height));
   }, [history, doc.width, doc.height]);
+
+  // 텍스트 도구로 클릭한 자리에 팝업을 띄운다 — 실제 래스터화·팔레트 반영은
+  // handleTextConfirm에서(팔레트를 건드리지 않고 활성 색상 하나로만 찍는다).
+  const handleTextToolClick = useCallback((x: number, y: number) => {
+    setTextPopup({ x, y });
+  }, []);
+
+  const handleTextConfirm = useCallback(
+    (text: string, fontSize: number) => {
+      if (!textPopup || !text.trim()) {
+        setTextPopup(null);
+        return;
+      }
+      const { width: tw, height: th, mask } = rasterizeText(text, fontSize);
+      const next = history.present.slice();
+      for (let ty = 0; ty < th; ty++) {
+        for (let tx = 0; tx < tw; tx++) {
+          if (!mask[ty * tw + tx]) continue;
+          const px = textPopup.x + tx;
+          const py = textPopup.y + ty;
+          if (px < 0 || py < 0 || px >= doc.width || py >= doc.height) continue;
+          next[py * doc.width + px] = activeColorIndex;
+        }
+      }
+      history.push(next);
+      setTextPopup(null);
+    },
+    [textPopup, doc.width, doc.height, activeColorIndex, history],
+  );
+
+  // 그라데이션 드래그가 끝나면 시작(활성 색상)~끝(보조 색상) 사이를 밴딩해
+  // 채운다 — 필요하면 팔레트를 확장하므로 pixels·palette를 함께 커밋한다.
+  const handleGradientToolEnd = useCallback(
+    (x0: number, y0: number, x1: number, y1: number) => {
+      const startHex = doc.palette[activeColorIndex] ?? "#000000";
+      const endHex = secondaryColorIndex >= 0 ? (doc.palette[secondaryColorIndex] ?? "#00000000") : "#00000000";
+      const result = applyGradient(history.present, doc.palette, doc.width, doc.height, x0, y0, x1, y1, startHex, endHex);
+      if (result.palette.length !== doc.palette.length) {
+        setDoc((d) => ({ ...d, palette: result.palette }));
+      }
+      history.push(result.pixels);
+    },
+    [activeColorIndex, secondaryColorIndex, history, doc.palette, doc.width, doc.height],
+  );
 
   const handleSave = useCallback(() => {
     if (activeTabIndex < 0) return;
@@ -762,6 +814,8 @@ export default function Editor({
               onRemoveColor={handleRemoveColor}
               tool={tool}
               onToolChange={setTool}
+              secondaryColorIndex={secondaryColorIndex}
+              onSelectSecondary={setSecondaryColorIndex}
             />
           </div>
           <div ref={canvasViewportRef} className="relative flex flex-1 items-center justify-center overflow-auto">
@@ -780,10 +834,15 @@ export default function Editor({
               onSelectionChange={selection.setMask}
               onStrokeEnd={handleStrokeEnd}
               onPickColor={handlePickColor}
+              onTextToolClick={handleTextToolClick}
+              onGradientToolEnd={handleGradientToolEnd}
               zoom={canvasZoom}
               onZoomChange={setCanvasZoom}
               viewportRef={canvasViewportRef}
             />
+            {textPopup && (
+              <TextToolPopup onConfirm={handleTextConfirm} onCancel={() => setTextPopup(null)} />
+            )}
             <div className="absolute bottom-2 left-2 flex items-center gap-0.5">
               <button
                 onClick={() => setCanvasZoom((z) => Math.max(1, z - 1))}

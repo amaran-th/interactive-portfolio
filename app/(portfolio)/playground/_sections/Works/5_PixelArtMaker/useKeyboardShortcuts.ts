@@ -12,6 +12,8 @@ const TOOL_KEYS: Record<string, Tool> = {
   m: "select",
   v: "move",
   w: "wand",
+  t: "text",
+  d: "gradient",
 };
 
 export function useKeyboardShortcuts({

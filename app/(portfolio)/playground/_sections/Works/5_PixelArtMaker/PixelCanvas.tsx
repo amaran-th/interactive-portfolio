@@ -33,6 +33,8 @@ export default function PixelCanvas({
   onSelectionChange,
   onStrokeEnd,
   onPickColor,
+  onTextToolClick,
+  onGradientToolEnd,
   zoom,
   onZoomChange,
   viewportRef,
@@ -51,6 +53,12 @@ export default function PixelCanvas({
   onSelectionChange: (mask: Set<number> | null) => void;
   onStrokeEnd: (next: number[]) => void;
   onPickColor: (colorIndex: number) => void;
+  // 텍스트 도구로 캔버스를 클릭했을 때(그리드 좌표) — 실제 텍스트 입력·래스터화·
+  // 팔레트 반영은 Editor가 맡는다(paste와 같은 패턴).
+  onTextToolClick: (x: number, y: number) => void;
+  // 그라데이션 드래그가 끝났을 때(시작·끝 그리드 좌표) — 팔레트 확장이 필요할 수
+  // 있어 실제 채우기는 Editor가 처리한다.
+  onGradientToolEnd: (x0: number, y0: number, x1: number, y1: number) => void;
   zoom: number;
   onZoomChange: (zoom: number) => void;
   // 확대 상태에서 스페이스+드래그로 스크롤할 대상 — 이 캔버스를 감싼 overflow-auto
@@ -71,6 +79,9 @@ export default function PixelCanvas({
   // 뷰포트(부모 컨테이너)를 스크롤한다.
   const [isSpaceHeld, setIsSpaceHeld] = useState(false);
   const panStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
+  // 그라데이션 도구는 드래그 중 실제 픽셀은 건드리지 않는다(팔레트 확장은 커밋
+  // 시점에 Editor가 처리) — 드래그 축만 얇은 선으로 미리 보여준다.
+  const gradientPreviewRef = useRef<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   // selectionMask 프롭은 React state를 거쳐 비동기로 갱신되므로, 빠른 연속 pointermove
   // 동안 오래된(stale) 값을 참조해 move 드래그가 잘못된 위치를 지우는 문제(자취 남음)가
   // 있었다. workingRef와 같은 패턴으로 항상 최신 값을 담는 ref를 별도로 둔다.
@@ -153,6 +164,16 @@ export default function PixelCanvas({
           ctx.strokeRect(x * scale + 0.5, y * scale + 0.5, scale - 1, scale - 1);
         });
       }
+
+      const gp = gradientPreviewRef.current;
+      if (gp) {
+        ctx.strokeStyle = "rgba(139, 92, 246, 0.9)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(gp.x0 * scale + scale / 2, gp.y0 * scale + scale / 2);
+        ctx.lineTo(gp.x1 * scale + scale / 2, gp.y1 * scale + scale / 2);
+        ctx.stroke();
+      }
     },
     [width, height, palette, zoom, showGrid],
   );
@@ -218,6 +239,19 @@ export default function PixelCanvas({
         return;
       }
 
+      if (tool === "text") {
+        onTextToolClick(point.x, point.y);
+        return;
+      }
+
+      if (tool === "gradient") {
+        drawingRef.current = true;
+        shapeStartRef.current = point;
+        gradientPreviewRef.current = { x0: point.x, y0: point.y, x1: point.x, y1: point.y };
+        render(workingRef.current);
+        return;
+      }
+
       if (tool === "bucket") {
         const next = floodFill(workingRef.current, width, height, point.x, point.y, activeColorIndex);
         if (next !== workingRef.current) {
@@ -272,7 +306,21 @@ export default function PixelCanvas({
         render(next);
       }
     },
-    [tool, width, height, activeColorIndex, isSpaceHeld, viewportRef, toGridPoint, plotPoint, render, onStrokeEnd, onPickColor, onSelectionChange],
+    [
+      tool,
+      width,
+      height,
+      activeColorIndex,
+      isSpaceHeld,
+      viewportRef,
+      toGridPoint,
+      plotPoint,
+      render,
+      onStrokeEnd,
+      onPickColor,
+      onTextToolClick,
+      onSelectionChange,
+    ],
   );
 
   const handlePointerMove = useCallback(
@@ -286,6 +334,14 @@ export default function PixelCanvas({
         return;
       }
       if (!drawingRef.current) return;
+
+      if (tool === "gradient" && shapeStartRef.current) {
+        const point = toGridPoint(e);
+        if (!point) return;
+        gradientPreviewRef.current = { x0: shapeStartRef.current.x, y0: shapeStartRef.current.y, x1: point.x, y1: point.y };
+        render(workingRef.current);
+        return;
+      }
 
       if (tool === "select" && shapeStartRef.current) {
         const point = toGridPoint(e);
@@ -377,6 +433,14 @@ export default function PixelCanvas({
       shapeStartRef.current = null;
       return;
     }
+    if (tool === "gradient") {
+      const gp = gradientPreviewRef.current;
+      gradientPreviewRef.current = null;
+      shapeStartRef.current = null;
+      render(workingRef.current);
+      if (gp && (gp.x0 !== gp.x1 || gp.y0 !== gp.y1)) onGradientToolEnd(gp.x0, gp.y0, gp.x1, gp.y1);
+      return;
+    }
     if (tool === "line" || tool === "rect" || tool === "circle") {
       shapeStartRef.current = null;
       onStrokeEnd(workingRef.current);
@@ -384,7 +448,7 @@ export default function PixelCanvas({
     }
     lastPointRef.current = null;
     onStrokeEnd(workingRef.current);
-  }, [tool, onStrokeEnd]);
+  }, [tool, onStrokeEnd, onGradientToolEnd, render]);
 
   // React의 onWheel은 리스너를 passive로 등록해 e.preventDefault()가 조용히
   // 무시된다 — Ctrl/Cmd+스크롤로 캔버스만 확대하려 해도 브라우저의 페이지 확대가
