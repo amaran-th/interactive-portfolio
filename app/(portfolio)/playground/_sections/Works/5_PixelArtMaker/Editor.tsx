@@ -753,11 +753,11 @@ export default function Editor({
     [palette],
   );
 
-  // 색상환을 조작하면 현재 활성 팔레트 스와치 자체의 값을 실시간으로 갱신한다
-  // (새 색을 "추가"하는 게 아니라 지금 선택된 색을 "수정"하는 것이 기본 동작) —
-  // 이미 그 색으로 칠한 픽셀이 있어도 함께 바뀐다. 한때 새 스와치로 분기시키는
-  // 방식을 시도했지만 사용해보니 불편하다는 피드백을 받아 되돌렸다.
-  const handleChangeActiveColor = useCallback(
+  // 색상환으로 특정 스와치를 명시적으로 "편집 모드"에 들어가 고칠 때만 쓰인다
+  // (ColorWheel의 연필 아이콘) — 이미 그 색으로 칠한 픽셀이 있어도 함께 바뀐다.
+  // 의도적인 동작이므로 괜찮다: 일반적인 색상환 조작(편집 모드 아님)은
+  // handleCommitColor가 대신 처리해, 이미 칠해진 스와치를 실수로 바꾸지 않는다.
+  const handleEditSwatchColor = useCallback(
     (hex: string) => {
       setDoc((d) => {
         const nextPalette = d.palette.slice();
@@ -767,6 +767,23 @@ export default function Editor({
       setHasMetaEdits(true);
     },
     [activeColorIndex],
+  );
+
+  // 색상환을 조작하고 손을 놓으면 호출된다 — 기존 스와치를 실시간으로 덮어쓰지
+  // 않고, 이미 같은 색이 팔레트에 있으면 그 스와치를 재사용하고 없으면 새
+  // 스와치로 추가한다(가득 찼으면 가장 가까운 기존 색으로 대체). 다른
+  // 픽셀아트 툴들처럼 "색을 섞는 것"과 "팔레트 항목을 고치는 것"을 분리해,
+  // 이미 칠한 색을 색상환 조작만으로 바꿔버리는 문제를 막는다.
+  const handleCommitColor = useCallback(
+    (hex: string) => {
+      const resolved = resolvePaletteIndex(hex, doc.palette);
+      if (resolved.palette !== doc.palette) {
+        setDoc((d) => ({ ...d, palette: resolved.palette }));
+        setHasMetaEdits(true);
+      }
+      setActiveColorIndex(resolved.index);
+    },
+    [doc.palette],
   );
 
   const handlePickColor = useCallback((colorIndex: number) => {
@@ -1021,7 +1038,8 @@ export default function Editor({
               palette={palette}
               activeColorIndex={activeColorIndex}
               onSelect={setActiveColorIndex}
-              onChangeActiveColor={handleChangeActiveColor}
+              onCommitColor={handleCommitColor}
+              onEditSwatchColor={handleEditSwatchColor}
               onAddColor={handleAddColor}
               onRemoveColor={handleRemoveColor}
               tool={tool}

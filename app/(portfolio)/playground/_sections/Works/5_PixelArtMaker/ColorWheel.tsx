@@ -1,6 +1,6 @@
 "use client";
 
-import { Pipette } from "lucide-react";
+import { Pencil, Pipette } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { hexToRgba, hsvToRgb, rgbaToHex, rgbToHsv } from "./hsv";
 import { MAX_PALETTE_COLORS, Tool } from "./types";
@@ -21,7 +21,8 @@ export default function ColorWheel({
   palette,
   activeColorIndex,
   onSelect,
-  onChangeActiveColor,
+  onCommitColor,
+  onEditSwatchColor,
   onAddColor,
   onRemoveColor,
   tool,
@@ -36,7 +37,13 @@ export default function ColorWheel({
   palette: string[];
   activeColorIndex: number;
   onSelect: (index: number) => void;
-  onChangeActiveColor: (hex: string) => void;
+  // 색상환을 조작하고 손을 놓으면(드래그 종료) 호출된다 — 이미 있는 색이면 그
+  // 스와치를 재사용하고, 없으면 새 스와치로 추가한다. 기존 스와치를 실시간으로
+  // 덮어쓰지 않으므로 이미 칠해진 픽셀은 건드리지 않는다.
+  onCommitColor: (hex: string) => void;
+  // 스와치의 연필 아이콘으로 명시적으로 "편집 모드"에 들어갔을 때만 쓰인다 —
+  // 이때는 의도적으로 그 스와치 자체(와 이미 칠한 픽셀)를 실시간으로 바꾼다.
+  onEditSwatchColor: (hex: string) => void;
   onAddColor: (hex: string) => void;
   onRemoveColor: (index: number) => void;
   tool: Tool;
@@ -50,6 +57,10 @@ export default function ColorWheel({
   gradientAngleDeg: number;
   onGradientAngleChange: (deg: number) => void;
 }) {
+  // null이면 색상환은 "지금 그릴 색"만 미리보기로 바꾼다(드래그가 끝나야 팔레트에
+  // 반영). 특정 인덱스면 그 스와치를 색상환으로 직접 편집하는 중 — 연필
+  // 아이콘으로만 들어가고, 다른 스와치를 클릭하면 빠져나온다.
+  const [editingSwatch, setEditingSwatch] = useState<number | null>(null);
   const squareRef = useRef<HTMLCanvasElement>(null);
   const draggingRef = useRef<"square" | "hue" | "alpha" | null>(null);
   const hueTrackRef = useRef<HTMLDivElement>(null);
@@ -109,13 +120,19 @@ export default function ColorWheel({
     drawSquare(hue);
   }, [hue, drawSquare]);
 
+  // 드래그 중에는 항상 hsva(마커·슬라이더 위치)만 갱신한다. 편집 모드일 때만
+  // 실시간으로 그 스와치 자체(onEditSwatchColor)를 바꾼다 — 편집 모드가 아니면
+  // 드래그가 끝날 때(handleDragEnd) 딱 한 번만 팔레트에 반영해, 매 이동마다
+  // 스와치가 늘어나거나 활성 색상이 계속 튀던 예전 문제를 피한다.
   const commit = useCallback(
     (next: [number, number, number, number]) => {
       setHsva(next);
-      const [r, g, b] = hsvToRgb(next[0], next[1], next[2]);
-      onChangeActiveColor(rgbaToHex(r, g, b, next[3]));
+      if (editingSwatch === activeColorIndex) {
+        const [r, g, b] = hsvToRgb(next[0], next[1], next[2]);
+        onEditSwatchColor(rgbaToHex(r, g, b, next[3]));
+      }
     },
-    [onChangeActiveColor],
+    [editingSwatch, activeColorIndex, onEditSwatchColor],
   );
 
   const applySquarePoint = useCallback(
@@ -203,7 +220,11 @@ export default function ColorWheel({
 
   const handleDragEnd = useCallback(() => {
     draggingRef.current = null;
-  }, []);
+    if (editingSwatch !== activeColorIndex) {
+      const [r, g, b] = hsvToRgb(hue, sat, val);
+      onCommitColor(rgbaToHex(r, g, b, alpha));
+    }
+  }, [editingSwatch, activeColorIndex, hue, sat, val, alpha, onCommitColor]);
 
   const isFull = palette.length >= MAX_PALETTE_COLORS;
   const markerX = sat * SQUARE_SIZE;
@@ -299,27 +320,64 @@ export default function ColorWheel({
         </div>
       </div>
 
+      <div className="flex w-full items-center gap-1.5 text-[10px] text-gray-500">
+        <div
+          className="h-4 w-4 shrink-0 shadow-[0_0_0_1px_rgba(0,0,0,0.15)]"
+          style={{ backgroundColor: rgbaToHex(...opaqueRgb, alpha) }}
+        />
+        {editingSwatch === activeColorIndex ? (
+          <span className="text-amber-600">
+            스와치 직접 수정 중 — 이미 칠한 픽셀도 함께 바뀝니다
+          </span>
+        ) : (
+          <span>
+            놓으면 팔레트에 반영됩니다
+            {isFull ? " (가득 차 가장 비슷한 색으로 대체)" : ""}
+          </span>
+        )}
+      </div>
+
       <p className="text-xs font-semibold text-gray-500">
         팔레트 ({palette.length}/{MAX_PALETTE_COLORS})
       </p>
       <div className="grid grid-cols-6 gap-1.5">
         {palette.map((color, index) => (
-          <button
-            key={index}
-            onClick={() => onSelect(index)}
-            onDoubleClick={() => onRemoveColor(index)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              onSelectSecondary(index);
-            }}
-            title={`${color} — 클릭: 선택 · 더블클릭: 제거 · 우클릭: 그라데이션 끝 색상으로 지정`}
-            className={`relative h-6 w-6 ${index === activeColorIndex ? "ring-2 ring-violet-500" : "ring-1 ring-black/10"}`}
-            style={{ backgroundColor: color }}
-          >
+          <div key={index} className="group relative h-6 w-6">
+            <button
+              onClick={() => {
+                onSelect(index);
+                setEditingSwatch(null);
+              }}
+              onDoubleClick={() => onRemoveColor(index)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                onSelectSecondary(index);
+              }}
+              title={`${color} — 클릭: 선택 · 더블클릭: 제거 · 우클릭: 그라데이션 끝 색상으로 지정`}
+              className={`h-6 w-6 ${
+                editingSwatch === index
+                  ? "ring-2 ring-amber-500"
+                  : index === activeColorIndex
+                    ? "ring-2 ring-violet-500"
+                    : "ring-1 ring-black/10"
+              }`}
+              style={{ backgroundColor: color }}
+            />
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(index);
+                setEditingSwatch((cur) => (cur === index ? null : index));
+              }}
+              title="이 스와치를 색상환으로 직접 수정(이미 칠한 픽셀도 함께 바뀜)"
+              className="absolute -top-1 -left-1 hidden h-3.5 w-3.5 items-center justify-center bg-gray-700 text-white group-hover:flex"
+            >
+              <Pencil className="h-2 w-2" />
+            </button>
             {index === secondaryColorIndex && (
               <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-white shadow-[0_0_0_1px_#8b5cf6]" />
             )}
-          </button>
+          </div>
         ))}
         <button
           disabled={isFull}
