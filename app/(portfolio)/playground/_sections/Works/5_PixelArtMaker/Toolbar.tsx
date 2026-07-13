@@ -1,6 +1,6 @@
 "use client";
 
-import { Circle, Copy, Eraser, Grid3x3, Minus, MousePointer2, Move, Paintbrush, PaintBucket, Redo2, Square, Trash2, Undo2, Wand2 } from "lucide-react";
+import { Circle, Copy, Eraser, Grid3x3, Minus, MousePointer2, Move, Paintbrush, PaintBucket, Redo2, Square, SquareX, Undo2, Wand2 } from "lucide-react";
 import { isMacPlatform } from "./platform";
 import { MirrorMode, Tool } from "./types";
 
@@ -151,7 +151,7 @@ export default function Toolbar({
           title="전체 지우기"
           className="flex h-7 w-7 items-center justify-center bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-500"
         >
-          <Trash2 className="h-4 w-4" />
+          <SquareX className="h-4 w-4" />
         </button>
         <div className="ml-auto flex gap-1 text-[10px] text-gray-500">
           {(["none", "horizontal", "vertical", "both"] as MirrorMode[]).map((m) => (
