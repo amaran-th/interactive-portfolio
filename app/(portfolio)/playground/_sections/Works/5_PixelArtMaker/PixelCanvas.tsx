@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   circleOutlinePoints,
   floodFill,
@@ -30,6 +30,7 @@ export default function PixelCanvas({
   onSelectionChange,
   onStrokeEnd,
   onPickColor,
+  zoom,
   onZoomChange,
 }: {
   width: number;
@@ -45,14 +46,10 @@ export default function PixelCanvas({
   onSelectionChange: (mask: Set<number> | null) => void;
   onStrokeEnd: (next: number[]) => void;
   onPickColor: (colorIndex: number) => void;
-  onZoomChange?: (zoom: number) => void;
+  zoom: number;
+  onZoomChange: (zoom: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [zoom, setZoom] = useState(1);
-
-  useEffect(() => {
-    onZoomChange?.(zoom);
-  }, [zoom, onZoomChange]);
   const workingRef = useRef<number[]>(pixels);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const shapeStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -335,11 +332,11 @@ export default function PixelCanvas({
     const handler = (e: WheelEvent) => {
       if (!e.ctrlKey) return;
       e.preventDefault();
-      setZoom((z) => Math.min(8, Math.max(1, z + (e.deltaY < 0 ? 1 : -1))));
+      onZoomChange(Math.min(8, Math.max(1, zoom + (e.deltaY < 0 ? 1 : -1))));
     };
     canvas.addEventListener("wheel", handler, { passive: false });
     return () => canvas.removeEventListener("wheel", handler);
-  }, []);
+  }, [zoom, onZoomChange]);
 
   // 스타일러스 호버 취소, 시스템 제스처 등으로 pointerup 없이 스트로크가 끊길 때 안전하게 커밋한다.
   // handlePointerUp과 도구별 분기가 완전히 같아야 하고, 위쪽의 drawingRef 가드 덕분에 pointerup

@@ -11,10 +11,10 @@ function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n));
 }
 
-// 트랙(색상/알파 슬라이더) 위 pointer 좌표를 0~1 값으로 환산한다.
-function trackValue(clientX: number, rect: DOMRect): number {
-  if (rect.width === 0) return 0;
-  return clamp01((clientX - rect.left) / rect.width);
+// 세로 트랙(색상/알파 슬라이더) 위 pointer 좌표를 0~1 값으로 환산한다.
+function trackValue(clientY: number, rect: DOMRect): number {
+  if (rect.height === 0) return 0;
+  return clamp01((clientY - rect.top) / rect.height);
 }
 
 export default function ColorWheel({
@@ -134,10 +134,10 @@ export default function ColorWheel({
   );
 
   const applyHuePoint = useCallback(
-    (clientX: number) => {
+    (clientY: number) => {
       const track = hueTrackRef.current;
       if (!track) return;
-      const t = trackValue(clientX, track.getBoundingClientRect());
+      const t = trackValue(clientY, track.getBoundingClientRect());
       commit([t * 360, sat, val, alpha]);
     },
     [sat, val, alpha, commit],
@@ -147,7 +147,7 @@ export default function ColorWheel({
     (e: React.PointerEvent<HTMLDivElement>) => {
       draggingRef.current = "hue";
       hueTrackRef.current?.setPointerCapture(e.pointerId);
-      applyHuePoint(e.clientX);
+      applyHuePoint(e.clientY);
     },
     [applyHuePoint],
   );
@@ -155,16 +155,16 @@ export default function ColorWheel({
   const handleHueMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (draggingRef.current !== "hue") return;
-      applyHuePoint(e.clientX);
+      applyHuePoint(e.clientY);
     },
     [applyHuePoint],
   );
 
   const applyAlphaPoint = useCallback(
-    (clientX: number) => {
+    (clientY: number) => {
       const track = alphaTrackRef.current;
       if (!track) return;
-      const t = trackValue(clientX, track.getBoundingClientRect());
+      const t = trackValue(clientY, track.getBoundingClientRect());
       commit([hue, sat, val, t]);
     },
     [hue, sat, val, commit],
@@ -174,7 +174,7 @@ export default function ColorWheel({
     (e: React.PointerEvent<HTMLDivElement>) => {
       draggingRef.current = "alpha";
       alphaTrackRef.current?.setPointerCapture(e.pointerId);
-      applyAlphaPoint(e.clientX);
+      applyAlphaPoint(e.clientY);
     },
     [applyAlphaPoint],
   );
@@ -182,7 +182,7 @@ export default function ColorWheel({
   const handleAlphaMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (draggingRef.current !== "alpha") return;
-      applyAlphaPoint(e.clientX);
+      applyAlphaPoint(e.clientY);
     },
     [applyAlphaPoint],
   );
@@ -197,76 +197,91 @@ export default function ColorWheel({
   const opaqueHex = `rgb(${opaqueRgb[0]}, ${opaqueRgb[1]}, ${opaqueRgb[2]})`;
 
   return (
-    <div className="flex flex-col gap-3 bg-white p-3 shadow-md">
-      <div className="relative" style={{ width: SQUARE_SIZE, height: SQUARE_SIZE }}>
-        <canvas
-          ref={squareRef}
-          width={SQUARE_SIZE}
-          height={SQUARE_SIZE}
-          className="cursor-crosshair touch-none shadow-sm"
-          onPointerDown={handleSquareDown}
-          onPointerMove={handleSquareMove}
-          onPointerUp={handleDragEnd}
-          onPointerCancel={handleDragEnd}
-        />
+    <div className="flex flex-col items-center gap-3 bg-white p-3 shadow-md">
+      <div className="flex gap-2">
+        {/* SV 정사각형 */}
         <div
-          className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_0_2px_#ffffff,0_1px_3px_rgba(0,0,0,0.35)]"
-          style={{ left: markerX, top: markerY, backgroundColor: opaqueHex }}
-        />
-      </div>
-
-      {/* 색상(hue) 슬라이더 */}
-      <div
-        ref={hueTrackRef}
-        onPointerDown={handleHueDown}
-        onPointerMove={handleHueMove}
-        onPointerUp={handleDragEnd}
-        onPointerCancel={handleDragEnd}
-        className="relative h-3.5 w-full cursor-pointer touch-none shadow-sm"
-        style={{
-          background:
-            "linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
-        }}
-      >
-        <div
-          className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_0_2px_#ffffff,0_1px_3px_rgba(0,0,0,0.35)]"
-          style={{ left: `${(hue / 360) * 100}%`, backgroundColor: opaqueHex }}
-        />
-      </div>
-
-      {/* 스포이트 + 알파(투명도) 슬라이더 */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => onToolChange("eyedropper")}
-          title="스포이트 (I)"
-          className={`flex h-7 w-7 shrink-0 items-center justify-center transition-colors ${
-            tool === "eyedropper" ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-          }`}
+          className="relative"
+          style={{ width: SQUARE_SIZE, height: SQUARE_SIZE }}
         >
-          <Pipette className="h-4 w-4" />
-        </button>
-        <div
-          ref={alphaTrackRef}
-          onPointerDown={handleAlphaDown}
-          onPointerMove={handleAlphaMove}
-          onPointerUp={handleDragEnd}
-          onPointerCancel={handleDragEnd}
-          className="relative h-3.5 flex-1 cursor-pointer touch-none shadow-sm"
-          style={{
-            backgroundImage:
-              "linear-gradient(45deg, #d4d4d8 25%, transparent 25%), linear-gradient(-45deg, #d4d4d8 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d4d4d8 75%), linear-gradient(-45deg, transparent 75%, #d4d4d8 75%)",
-            backgroundSize: "8px 8px",
-            backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0px",
-          }}
-        >
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{ background: `linear-gradient(to right, transparent, ${opaqueHex})` }}
+          <canvas
+            ref={squareRef}
+            width={SQUARE_SIZE}
+            height={SQUARE_SIZE}
+            className="cursor-crosshair touch-none shadow-sm"
+            onPointerDown={handleSquareDown}
+            onPointerMove={handleSquareMove}
+            onPointerUp={handleDragEnd}
+            onPointerCancel={handleDragEnd}
           />
           <div
-            className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_0_2px_#ffffff,0_1px_3px_rgba(0,0,0,0.35)]"
-            style={{ left: `${alpha * 100}%`, backgroundColor: opaqueHex }}
+            className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_0_2px_#ffffff,0_1px_3px_rgba(0,0,0,0.35)]"
+            style={{ left: markerX, top: markerY, backgroundColor: opaqueHex }}
           />
+        </div>
+
+        {/* 스포이트(위) + 색상·알파 세로 슬라이더(아래, 나란히) */}
+        <div className="flex flex-col gap-1.5" style={{ height: SQUARE_SIZE }}>
+          <button
+            onClick={() => onToolChange("eyedropper")}
+            title="스포이트 (I)"
+            className={`flex h-7 w-7 shrink-0 items-center justify-center transition-colors ${
+              tool === "eyedropper"
+                ? "bg-violet-500 text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            <Pipette className="h-4 w-4" />
+          </button>
+          <div className="flex flex-1 gap-1.5">
+            {/* 색상(hue) 세로 슬라이더 */}
+            <div
+              ref={hueTrackRef}
+              onPointerDown={handleHueDown}
+              onPointerMove={handleHueMove}
+              onPointerUp={handleDragEnd}
+              onPointerCancel={handleDragEnd}
+              className="relative h-full w-3.5 cursor-pointer touch-none shadow-sm"
+              style={{
+                background:
+                  "linear-gradient(to bottom, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
+              }}
+            >
+              <div
+                className="pointer-events-none absolute left-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_0_2px_#ffffff,0_1px_3px_rgba(0,0,0,0.35)]"
+                style={{
+                  top: `${(hue / 360) * 100}%`,
+                  backgroundColor: opaqueHex,
+                }}
+              />
+            </div>
+            {/* 알파(투명도) 세로 슬라이더 */}
+            <div
+              ref={alphaTrackRef}
+              onPointerDown={handleAlphaDown}
+              onPointerMove={handleAlphaMove}
+              onPointerUp={handleDragEnd}
+              onPointerCancel={handleDragEnd}
+              className="relative h-full w-3.5 cursor-pointer touch-none shadow-sm"
+              style={{
+                backgroundImage:
+                  "linear-gradient(45deg, #d4d4d8 25%, transparent 25%), linear-gradient(-45deg, #d4d4d8 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d4d4d8 75%), linear-gradient(-45deg, transparent 75%, #d4d4d8 75%)",
+                backgroundSize: "8px 8px",
+                backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0px",
+              }}
+            >
+              <div
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  background: `linear-gradient(to bottom, transparent, ${opaqueHex})`,
+                }}
+              />
+              <div
+                className="pointer-events-none absolute left-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_0_2px_#ffffff,0_1px_3px_rgba(0,0,0,0.35)]"
+                style={{ top: `${alpha * 100}%`, backgroundColor: opaqueHex }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -287,7 +302,9 @@ export default function ColorWheel({
         <button
           disabled={isFull}
           onClick={() => onAddColor(rgbaToHex(...opaqueRgb, alpha))}
-          title={isFull ? "팔레트가 가득 찼습니다" : "현재 값을 새 스와치로 추가"}
+          title={
+            isFull ? "팔레트가 가득 찼습니다" : "현재 값을 새 스와치로 추가"
+          }
           className="flex h-6 w-6 items-center justify-center bg-gray-100 text-xs text-gray-500 shadow-sm disabled:opacity-30"
         >
           +

@@ -1,6 +1,6 @@
 "use client";
 
-import { Save, X } from "lucide-react";
+import { Minus, Plus, Save, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getPixelArt,
@@ -43,8 +43,8 @@ type Tab = { doc: PixelArt; hasMetaEdits: boolean };
 
 // 새 캔버스의 기본 팔레트 — 흰색·검은색과 색상환을 고르게 덮는 원색 8개, 총 10개.
 const DEFAULT_PALETTE = [
-  "#ffffff",
   "#000000",
+  "#ffffff",
   "#ff0000",
   "#ff8800",
   "#ffee00",
@@ -741,10 +741,27 @@ export default function Editor({
               onSelectionChange={selection.setMask}
               onStrokeEnd={handleStrokeEnd}
               onPickColor={handlePickColor}
+              zoom={canvasZoom}
               onZoomChange={setCanvasZoom}
             />
-            <div className="absolute bottom-2 left-2 bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
-              {canvasZoom}x
+            <div className="absolute bottom-2 left-2 flex items-center gap-0.5">
+              <button
+                onClick={() => setCanvasZoom((z) => Math.max(1, z - 1))}
+                disabled={canvasZoom <= 1}
+                title="축소"
+                className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
+              >
+                <Minus className="h-3 w-3" />
+              </button>
+              <div className="bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">{canvasZoom}x</div>
+              <button
+                onClick={() => setCanvasZoom((z) => Math.min(8, z + 1))}
+                disabled={canvasZoom >= 8}
+                title="확대"
+                className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
+              >
+                <Plus className="h-3 w-3" />
+              </button>
             </div>
           </div>
           <div className="w-60 shrink-0">
