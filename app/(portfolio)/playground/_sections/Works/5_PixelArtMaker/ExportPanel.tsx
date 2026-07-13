@@ -50,28 +50,41 @@ export default function ExportPanel({ doc }: { doc: PixelArt }) {
   // 대부분 브라우저의 ClipboardItem이 image/png만 신뢰성 있게 지원해 제외.
   const handleSecondary = useCallback(async () => {
     if (format === "png") {
-      flash((await copyPngToClipboard(doc, scale)) ? "PNG를 클립보드에 복사했습니다" : "클립보드 복사 실패");
+      flash(
+        (await copyPngToClipboard(doc, scale))
+          ? "PNG를 클립보드에 복사했습니다"
+          : "클립보드 복사 실패",
+      );
     } else if (format === "svg") {
-      flash((await copyTextToClipboard(buildSvgString(doc))) ? "SVG 코드를 복사했습니다" : "클립보드 복사 실패");
+      flash(
+        (await copyTextToClipboard(buildSvgString(doc)))
+          ? "SVG 코드를 복사했습니다"
+          : "클립보드 복사 실패",
+      );
     } else if (format === "json") {
-      flash((await copyTextToClipboard(JSON.stringify(doc, null, 2))) ? "JSON을 복사했습니다" : "클립보드 복사 실패");
+      flash(
+        (await copyTextToClipboard(JSON.stringify(doc, null, 2)))
+          ? "JSON을 복사했습니다"
+          : "클립보드 복사 실패",
+      );
     }
   }, [format, doc, scale, flash]);
 
   const hasSecondary = format !== "jpg";
-  const secondaryTitle = format === "png" ? "클립보드에 이미지로 복사" : "코드 복사";
+  const secondaryTitle =
+    format === "png" ? "클립보드에 이미지로 복사" : "코드 복사";
 
   return (
-    <div className="flex flex-col gap-3 bg-white p-3 shadow-md">
-      <p className="text-xs font-semibold text-gray-500">내보내기</p>
-
+    <>
       <div className="grid grid-cols-4 gap-1">
         {FORMATS.map((f) => (
           <button
             key={f.id}
             onClick={() => setFormat(f.id)}
             className={`py-1.5 text-[10px] font-semibold ${
-              format === f.id ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              format === f.id
+                ? "bg-violet-500 text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
             {f.label}
@@ -93,7 +106,9 @@ export default function ExportPanel({ doc }: { doc: PixelArt }) {
                 key={s}
                 onClick={() => setScale(s)}
                 className={`flex-1 py-1 text-[10px] ${
-                  scale === s ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  scale === s
+                    ? "bg-violet-500 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
                 {s}×
@@ -122,6 +137,6 @@ export default function ExportPanel({ doc }: { doc: PixelArt }) {
           </button>
         )}
       </div>
-    </div>
+    </>
   );
 }

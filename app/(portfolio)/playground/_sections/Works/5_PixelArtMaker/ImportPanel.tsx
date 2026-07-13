@@ -1,10 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { mergeColors, pixelateImage, quantizeColors, reducePaletteFast, resamplePixelGrid } from "./pixelate";
+import {
+  mergeColors,
+  pixelateImage,
+  quantizeColors,
+  reducePaletteFast,
+  resamplePixelGrid,
+} from "./pixelate";
 import { CANVAS_PRESETS } from "./types";
 
-type Preview = { width: number; height: number; palette: string[]; pixels: number[] };
+type Preview = {
+  width: number;
+  height: number;
+  palette: string[];
+  pixels: number[];
+};
 
 // 미리보기 캔버스가 화면에 표시되는 최대 크기(정사각형 안에 맞춤, 가로세로
 // 비율은 유지) — 실제 캔버스 픽셀 수(preview.width/height)와는 별개다.
@@ -27,7 +38,10 @@ export default function ImportPanel({
   // null = 픽셀 해상도(pixelSize)를 그대로 최종 캔버스 크기로 쓴다. 값이 있으면
   // 그 규격으로 확대/축소해 배치한다 — "변환할 대상 비트 규격"(pixelSize)과
   // "실제 캔버스 크기"를 독립적으로 고를 수 있게 하는 게 이 상태의 목적이다.
-  const [canvasPreset, setCanvasPreset] = useState<{ width: number; height: number } | null>(null);
+  const [canvasPreset, setCanvasPreset] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
   const [imageEl, setImageEl] = useState<HTMLImageElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const autoOpenedRef = useRef(false);
@@ -48,7 +62,12 @@ export default function ImportPanel({
       // 넘기기 전에 먼저 빠르게 후보 수를 줄여야 브라우저가 멈추지 않는다.
       const capped = reducePaletteFast(raw.palette, raw.pixels, 256);
       const quantized = quantizeColors(capped.palette, capped.pixels, colors);
-      setPreview({ width: raw.width, height: raw.height, palette: quantized.palette, pixels: quantized.pixels });
+      setPreview({
+        width: raw.width,
+        height: raw.height,
+        palette: quantized.palette,
+        pixels: quantized.pixels,
+      });
     },
     [],
   );
@@ -110,8 +129,17 @@ export default function ImportPanel({
   const handleMergeClick = useCallback(
     (indexA: number, indexB: number) => {
       if (!preview) return;
-      const merged = mergeColors(preview.palette, preview.pixels, indexA, indexB);
-      setPreview({ ...preview, palette: merged.palette, pixels: merged.pixels });
+      const merged = mergeColors(
+        preview.palette,
+        preview.pixels,
+        indexA,
+        indexB,
+      );
+      setPreview({
+        ...preview,
+        palette: merged.palette,
+        pixels: merged.pixels,
+      });
     },
     [preview],
   );
@@ -139,17 +167,31 @@ export default function ImportPanel({
 
   const handleConfirm = useCallback(() => {
     if (!preview) return;
-    if (!canvasPreset || (canvasPreset.width === preview.width && canvasPreset.height === preview.height)) {
+    if (
+      !canvasPreset ||
+      (canvasPreset.width === preview.width &&
+        canvasPreset.height === preview.height)
+    ) {
       onConfirm(preview);
       return;
     }
-    const pixels = resamplePixelGrid(preview.pixels, preview.width, preview.height, canvasPreset.width, canvasPreset.height);
-    onConfirm({ width: canvasPreset.width, height: canvasPreset.height, palette: preview.palette, pixels });
+    const pixels = resamplePixelGrid(
+      preview.pixels,
+      preview.width,
+      preview.height,
+      canvasPreset.width,
+      canvasPreset.height,
+    );
+    onConfirm({
+      width: canvasPreset.width,
+      height: canvasPreset.height,
+      palette: preview.palette,
+      pixels,
+    });
   }, [preview, canvasPreset, onConfirm]);
 
   return (
-    <div className="flex flex-col gap-3 bg-white p-3 shadow-md">
-      <p className="text-xs font-semibold text-gray-500">이미지를 픽셀아트로 변환</p>
+    <>
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -161,7 +203,9 @@ export default function ImportPanel({
           isDragOver ? "bg-violet-50" : "bg-gray-50"
         }`}
       >
-        <p className="text-center text-[10px] text-gray-400">이미지를 여기로 드래그하거나 파일을 선택하세요</p>
+        <p className="text-center text-[10px] text-gray-400">
+          이미지를 여기로 드래그하거나 파일을 선택하세요
+        </p>
         <input
           ref={fileInputRef}
           type="file"
@@ -184,8 +228,18 @@ export default function ImportPanel({
               ref={previewCanvasRef}
               style={{
                 imageRendering: "pixelated",
-                width: preview.width * Math.min(PREVIEW_DISPLAY_MAX / preview.width, PREVIEW_DISPLAY_MAX / preview.height),
-                height: preview.height * Math.min(PREVIEW_DISPLAY_MAX / preview.width, PREVIEW_DISPLAY_MAX / preview.height),
+                width:
+                  preview.width *
+                  Math.min(
+                    PREVIEW_DISPLAY_MAX / preview.width,
+                    PREVIEW_DISPLAY_MAX / preview.height,
+                  ),
+                height:
+                  preview.height *
+                  Math.min(
+                    PREVIEW_DISPLAY_MAX / preview.width,
+                    PREVIEW_DISPLAY_MAX / preview.height,
+                  ),
               }}
             />
           </div>
@@ -197,9 +251,17 @@ export default function ImportPanel({
                 min={8}
                 max={128}
                 value={pixelSize}
-                onChange={(e) => handleOptionChange(Number(e.target.value), antiAlias, maxColors)}
+                onChange={(e) =>
+                  handleOptionChange(
+                    Number(e.target.value),
+                    antiAlias,
+                    maxColors,
+                  )
+                }
               />
-              <span className="w-9 text-right text-[10px] tabular-nums text-gray-400">{pixelSize}px</span>
+              <span className="w-9 text-right text-[10px] tabular-nums text-gray-400">
+                {pixelSize}px
+              </span>
             </span>
           </label>
           <label className="flex items-center justify-between text-xs text-gray-600">
@@ -207,7 +269,9 @@ export default function ImportPanel({
             <input
               type="checkbox"
               checked={antiAlias}
-              onChange={(e) => handleOptionChange(pixelSize, e.target.checked, maxColors)}
+              onChange={(e) =>
+                handleOptionChange(pixelSize, e.target.checked, maxColors)
+              }
             />
           </label>
           <label className="flex items-center justify-between text-xs text-gray-600">
@@ -218,22 +282,40 @@ export default function ImportPanel({
                 min={2}
                 max={16}
                 value={maxColors}
-                onChange={(e) => handleOptionChange(pixelSize, antiAlias, Number(e.target.value))}
+                onChange={(e) =>
+                  handleOptionChange(
+                    pixelSize,
+                    antiAlias,
+                    Number(e.target.value),
+                  )
+                }
               />
-              <span className="w-5 text-right text-[10px] tabular-nums text-gray-400">{maxColors}</span>
+              <span className="w-5 text-right text-[10px] tabular-nums text-gray-400">
+                {maxColors}
+              </span>
             </span>
           </label>
           <label className="flex items-center justify-between text-xs text-gray-600">
             캔버스 크기
             <select
-              value={canvasPreset ? `${canvasPreset.width}x${canvasPreset.height}` : "same"}
+              value={
+                canvasPreset
+                  ? `${canvasPreset.width}x${canvasPreset.height}`
+                  : "same"
+              }
               onChange={(e) => {
                 if (e.target.value === "same") {
                   setCanvasPreset(null);
                   return;
                 }
-                const preset = CANVAS_PRESETS.find((p) => `${p.width}x${p.height}` === e.target.value);
-                if (preset) setCanvasPreset({ width: preset.width, height: preset.height });
+                const preset = CANVAS_PRESETS.find(
+                  (p) => `${p.width}x${p.height}` === e.target.value,
+                );
+                if (preset)
+                  setCanvasPreset({
+                    width: preset.width,
+                    height: preset.height,
+                  });
               }}
               className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600"
             >
@@ -251,18 +333,24 @@ export default function ImportPanel({
               <button
                 key={i}
                 title="더블클릭하면 다음 색상과 병합됩니다"
-                onDoubleClick={() => preview.palette.length > 1 && handleMergeClick(i, (i + 1) % preview.palette.length)}
+                onDoubleClick={() =>
+                  preview.palette.length > 1 &&
+                  handleMergeClick(i, (i + 1) % preview.palette.length)
+                }
                 className="h-5 w-5 ring-1 ring-black/10"
                 style={{ backgroundColor: color }}
               />
             ))}
           </div>
 
-          <button onClick={handleConfirm} className="bg-violet-500 py-2 text-xs font-semibold text-white hover:bg-violet-600">
+          <button
+            onClick={handleConfirm}
+            className="bg-violet-500 py-2 text-xs font-semibold text-white hover:bg-violet-600"
+          >
             가져오기
           </button>
         </>
       )}
-    </div>
+    </>
   );
 }

@@ -9,6 +9,7 @@ import {
   savePixelArt,
   uid,
 } from "../_shared/assetLibrary";
+import Accordion from "./Accordion";
 import ColorWheel from "./ColorWheel";
 import ConfirmDialog from "./ConfirmDialog";
 import ContextMenu, { ContextMenuItem } from "./ContextMenu";
@@ -125,7 +126,12 @@ export default function Editor({
   const [secondaryColorIndex, setSecondaryColorIndex] = useState(-1);
   // 텍스트 도구로 캔버스를 클릭하면 그 그리드 좌표에서 시작한다 — 아직 픽셀에
   // 굽지 않은 상태로 캔버스 위에 인라인 입력·미리보기를 띄운다(모달 없음).
-  const [pendingText, setPendingText] = useState<{ x: number; y: number; text: string; fontSize: number } | null>(null);
+  const [pendingText, setPendingText] = useState<{
+    x: number;
+    y: number;
+    text: string;
+    fontSize: number;
+  } | null>(null);
   // PixelCanvas가 Ctrl+스크롤로 자체 관리하는 확대 배율 — 뷰포트 좌측 하단에
   // 표시만 하기 위해 값을 그대로 올려받는다.
   const [canvasZoom, setCanvasZoom] = useState(1);
@@ -331,9 +337,12 @@ export default function Editor({
     [commitPendingText],
   );
 
-  const handlePendingTextChange = useCallback((text: string, fontSize: number) => {
-    setPendingText((p) => (p ? { ...p, text, fontSize } : p));
-  }, []);
+  const handlePendingTextChange = useCallback(
+    (text: string, fontSize: number) => {
+      setPendingText((p) => (p ? { ...p, text, fontSize } : p));
+    },
+    [],
+  );
 
   const handlePendingTextMove = useCallback((x: number, y: number) => {
     setPendingText((p) => (p ? { ...p, x, y } : p));
@@ -365,14 +374,35 @@ export default function Editor({
   const handleGradientToolEnd = useCallback(
     (x0: number, y0: number, x1: number, y1: number) => {
       const startHex = doc.palette[activeColorIndex] ?? "#000000";
-      const endHex = secondaryColorIndex >= 0 ? (doc.palette[secondaryColorIndex] ?? "#00000000") : "#00000000";
-      const result = applyGradient(history.present, doc.palette, doc.width, doc.height, x0, y0, x1, y1, startHex, endHex);
+      const endHex =
+        secondaryColorIndex >= 0
+          ? (doc.palette[secondaryColorIndex] ?? "#00000000")
+          : "#00000000";
+      const result = applyGradient(
+        history.present,
+        doc.palette,
+        doc.width,
+        doc.height,
+        x0,
+        y0,
+        x1,
+        y1,
+        startHex,
+        endHex,
+      );
       if (result.palette.length !== doc.palette.length) {
         setDoc((d) => ({ ...d, palette: result.palette }));
       }
       history.push(result.pixels);
     },
-    [activeColorIndex, secondaryColorIndex, history, doc.palette, doc.width, doc.height],
+    [
+      activeColorIndex,
+      secondaryColorIndex,
+      history,
+      doc.palette,
+      doc.width,
+      doc.height,
+    ],
   );
 
   const handleSave = useCallback(() => {
@@ -673,7 +703,8 @@ export default function Editor({
           {
             label: "캔버스 크기 수정",
             onClick: () => setResizingCanvas(true),
-            disabled: noActiveTab,
+            // 배경화면은 데스크탑 전체를 채우는 용도라 크기가 고정이어야 한다.
+            disabled: noActiveTab || isWallpaper,
           },
           {
             label: "붙여넣기",
@@ -692,7 +723,7 @@ export default function Editor({
         ],
       });
     },
-    [doc, history, selection, activeTabIndex],
+    [doc, history, selection, activeTabIndex, isWallpaper],
   );
 
   return (
@@ -851,7 +882,10 @@ export default function Editor({
               onSelectSecondary={setSecondaryColorIndex}
             />
           </div>
-          <div ref={canvasViewportRef} className="relative flex flex-1 items-center justify-center overflow-auto">
+          <div
+            ref={canvasViewportRef}
+            className="relative flex flex-1 items-center justify-center overflow-auto"
+          >
             <PixelCanvas
               width={doc.width}
               height={doc.height}
@@ -869,7 +903,12 @@ export default function Editor({
               onPickColor={handlePickColor}
               onTextToolClick={handleTextToolClick}
               pendingText={
-                pendingText ? { ...pendingText, colorHex: doc.palette[activeColorIndex] ?? "#000000" } : null
+                pendingText
+                  ? {
+                      ...pendingText,
+                      colorHex: doc.palette[activeColorIndex] ?? "#000000",
+                    }
+                  : null
               }
               onPendingTextChange={handlePendingTextChange}
               onPendingTextMove={handlePendingTextMove}
@@ -903,39 +942,43 @@ export default function Editor({
             </div>
           </div>
           <div className="flex w-60 shrink-0 flex-col gap-3">
-            <ImportPanel
-              autoOpen={wantsAutoImport}
-              onConfirm={(imported) => {
-                // wantsAutoImport가 true인 경우는 "새로 만들기 → 이미지로
-                // 불러오기"로 방금 만든, 아직 아무것도 그리지 않은 빈 캔버스다 —
-                // 그 자리에 그대로 불러온 이미지 크기로 채운다.
-                if (wantsAutoImport) {
-                  setDoc((d) => ({
-                    ...d,
+            <Accordion title="이미지 불러오기">
+              <ImportPanel
+                autoOpen={wantsAutoImport}
+                onConfirm={(imported) => {
+                  // wantsAutoImport가 true인 경우는 "새로 만들기 → 이미지로
+                  // 불러오기"로 방금 만든, 아직 아무것도 그리지 않은 빈 캔버스다 —
+                  // 그 자리에 그대로 불러온 이미지 크기로 채운다.
+                  if (wantsAutoImport) {
+                    setDoc((d) => ({
+                      ...d,
+                      width: imported.width,
+                      height: imported.height,
+                      palette: imported.palette,
+                    }));
+                    history.reset(imported.pixels);
+                    setHasMetaEdits(true);
+                    setWantsAutoImport(false);
+                    return;
+                  }
+                  // 그 외에는 지금 열려 있던(이미 그려뒀을 수 있는) 캔버스를 건드리지
+                  // 않고, 불러온 이미지를 새 탭으로 연다 — 이미지 불러오기가 편집
+                  // 중인 캔버스의 크기를 바꾸지 않아야 한다.
+                  openNewTab({
+                    id: uid(),
+                    name: "제목 없음",
                     width: imported.width,
                     height: imported.height,
                     palette: imported.palette,
-                  }));
-                  history.reset(imported.pixels);
-                  setHasMetaEdits(true);
-                  setWantsAutoImport(false);
-                  return;
-                }
-                // 그 외에는 지금 열려 있던(이미 그려뒀을 수 있는) 캔버스를 건드리지
-                // 않고, 불러온 이미지를 새 탭으로 연다 — 이미지 불러오기가 편집
-                // 중인 캔버스의 크기를 바꾸지 않아야 한다.
-                openNewTab({
-                  id: uid(),
-                  name: "제목 없음",
-                  width: imported.width,
-                  height: imported.height,
-                  palette: imported.palette,
-                  pixels: imported.pixels,
-                  createdAt: Date.now(),
-                });
-              }}
-            />
-            <ExportPanel doc={{ ...doc, pixels: history.present }} />
+                    pixels: imported.pixels,
+                    createdAt: Date.now(),
+                  });
+                }}
+              />
+            </Accordion>
+            <Accordion title="내보내기">
+              <ExportPanel doc={{ ...doc, pixels: history.present }} />
+            </Accordion>
           </div>
         </div>
       ) : (
