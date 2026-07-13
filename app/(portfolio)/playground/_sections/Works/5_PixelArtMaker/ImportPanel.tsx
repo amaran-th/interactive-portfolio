@@ -6,6 +6,10 @@ import { CANVAS_PRESETS } from "./types";
 
 type Preview = { width: number; height: number; palette: string[]; pixels: number[] };
 
+// 미리보기 캔버스가 화면에 표시되는 최대 크기(정사각형 안에 맞춤, 가로세로
+// 비율은 유지) — 실제 캔버스 픽셀 수(preview.width/height)와는 별개다.
+const PREVIEW_DISPLAY_MAX = 160;
+
 export default function ImportPanel({
   onConfirm,
   autoOpen,
@@ -14,6 +18,7 @@ export default function ImportPanel({
   autoOpen?: boolean;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [pixelSize, setPixelSize] = useState(32);
@@ -111,6 +116,27 @@ export default function ImportPanel({
     [preview],
   );
 
+  // 슬라이더를 조정할 때마다 preview가 바뀌므로, 실제로 어떤 픽셀아트가 나올지
+  // 색상 스와치만으로는 알 수 없다는 피드백을 받아 결과를 직접 그려서 보여준다.
+  useEffect(() => {
+    const canvas = previewCanvasRef.current;
+    if (!canvas || !preview) return;
+    canvas.width = preview.width;
+    canvas.height = preview.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, preview.width, preview.height);
+    for (let y = 0; y < preview.height; y++) {
+      for (let x = 0; x < preview.width; x++) {
+        const colorIndex = preview.pixels[y * preview.width + x];
+        if (colorIndex < 0) continue;
+        ctx.fillStyle = preview.palette[colorIndex] ?? "#ff00ff";
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+  }, [preview]);
+
   const handleConfirm = useCallback(() => {
     if (!preview) return;
     if (!canvasPreset || (canvasPreset.width === preview.width && canvasPreset.height === preview.height)) {
@@ -153,6 +179,16 @@ export default function ImportPanel({
 
       {preview && (
         <>
+          <div className="flex items-center justify-center bg-gray-50 p-2 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]">
+            <canvas
+              ref={previewCanvasRef}
+              style={{
+                imageRendering: "pixelated",
+                width: preview.width * Math.min(PREVIEW_DISPLAY_MAX / preview.width, PREVIEW_DISPLAY_MAX / preview.height),
+                height: preview.height * Math.min(PREVIEW_DISPLAY_MAX / preview.width, PREVIEW_DISPLAY_MAX / preview.height),
+              }}
+            />
+          </div>
           <label className="flex items-center justify-between text-xs text-gray-600">
             <span>픽셀 해상도(비트 규격)</span>
             <span className="flex items-center gap-1.5">
