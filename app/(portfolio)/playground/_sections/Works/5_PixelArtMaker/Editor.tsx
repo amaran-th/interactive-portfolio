@@ -56,19 +56,9 @@ type Tab = { doc: PixelArt; hasMetaEdits: boolean };
 // 편집을 멈추고 이 시간(ms)이 지나면 자동 저장한다.
 const AUTOSAVE_DELAY_MS = 3000;
 
-// 새 캔버스의 기본 팔레트 — 흰색·검은색과 색상환을 고르게 덮는 원색 8개, 총 10개.
-const DEFAULT_PALETTE = [
-  "#000000",
-  "#ffffff",
-  "#ff0000",
-  "#ff8800",
-  "#ffee00",
-  "#22cc44",
-  "#00bcd4",
-  "#2266ff",
-  "#8833ee",
-  "#ee3399",
-];
+// 새 캔버스의 기본 팔레트 — 미리 채워두지 않고 빈 채로 시작해, 색상환에서
+// 직접 고른 색만 팔레트에 쌓이게 한다.
+const DEFAULT_PALETTE: string[] = [];
 
 function blankDoc(width: number, height: number): PixelArt {
   return {

@@ -26,6 +26,6 @@ export const CANVAS_PRESETS = [
 // 새 캔버스·캔버스 크기 수정 모두에서 쓰는 한 변의 최댓값.
 export const MAX_CANVAS_SIZE = 512;
 
-export const MAX_PALETTE_COLORS = 16;
+export const MAX_PALETTE_COLORS = 64;
 
 export type Point = { x: number; y: number };
