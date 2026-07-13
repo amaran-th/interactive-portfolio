@@ -60,7 +60,7 @@ export default function NewCanvasDialog({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="파일명"
-          className="mb-3 w-full bg-white px-3 py-2 text-sm text-gray-900 shadow-[0_0_0_1px_rgba(0,0,0,0.12)] outline-none focus:shadow-[0_0_0_1.5px_#8b5cf6]"
+          className="mb-3 w-full select-text bg-white px-3 py-2 text-sm text-gray-900 shadow-[0_0_0_1px_rgba(0,0,0,0.12)] outline-none focus:shadow-[0_0_0_1.5px_#8b5cf6]"
         />
 
         <div className="flex gap-3">

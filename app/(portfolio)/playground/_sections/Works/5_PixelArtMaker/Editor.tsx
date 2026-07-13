@@ -665,7 +665,7 @@ export default function Editor({
   return (
     <div
       ref={rootRef}
-      className={`relative flex h-full w-full flex-col bg-white text-gray-900 transition-all duration-200 ease-out ${
+      className={`relative flex h-full w-full select-none flex-col bg-white text-gray-900 transition-all duration-200 ease-out ${
         mounted && !closing ? "scale-100 opacity-100" : "scale-95 opacity-0"
       }`}
     >
@@ -680,7 +680,7 @@ export default function Editor({
               setName(e.target.value);
               setHasMetaEdits(true);
             }}
-            className={`flex-1 bg-transparent text-sm font-semibold text-gray-900 outline-none ${isWallpaper ? "cursor-default" : ""}`}
+            className={`flex-1 select-text bg-transparent text-sm font-semibold text-gray-900 outline-none ${isWallpaper ? "cursor-default" : ""}`}
           />
         ) : (
           <span className="flex-1 text-sm font-semibold text-gray-400">

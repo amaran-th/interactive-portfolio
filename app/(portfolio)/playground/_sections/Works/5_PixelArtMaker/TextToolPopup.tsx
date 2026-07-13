@@ -26,7 +26,7 @@ export default function TextToolPopup({
             else if (e.key === "Escape") onCancel();
           }}
           placeholder="텍스트 입력"
-          className="mb-3 w-full bg-white px-3 py-2 text-sm text-gray-900 shadow-[0_0_0_1px_rgba(0,0,0,0.12)] outline-none focus:shadow-[0_0_0_1.5px_#8b5cf6]"
+          className="mb-3 w-full select-text bg-white px-3 py-2 text-sm text-gray-900 shadow-[0_0_0_1px_rgba(0,0,0,0.12)] outline-none focus:shadow-[0_0_0_1.5px_#8b5cf6]"
         />
         <label className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-gray-400">
           <span>글자 크기</span>
