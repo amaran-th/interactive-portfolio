@@ -42,6 +42,9 @@ import {
 // 그림 내용은 그대로 보존된다).
 type Tab = { doc: PixelArt; hasMetaEdits: boolean };
 
+// 편집을 멈추고 이 시간(ms)이 지나면 자동 저장한다.
+const AUTOSAVE_DELAY_MS = 3000;
+
 // 새 캔버스의 기본 팔레트 — 흰색·검은색과 색상환을 고르게 덮는 원색 8개, 총 10개.
 const DEFAULT_PALETTE = [
   "#000000",
@@ -305,6 +308,21 @@ export default function Editor({
     history.reset(toSave.pixels);
     setHasMetaEdits(false);
   }, [activeTabIndex, doc, name, history, isWallpaper, flagSaveError]);
+
+  // 자동 저장 — 편집을 멈춘 지 AUTOSAVE_DELAY_MS가 지나면 수동 저장과 동일한
+  // handleSave를 그대로 호출한다. 매 획마다 저장하면 낭비이므로 편집이 있을
+  // 때만 타이머를 다시 건다(디바운스). 완전히 빈 새 캔버스는 history.canUndo도
+  // hasMetaEdits도 false라 애초에 대상이 아니다.
+  const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (activeTabIndex < 0) return;
+    const dirty = history.canUndo || hasMetaEdits;
+    if (!dirty) return;
+    autosaveTimeoutRef.current = setTimeout(handleSave, AUTOSAVE_DELAY_MS);
+    return () => {
+      if (autosaveTimeoutRef.current) clearTimeout(autosaveTimeoutRef.current);
+    };
+  }, [activeTabIndex, history.canUndo, hasMetaEdits, handleSave]);
 
   // 다른 이름으로 저장 — 원본(배경화면이라도)은 건드리지 않고 새 id로 일반
   // 픽셀아트 목록에 별도 항목을 만든 뒤, 이후 편집은 그 새 사본을 대상으로 한다.
