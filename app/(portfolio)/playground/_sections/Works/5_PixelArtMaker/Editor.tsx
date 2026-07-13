@@ -113,6 +113,7 @@ export default function Editor({
   const [mirror, setMirror] = useState<MirrorMode>("none");
   const [showGrid, setShowGrid] = useState(true);
   const [brushSize, setBrushSize] = useState(1);
+  const [filledShapes, setFilledShapes] = useState(false);
   // PixelCanvas가 Ctrl+스크롤로 자체 관리하는 확대 배율 — 뷰포트 좌측 하단에
   // 표시만 하기 위해 값을 그대로 올려받는다.
   const [canvasZoom, setCanvasZoom] = useState(1);
@@ -720,6 +721,8 @@ export default function Editor({
               onToggleGrid={() => setShowGrid((g) => !g)}
               brushSize={brushSize}
               onBrushSizeChange={setBrushSize}
+              filledShapes={filledShapes}
+              onToggleFilledShapes={() => setFilledShapes((f) => !f)}
               onClearCanvas={handleClearCanvas}
             />
             <ColorWheel
@@ -745,6 +748,7 @@ export default function Editor({
               selectionMask={selection.mask}
               showGrid={showGrid}
               brushSize={brushSize}
+              filledShapes={filledShapes}
               onSelectionChange={selection.setMask}
               onStrokeEnd={handleStrokeEnd}
               onPickColor={handlePickColor}

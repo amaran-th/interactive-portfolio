@@ -38,6 +38,9 @@ const BRUSH_SIZES = [1, 2, 3, 4];
 // 애초에 픽셀을 그리지 않으므로 브러시 크기와 무관하다.
 const BRUSH_SIZE_TOOLS: Tool[] = ["pencil", "eraser", "line", "rect", "circle"];
 
+// 채우기 옵션은 사각형·원 도형에만 의미가 있다.
+const SHAPE_TOOLS: Tool[] = ["rect", "circle"];
+
 export default function Toolbar({
   tool,
   onToolChange,
@@ -51,6 +54,8 @@ export default function Toolbar({
   onToggleGrid,
   brushSize,
   onBrushSizeChange,
+  filledShapes,
+  onToggleFilledShapes,
   onClearCanvas,
 }: {
   tool: Tool;
@@ -65,6 +70,8 @@ export default function Toolbar({
   onToggleGrid: () => void;
   brushSize: number;
   onBrushSizeChange: (size: number) => void;
+  filledShapes: boolean;
+  onToggleFilledShapes: () => void;
   onClearCanvas: () => void;
 }) {
   const mod = isMacPlatform() ? "⌘" : "Ctrl+";
@@ -110,6 +117,16 @@ export default function Toolbar({
                   </button>
                 ))}
               </div>
+              <button
+                disabled={!SHAPE_TOOLS.includes(tool)}
+                onClick={onToggleFilledShapes}
+                title="사각형·원을 채워서 그리기"
+                className={`py-1 text-[10px] disabled:opacity-30 ${
+                  filledShapes ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                도형 채우기
+              </button>
             </div>
           )}
         </div>

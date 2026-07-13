@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import {
+  circleFillPoints,
   circleOutlinePoints,
   floodFill,
   getPixel,
   linePoints,
   mirrorPoints,
+  rectFillPoints,
   rectOutlinePoints,
   setPixel,
   wandMask,
@@ -27,6 +29,7 @@ export default function PixelCanvas({
   selectionMask,
   showGrid,
   brushSize,
+  filledShapes,
   onSelectionChange,
   onStrokeEnd,
   onPickColor,
@@ -43,6 +46,7 @@ export default function PixelCanvas({
   selectionMask: Set<number> | null;
   showGrid: boolean;
   brushSize: number;
+  filledShapes: boolean;
   onSelectionChange: (mask: Set<number> | null) => void;
   onStrokeEnd: (next: number[]) => void;
   onPickColor: (colorIndex: number) => void;
@@ -273,10 +277,14 @@ export default function PixelCanvas({
         if (tool === "line") {
           shapePoints = linePoints(start.x, start.y, point.x, point.y);
         } else if (tool === "rect") {
-          shapePoints = rectOutlinePoints(start.x, start.y, point.x, point.y);
+          shapePoints = filledShapes
+            ? rectFillPoints(start.x, start.y, point.x, point.y)
+            : rectOutlinePoints(start.x, start.y, point.x, point.y);
         } else {
           const radius = Math.round(Math.hypot(point.x - start.x, point.y - start.y));
-          shapePoints = circleOutlinePoints(start.x, start.y, radius);
+          shapePoints = filledShapes
+            ? circleFillPoints(start.x, start.y, radius)
+            : circleOutlinePoints(start.x, start.y, radius);
         }
         let next = pixels;
         for (const p of shapePoints) {
@@ -300,7 +308,7 @@ export default function PixelCanvas({
       workingRef.current = next;
       render(next);
     },
-    [tool, width, height, activeColorIndex, pixels, toGridPoint, plotPoint, render, onSelectionChange],
+    [tool, width, height, activeColorIndex, pixels, filledShapes, toGridPoint, plotPoint, render, onSelectionChange],
   );
 
   // 맨 앞에서 drawingRef를 한 번만 검사·소비하도록 통일한다 — pointerup 처리 후 브라우저가

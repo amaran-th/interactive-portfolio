@@ -85,6 +85,42 @@ export function rectOutlinePoints(x0: number, y0: number, x1: number, y1: number
   return points;
 }
 
+export function rectFillPoints(x0: number, y0: number, x1: number, y1: number): { x: number; y: number }[] {
+  const left = Math.min(x0, x1);
+  const right = Math.max(x0, x1);
+  const top = Math.min(y0, y1);
+  const bottom = Math.max(y0, y1);
+  const points: { x: number; y: number }[] = [];
+  for (let y = top; y <= bottom; y++) {
+    for (let x = left; x <= right; x++) points.push({ x, y });
+  }
+  return points;
+}
+
+// 미드포인트 원 알고리즘의 채운 버전 — 외곽선 좌표를 찍는 대신, 같은 반복에서
+// 나오는 각 행(y)마다 좌우 대칭 구간을 수평으로 채운다.
+export function circleFillPoints(cx: number, cy: number, radius: number): { x: number; y: number }[] {
+  const points: { x: number; y: number }[] = [];
+  let x = radius;
+  let y = 0;
+  let err = 0;
+  while (x >= y) {
+    for (let px = cx - x; px <= cx + x; px++) {
+      points.push({ x: px, y: cy + y }, { x: px, y: cy - y });
+    }
+    for (let px = cx - y; px <= cx + y; px++) {
+      points.push({ x: px, y: cy + x }, { x: px, y: cy - x });
+    }
+    y += 1;
+    err += 1 + 2 * y;
+    if (2 * (err - x) + 1 > 0) {
+      x -= 1;
+      err += 1 - 2 * x;
+    }
+  }
+  return points;
+}
+
 // 미드포인트 원 알고리즘(외곽선)
 export function circleOutlinePoints(cx: number, cy: number, radius: number): { x: number; y: number }[] {
   const points: { x: number; y: number }[] = [];
