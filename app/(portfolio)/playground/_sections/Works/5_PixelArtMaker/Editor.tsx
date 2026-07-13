@@ -12,6 +12,7 @@ import {
 import ColorWheel from "./ColorWheel";
 import ConfirmDialog from "./ConfirmDialog";
 import ContextMenu, { ContextMenuItem } from "./ContextMenu";
+import ExportPanel from "./ExportPanel";
 import {
   exportAsJPG,
   exportAsJSON,
@@ -775,7 +776,8 @@ export default function Editor({
               </button>
             </div>
           </div>
-          <div className="w-60 shrink-0">
+          <div className="flex w-60 shrink-0 flex-col gap-3">
+            <ExportPanel doc={{ ...doc, pixels: history.present }} />
             <ImportPanel
               autoOpen={wantsAutoImport}
               onConfirm={(imported) => {

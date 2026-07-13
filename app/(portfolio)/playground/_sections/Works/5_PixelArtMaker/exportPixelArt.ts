@@ -45,7 +45,9 @@ export function exportAsJPG(doc: PixelArt, scale = 8): void {
   }, "image/jpeg", 0.92);
 }
 
-export function exportAsSVG(doc: PixelArt): void {
+// 파일 다운로드와 "코드 복사"(클립보드에 텍스트로 복사) 양쪽에서 같은 SVG
+// 문자열을 재사용한다.
+export function buildSvgString(doc: PixelArt): string {
   const rects: string[] = [];
   for (let y = 0; y < doc.height; y++) {
     for (let x = 0; x < doc.width; x++) {
@@ -58,10 +60,36 @@ export function exportAsSVG(doc: PixelArt): void {
       rects.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="${rgbToHex(r, g, b)}"${opacity}/>`);
     }
   }
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${doc.width} ${doc.height}" shape-rendering="crispEdges">${rects.join("")}</svg>`;
-  triggerDownload(new Blob([svg], { type: "image/svg+xml" }), `${doc.name}.svg`);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${doc.width} ${doc.height}" shape-rendering="crispEdges">${rects.join("")}</svg>`;
+}
+
+export function exportAsSVG(doc: PixelArt): void {
+  triggerDownload(new Blob([buildSvgString(doc)], { type: "image/svg+xml" }), `${doc.name}.svg`);
 }
 
 export function exportAsJSON(doc: PixelArt): void {
   triggerDownload(new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" }), `${doc.name}.json`);
+}
+
+// PNG만 클립보드 이미지로 신뢰성 있게 지원된다(대부분 브라우저의 ClipboardItem은
+// image/png만 받는다) — JPG는 파일 저장만 제공한다.
+export async function copyPngToClipboard(doc: PixelArt, scale = 8): Promise<boolean> {
+  try {
+    const canvas = renderToCanvas(doc, scale);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) return false;
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function copyTextToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
 }
