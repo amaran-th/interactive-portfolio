@@ -13,8 +13,11 @@ import {
   setPixel,
   wandMask,
 } from "./pixelGrid";
+import { rasterizeText } from "./textStamp";
 import { MirrorMode, Tool } from "./types";
 import { moveSelection } from "./useSelection";
+
+export type PendingText = { x: number; y: number; text: string; fontSize: number; colorHex: string };
 
 const CELL_SIZE = 16;
 
@@ -34,6 +37,11 @@ export default function PixelCanvas({
   onStrokeEnd,
   onPickColor,
   onTextToolClick,
+  pendingText,
+  onPendingTextChange,
+  onPendingTextMove,
+  onPendingTextCommit,
+  onPendingTextCancel,
   onGradientToolEnd,
   zoom,
   onZoomChange,
@@ -53,9 +61,18 @@ export default function PixelCanvas({
   onSelectionChange: (mask: Set<number> | null) => void;
   onStrokeEnd: (next: number[]) => void;
   onPickColor: (colorIndex: number) => void;
-  // 텍스트 도구로 캔버스를 클릭했을 때(그리드 좌표) — 실제 텍스트 입력·래스터화·
-  // 팔레트 반영은 Editor가 맡는다(paste와 같은 패턴).
+  // 텍스트 도구로 캔버스를 클릭했을 때(그리드 좌표) — pendingText가 없으면 그
+  // 자리에 새로 시작하고, 있으면(경계 밖 클릭) Editor가 먼저 커밋한 뒤 새로
+  // 시작한다. 실제 래스터화·팔레트 반영은 Editor가 맡는다.
   onTextToolClick: (x: number, y: number) => void;
+  // 아직 확정하지 않은 텍스트 — 캔버스 위에 인라인 입력·반투명 미리보기로
+  // 보여주고, 그 경계 안을 드래그하면 이동만 한다(모달 없이 캔버스 안에서
+  // 이동·크기조절·타이핑이 끝나면 Enter/포커스 아웃/도구 전환 시 커밋).
+  pendingText: PendingText | null;
+  onPendingTextChange: (text: string, fontSize: number) => void;
+  onPendingTextMove: (x: number, y: number) => void;
+  onPendingTextCommit: () => void;
+  onPendingTextCancel: () => void;
   // 그라데이션 드래그가 끝났을 때(시작·끝 그리드 좌표) — 팔레트 확장이 필요할 수
   // 있어 실제 채우기는 Editor가 처리한다.
   onGradientToolEnd: (x0: number, y0: number, x1: number, y1: number) => void;
@@ -82,10 +99,15 @@ export default function PixelCanvas({
   // 그라데이션 도구는 드래그 중 실제 픽셀은 건드리지 않는다(팔레트 확장은 커밋
   // 시점에 Editor가 처리) — 드래그 축만 얇은 선으로 미리 보여준다.
   const gradientPreviewRef = useRef<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  // pendingText 경계 안을 클릭해 드래그를 시작하면, 클릭 지점과 텍스트 원점 사이의
+  // 오프셋을 기억해 마우스를 따라 자연스럽게 이동하도록 한다.
+  const textDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   // selectionMask 프롭은 React state를 거쳐 비동기로 갱신되므로, 빠른 연속 pointermove
   // 동안 오래된(stale) 값을 참조해 move 드래그가 잘못된 위치를 지우는 문제(자취 남음)가
   // 있었다. workingRef와 같은 패턴으로 항상 최신 값을 담는 ref를 별도로 둔다.
   const selectionMaskRef = useRef<Set<number> | null>(selectionMask);
+  // 텍스트 도구의 인라인 입력을 캔버스 좌표계에 절대 위치시키는 데도 쓰인다.
+  const scale = CELL_SIZE * zoom;
 
   useEffect(() => {
     workingRef.current = pixels;
@@ -119,7 +141,6 @@ export default function PixelCanvas({
     (data: number[]) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      const scale = CELL_SIZE * zoom;
       canvas.width = width * scale;
       canvas.height = height * scale;
       const ctx = canvas.getContext("2d");
@@ -174,8 +195,29 @@ export default function PixelCanvas({
         ctx.lineTo(gp.x1 * scale + scale / 2, gp.y1 * scale + scale / 2);
         ctx.stroke();
       }
+
+      // 확정 전 텍스트 — 반투명으로 그려 아직 커밋되지 않았다는 걸 보여주고,
+      // 경계를 얇은 사각형으로 표시해 드래그 가능한 영역임을 알려준다.
+      if (pendingText && pendingText.text) {
+        const { width: tw, height: th, mask } = rasterizeText(pendingText.text, pendingText.fontSize);
+        ctx.fillStyle = pendingText.colorHex;
+        ctx.globalAlpha = 0.7;
+        for (let ty = 0; ty < th; ty++) {
+          for (let tx = 0; tx < tw; tx++) {
+            if (!mask[ty * tw + tx]) continue;
+            const px = pendingText.x + tx;
+            const py = pendingText.y + ty;
+            if (px < 0 || py < 0 || px >= width || py >= height) continue;
+            ctx.fillRect(px * scale, py * scale, scale, scale);
+          }
+        }
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = "rgba(139, 92, 246, 0.9)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(pendingText.x * scale + 0.5, pendingText.y * scale + 0.5, tw * scale - 1, th * scale - 1);
+      }
     },
-    [width, height, palette, zoom, showGrid],
+    [width, height, palette, showGrid, pendingText, scale],
   );
 
   useEffect(() => {
@@ -240,6 +282,19 @@ export default function PixelCanvas({
       }
 
       if (tool === "text") {
+        if (pendingText && pendingText.text) {
+          const { width: tw, height: th } = rasterizeText(pendingText.text, pendingText.fontSize);
+          const withinBounds =
+            point.x >= pendingText.x &&
+            point.x < pendingText.x + tw &&
+            point.y >= pendingText.y &&
+            point.y < pendingText.y + th;
+          if (withinBounds) {
+            textDragRef.current = { offsetX: point.x - pendingText.x, offsetY: point.y - pendingText.y };
+            drawingRef.current = true;
+            return;
+          }
+        }
         onTextToolClick(point.x, point.y);
         return;
       }
@@ -319,6 +374,7 @@ export default function PixelCanvas({
       onStrokeEnd,
       onPickColor,
       onTextToolClick,
+      pendingText,
       onSelectionChange,
     ],
   );
@@ -334,6 +390,13 @@ export default function PixelCanvas({
         return;
       }
       if (!drawingRef.current) return;
+
+      if (tool === "text" && textDragRef.current) {
+        const point = toGridPoint(e);
+        if (!point) return;
+        onPendingTextMove(point.x - textDragRef.current.offsetX, point.y - textDragRef.current.offsetY);
+        return;
+      }
 
       if (tool === "gradient" && shapeStartRef.current) {
         const point = toGridPoint(e);
@@ -415,7 +478,20 @@ export default function PixelCanvas({
       workingRef.current = next;
       render(next);
     },
-    [tool, width, height, activeColorIndex, pixels, filledShapes, viewportRef, toGridPoint, plotPoint, render, onSelectionChange],
+    [
+      tool,
+      width,
+      height,
+      activeColorIndex,
+      pixels,
+      filledShapes,
+      viewportRef,
+      onPendingTextMove,
+      toGridPoint,
+      plotPoint,
+      render,
+      onSelectionChange,
+    ],
   );
 
   // 맨 앞에서 drawingRef를 한 번만 검사·소비하도록 통일한다 — pointerup 처리 후 브라우저가
@@ -431,6 +507,10 @@ export default function PixelCanvas({
 
     if (tool === "select") {
       shapeStartRef.current = null;
+      return;
+    }
+    if (tool === "text") {
+      textDragRef.current = null;
       return;
     }
     if (tool === "gradient") {
@@ -478,15 +558,66 @@ export default function PixelCanvas({
   const handlePointerCancel = handlePointerUp;
 
   return (
-    <canvas
-      ref={canvasRef}
-      className={`touch-none shadow-md ${isSpaceHeld ? "cursor-grab" : "cursor-crosshair"}`}
-      style={{ imageRendering: "pixelated" }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerCancel}
-      onLostPointerCapture={handlePointerCancel}
-    />
+    <div className="relative inline-block">
+      <canvas
+        ref={canvasRef}
+        className={`touch-none shadow-md ${isSpaceHeld ? "cursor-grab" : "cursor-crosshair"}`}
+        style={{ imageRendering: "pixelated" }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        onLostPointerCapture={handlePointerCancel}
+      />
+      {pendingText && (
+        <div
+          className="absolute z-10 flex items-center gap-1 bg-white px-1.5 py-1 shadow-[0_0_0_1px_#8b5cf6]"
+          style={{ left: pendingText.x * scale, top: Math.max(0, pendingText.y * scale - 34) }}
+          // 캔버스의 pointerdown이 이 오버레이 클릭까지 그리기로 잡아채지 않도록 막는다.
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <input
+            autoFocus
+            value={pendingText.text}
+            onChange={(e) => onPendingTextChange(e.target.value, pendingText.fontSize)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onPendingTextCommit();
+              else if (e.key === "Escape") onPendingTextCancel();
+            }}
+            placeholder="텍스트"
+            className="w-20 select-text bg-transparent text-xs text-gray-900 outline-none"
+          />
+          <button
+            onClick={() => onPendingTextChange(pendingText.text, Math.max(4, pendingText.fontSize - 2))}
+            title="글자 작게"
+            className="flex h-4 w-4 items-center justify-center bg-gray-100 text-[10px] text-gray-600 hover:bg-gray-200"
+          >
+            −
+          </button>
+          <span className="w-6 text-center text-[9px] text-gray-500">{pendingText.fontSize}</span>
+          <button
+            onClick={() => onPendingTextChange(pendingText.text, Math.min(64, pendingText.fontSize + 2))}
+            title="글자 크게"
+            className="flex h-4 w-4 items-center justify-center bg-gray-100 text-[10px] text-gray-600 hover:bg-gray-200"
+          >
+            +
+          </button>
+          <button
+            onClick={onPendingTextCommit}
+            title="확정 (Enter)"
+            className="flex h-4 w-4 items-center justify-center bg-violet-500 text-[10px] text-white hover:bg-violet-600"
+          >
+            ✓
+          </button>
+          <button
+            onClick={onPendingTextCancel}
+            title="취소 (Esc)"
+            className="flex h-4 w-4 items-center justify-center bg-gray-100 text-[10px] text-gray-500 hover:bg-red-50 hover:text-red-500"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

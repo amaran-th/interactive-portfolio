@@ -17,7 +17,12 @@ import LauncherIcon from "./LauncherIcon";
 import TrashIcon from "./TrashIcon";
 import WallpaperBackground from "./WallpaperBackground";
 import WallpaperIcon from "./WallpaperIcon";
-import { exportAsJPG, exportAsJSON, exportAsPNG, exportAsSVG } from "./exportPixelArt";
+import {
+  exportAsJPG,
+  exportAsJSON,
+  exportAsPNG,
+  exportAsSVG,
+} from "./exportPixelArt";
 import {
   getIconPosition,
   getStoredPosition,
@@ -38,7 +43,12 @@ const ICON_FOOTPRINT = 80;
 const TRASH_ID = "__trash__";
 const FORMAT_ID = "__format__";
 const LAUNCHER_ID = "__editor_launcher__";
-const SPECIAL_ICON_IDS = [TRASH_ID, FORMAT_ID, WALLPAPER_ID, LAUNCHER_ID] as const;
+const SPECIAL_ICON_IDS = [
+  TRASH_ID,
+  FORMAT_ID,
+  WALLPAPER_ID,
+  LAUNCHER_ID,
+] as const;
 
 export default function Desktop({
   refreshSignal,
@@ -55,15 +65,25 @@ export default function Desktop({
 }) {
   const [items, setItems] = useState<PixelArt[]>([]);
   const [wallpaper, setWallpaper] = useState<PixelArt>(() => getWallpaper());
-  const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const [positions, setPositions] = useState<
+    Record<string, { x: number; y: number }>
+  >({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState<Menu>(null);
   const [pendingDelete, setPendingDelete] = useState<string[] | null>(null);
   const [pendingFormat, setPendingFormat] = useState(false);
-  const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const [box, setBox] = useState<{
+    x0: number;
+    y0: number;
+    x1: number;
+    y1: number;
+  } | null>(null);
   const [trashHover, setTrashHover] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [fittedSize, setFittedSize] = useState<{ width: number; height: number } | null>(null);
+  const [fittedSize, setFittedSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // 특수 아이콘(트래시/포맷) 자체를 드래그하는 동안에는 pointerup이 그 위에서
@@ -113,7 +133,9 @@ export default function Desktop({
     const containerWidth = containerRef.current?.getBoundingClientRect().width;
     const pos: Record<string, { x: number; y: number }> = {};
     list.forEach((art, i) => {
-      pos[art.id] = clampToContainer(getIconPosition(art.id, i, containerWidth));
+      pos[art.id] = clampToContainer(
+        getIconPosition(art.id, i, containerWidth),
+      );
     });
     // 특수 아이콘은 아직 옮긴 적이 없으면(저장된 위치 없음) positions에 아예 넣지
     // 않는다 — 렌더링에서 이 경우 CSS 코너 클래스(bottom-4 right-4 등)로 기본
@@ -140,11 +162,14 @@ export default function Desktop({
   // 문제가 있었다. 위치가 실제로 바뀌는 건 드래그로 옮길 때뿐이다.
   useEffect(() => {
     const handleResize = () => {
-      const containerWidth = containerRef.current?.getBoundingClientRect().width;
+      const containerWidth =
+        containerRef.current?.getBoundingClientRect().width;
       setPositions(() => {
         const next: Record<string, { x: number; y: number }> = {};
         items.forEach((art, i) => {
-          next[art.id] = clampToContainer(getIconPosition(art.id, i, containerWidth));
+          next[art.id] = clampToContainer(
+            getIconPosition(art.id, i, containerWidth),
+          );
         });
         for (const id of SPECIAL_ICON_IDS) {
           const stored = getStoredPosition(id);
@@ -170,7 +195,8 @@ export default function Desktop({
       setBox({ x0, y0, x1: x0, y1: y0 });
       setSelected(new Set());
 
-      const move = (ev: PointerEvent) => setBox({ x0, y0, x1: ev.clientX - offsetX, y1: ev.clientY - offsetY });
+      const move = (ev: PointerEvent) =>
+        setBox({ x0, y0, x1: ev.clientX - offsetX, y1: ev.clientY - offsetY });
       const up = (ev: PointerEvent) => {
         window.removeEventListener("pointermove", move);
         window.removeEventListener("pointerup", up);
@@ -184,7 +210,13 @@ export default function Desktop({
         for (const art of items) {
           const p = positions[art.id];
           if (!p) continue;
-          if (p.x + 80 >= minX && p.x <= maxX && p.y + 80 >= minY && p.y <= maxY) next.add(art.id);
+          if (
+            p.x + 80 >= minX &&
+            p.x <= maxX &&
+            p.y + 80 >= minY &&
+            p.y <= maxY
+          )
+            next.add(art.id);
         }
         setSelected(next);
         setBox(null);
@@ -222,7 +254,8 @@ export default function Desktop({
         if (id === TRASH_ID) setTrashHover(false);
       }
 
-      const group = !isSpecial && selected.has(id) ? Array.from(selected) : [id];
+      const group =
+        !isSpecial && selected.has(id) ? Array.from(selected) : [id];
       if (!isSpecial && !selected.has(id)) setSelected(new Set([id]));
 
       const containerRect = containerRef.current?.getBoundingClientRect();
@@ -246,7 +279,8 @@ export default function Desktop({
         const dy = ev.clientY - startY;
         setPositions((prev) => {
           const next = { ...prev };
-          for (const sp of startPositions) next[sp.id] = { x: sp.x + dx, y: sp.y + dy };
+          for (const sp of startPositions)
+            next[sp.id] = { x: sp.x + dx, y: sp.y + dy };
           return next;
         });
       };
@@ -305,170 +339,230 @@ export default function Desktop({
   ];
 
   return (
-    <div ref={wrapperRef} className="flex h-full w-full items-center justify-center overflow-hidden bg-white">
     <div
-      ref={containerRef}
-      className="relative select-none overflow-hidden bg-white"
-      style={fittedSize ? { width: fittedSize.width, height: fittedSize.height } : { width: "100%", height: "100%" }}
-      onPointerDown={startBoxSelect}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        setMenu({
-          x: e.clientX,
-          y: e.clientY,
-          items: [{ label: "새로 만들기", onClick: onCreate }],
-        });
-      }}
+      ref={wrapperRef}
+      className="flex h-full w-full items-center justify-center overflow-hidden"
     >
-      <WallpaperBackground art={wallpaper} />
+      <div
+        ref={containerRef}
+        className="relative select-none overflow-hidden"
+        style={
+          fittedSize
+            ? { width: fittedSize.width, height: fittedSize.height }
+            : { width: "100%", height: "100%" }
+        }
+        onPointerDown={startBoxSelect}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMenu({
+            x: e.clientX,
+            y: e.clientY,
+            items: [{ label: "새로 만들기", onClick: onCreate }],
+          });
+        }}
+      >
+        <WallpaperBackground art={wallpaper} />
 
-      {items.map((art) => {
-        const p = positions[art.id];
-        if (!p) return null;
-        return (
-          <DesktopIcon
-            key={art.id}
-            art={art}
-            x={p.x}
-            y={p.y}
-            selected={selected.has(art.id)}
-            editing={renamingId === art.id}
-            onPointerDownIcon={(e) => startIconDrag(art.id, e)}
-            onDoubleClick={() => onOpen(art.id)}
-            onRenameConfirm={(next) => {
-              renamePixelArt(art.id, next);
-              setRenamingId(null);
-              refresh();
-            }}
-            onRenameCancel={() => setRenamingId(null)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setMenu({
-                x: e.clientX,
-                y: e.clientY,
-                items: [
-                  {
-                    label: "이름 바꾸기",
-                    onClick: () => setRenamingId(art.id),
-                  },
-                  { label: "PNG로 내보내기", onClick: () => exportAsPNG(art) },
-                  { label: "SVG로 내보내기", onClick: () => exportAsSVG(art) },
-                  { label: "JSON으로 내보내기", onClick: () => exportAsJSON(art) },
-                  { label: "JPG로 내보내기 (손실 압축)", onClick: () => exportAsJPG(art) },
-                  {
-                    label: "복제",
-                    onClick: () => {
-                      duplicatePixelArt(art.id);
-                      refresh();
+        {items.map((art) => {
+          const p = positions[art.id];
+          if (!p) return null;
+          return (
+            <DesktopIcon
+              key={art.id}
+              art={art}
+              x={p.x}
+              y={p.y}
+              selected={selected.has(art.id)}
+              editing={renamingId === art.id}
+              onPointerDownIcon={(e) => startIconDrag(art.id, e)}
+              onDoubleClick={() => onOpen(art.id)}
+              onRenameConfirm={(next) => {
+                renamePixelArt(art.id, next);
+                setRenamingId(null);
+                refresh();
+              }}
+              onRenameCancel={() => setRenamingId(null)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setMenu({
+                  x: e.clientX,
+                  y: e.clientY,
+                  items: [
+                    {
+                      label: "이름 바꾸기",
+                      onClick: () => setRenamingId(art.id),
                     },
-                  },
-                  {
-                    label: "삭제",
-                    danger: true,
-                    onClick: () => setPendingDelete([art.id]),
-                  },
-                ],
-              });
+                    {
+                      label: "PNG로 내보내기",
+                      onClick: () => exportAsPNG(art),
+                    },
+                    {
+                      label: "SVG로 내보내기",
+                      onClick: () => exportAsSVG(art),
+                    },
+                    {
+                      label: "JSON으로 내보내기",
+                      onClick: () => exportAsJSON(art),
+                    },
+                    {
+                      label: "JPG로 내보내기 (손실 압축)",
+                      onClick: () => exportAsJPG(art),
+                    },
+                    {
+                      label: "복제",
+                      onClick: () => {
+                        duplicatePixelArt(art.id);
+                        refresh();
+                      },
+                    },
+                    {
+                      label: "삭제",
+                      danger: true,
+                      onClick: () => setPendingDelete([art.id]),
+                    },
+                  ],
+                });
+              }}
+            />
+          );
+        })}
+
+        {box && (
+          <div
+            className="pointer-events-none absolute bg-violet-500/10 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.6)]"
+            style={{
+              left: Math.min(box.x0, box.x1),
+              top: Math.min(box.y0, box.y1),
+              width: Math.abs(box.x1 - box.x0),
+              height: Math.abs(box.y1 - box.y0),
             }}
           />
-        );
-      })}
+        )}
 
-      {box && (
         <div
-          className="pointer-events-none absolute bg-violet-500/10 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.6)]"
-          style={{
-            left: Math.min(box.x0, box.x1),
-            top: Math.min(box.y0, box.y1),
-            width: Math.abs(box.x1 - box.x0),
-            height: Math.abs(box.y1 - box.y0),
+          onPointerDown={(e) => startIconDrag(TRASH_ID, e)}
+          onPointerEnter={() =>
+            draggingSpecialRef.current !== TRASH_ID && setTrashHover(true)
+          }
+          onPointerLeave={() =>
+            draggingSpecialRef.current !== TRASH_ID && setTrashHover(false)
+          }
+          onPointerUp={handleTrashDrop}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
           }}
-        />
-      )}
+          className={`absolute flex w-20 flex-col items-center gap-1 p-2 ${positions[TRASH_ID] ? "" : "bottom-4 right-4"}`}
+          style={
+            positions[TRASH_ID]
+              ? { left: positions[TRASH_ID].x, top: positions[TRASH_ID].y }
+              : undefined
+          }
+          title="선택한 아이콘을 여기로 드래그해 삭제 · 드래그해서 위치 이동 가능"
+        >
+          <TrashIcon active={trashHover} />
+          <span className="w-full truncate text-center text-[10px] text-gray-600">
+            휴지통
+          </span>
+        </div>
 
-      <div
-        onPointerDown={(e) => startIconDrag(TRASH_ID, e)}
-        onPointerEnter={() => draggingSpecialRef.current !== TRASH_ID && setTrashHover(true)}
-        onPointerLeave={() => draggingSpecialRef.current !== TRASH_ID && setTrashHover(false)}
-        onPointerUp={handleTrashDrop}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
-        }}
-        className={`absolute flex w-20 flex-col items-center gap-1 p-2 ${positions[TRASH_ID] ? "" : "bottom-4 right-4"}`}
-        style={positions[TRASH_ID] ? { left: positions[TRASH_ID].x, top: positions[TRASH_ID].y } : undefined}
-        title="선택한 아이콘을 여기로 드래그해 삭제 · 드래그해서 위치 이동 가능"
-      >
-        <TrashIcon active={trashHover} />
-        <span className="w-full truncate text-center text-[10px] text-gray-600">휴지통</span>
+        <div
+          onPointerDown={(e) => startIconDrag(FORMAT_ID, e)}
+          onDoubleClick={() => setPendingFormat(true)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
+          }}
+          className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-black/5 ${positions[FORMAT_ID] ? "" : "bottom-4 left-4"}`}
+          style={
+            positions[FORMAT_ID]
+              ? { left: positions[FORMAT_ID].x, top: positions[FORMAT_ID].y }
+              : undefined
+          }
+          title="더블클릭하면 이 프로젝트의 저장된 모든 작품과 배치를 초기화합니다 · 드래그해서 위치 이동 가능"
+        >
+          <FormatIcon />
+          <span className="w-full truncate text-center text-[10px] text-gray-600">
+            포맷
+          </span>
+        </div>
+
+        <div
+          onPointerDown={(e) => startIconDrag(WALLPAPER_ID, e)}
+          onDoubleClick={() => onOpen(WALLPAPER_ID)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
+          }}
+          className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-black/5 ${positions[WALLPAPER_ID] ? "" : "top-4 right-4"}`}
+          style={
+            positions[WALLPAPER_ID]
+              ? {
+                  left: positions[WALLPAPER_ID].x,
+                  top: positions[WALLPAPER_ID].y,
+                }
+              : undefined
+          }
+          title="더블클릭하면 배경화면을 편집합니다 · 드래그해서 위치 이동 가능"
+        >
+          <WallpaperIcon art={wallpaper} />
+          <span className="w-full truncate text-center text-[10px] text-gray-600">
+            배경화면
+          </span>
+        </div>
+
+        <div
+          onPointerDown={(e) => startIconDrag(LAUNCHER_ID, e)}
+          onDoubleClick={onOpenLauncher}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
+          }}
+          className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-black/5 ${positions[LAUNCHER_ID] ? "" : "top-4 left-4"}`}
+          style={
+            positions[LAUNCHER_ID]
+              ? {
+                  left: positions[LAUNCHER_ID].x,
+                  top: positions[LAUNCHER_ID].y,
+                }
+              : undefined
+          }
+          title="더블클릭하면 새로 만들기·기존 파일 열기·이미지 불러오기를 선택할 수 있습니다 · 드래그해서 위치 이동 가능"
+        >
+          <LauncherIcon />
+          <span className="w-full truncate text-center text-[10px] text-gray-600">
+            편집기
+          </span>
+        </div>
+
+        {menu && (
+          <ContextMenu
+            x={menu.x}
+            y={menu.y}
+            items={menu.items}
+            onClose={() => setMenu(null)}
+          />
+        )}
+        {pendingDelete && (
+          <ConfirmDialog
+            message={`${pendingDelete.length}개 항목을 삭제하시겠습니까?`}
+            onConfirm={confirmDelete}
+            onCancel={() => setPendingDelete(null)}
+          />
+        )}
+        {pendingFormat && (
+          <ConfirmDialog
+            message="저장된 모든 픽셀아트와 아이콘 배치를 초기화합니다. 되돌릴 수 없습니다. 계속할까요?"
+            onConfirm={confirmFormat}
+            onCancel={() => setPendingFormat(false)}
+          />
+        )}
       </div>
-
-      <div
-        onPointerDown={(e) => startIconDrag(FORMAT_ID, e)}
-        onDoubleClick={() => setPendingFormat(true)}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
-        }}
-        className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-black/5 ${positions[FORMAT_ID] ? "" : "bottom-4 left-4"}`}
-        style={positions[FORMAT_ID] ? { left: positions[FORMAT_ID].x, top: positions[FORMAT_ID].y } : undefined}
-        title="더블클릭하면 이 프로젝트의 저장된 모든 작품과 배치를 초기화합니다 · 드래그해서 위치 이동 가능"
-      >
-        <FormatIcon />
-        <span className="w-full truncate text-center text-[10px] text-gray-600">포맷</span>
-      </div>
-
-      <div
-        onPointerDown={(e) => startIconDrag(WALLPAPER_ID, e)}
-        onDoubleClick={() => onOpen(WALLPAPER_ID)}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
-        }}
-        className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-black/5 ${positions[WALLPAPER_ID] ? "" : "top-4 right-4"}`}
-        style={positions[WALLPAPER_ID] ? { left: positions[WALLPAPER_ID].x, top: positions[WALLPAPER_ID].y } : undefined}
-        title="더블클릭하면 배경화면을 편집합니다 · 드래그해서 위치 이동 가능"
-      >
-        <WallpaperIcon art={wallpaper} />
-        <span className="w-full truncate text-center text-[10px] text-gray-600">배경화면</span>
-      </div>
-
-      <div
-        onPointerDown={(e) => startIconDrag(LAUNCHER_ID, e)}
-        onDoubleClick={onOpenLauncher}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
-        }}
-        className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-black/5 ${positions[LAUNCHER_ID] ? "" : "top-4 left-4"}`}
-        style={positions[LAUNCHER_ID] ? { left: positions[LAUNCHER_ID].x, top: positions[LAUNCHER_ID].y } : undefined}
-        title="더블클릭하면 새로 만들기·기존 파일 열기·이미지 불러오기를 선택할 수 있습니다 · 드래그해서 위치 이동 가능"
-      >
-        <LauncherIcon />
-        <span className="w-full truncate text-center text-[10px] text-gray-600">편집기</span>
-      </div>
-
-      {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
-      {pendingDelete && (
-        <ConfirmDialog
-          message={`${pendingDelete.length}개 항목을 삭제하시겠습니까?`}
-          onConfirm={confirmDelete}
-          onCancel={() => setPendingDelete(null)}
-        />
-      )}
-      {pendingFormat && (
-        <ConfirmDialog
-          message="저장된 모든 픽셀아트와 아이콘 배치를 초기화합니다. 되돌릴 수 없습니다. 계속할까요?"
-          onConfirm={confirmFormat}
-          onCancel={() => setPendingFormat(false)}
-        />
-      )}
-    </div>
     </div>
   );
 }

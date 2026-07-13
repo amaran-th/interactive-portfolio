@@ -26,7 +26,6 @@ import PixelCanvas from "./PixelCanvas";
 import { createGrid, getPixel, resizeGrid } from "./pixelGrid";
 import ResizeCanvasDialog from "./ResizeCanvasDialog";
 import { rasterizeText } from "./textStamp";
-import TextToolPopup from "./TextToolPopup";
 import Toolbar from "./Toolbar";
 import { CANVAS_PRESETS, MirrorMode, Tool } from "./types";
 import { useCanvasHistory } from "./useCanvasHistory";
@@ -124,8 +123,9 @@ export default function Editor({
   // 그라데이션 도구의 끝 색상 — 팔레트 인덱스, -1이면 투명. MS페인트의
   // 주/보조 색상과 같은 개념으로 팔레트 스와치를 우클릭하면 바뀐다.
   const [secondaryColorIndex, setSecondaryColorIndex] = useState(-1);
-  // 텍스트 도구로 캔버스를 클릭하면 그 그리드 좌표에 팝업을 띄운다.
-  const [textPopup, setTextPopup] = useState<{ x: number; y: number } | null>(null);
+  // 텍스트 도구로 캔버스를 클릭하면 그 그리드 좌표에서 시작한다 — 아직 픽셀에
+  // 굽지 않은 상태로 캔버스 위에 인라인 입력·미리보기를 띄운다(모달 없음).
+  const [pendingText, setPendingText] = useState<{ x: number; y: number; text: string; fontSize: number } | null>(null);
   // PixelCanvas가 Ctrl+스크롤로 자체 관리하는 확대 배율 — 뷰포트 좌측 하단에
   // 표시만 하기 위해 값을 그대로 올려받는다.
   const [canvasZoom, setCanvasZoom] = useState(1);
@@ -298,34 +298,67 @@ export default function Editor({
     history.push(createGrid(doc.width, doc.height));
   }, [history, doc.width, doc.height]);
 
-  // 텍스트 도구로 클릭한 자리에 팝업을 띄운다 — 실제 래스터화·팔레트 반영은
-  // handleTextConfirm에서(팔레트를 건드리지 않고 활성 색상 하나로만 찍는다).
-  const handleTextToolClick = useCallback((x: number, y: number) => {
-    setTextPopup({ x, y });
-  }, []);
-
-  const handleTextConfirm = useCallback(
-    (text: string, fontSize: number) => {
-      if (!textPopup || !text.trim()) {
-        setTextPopup(null);
-        return;
-      }
-      const { width: tw, height: th, mask } = rasterizeText(text, fontSize);
+  // 확정 전 텍스트를 실제 픽셀에 굽는다(래스터화 → 활성 색상 하나로 찍기).
+  // 팔레트는 건드리지 않는다 — 여러 색을 섞으면 무한정 늘어난다.
+  const commitPendingText = useCallback(
+    (p: { x: number; y: number; text: string; fontSize: number }) => {
+      if (!p.text.trim()) return;
+      const { width: tw, height: th, mask } = rasterizeText(p.text, p.fontSize);
       const next = history.present.slice();
       for (let ty = 0; ty < th; ty++) {
         for (let tx = 0; tx < tw; tx++) {
           if (!mask[ty * tw + tx]) continue;
-          const px = textPopup.x + tx;
-          const py = textPopup.y + ty;
+          const px = p.x + tx;
+          const py = p.y + ty;
           if (px < 0 || py < 0 || px >= doc.width || py >= doc.height) continue;
           next[py * doc.width + px] = activeColorIndex;
         }
       }
       history.push(next);
-      setTextPopup(null);
     },
-    [textPopup, doc.width, doc.height, activeColorIndex, history],
+    [doc.width, doc.height, activeColorIndex, history],
   );
+
+  // 텍스트 도구로 클릭한 자리에 인라인 입력을 띄운다 — 이미 확정 전 텍스트가
+  // 떠 있었다면(경계 밖 클릭) 먼저 굽고 새 자리에서 다시 시작한다.
+  const handleTextToolClick = useCallback(
+    (x: number, y: number) => {
+      setPendingText((p) => {
+        if (p) commitPendingText(p);
+        return { x, y, text: "", fontSize: 8 };
+      });
+    },
+    [commitPendingText],
+  );
+
+  const handlePendingTextChange = useCallback((text: string, fontSize: number) => {
+    setPendingText((p) => (p ? { ...p, text, fontSize } : p));
+  }, []);
+
+  const handlePendingTextMove = useCallback((x: number, y: number) => {
+    setPendingText((p) => (p ? { ...p, x, y } : p));
+  }, []);
+
+  const handlePendingTextCommit = useCallback(() => {
+    setPendingText((p) => {
+      if (p) commitPendingText(p);
+      return null;
+    });
+  }, [commitPendingText]);
+
+  const handlePendingTextCancel = useCallback(() => {
+    setPendingText(null);
+  }, []);
+
+  // 텍스트 도구를 벗어나면(다른 도구로 전환) 뜬 채로 남아있던 텍스트를 잃지
+  // 않도록 자동으로 굽는다 — 빈 텍스트면 commitPendingText가 그냥 무시한다.
+  useEffect(() => {
+    if (tool !== "text" && pendingText) {
+      commitPendingText(pendingText);
+      setPendingText(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool]);
 
   // 그라데이션 드래그가 끝나면 시작(활성 색상)~끝(보조 색상) 사이를 밴딩해
   // 채운다 — 필요하면 팔레트를 확장하므로 pixels·palette를 함께 커밋한다.
@@ -835,14 +868,18 @@ export default function Editor({
               onStrokeEnd={handleStrokeEnd}
               onPickColor={handlePickColor}
               onTextToolClick={handleTextToolClick}
+              pendingText={
+                pendingText ? { ...pendingText, colorHex: doc.palette[activeColorIndex] ?? "#000000" } : null
+              }
+              onPendingTextChange={handlePendingTextChange}
+              onPendingTextMove={handlePendingTextMove}
+              onPendingTextCommit={handlePendingTextCommit}
+              onPendingTextCancel={handlePendingTextCancel}
               onGradientToolEnd={handleGradientToolEnd}
               zoom={canvasZoom}
               onZoomChange={setCanvasZoom}
               viewportRef={canvasViewportRef}
             />
-            {textPopup && (
-              <TextToolPopup onConfirm={handleTextConfirm} onCancel={() => setTextPopup(null)} />
-            )}
             <div className="absolute bottom-2 left-2 flex items-center gap-0.5">
               <button
                 onClick={() => setCanvasZoom((z) => Math.max(1, z - 1))}
