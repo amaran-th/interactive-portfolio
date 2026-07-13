@@ -4,7 +4,10 @@ export function hexToRgb(hex: string): [number, number, number] {
 }
 
 export function rgbToHex(r: number, g: number, b: number): string {
-  const toHex = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0");
+  const toHex = (n: number) =>
+    Math.max(0, Math.min(255, Math.round(n)))
+      .toString(16)
+      .padStart(2, "0");
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
@@ -28,7 +31,11 @@ export function rgbaToHex(r: number, g: number, b: number, a: number): string {
 }
 
 // h: 0-360, s: 0-1, v: 0-1 -> [r, g, b] 각 0-255
-export function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
+export function hsvToRgb(
+  h: number,
+  s: number,
+  v: number,
+): [number, number, number] {
   const c = v * s;
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
   const m = v - c;
@@ -44,8 +51,25 @@ export function hsvToRgb(h: number, s: number, v: number): [number, number, numb
   return [(r + m) * 255, (g + m) * 255, (b + m) * 255];
 }
 
+// 두 hex 색을 t(0~1) 비율로 선형 보간한다 — 안티에일리어싱 텍스트를 실제
+// 픽셀에 구울 때 배경색과 글자색을 섞어 하나의 불투명 색으로 만드는 데 쓴다.
+export function mixHex(hexA: string, hexB: string, t: number): string {
+  const [ar, ag, ab] = hexToRgba(hexA);
+  const [br, bg, bb] = hexToRgba(hexB);
+  return rgbaToHex(
+    ar + (br - ar) * t,
+    ag + (bg - ag) * t,
+    ab + (bb - ab) * t,
+    1,
+  );
+}
+
 // r,g,b: 0-255 -> [h(0-360), s(0-1), v(0-1)]
-export function rgbToHsv(r: number, g: number, b: number): [number, number, number] {
+export function rgbToHsv(
+  r: number,
+  g: number,
+  b: number,
+): [number, number, number] {
   const rn = r / 255;
   const gn = g / 255;
   const bn = b / 255;

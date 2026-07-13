@@ -2,6 +2,13 @@
 
 import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import {
+  bboxGradientAxis,
+  buildGradientSteps,
+  projectT,
+  stepColorAt,
+} from "./gradientFill";
+import { rgbaToHex } from "./hsv";
+import {
   circleFillPoints,
   circleOutlinePoints,
   floodFill,
@@ -14,12 +21,48 @@ import {
   wandMask,
 } from "./pixelGrid";
 import { rasterizeText } from "./textStamp";
-import { MirrorMode, Tool } from "./types";
+import { MirrorMode, Point, Tool } from "./types";
 import { moveSelection } from "./useSelection";
 
-export type PendingText = { x: number; y: number; text: string; fontSize: number; colorHex: string };
+export type PendingText = {
+  x: number;
+  y: number;
+  text: string;
+  fontSize: number;
+  colorHex: string;
+  antialias: boolean;
+  gradientFill: boolean;
+};
 
 const CELL_SIZE = 16;
+
+// 도형 그라데이션 채우기가 실제로 색칠할 낱개 픽셀 좌표를 모두 펼친다 —
+// plotPoint의 브러시 크기·미러 확장과 정확히 같은 규칙을 쓴다(그래야 그라데이션
+// 미리보기가 실제 커밋 결과와 어긋나지 않는다). 중복 좌표는 한 번만 담는다.
+function expandPoints(
+  shapePoints: Point[],
+  width: number,
+  height: number,
+  mirror: MirrorMode,
+  brushSize: number,
+): Point[] {
+  const half = Math.floor(brushSize / 2);
+  const seen = new Map<number, Point>();
+  for (const { x, y } of shapePoints) {
+    for (let dy = 0; dy < brushSize; dy++) {
+      for (let dx = 0; dx < brushSize; dx++) {
+        const bx = x - half + dx;
+        const by = y - half + dy;
+        if (bx < 0 || by < 0 || bx >= width || by >= height) continue;
+        for (const p of mirrorPoints(width, height, mirror, bx, by)) {
+          const key = p.y * width + p.x;
+          if (!seen.has(key)) seen.set(key, p);
+        }
+      }
+    }
+  }
+  return [...seen.values()];
+}
 
 export default function PixelCanvas({
   width,
@@ -40,9 +83,17 @@ export default function PixelCanvas({
   pendingText,
   onPendingTextChange,
   onPendingTextMove,
+  onPendingTextToggleAA,
+  onPendingTextToggleGradient,
   onPendingTextCommit,
   onPendingTextCancel,
   onGradientToolEnd,
+  shapeGradientFill,
+  gradientStartHex,
+  gradientEndHex,
+  gradientSteps,
+  gradientAngleDeg,
+  onShapeGradientEnd,
   zoom,
   onZoomChange,
   viewportRef,
@@ -71,11 +122,24 @@ export default function PixelCanvas({
   pendingText: PendingText | null;
   onPendingTextChange: (text: string, fontSize: number) => void;
   onPendingTextMove: (x: number, y: number) => void;
+  onPendingTextToggleAA: () => void;
+  onPendingTextToggleGradient: () => void;
   onPendingTextCommit: () => void;
   onPendingTextCancel: () => void;
   // 그라데이션 드래그가 끝났을 때(시작·끝 그리드 좌표) — 팔레트 확장이 필요할 수
   // 있어 실제 채우기는 Editor가 처리한다.
   onGradientToolEnd: (x0: number, y0: number, x1: number, y1: number) => void;
+  // 직선·사각형·원을 단색 대신 그라데이션으로 채운다 — 실제 색 계산엔 활성/보조
+  // 색상(hex로 미리 풀어서 받음)·단계 수·방향(각도)이 필요하다.
+  shapeGradientFill: boolean;
+  gradientStartHex: string;
+  gradientEndHex: string;
+  gradientSteps: number;
+  gradientAngleDeg: number;
+  // 그라데이션 채우기 도형 드래그가 끝났을 때 — 브러시 크기·미러까지 반영해
+  // 이미 펼쳐둔 최종 좌표 목록을 넘긴다. 팔레트 확장이 필요해 실제 색 결정과
+  // 커밋은 Editor가 처리한다.
+  onShapeGradientEnd: (points: Point[]) => void;
   zoom: number;
   onZoomChange: (zoom: number) => void;
   // 확대 상태에서 스페이스+드래그로 스크롤할 대상 — 이 캔버스를 감싼 overflow-auto
@@ -95,10 +159,28 @@ export default function PixelCanvas({
   // 스페이스바를 누른 채 드래그하면(포토샵·Aseprite와 같은 관례) 그리기 대신
   // 뷰포트(부모 컨테이너)를 스크롤한다.
   const [isSpaceHeld, setIsSpaceHeld] = useState(false);
-  const panStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
+  const panStartRef = useRef<{
+    x: number;
+    y: number;
+    scrollLeft: number;
+    scrollTop: number;
+  } | null>(null);
   // 그라데이션 도구는 드래그 중 실제 픽셀은 건드리지 않는다(팔레트 확장은 커밋
   // 시점에 Editor가 처리) — 드래그 축만 얇은 선으로 미리 보여준다.
-  const gradientPreviewRef = useRef<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const gradientPreviewRef = useRef<{
+    x0: number;
+    y0: number;
+    x1: number;
+    y1: number;
+  } | null>(null);
+  // 그라데이션으로 채우는 직선·사각형·원도 같은 이유로 드래그 중에는 실제
+  // 픽셀(workingRef)을 건드리지 않는다 — 대신 정확한 그라데이션 색을 각 점마다
+  // 미리 계산해 캔버스 오버레이로만 보여주고, 드래그가 끝나면 좌표만 Editor에
+  // 넘겨 팔레트 확장을 포함한 실제 커밋을 맡긴다.
+  const shapeGradientOverlayRef = useRef<{
+    points: Point[];
+    colors: string[];
+  } | null>(null);
   // pendingText 경계 안을 클릭해 드래그를 시작하면, 클릭 지점과 텍스트 원점 사이의
   // 오프셋을 기억해 마우스를 따라 자연스럽게 이동하도록 한다.
   const textDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
@@ -182,7 +264,12 @@ export default function PixelCanvas({
           const x = i % width;
           const y = Math.floor(i / width);
           ctx.fillRect(x * scale, y * scale, scale, scale);
-          ctx.strokeRect(x * scale + 0.5, y * scale + 0.5, scale - 1, scale - 1);
+          ctx.strokeRect(
+            x * scale + 0.5,
+            y * scale + 0.5,
+            scale - 1,
+            scale - 1,
+          );
         });
       }
 
@@ -196,28 +283,79 @@ export default function PixelCanvas({
         ctx.stroke();
       }
 
+      // 그라데이션으로 채우는 직선·사각형·원 미리보기 — 실제 픽셀은 아직 건드리지
+      // 않았으므로(shapeGradientOverlayRef만 갱신) 이 오버레이가 곧 결과 모양이다.
+      const sg = shapeGradientOverlayRef.current;
+      if (sg) {
+        sg.points.forEach((p, i) => {
+          ctx.fillStyle = sg.colors[i];
+          ctx.fillRect(p.x * scale, p.y * scale, scale, scale);
+        });
+      }
+
       // 확정 전 텍스트 — 반투명으로 그려 아직 커밋되지 않았다는 걸 보여주고,
-      // 경계를 얇은 사각형으로 표시해 드래그 가능한 영역임을 알려준다.
+      // 경계를 얇은 사각형으로 표시해 드래그 가능한 영역임을 알려준다. gradientFill이면
+      // 칸마다 정확한 그라데이션 색을(팔레트 제약 없이 그대로) 쓰고, antialias면
+      // 글자 가장자리의 커버리지 비율만큼 더 옅게 그려 부드러운 느낌을 미리 보여준다.
       if (pendingText && pendingText.text) {
-        const { width: tw, height: th, mask } = rasterizeText(pendingText.text, pendingText.fontSize);
-        ctx.fillStyle = pendingText.colorHex;
-        ctx.globalAlpha = 0.7;
+        const {
+          width: tw,
+          height: th,
+          alpha,
+        } = rasterizeText(pendingText.text, pendingText.fontSize);
+        const stepColors = pendingText.gradientFill
+          ? buildGradientSteps(gradientStartHex, gradientEndHex, gradientSteps)
+          : null;
+        const axis =
+          stepColors &&
+          bboxGradientAxis(
+            [
+              { x: pendingText.x, y: pendingText.y },
+              { x: pendingText.x + tw, y: pendingText.y + th },
+            ],
+            gradientAngleDeg,
+          );
         for (let ty = 0; ty < th; ty++) {
           for (let tx = 0; tx < tw; tx++) {
-            if (!mask[ty * tw + tx]) continue;
+            const coverage = alpha[ty * tw + tx] / 255;
+            if (coverage === 0) continue;
             const px = pendingText.x + tx;
             const py = pendingText.y + ty;
             if (px < 0 || py < 0 || px >= width || py >= height) continue;
+            if (stepColors && axis) {
+              const t = projectT(px, py, axis.x0, axis.y0, axis.x1, axis.y1);
+              const c = stepColorAt(stepColors, t);
+              ctx.fillStyle = rgbaToHex(c[0], c[1], c[2], c[3]);
+            } else {
+              ctx.fillStyle = pendingText.colorHex;
+            }
+            ctx.globalAlpha = pendingText.antialias ? 0.7 * coverage : 0.7;
             ctx.fillRect(px * scale, py * scale, scale, scale);
           }
         }
         ctx.globalAlpha = 1;
         ctx.strokeStyle = "rgba(139, 92, 246, 0.9)";
         ctx.lineWidth = 1;
-        ctx.strokeRect(pendingText.x * scale + 0.5, pendingText.y * scale + 0.5, tw * scale - 1, th * scale - 1);
+        ctx.strokeRect(
+          pendingText.x * scale + 0.5,
+          pendingText.y * scale + 0.5,
+          tw * scale - 1,
+          th * scale - 1,
+        );
       }
     },
-    [width, height, palette, showGrid, pendingText, scale],
+    [
+      width,
+      height,
+      palette,
+      showGrid,
+      pendingText,
+      scale,
+      gradientStartHex,
+      gradientEndHex,
+      gradientSteps,
+      gradientAngleDeg,
+    ],
   );
 
   useEffect(() => {
@@ -265,7 +403,12 @@ export default function PixelCanvas({
       if (isSpaceHeld) {
         const container = viewportRef.current;
         if (container) {
-          panStartRef.current = { x: e.clientX, y: e.clientY, scrollLeft: container.scrollLeft, scrollTop: container.scrollTop };
+          panStartRef.current = {
+            x: e.clientX,
+            y: e.clientY,
+            scrollLeft: container.scrollLeft,
+            scrollTop: container.scrollTop,
+          };
           canvasRef.current?.setPointerCapture(e.pointerId);
         }
         return;
@@ -276,21 +419,32 @@ export default function PixelCanvas({
       canvasRef.current?.setPointerCapture(e.pointerId);
 
       if (tool === "eyedropper") {
-        const colorIndex = getPixel(workingRef.current, width, point.x, point.y);
+        const colorIndex = getPixel(
+          workingRef.current,
+          width,
+          point.x,
+          point.y,
+        );
         if (colorIndex >= 0) onPickColor(colorIndex);
         return;
       }
 
       if (tool === "text") {
         if (pendingText && pendingText.text) {
-          const { width: tw, height: th } = rasterizeText(pendingText.text, pendingText.fontSize);
+          const { width: tw, height: th } = rasterizeText(
+            pendingText.text,
+            pendingText.fontSize,
+          );
           const withinBounds =
             point.x >= pendingText.x &&
             point.x < pendingText.x + tw &&
             point.y >= pendingText.y &&
             point.y < pendingText.y + th;
           if (withinBounds) {
-            textDragRef.current = { offsetX: point.x - pendingText.x, offsetY: point.y - pendingText.y };
+            textDragRef.current = {
+              offsetX: point.x - pendingText.x,
+              offsetY: point.y - pendingText.y,
+            };
             drawingRef.current = true;
             return;
           }
@@ -302,13 +456,25 @@ export default function PixelCanvas({
       if (tool === "gradient") {
         drawingRef.current = true;
         shapeStartRef.current = point;
-        gradientPreviewRef.current = { x0: point.x, y0: point.y, x1: point.x, y1: point.y };
+        gradientPreviewRef.current = {
+          x0: point.x,
+          y0: point.y,
+          x1: point.x,
+          y1: point.y,
+        };
         render(workingRef.current);
         return;
       }
 
       if (tool === "bucket") {
-        const next = floodFill(workingRef.current, width, height, point.x, point.y, activeColorIndex);
+        const next = floodFill(
+          workingRef.current,
+          width,
+          height,
+          point.x,
+          point.y,
+          activeColorIndex,
+        );
         if (next !== workingRef.current) {
           workingRef.current = next;
           render(next);
@@ -318,7 +484,13 @@ export default function PixelCanvas({
       }
 
       if (tool === "wand") {
-        const clicked = wandMask(workingRef.current, width, height, point.x, point.y);
+        const clicked = wandMask(
+          workingRef.current,
+          width,
+          height,
+          point.x,
+          point.y,
+        );
         const current = selectionMaskRef.current;
         // Shift = 기존 선택 영역에 추가, Alt/Option = 기존 선택 영역에서 제외.
         // 두 키 다 없으면 기존과 동일하게 새로 선택한 영역으로 완전히 대체한다.
@@ -356,7 +528,12 @@ export default function PixelCanvas({
         drawingRef.current = true;
         lastPointRef.current = point;
         const colorIndex = tool === "eraser" ? -1 : activeColorIndex;
-        const next = plotPoint(workingRef.current, point.x, point.y, colorIndex);
+        const next = plotPoint(
+          workingRef.current,
+          point.x,
+          point.y,
+          colorIndex,
+        );
         workingRef.current = next;
         render(next);
       }
@@ -384,8 +561,11 @@ export default function PixelCanvas({
       if (panStartRef.current) {
         const container = viewportRef.current;
         if (container) {
-          container.scrollLeft = panStartRef.current.scrollLeft - (e.clientX - panStartRef.current.x);
-          container.scrollTop = panStartRef.current.scrollTop - (e.clientY - panStartRef.current.y);
+          container.scrollLeft =
+            panStartRef.current.scrollLeft -
+            (e.clientX - panStartRef.current.x);
+          container.scrollTop =
+            panStartRef.current.scrollTop - (e.clientY - panStartRef.current.y);
         }
         return;
       }
@@ -394,14 +574,22 @@ export default function PixelCanvas({
       if (tool === "text" && textDragRef.current) {
         const point = toGridPoint(e);
         if (!point) return;
-        onPendingTextMove(point.x - textDragRef.current.offsetX, point.y - textDragRef.current.offsetY);
+        onPendingTextMove(
+          point.x - textDragRef.current.offsetX,
+          point.y - textDragRef.current.offsetY,
+        );
         return;
       }
 
       if (tool === "gradient" && shapeStartRef.current) {
         const point = toGridPoint(e);
         if (!point) return;
-        gradientPreviewRef.current = { x0: shapeStartRef.current.x, y0: shapeStartRef.current.y, x1: point.x, y1: point.y };
+        gradientPreviewRef.current = {
+          x0: shapeStartRef.current.x,
+          y0: shapeStartRef.current.y,
+          x1: point.x,
+          y1: point.y,
+        };
         render(workingRef.current);
         return;
       }
@@ -428,7 +616,14 @@ export default function PixelCanvas({
         const dx = point.x - lastPointRef.current.x;
         const dy = point.y - lastPointRef.current.y;
         if (dx === 0 && dy === 0) return;
-        const result = moveSelection(workingRef.current, width, height, selectionMaskRef.current, dx, dy);
+        const result = moveSelection(
+          workingRef.current,
+          width,
+          height,
+          selectionMaskRef.current,
+          dx,
+          dy,
+        );
         workingRef.current = result.pixels;
         // ref를 먼저 동기 갱신해 바로 다음 pointermove(React state가 아직 반영되기 전)도
         // 항상 최신 마스크를 기준으로 계산하도록 한다.
@@ -451,11 +646,41 @@ export default function PixelCanvas({
             ? rectFillPoints(start.x, start.y, point.x, point.y)
             : rectOutlinePoints(start.x, start.y, point.x, point.y);
         } else {
-          const radius = Math.round(Math.hypot(point.x - start.x, point.y - start.y));
+          const radius = Math.round(
+            Math.hypot(point.x - start.x, point.y - start.y),
+          );
           shapePoints = filledShapes
             ? circleFillPoints(start.x, start.y, radius)
             : circleOutlinePoints(start.x, start.y, radius);
         }
+        if (shapeGradientFill) {
+          const expanded = expandPoints(
+            shapePoints,
+            width,
+            height,
+            mirror,
+            brushSize,
+          );
+          const stepColors = buildGradientSteps(
+            gradientStartHex,
+            gradientEndHex,
+            gradientSteps,
+          );
+          const axis = bboxGradientAxis(expanded, gradientAngleDeg);
+          const kept: Point[] = [];
+          const colors: string[] = [];
+          for (const p of expanded) {
+            const t = projectT(p.x, p.y, axis.x0, axis.y0, axis.x1, axis.y1);
+            const c = stepColorAt(stepColors, t);
+            if (c[3] <= 0.02) continue; // 완전히 투명한 구간은 그리지 않는다
+            kept.push(p);
+            colors.push(rgbaToHex(c[0], c[1], c[2], c[3]));
+          }
+          shapeGradientOverlayRef.current = { points: kept, colors };
+          render(pixels);
+          return;
+        }
+
         let next = pixels;
         for (const p of shapePoints) {
           if (p.x < 0 || p.y < 0 || p.x >= width || p.y >= height) continue;
@@ -471,7 +696,12 @@ export default function PixelCanvas({
       if (!point || !lastPointRef.current) return;
       const colorIndex = tool === "eraser" ? -1 : activeColorIndex;
       let next = workingRef.current;
-      for (const p of linePoints(lastPointRef.current.x, lastPointRef.current.y, point.x, point.y)) {
+      for (const p of linePoints(
+        lastPointRef.current.x,
+        lastPointRef.current.y,
+        point.x,
+        point.y,
+      )) {
         next = plotPoint(next, p.x, p.y, colorIndex);
       }
       lastPointRef.current = point;
@@ -485,6 +715,13 @@ export default function PixelCanvas({
       activeColorIndex,
       pixels,
       filledShapes,
+      mirror,
+      brushSize,
+      shapeGradientFill,
+      gradientStartHex,
+      gradientEndHex,
+      gradientSteps,
+      gradientAngleDeg,
       viewportRef,
       onPendingTextMove,
       toGridPoint,
@@ -518,17 +755,33 @@ export default function PixelCanvas({
       gradientPreviewRef.current = null;
       shapeStartRef.current = null;
       render(workingRef.current);
-      if (gp && (gp.x0 !== gp.x1 || gp.y0 !== gp.y1)) onGradientToolEnd(gp.x0, gp.y0, gp.x1, gp.y1);
+      if (gp && (gp.x0 !== gp.x1 || gp.y0 !== gp.y1))
+        onGradientToolEnd(gp.x0, gp.y0, gp.x1, gp.y1);
       return;
     }
     if (tool === "line" || tool === "rect" || tool === "circle") {
       shapeStartRef.current = null;
+      if (shapeGradientFill) {
+        const sg = shapeGradientOverlayRef.current;
+        shapeGradientOverlayRef.current = null;
+        render(pixels);
+        if (sg && sg.points.length > 0) onShapeGradientEnd(sg.points);
+        return;
+      }
       onStrokeEnd(workingRef.current);
       return;
     }
     lastPointRef.current = null;
     onStrokeEnd(workingRef.current);
-  }, [tool, onStrokeEnd, onGradientToolEnd, render]);
+  }, [
+    tool,
+    shapeGradientFill,
+    pixels,
+    onStrokeEnd,
+    onGradientToolEnd,
+    onShapeGradientEnd,
+    render,
+  ]);
 
   // React의 onWheel은 리스너를 passive로 등록해 e.preventDefault()가 조용히
   // 무시된다 — Ctrl/Cmd+스크롤로 캔버스만 확대하려 해도 브라우저의 페이지 확대가
@@ -572,14 +825,19 @@ export default function PixelCanvas({
       {pendingText && (
         <div
           className="absolute z-10 flex items-center gap-1 bg-white px-1.5 py-1 shadow-[0_0_0_1px_#8b5cf6]"
-          style={{ left: pendingText.x * scale, top: Math.max(0, pendingText.y * scale - 34) }}
+          style={{
+            left: pendingText.x * scale,
+            top: Math.max(0, pendingText.y * scale - 34),
+          }}
           // 캔버스의 pointerdown이 이 오버레이 클릭까지 그리기로 잡아채지 않도록 막는다.
           onPointerDown={(e) => e.stopPropagation()}
         >
           <input
             autoFocus
             value={pendingText.text}
-            onChange={(e) => onPendingTextChange(e.target.value, pendingText.fontSize)}
+            onChange={(e) =>
+              onPendingTextChange(e.target.value, pendingText.fontSize)
+            }
             onKeyDown={(e) => {
               if (e.key === "Enter") onPendingTextCommit();
               else if (e.key === "Escape") onPendingTextCancel();
@@ -588,19 +846,53 @@ export default function PixelCanvas({
             className="w-20 select-text bg-transparent text-xs text-gray-900 outline-none"
           />
           <button
-            onClick={() => onPendingTextChange(pendingText.text, Math.max(4, pendingText.fontSize - 2))}
+            onClick={() =>
+              onPendingTextChange(
+                pendingText.text,
+                Math.max(4, pendingText.fontSize - 2),
+              )
+            }
             title="글자 작게"
             className="flex h-4 w-4 items-center justify-center bg-gray-100 text-[10px] text-gray-600 hover:bg-gray-200"
           >
             −
           </button>
-          <span className="w-6 text-center text-[9px] text-gray-500">{pendingText.fontSize}</span>
+          <span className="w-6 text-center text-[9px] text-gray-500">
+            {pendingText.fontSize}
+          </span>
           <button
-            onClick={() => onPendingTextChange(pendingText.text, Math.min(64, pendingText.fontSize + 2))}
+            onClick={() =>
+              onPendingTextChange(
+                pendingText.text,
+                Math.min(64, pendingText.fontSize + 2),
+              )
+            }
             title="글자 크게"
             className="flex h-4 w-4 items-center justify-center bg-gray-100 text-[10px] text-gray-600 hover:bg-gray-200"
           >
             +
+          </button>
+          <button
+            onClick={onPendingTextToggleAA}
+            title="안티에일리어싱"
+            className={`flex h-4 w-6 items-center justify-center text-[8px] font-semibold ${
+              pendingText.antialias
+                ? "bg-violet-500 text-white"
+                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+            }`}
+          >
+            AA
+          </button>
+          <button
+            onClick={onPendingTextToggleGradient}
+            title="그라데이션 채우기"
+            className={`flex h-4 w-6 items-center justify-center text-[8px] font-semibold ${
+              pendingText.gradientFill
+                ? "bg-violet-500 text-white"
+                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+            }`}
+          >
+            그라
           </button>
           <button
             onClick={onPendingTextCommit}

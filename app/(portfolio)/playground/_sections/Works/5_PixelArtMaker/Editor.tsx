@@ -20,7 +20,15 @@ import {
   exportAsPNG,
   exportAsSVG,
 } from "./exportPixelArt";
-import { applyGradient } from "./gradientFill";
+import {
+  applyGradient,
+  bboxGradientAxis,
+  buildGradientSteps,
+  projectT,
+  resolvePaletteIndex,
+  stepColorAt,
+} from "./gradientFill";
+import { mixHex, rgbaToHex } from "./hsv";
 import ImportPanel from "./ImportPanel";
 import NewCanvasDialog from "./NewCanvasDialog";
 import PixelCanvas from "./PixelCanvas";
@@ -126,12 +134,24 @@ export default function Editor({
   const [secondaryColorIndex, setSecondaryColorIndex] = useState(-1);
   // 텍스트 도구로 캔버스를 클릭하면 그 그리드 좌표에서 시작한다 — 아직 픽셀에
   // 굽지 않은 상태로 캔버스 위에 인라인 입력·미리보기를 띄운다(모달 없음).
+  // antialias: 글자 가장자리를 배경과 섞어 부드럽게 굽는다. gradientFill: 활성/
+  // 보조 색상 그라데이션으로 글자를 채운다(둘 다 켜면 함께 적용된다).
   const [pendingText, setPendingText] = useState<{
     x: number;
     y: number;
     text: string;
     fontSize: number;
+    antialias: boolean;
+    gradientFill: boolean;
   } | null>(null);
+  // 그라데이션 도구·도형 그라데이션 채우기·텍스트 그라데이션 채우기가 공유하는
+  // 설정 — 단계 수와 방향(각도). 그라데이션 도구 자체는 드래그로 축을 직접
+  // 정하므로 angleDeg의 영향을 받지 않고, 드래그 제스처가 없는 도형·텍스트
+  // 채우기에서만 이 각도로 축을 계산한다.
+  const [gradientSteps, setGradientSteps] = useState(8);
+  const [gradientAngleDeg, setGradientAngleDeg] = useState(0);
+  // 직선·사각형·원을 그릴 때 단색 대신 그라데이션으로 채운다.
+  const [shapeGradientFill, setShapeGradientFill] = useState(false);
   // PixelCanvas가 Ctrl+스크롤로 자체 관리하는 확대 배율 — 뷰포트 좌측 하단에
   // 표시만 하기 위해 값을 그대로 올려받는다.
   const [canvasZoom, setCanvasZoom] = useState(1);
@@ -304,25 +324,88 @@ export default function Editor({
     history.push(createGrid(doc.width, doc.height));
   }, [history, doc.width, doc.height]);
 
-  // 확정 전 텍스트를 실제 픽셀에 굽는다(래스터화 → 활성 색상 하나로 찍기).
-  // 팔레트는 건드리지 않는다 — 여러 색을 섞으면 무한정 늘어난다.
+  // 확정 전 텍스트를 실제 픽셀에 굽는다(래스터화 → 커버리지 기반으로 색 결정).
+  // gradientFill이면 각 칸의 색을 캔버스 좌표 기준 그라데이션에서 가져오고,
+  // 아니면 활성 색상 하나를 쓴다. antialias면 그 색을 커버리지 비율만큼 배경과
+  // 섞어 하나의 불투명 색으로 만든다(인덱스 팔레트라 반투명을 그대로 저장할
+  // 수 없다). 새로 필요한 색은 resolvePaletteIndex로 팔레트에 반영한다.
   const commitPendingText = useCallback(
-    (p: { x: number; y: number; text: string; fontSize: number }) => {
+    (p: {
+      x: number;
+      y: number;
+      text: string;
+      fontSize: number;
+      antialias: boolean;
+      gradientFill: boolean;
+    }) => {
       if (!p.text.trim()) return;
-      const { width: tw, height: th, mask } = rasterizeText(p.text, p.fontSize);
+      const {
+        width: tw,
+        height: th,
+        alpha,
+      } = rasterizeText(p.text, p.fontSize);
       const next = history.present.slice();
+      let nextPalette = doc.palette;
+      const flatHex = doc.palette[activeColorIndex] ?? "#000000";
+      const startHex = flatHex;
+      const endHex =
+        secondaryColorIndex >= 0
+          ? (doc.palette[secondaryColorIndex] ?? "#00000000")
+          : "#00000000";
+      const stepColors = p.gradientFill
+        ? buildGradientSteps(startHex, endHex, gradientSteps)
+        : null;
+      const axis =
+        stepColors &&
+        bboxGradientAxis(
+          [
+            { x: p.x, y: p.y },
+            { x: p.x + tw, y: p.y + th },
+          ],
+          gradientAngleDeg,
+        );
       for (let ty = 0; ty < th; ty++) {
         for (let tx = 0; tx < tw; tx++) {
-          if (!mask[ty * tw + tx]) continue;
+          const coverage = alpha[ty * tw + tx] / 255;
+          if (coverage === 0) continue;
+          if (!p.antialias && coverage <= 0.5) continue;
           const px = p.x + tx;
           const py = p.y + ty;
           if (px < 0 || py < 0 || px >= doc.width || py >= doc.height) continue;
-          next[py * doc.width + px] = activeColorIndex;
+          const idx = py * doc.width + px;
+          let fgHex = flatHex;
+          if (stepColors && axis) {
+            const t = projectT(px, py, axis.x0, axis.y0, axis.x1, axis.y1);
+            const c = stepColorAt(stepColors, t);
+            if (c[3] <= 0.02) continue; // 완전히 투명한 그라데이션 구간은 건너뛴다
+            fgHex = rgbaToHex(c[0], c[1], c[2], c[3]);
+          }
+          let finalHex = fgHex;
+          if (p.antialias) {
+            const bgIndex = next[idx];
+            const bgHex =
+              bgIndex >= 0 ? (nextPalette[bgIndex] ?? "#ffffff") : "#ffffff";
+            finalHex = mixHex(bgHex, fgHex, coverage);
+          }
+          const resolved = resolvePaletteIndex(finalHex, nextPalette);
+          nextPalette = resolved.palette;
+          next[idx] = resolved.index;
         }
       }
+      if (nextPalette !== doc.palette)
+        setDoc((d) => ({ ...d, palette: nextPalette }));
       history.push(next);
     },
-    [doc.width, doc.height, activeColorIndex, history],
+    [
+      doc.width,
+      doc.height,
+      doc.palette,
+      activeColorIndex,
+      secondaryColorIndex,
+      gradientSteps,
+      gradientAngleDeg,
+      history,
+    ],
   );
 
   // 텍스트 도구로 클릭한 자리에 인라인 입력을 띄운다 — 이미 확정 전 텍스트가
@@ -331,7 +414,14 @@ export default function Editor({
     (x: number, y: number) => {
       setPendingText((p) => {
         if (p) commitPendingText(p);
-        return { x, y, text: "", fontSize: 8 };
+        return {
+          x,
+          y,
+          text: "",
+          fontSize: 8,
+          antialias: false,
+          gradientFill: false,
+        };
       });
     },
     [commitPendingText],
@@ -346,6 +436,14 @@ export default function Editor({
 
   const handlePendingTextMove = useCallback((x: number, y: number) => {
     setPendingText((p) => (p ? { ...p, x, y } : p));
+  }, []);
+
+  const handlePendingTextToggleAA = useCallback(() => {
+    setPendingText((p) => (p ? { ...p, antialias: !p.antialias } : p));
+  }, []);
+
+  const handlePendingTextToggleGradient = useCallback(() => {
+    setPendingText((p) => (p ? { ...p, gradientFill: !p.gradientFill } : p));
   }, []);
 
   const handlePendingTextCommit = useCallback(() => {
@@ -389,6 +487,7 @@ export default function Editor({
         y1,
         startHex,
         endHex,
+        gradientSteps,
       );
       if (result.palette.length !== doc.palette.length) {
         setDoc((d) => ({ ...d, palette: result.palette }));
@@ -398,10 +497,57 @@ export default function Editor({
     [
       activeColorIndex,
       secondaryColorIndex,
+      gradientSteps,
       history,
       doc.palette,
       doc.width,
       doc.height,
+    ],
+  );
+
+  // 직선·사각형·원을 그라데이션으로 채울 때 드래그가 끝나면 호출된다 —
+  // PixelCanvas가 브러시 크기·미러까지 반영해 이미 펼쳐둔 최종 좌표 목록을
+  // 그대로 받아, 각 좌표의 그라데이션 색을 계산해 굽는다(팔레트 확장 포함).
+  const handleShapeGradientEnd = useCallback(
+    (points: { x: number; y: number }[]) => {
+      if (points.length === 0) return;
+      const startHex = doc.palette[activeColorIndex] ?? "#000000";
+      const endHex =
+        secondaryColorIndex >= 0
+          ? (doc.palette[secondaryColorIndex] ?? "#00000000")
+          : "#00000000";
+      const stepColors = buildGradientSteps(startHex, endHex, gradientSteps);
+      const axis = bboxGradientAxis(points, gradientAngleDeg);
+      let nextPalette = doc.palette;
+      const next = history.present.slice();
+      for (const p of points) {
+        if (p.x < 0 || p.y < 0 || p.x >= doc.width || p.y >= doc.height)
+          continue;
+        const t = projectT(p.x, p.y, axis.x0, axis.y0, axis.x1, axis.y1);
+        const c = stepColorAt(stepColors, t);
+        const idx = p.y * doc.width + p.x;
+        if (c[3] <= 0.02) {
+          next[idx] = -1;
+          continue;
+        }
+        const hex = rgbaToHex(c[0], c[1], c[2], c[3]);
+        const resolved = resolvePaletteIndex(hex, nextPalette);
+        nextPalette = resolved.palette;
+        next[idx] = resolved.index;
+      }
+      if (nextPalette !== doc.palette)
+        setDoc((d) => ({ ...d, palette: nextPalette }));
+      history.push(next);
+    },
+    [
+      doc.palette,
+      doc.width,
+      doc.height,
+      activeColorIndex,
+      secondaryColorIndex,
+      gradientSteps,
+      gradientAngleDeg,
+      history,
     ],
   );
 
@@ -867,6 +1013,8 @@ export default function Editor({
               onBrushSizeChange={setBrushSize}
               filledShapes={filledShapes}
               onToggleFilledShapes={() => setFilledShapes((f) => !f)}
+              shapeGradientFill={shapeGradientFill}
+              onToggleShapeGradientFill={() => setShapeGradientFill((g) => !g)}
               onClearCanvas={handleClearCanvas}
             />
             <ColorWheel
@@ -880,6 +1028,10 @@ export default function Editor({
               onToolChange={setTool}
               secondaryColorIndex={secondaryColorIndex}
               onSelectSecondary={setSecondaryColorIndex}
+              gradientSteps={gradientSteps}
+              onGradientStepsChange={setGradientSteps}
+              gradientAngleDeg={gradientAngleDeg}
+              onGradientAngleChange={setGradientAngleDeg}
             />
           </div>
           <div
@@ -912,9 +1064,21 @@ export default function Editor({
               }
               onPendingTextChange={handlePendingTextChange}
               onPendingTextMove={handlePendingTextMove}
+              onPendingTextToggleAA={handlePendingTextToggleAA}
+              onPendingTextToggleGradient={handlePendingTextToggleGradient}
               onPendingTextCommit={handlePendingTextCommit}
               onPendingTextCancel={handlePendingTextCancel}
               onGradientToolEnd={handleGradientToolEnd}
+              shapeGradientFill={shapeGradientFill}
+              gradientStartHex={doc.palette[activeColorIndex] ?? "#000000"}
+              gradientEndHex={
+                secondaryColorIndex >= 0
+                  ? (doc.palette[secondaryColorIndex] ?? "#00000000")
+                  : "#00000000"
+              }
+              gradientSteps={gradientSteps}
+              gradientAngleDeg={gradientAngleDeg}
+              onShapeGradientEnd={handleShapeGradientEnd}
               zoom={canvasZoom}
               onZoomChange={setCanvasZoom}
               viewportRef={canvasViewportRef}

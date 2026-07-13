@@ -28,6 +28,10 @@ export default function ColorWheel({
   onToolChange,
   secondaryColorIndex,
   onSelectSecondary,
+  gradientSteps,
+  onGradientStepsChange,
+  gradientAngleDeg,
+  onGradientAngleChange,
 }: {
   palette: string[];
   activeColorIndex: number;
@@ -40,6 +44,11 @@ export default function ColorWheel({
   // 그라데이션 끝 색상 — MS페인트의 보조 색상과 같은 개념. -1이면 투명.
   secondaryColorIndex: number;
   onSelectSecondary: (index: number) => void;
+  // 그라데이션 도구·도형/텍스트 그라데이션 채우기가 공유하는 단계 수·방향.
+  gradientSteps: number;
+  onGradientStepsChange: (steps: number) => void;
+  gradientAngleDeg: number;
+  onGradientAngleChange: (deg: number) => void;
 }) {
   const squareRef = useRef<HTMLCanvasElement>(null);
   const draggingRef = useRef<"square" | "hue" | "alpha" | null>(null);
@@ -340,10 +349,47 @@ export default function ColorWheel({
           }
         />
         <span className="text-gray-400">(스와치 우클릭으로 지정)</span>
-        <button onClick={() => onSelectSecondary(-1)} className="ml-auto text-violet-500 hover:underline">
+        <button
+          onClick={() => onSelectSecondary(-1)}
+          className="ml-auto text-violet-500 hover:underline"
+        >
           투명으로
         </button>
       </div>
+
+      <label className="flex w-full items-center justify-between text-[10px] text-gray-500">
+        <span>그라데이션 단계</span>
+        <span className="flex items-center gap-1.5">
+          <input
+            type="range"
+            min={2}
+            max={32}
+            value={gradientSteps}
+            onChange={(e) => onGradientStepsChange(Number(e.target.value))}
+          />
+          <span className="w-5 text-right tabular-nums text-gray-400">
+            {gradientSteps}
+          </span>
+        </span>
+      </label>
+      <label
+        className="flex w-full items-center justify-between text-[10px] text-gray-500"
+        title="그라데이션 도구는 드래그 방향을 그대로 쓰고, 도형·텍스트 그라데이션 채우기만 이 각도를 따른다"
+      >
+        <span>그라데이션 방향</span>
+        <span className="flex items-center gap-1.5">
+          <input
+            type="range"
+            min={0}
+            max={359}
+            value={gradientAngleDeg}
+            onChange={(e) => onGradientAngleChange(Number(e.target.value))}
+          />
+          <span className="w-7 text-right tabular-nums text-gray-400">
+            {gradientAngleDeg}°
+          </span>
+        </span>
+      </label>
     </div>
   );
 }
