@@ -274,6 +274,12 @@ export default function Editor({
     [history],
   );
 
+  // 실행취소로 되돌릴 수 있으므로(다른 파괴적 동작들과 같은 관례) 별도 확인 없이
+  // 바로 전체를 투명하게 지운다.
+  const handleClearCanvas = useCallback(() => {
+    history.push(createGrid(doc.width, doc.height));
+  }, [history, doc.width, doc.height]);
+
   const handleSave = useCallback(() => {
     if (activeTabIndex < 0) return;
     // 배경화면은 이름이 고정("배경화면")이고 일반 픽셀아트 목록이 아닌
@@ -714,6 +720,7 @@ export default function Editor({
               onToggleGrid={() => setShowGrid((g) => !g)}
               brushSize={brushSize}
               onBrushSizeChange={setBrushSize}
+              onClearCanvas={handleClearCanvas}
             />
             <ColorWheel
               palette={palette}
