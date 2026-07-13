@@ -128,6 +128,8 @@ export default function Editor({
   // 아니라 이 루트 기준 상대좌표로 계산해야 편집창이 letterbox로 작아지거나
   // 가운데 정렬돼도 메뉴가 버튼 바로 아래에 정확히 뜬다.
   const rootRef = useRef<HTMLDivElement>(null);
+  // 확대 상태에서 스페이스+드래그로 스크롤할 대상 — PixelCanvas에 그대로 내려준다.
+  const canvasViewportRef = useRef<HTMLDivElement>(null);
   const [resizingCanvas, setResizingCanvas] = useState(false);
   const [showNewCanvasDialog, setShowNewCanvasDialog] = useState(
     !initial.found && startMode === "newCanvas",
@@ -141,7 +143,9 @@ export default function Editor({
   // localStorage 용량 초과 등으로 저장이 실패해도 이 앱은 토스트 UI가 없어
   // 조용히 묻히기 쉽다 — 제목표시줄에 잠깐 빨간 문구로 알려준다.
   const [saveError, setSaveError] = useState(false);
-  const saveErrorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveErrorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const flagSaveError = useCallback(() => {
     setSaveError(true);
     if (saveErrorTimeoutRef.current) clearTimeout(saveErrorTimeoutRef.current);
@@ -149,7 +153,8 @@ export default function Editor({
   }, []);
   useEffect(() => {
     return () => {
-      if (saveErrorTimeoutRef.current) clearTimeout(saveErrorTimeoutRef.current);
+      if (saveErrorTimeoutRef.current)
+        clearTimeout(saveErrorTimeoutRef.current);
     };
   }, []);
   const isWallpaper = doc.id === WALLPAPER_ID;
@@ -612,7 +617,11 @@ export default function Editor({
             편집기
           </span>
         )}
-        {saveError && <span className="text-[10px] font-semibold text-red-500">저장 실패</span>}
+        {saveError && (
+          <span className="text-[10px] font-semibold text-red-500">
+            저장 실패
+          </span>
+        )}
         {activeTabIndex >= 0 && (
           <button
             onClick={handleSave}
@@ -737,7 +746,7 @@ export default function Editor({
               onToolChange={setTool}
             />
           </div>
-          <div className="relative flex flex-1 items-center justify-center overflow-auto">
+          <div ref={canvasViewportRef} className="relative flex flex-1 items-center justify-center overflow-auto">
             <PixelCanvas
               width={doc.width}
               height={doc.height}
@@ -755,6 +764,7 @@ export default function Editor({
               onPickColor={handlePickColor}
               zoom={canvasZoom}
               onZoomChange={setCanvasZoom}
+              viewportRef={canvasViewportRef}
             />
             <div className="absolute bottom-2 left-2 flex items-center gap-0.5">
               <button
@@ -765,7 +775,9 @@ export default function Editor({
               >
                 <Minus className="h-3 w-3" />
               </button>
-              <div className="bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">{canvasZoom}x</div>
+              <div className="bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
+                {canvasZoom}x
+              </div>
               <button
                 onClick={() => setCanvasZoom((z) => Math.min(8, z + 1))}
                 disabled={canvasZoom >= 8}
@@ -777,7 +789,6 @@ export default function Editor({
             </div>
           </div>
           <div className="flex w-60 shrink-0 flex-col gap-3">
-            <ExportPanel doc={{ ...doc, pixels: history.present }} />
             <ImportPanel
               autoOpen={wantsAutoImport}
               onConfirm={(imported) => {
@@ -810,6 +821,7 @@ export default function Editor({
                 });
               }}
             />
+            <ExportPanel doc={{ ...doc, pixels: history.present }} />
           </div>
         </div>
       ) : (

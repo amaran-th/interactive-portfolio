@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import {
   circleFillPoints,
   circleOutlinePoints,
@@ -35,6 +35,7 @@ export default function PixelCanvas({
   onPickColor,
   zoom,
   onZoomChange,
+  viewportRef,
 }: {
   width: number;
   height: number;
@@ -52,12 +53,24 @@ export default function PixelCanvas({
   onPickColor: (colorIndex: number) => void;
   zoom: number;
   onZoomChange: (zoom: number) => void;
+  // 확대 상태에서 스페이스+드래그로 스크롤할 대상 — 이 캔버스를 감싼 overflow-auto
+  // 뷰포트 컨테이너의 ref를 Editor가 그대로 내려준다.
+  viewportRef: RefObject<HTMLDivElement | null>;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // 트랙패드 스크롤/핀치는 짧은 시간 안에 작은 deltaY를 가진 wheel 이벤트를 수십 번
+  // 쏟아낸다 — 이벤트 하나당 배율을 한 단계씩 바꾸면 살짝만 스크롤해도 확대가
+  // 급격히 튀었다. deltaY를 누적해 일정 값을 넘을 때만 한 단계 바꾸도록 한다.
+  const wheelDeltaRef = useRef(0);
   const workingRef = useRef<number[]>(pixels);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const shapeStartRef = useRef<{ x: number; y: number } | null>(null);
   const drawingRef = useRef(false);
+  // 확대된 상태에서는 캔버스가 뷰포트보다 커져 화면을 옮겨볼 방법이 필요하다 —
+  // 스페이스바를 누른 채 드래그하면(포토샵·Aseprite와 같은 관례) 그리기 대신
+  // 뷰포트(부모 컨테이너)를 스크롤한다.
+  const [isSpaceHeld, setIsSpaceHeld] = useState(false);
+  const panStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
   // selectionMask 프롭은 React state를 거쳐 비동기로 갱신되므로, 빠른 연속 pointermove
   // 동안 오래된(stale) 값을 참조해 move 드래그가 잘못된 위치를 지우는 문제(자취 남음)가
   // 있었다. workingRef와 같은 패턴으로 항상 최신 값을 담는 ref를 별도로 둔다.
@@ -70,6 +83,26 @@ export default function PixelCanvas({
   useEffect(() => {
     selectionMaskRef.current = selectionMask;
   }, [selectionMask]);
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+      e.preventDefault();
+      setIsSpaceHeld(true);
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+      setIsSpaceHeld(false);
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+    };
+  }, []);
 
   const render = useCallback(
     (data: number[]) => {
@@ -165,6 +198,16 @@ export default function PixelCanvas({
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
       if (e.button !== 0) return;
+
+      if (isSpaceHeld) {
+        const container = viewportRef.current;
+        if (container) {
+          panStartRef.current = { x: e.clientX, y: e.clientY, scrollLeft: container.scrollLeft, scrollTop: container.scrollTop };
+          canvasRef.current?.setPointerCapture(e.pointerId);
+        }
+        return;
+      }
+
       const point = toGridPoint(e);
       if (!point) return;
       canvasRef.current?.setPointerCapture(e.pointerId);
@@ -229,11 +272,19 @@ export default function PixelCanvas({
         render(next);
       }
     },
-    [tool, width, height, activeColorIndex, toGridPoint, plotPoint, render, onStrokeEnd, onPickColor, onSelectionChange],
+    [tool, width, height, activeColorIndex, isSpaceHeld, viewportRef, toGridPoint, plotPoint, render, onStrokeEnd, onPickColor, onSelectionChange],
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
+      if (panStartRef.current) {
+        const container = viewportRef.current;
+        if (container) {
+          container.scrollLeft = panStartRef.current.scrollLeft - (e.clientX - panStartRef.current.x);
+          container.scrollTop = panStartRef.current.scrollTop - (e.clientY - panStartRef.current.y);
+        }
+        return;
+      }
       if (!drawingRef.current) return;
 
       if (tool === "select" && shapeStartRef.current) {
@@ -308,13 +359,17 @@ export default function PixelCanvas({
       workingRef.current = next;
       render(next);
     },
-    [tool, width, height, activeColorIndex, pixels, filledShapes, toGridPoint, plotPoint, render, onSelectionChange],
+    [tool, width, height, activeColorIndex, pixels, filledShapes, viewportRef, toGridPoint, plotPoint, render, onSelectionChange],
   );
 
   // 맨 앞에서 drawingRef를 한 번만 검사·소비하도록 통일한다 — pointerup 처리 후 브라우저가
   // 뒤이어 보내는 lostpointercapture(그리고 handlePointerCancel의 재사용)가 같은 제스처를
   // 두 번 커밋하지 않도록 이 함수 자체를 멱등하게 만든다.
   const handlePointerUp = useCallback(() => {
+    if (panStartRef.current) {
+      panStartRef.current = null;
+      return;
+    }
     if (!drawingRef.current) return;
     drawingRef.current = false;
 
@@ -332,15 +387,22 @@ export default function PixelCanvas({
   }, [tool, onStrokeEnd]);
 
   // React의 onWheel은 리스너를 passive로 등록해 e.preventDefault()가 조용히
-  // 무시된다 — Ctrl+스크롤로 캔버스만 확대하려 해도 브라우저의 페이지 확대가
+  // 무시된다 — Ctrl/Cmd+스크롤로 캔버스만 확대하려 해도 브라우저의 페이지 확대가
   // 함께 발동했다. addEventListener를 { passive: false }로 직접 붙여야 막힌다.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const WHEEL_ZOOM_THRESHOLD = 50;
     const handler = (e: WheelEvent) => {
-      if (!e.ctrlKey) return;
+      // macOS는 Cmd(metaKey), 다른 플랫폼은 Ctrl(ctrlKey) — 트랙패드 핀치 제스처는
+      // 브라우저가 관례적으로 ctrlKey:true인 wheel 이벤트로 보내므로 그대로 잡힌다.
+      if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
-      onZoomChange(Math.min(8, Math.max(1, zoom + (e.deltaY < 0 ? 1 : -1))));
+      wheelDeltaRef.current += e.deltaY;
+      if (Math.abs(wheelDeltaRef.current) < WHEEL_ZOOM_THRESHOLD) return;
+      const direction = wheelDeltaRef.current < 0 ? 1 : -1;
+      wheelDeltaRef.current = 0;
+      onZoomChange(Math.min(8, Math.max(1, zoom + direction)));
     };
     canvas.addEventListener("wheel", handler, { passive: false });
     return () => canvas.removeEventListener("wheel", handler);
@@ -354,7 +416,7 @@ export default function PixelCanvas({
   return (
     <canvas
       ref={canvasRef}
-      className="cursor-crosshair touch-none shadow-md"
+      className={`touch-none shadow-md ${isSpaceHeld ? "cursor-grab" : "cursor-crosshair"}`}
       style={{ imageRendering: "pixelated" }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
