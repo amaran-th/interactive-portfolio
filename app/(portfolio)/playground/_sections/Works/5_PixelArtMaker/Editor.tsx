@@ -13,6 +13,7 @@ import Accordion from "./Accordion";
 import ColorWheel from "./ColorWheel";
 import ConfirmDialog from "./ConfirmDialog";
 import ContextMenu, { ContextMenuItem } from "./ContextMenu";
+import DrawToolbar from "./DrawToolbar";
 import ExportPanel from "./ExportPanel";
 import {
   exportAsJPG,
@@ -1075,157 +1076,163 @@ export default function Editor({
       )}
 
       {activeTabIndex >= 0 ? (
-        <div className="flex flex-1 gap-4 overflow-auto p-4">
-          <div className="flex w-56 shrink-0 flex-col gap-3">
-            <Toolbar
-              tool={tool}
-              onToolChange={setTool}
-              mirror={mirror}
-              onMirrorChange={setMirror}
-              canUndo={history.canUndo}
-              canRedo={history.canRedo}
-              onUndo={history.undo}
-              onRedo={history.redo}
-              showGrid={showGrid}
-              onToggleGrid={() => setShowGrid((g) => !g)}
-              brushSize={brushSize}
-              onBrushSizeChange={setBrushSize}
-              filledShapes={filledShapes}
-              onToggleFilledShapes={() => setFilledShapes((f) => !f)}
-              shapeGradientFill={shapeGradientFill}
-              onToggleShapeGradientFill={() => setShapeGradientFill((g) => !g)}
-              onClearCanvas={handleClearCanvas}
-            />
-            <ColorWheel
-              palette={palette}
-              activeColorIndex={activeColorIndex}
-              onSelect={setActiveColorIndex}
-              onCommitColor={handleCommitColor}
-              onEditSwatchColor={handleEditSwatchColor}
-              onAddColor={handleAddColor}
-              onRemoveColor={handleRemoveColor}
-              tool={tool}
-              onToolChange={setTool}
-              secondaryColorIndex={secondaryColorIndex}
-              onSelectSecondary={setSecondaryColorIndex}
-              gradientSteps={gradientSteps}
-              onGradientStepsChange={setGradientSteps}
-              gradientAngleDeg={gradientAngleDeg}
-              onGradientAngleChange={setGradientAngleDeg}
-            />
-          </div>
-          <div
-            ref={canvasViewportRef}
-            className="relative flex flex-1 items-center justify-center overflow-auto"
-          >
-            <PixelCanvas
-              width={doc.width}
-              height={doc.height}
-              palette={palette}
-              pixels={history.present}
-              tool={tool}
-              mirror={mirror}
-              activeColorIndex={activeColorIndex}
-              selectionMask={selection.mask}
-              showGrid={showGrid}
-              brushSize={brushSize}
-              filledShapes={filledShapes}
-              onSelectionChange={selection.setMask}
-              onStrokeEnd={handleStrokeEnd}
-              onEnsureColor={handleEnsureFirstColor}
-              onPickColor={handlePickColor}
-              onTextToolClick={handleTextToolClick}
-              pendingText={
-                pendingText
-                  ? {
-                      ...pendingText,
-                      colorHex: doc.palette[activeColorIndex] ?? "#000000",
-                    }
-                  : null
-              }
-              onPendingTextChange={handlePendingTextChange}
-              onPendingTextMove={handlePendingTextMove}
-              onPendingTextToggleAA={handlePendingTextToggleAA}
-              onPendingTextToggleGradient={handlePendingTextToggleGradient}
-              onPendingTextCommit={handlePendingTextCommit}
-              onPendingTextCancel={handlePendingTextCancel}
-              onGradientToolEnd={handleGradientToolEnd}
-              shapeGradientFill={shapeGradientFill}
-              gradientStartHex={doc.palette[activeColorIndex] ?? "#000000"}
-              gradientEndHex={
-                secondaryColorIndex >= 0
-                  ? (doc.palette[secondaryColorIndex] ?? "#00000000")
-                  : "#00000000"
-              }
-              gradientSteps={gradientSteps}
-              gradientAngleDeg={gradientAngleDeg}
-              onShapeGradientEnd={handleShapeGradientEnd}
-              zoom={canvasZoom}
-              onZoomChange={setCanvasZoom}
-              viewportRef={canvasViewportRef}
-            />
-            <div className="absolute bottom-2 left-2 flex items-center gap-0.5">
-              <button
-                onClick={() => setCanvasZoom((z) => Math.max(1, z - 1))}
-                disabled={canvasZoom <= 1}
-                title="축소"
-                className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
-              >
-                <Minus className="h-3 w-3" />
-              </button>
-              <div className="bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
-                {canvasZoom}x
-              </div>
-              <button
-                onClick={() => setCanvasZoom((z) => Math.min(8, z + 1))}
-                disabled={canvasZoom >= 8}
-                title="확대"
-                className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
-              >
-                <Plus className="h-3 w-3" />
-              </button>
+        <>
+          <DrawToolbar
+            tool={tool}
+            onToolChange={setTool}
+            brushSize={brushSize}
+            onBrushSizeChange={setBrushSize}
+            filledShapes={filledShapes}
+            onToggleFilledShapes={() => setFilledShapes((f) => !f)}
+            shapeGradientFill={shapeGradientFill}
+            onToggleShapeGradientFill={() => setShapeGradientFill((g) => !g)}
+          />
+          <div className="flex flex-1 gap-4 overflow-auto p-4">
+            <div className="flex w-56 shrink-0 flex-col gap-3">
+              <Toolbar
+                tool={tool}
+                onToolChange={setTool}
+                mirror={mirror}
+                onMirrorChange={setMirror}
+                canUndo={history.canUndo}
+                canRedo={history.canRedo}
+                onUndo={history.undo}
+                onRedo={history.redo}
+                showGrid={showGrid}
+                onToggleGrid={() => setShowGrid((g) => !g)}
+                onClearCanvas={handleClearCanvas}
+              />
+              <ColorWheel
+                palette={palette}
+                activeColorIndex={activeColorIndex}
+                onSelect={setActiveColorIndex}
+                onCommitColor={handleCommitColor}
+                onEditSwatchColor={handleEditSwatchColor}
+                onAddColor={handleAddColor}
+                onRemoveColor={handleRemoveColor}
+                tool={tool}
+                onToolChange={setTool}
+                secondaryColorIndex={secondaryColorIndex}
+                onSelectSecondary={setSecondaryColorIndex}
+                gradientSteps={gradientSteps}
+                onGradientStepsChange={setGradientSteps}
+                gradientAngleDeg={gradientAngleDeg}
+                onGradientAngleChange={setGradientAngleDeg}
+              />
             </div>
-          </div>
-          <div className="flex w-60 shrink-0 flex-col gap-3">
-            <Accordion title="이미지 불러오기">
-              <ImportPanel
-                autoOpen={wantsAutoImport}
-                onConfirm={(imported) => {
-                  // wantsAutoImport가 true인 경우는 "새로 만들기 → 이미지로
-                  // 불러오기"로 방금 만든, 아직 아무것도 그리지 않은 빈 캔버스다 —
-                  // 그 자리에 그대로 불러온 이미지 크기로 채운다.
-                  if (wantsAutoImport) {
-                    setDoc((d) => ({
-                      ...d,
+            <div
+              ref={canvasViewportRef}
+              className="relative flex flex-1 items-center justify-center overflow-auto"
+            >
+              <PixelCanvas
+                width={doc.width}
+                height={doc.height}
+                palette={palette}
+                pixels={history.present}
+                tool={tool}
+                mirror={mirror}
+                activeColorIndex={activeColorIndex}
+                selectionMask={selection.mask}
+                showGrid={showGrid}
+                brushSize={brushSize}
+                filledShapes={filledShapes}
+                onSelectionChange={selection.setMask}
+                onStrokeEnd={handleStrokeEnd}
+                onEnsureColor={handleEnsureFirstColor}
+                onPickColor={handlePickColor}
+                onTextToolClick={handleTextToolClick}
+                pendingText={
+                  pendingText
+                    ? {
+                        ...pendingText,
+                        colorHex: doc.palette[activeColorIndex] ?? "#000000",
+                      }
+                    : null
+                }
+                onPendingTextChange={handlePendingTextChange}
+                onPendingTextMove={handlePendingTextMove}
+                onPendingTextToggleAA={handlePendingTextToggleAA}
+                onPendingTextToggleGradient={handlePendingTextToggleGradient}
+                onPendingTextCommit={handlePendingTextCommit}
+                onPendingTextCancel={handlePendingTextCancel}
+                onGradientToolEnd={handleGradientToolEnd}
+                shapeGradientFill={shapeGradientFill}
+                gradientStartHex={doc.palette[activeColorIndex] ?? "#000000"}
+                gradientEndHex={
+                  secondaryColorIndex >= 0
+                    ? (doc.palette[secondaryColorIndex] ?? "#00000000")
+                    : "#00000000"
+                }
+                gradientSteps={gradientSteps}
+                gradientAngleDeg={gradientAngleDeg}
+                onShapeGradientEnd={handleShapeGradientEnd}
+                zoom={canvasZoom}
+                onZoomChange={setCanvasZoom}
+                viewportRef={canvasViewportRef}
+              />
+              <div className="absolute bottom-2 left-2 flex items-center gap-0.5">
+                <button
+                  onClick={() => setCanvasZoom((z) => Math.max(1, z - 1))}
+                  disabled={canvasZoom <= 1}
+                  title="축소"
+                  className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
+                >
+                  <Minus className="h-3 w-3" />
+                </button>
+                <div className="bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
+                  {canvasZoom}x
+                </div>
+                <button
+                  onClick={() => setCanvasZoom((z) => Math.min(8, z + 1))}
+                  disabled={canvasZoom >= 8}
+                  title="확대"
+                  className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
+                >
+                  <Plus className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+            <div className="flex w-60 shrink-0 flex-col gap-3">
+              <Accordion title="이미지 불러오기">
+                <ImportPanel
+                  autoOpen={wantsAutoImport}
+                  onConfirm={(imported) => {
+                    // wantsAutoImport가 true인 경우는 "새로 만들기 → 이미지로
+                    // 불러오기"로 방금 만든, 아직 아무것도 그리지 않은 빈 캔버스다 —
+                    // 그 자리에 그대로 불러온 이미지 크기로 채운다.
+                    if (wantsAutoImport) {
+                      setDoc((d) => ({
+                        ...d,
+                        width: imported.width,
+                        height: imported.height,
+                        palette: imported.palette,
+                      }));
+                      history.reset(imported.pixels);
+                      setHasMetaEdits(true);
+                      setWantsAutoImport(false);
+                      return;
+                    }
+                    // 그 외에는 지금 열려 있던(이미 그려뒀을 수 있는) 캔버스를 건드리지
+                    // 않고, 불러온 이미지를 새 탭으로 연다 — 이미지 불러오기가 편집
+                    // 중인 캔버스의 크기를 바꾸지 않아야 한다.
+                    openNewTab({
+                      id: uid(),
+                      name: "제목 없음",
                       width: imported.width,
                       height: imported.height,
                       palette: imported.palette,
-                    }));
-                    history.reset(imported.pixels);
-                    setHasMetaEdits(true);
-                    setWantsAutoImport(false);
-                    return;
-                  }
-                  // 그 외에는 지금 열려 있던(이미 그려뒀을 수 있는) 캔버스를 건드리지
-                  // 않고, 불러온 이미지를 새 탭으로 연다 — 이미지 불러오기가 편집
-                  // 중인 캔버스의 크기를 바꾸지 않아야 한다.
-                  openNewTab({
-                    id: uid(),
-                    name: "제목 없음",
-                    width: imported.width,
-                    height: imported.height,
-                    palette: imported.palette,
-                    pixels: imported.pixels,
-                    createdAt: Date.now(),
-                  });
-                }}
-              />
-            </Accordion>
-            <Accordion title="내보내기">
-              <ExportPanel doc={{ ...doc, pixels: history.present }} />
-            </Accordion>
+                      pixels: imported.pixels,
+                      createdAt: Date.now(),
+                    });
+                  }}
+                />
+              </Accordion>
+              <Accordion title="내보내기">
+                <ExportPanel doc={{ ...doc, pixels: history.present }} />
+              </Accordion>
+            </div>
           </div>
-        </div>
+        </>
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
           <p className="text-sm text-gray-400">열린 파일이 없습니다</p>
