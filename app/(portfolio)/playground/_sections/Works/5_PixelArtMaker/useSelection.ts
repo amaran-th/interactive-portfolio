@@ -1,7 +1,11 @@
 import { useCallback, useState } from "react";
-import { getPixel, idx, setPixel } from "./pixelGrid";
+import { setPixel } from "./pixelGrid";
 
-type Clip = { w: number; h: number; cells: { dx: number; dy: number; colorIndex: number }[] };
+type Clip = {
+  w: number;
+  h: number;
+  cells: { dx: number; dy: number; colorIndex: number }[];
+};
 
 export function useSelection() {
   const [mask, setMask] = useState<Set<number> | null>(null);
@@ -31,7 +35,13 @@ export function useSelection() {
   );
 
   const paste = useCallback(
-    (pixels: number[], width: number, height: number, atX: number, atY: number): number[] => {
+    (
+      pixels: number[],
+      width: number,
+      height: number,
+      atX: number,
+      atY: number,
+    ): number[] => {
       if (!clipboard) return pixels;
       let next = pixels;
       for (const cell of clipboard.cells) {
@@ -46,30 +56,4 @@ export function useSelection() {
   );
 
   return { mask, setMask, clipboard, copy, paste };
-}
-
-// 선택 마스크를 (dx, dy)만큼 이동: 원래 자리는 비우고(-1) 새 자리로 색을 옮긴다.
-export function moveSelection(
-  pixels: number[],
-  width: number,
-  height: number,
-  mask: Set<number>,
-  dx: number,
-  dy: number,
-): { pixels: number[]; mask: Set<number> } {
-  const moved: { x: number; y: number; colorIndex: number }[] = [];
-  let next = pixels.slice();
-  mask.forEach((i) => {
-    const x = i % width;
-    const y = Math.floor(i / width);
-    moved.push({ x: x + dx, y: y + dy, colorIndex: getPixel(pixels, width, x, y) });
-    next[i] = -1;
-  });
-  const nextMask = new Set<number>();
-  for (const m of moved) {
-    if (m.x < 0 || m.y < 0 || m.x >= width || m.y >= height) continue;
-    next = setPixel(next, width, m.x, m.y, m.colorIndex);
-    nextMask.add(idx(width, m.x, m.y));
-  }
-  return { pixels: next, mask: nextMask };
 }

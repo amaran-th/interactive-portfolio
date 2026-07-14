@@ -22,7 +22,6 @@ import {
 } from "./pixelGrid";
 import { rasterizeText } from "./textStamp";
 import { MirrorMode, Point, Tool } from "./types";
-import { moveSelection } from "./useSelection";
 
 export type PendingText = {
   x: number;
@@ -161,6 +160,19 @@ export default function PixelCanvas({
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const shapeStartRef = useRef<{ x: number; y: number } | null>(null);
   const drawingRef = useRef(false);
+  // 선택 영역 이동 중에는 매 pointermove마다 조금씩 옮기지 않는다 — 옛 구현은
+  // 그렇게 해서 (1) 이동 경로에 있던(선택 밖) 픽셀이 덮여 사라지고, (2) 캔버스
+  // 밖으로 나간 칸은 마스크에서 아예 빠져 다시 안으로 들여와도 복원되지
+  // 않았다. 대신 드래그를 시작할 때 선택 내용을 "들어올려"(원래 자리를 -1로
+  // 비운 바탕과, 각 칸의 원래 좌표·색을 따로) 한 번만 기록해두고, 매
+  // pointermove마다 시작점 기준 누적 이동량으로 이 바탕 위에 항상 새로
+  // 그린다 — 그래서 어디를 지나가도 원래 있던 내용이 사라지지 않고, 경계
+  // 밖으로 나갔던 칸도 다시 들어오면 그대로 복원된다.
+  const moveBaseRef = useRef<number[] | null>(null);
+  const moveContentRef = useRef<
+    { x: number; y: number; colorIndex: number }[] | null
+  >(null);
+  const moveStartPointRef = useRef<{ x: number; y: number } | null>(null);
   // 확대된 상태에서는 캔버스가 뷰포트보다 커져 화면을 옮겨볼 방법이 필요하다 —
   // 스페이스바를 누른 채 드래그하면(포토샵·Aseprite와 같은 관례) 그리기 대신
   // 뷰포트(부모 컨테이너)를 스크롤한다.
@@ -364,8 +376,13 @@ export default function PixelCanvas({
     ],
   );
 
+  // pixels가 아니라 workingRef.current를 그린다 — 선택 영역을 옮기는 동안처럼
+  // 아직 history에 커밋하지 않아 pixels prop은 그대로인데 selectionMask만
+  // 계속 바뀌는 경우, 이 effect가 옛 pixels로 다시 그려 방금 그린 미리보기를
+  // 덮어써 깜빡이는 문제가 있었다. workingRef.current는 그런 상황에서도 항상
+  // 최신 상태를 담고 있다(그 밖의 경우엔 pixels와 같은 값으로 동기화돼 있다).
   useEffect(() => {
-    render(pixels);
+    render(workingRef.current);
   }, [pixels, selectionMask, render]);
 
   const toGridPoint = useCallback(
@@ -376,6 +393,21 @@ export default function PixelCanvas({
       const x = Math.floor(((e.clientX - rect.left) / rect.width) * width);
       const y = Math.floor(((e.clientY - rect.top) / rect.height) * height);
       if (x < 0 || y < 0 || x >= width || y >= height) return null;
+      return { x, y };
+    },
+    [width, height],
+  );
+
+  // toGridPoint와 달리 캔버스 밖으로 나간 좌표도 거부하지 않고 그대로 돌려준다
+  // — 선택 영역을 옮기는 동안 포인터가 캔버스 경계를 살짝 넘어가도 이동량
+  // 계산이 멈추지 않게 하려는 용도다(실제 칸 배치는 나중에 각자 범위를 검사).
+  const toRawGridPoint = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return null;
+      const rect = canvas.getBoundingClientRect();
+      const x = Math.floor(((e.clientX - rect.left) / rect.width) * width);
+      const y = Math.floor(((e.clientY - rect.top) / rect.height) * height);
       return { x, y };
     },
     [width, height],
@@ -522,7 +554,25 @@ export default function PixelCanvas({
       }
 
       if (tool === "move" && selectionMaskRef.current) {
-        lastPointRef.current = point;
+        // 선택 내용을 "들어올린다" — 원래 좌표·색을 따로 기록하고, 바탕에서는
+        // 그 자리를 비운다. 드래그 내내 이 스냅샷만 기준으로 다시 그리므로
+        // 지나가는 길에 있던 다른 픽셀이 사라지지 않는다.
+        const mask = selectionMaskRef.current;
+        const base = workingRef.current.slice();
+        const content: { x: number; y: number; colorIndex: number }[] = [];
+        mask.forEach((i) => {
+          const x = i % width;
+          const y = Math.floor(i / width);
+          content.push({
+            x,
+            y,
+            colorIndex: getPixel(workingRef.current, width, x, y),
+          });
+          base[i] = -1;
+        });
+        moveBaseRef.current = base;
+        moveContentRef.current = content;
+        moveStartPointRef.current = point;
         drawingRef.current = true;
         return;
       }
@@ -622,27 +672,33 @@ export default function PixelCanvas({
         return;
       }
 
-      if (tool === "move" && selectionMaskRef.current && lastPointRef.current) {
-        const point = toGridPoint(e);
+      if (
+        tool === "move" &&
+        moveBaseRef.current &&
+        moveContentRef.current &&
+        moveStartPointRef.current
+      ) {
+        // toGridPoint가 아니라 toRawGridPoint를 쓴다 — 포인터가 캔버스 밖으로
+        // 살짝 나가도 이동량 계산이 멈추지 않고 계속 그 방향을 따라가게 한다.
+        const point = toRawGridPoint(e);
         if (!point) return;
-        const dx = point.x - lastPointRef.current.x;
-        const dy = point.y - lastPointRef.current.y;
-        if (dx === 0 && dy === 0) return;
-        const result = moveSelection(
-          workingRef.current,
-          width,
-          height,
-          selectionMaskRef.current,
-          dx,
-          dy,
-        );
-        workingRef.current = result.pixels;
+        const dx = point.x - moveStartPointRef.current.x;
+        const dy = point.y - moveStartPointRef.current.y;
+        let next = moveBaseRef.current.slice();
+        const nextMask = new Set<number>();
+        for (const c of moveContentRef.current) {
+          const nx = c.x + dx;
+          const ny = c.y + dy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          next = setPixel(next, width, nx, ny, c.colorIndex);
+          nextMask.add(ny * width + nx);
+        }
+        workingRef.current = next;
         // ref를 먼저 동기 갱신해 바로 다음 pointermove(React state가 아직 반영되기 전)도
         // 항상 최신 마스크를 기준으로 계산하도록 한다.
-        selectionMaskRef.current = result.mask;
-        onSelectionChange(result.mask);
-        lastPointRef.current = point;
-        render(result.pixels);
+        selectionMaskRef.current = nextMask;
+        onSelectionChange(nextMask);
+        render(next);
         return;
       }
 
@@ -737,6 +793,7 @@ export default function PixelCanvas({
       viewportRef,
       onPendingTextMove,
       toGridPoint,
+      toRawGridPoint,
       plotPoint,
       render,
       onSelectionChange,
@@ -780,6 +837,13 @@ export default function PixelCanvas({
         if (sg && sg.points.length > 0) onShapeGradientEnd(sg.points);
         return;
       }
+      onStrokeEnd(workingRef.current);
+      return;
+    }
+    if (tool === "move") {
+      moveBaseRef.current = null;
+      moveContentRef.current = null;
+      moveStartPointRef.current = null;
       onStrokeEnd(workingRef.current);
       return;
     }
