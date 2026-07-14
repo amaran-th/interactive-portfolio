@@ -11,8 +11,12 @@ function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n));
 }
 
-// 세로 트랙(색상/알파 슬라이더) 위 pointer 좌표를 0~1 값으로 환산한다.
-function trackValue(clientY: number, rect: DOMRect): number {
+// 세로 트랙(색상/알파 슬라이더) 위 pointer 좌표를 0~1 값으로 환산한다. 트랙
+// 위아래 밖으로 나가면 null을 돌려줘 호출부가 갱신을 건너뛰게 한다 — SV
+// 사각형과 같은 이유로, 드래그가 트랙 밖으로 나간 지점의 값을 그대로
+// 커밋하지 않고 마지막으로 안쪽이었던 값을 유지하기 위해서다.
+function trackValue(clientY: number, rect: DOMRect): number | null {
+  if (clientY < rect.top || clientY > rect.bottom) return null;
   if (rect.height === 0) return 0;
   return clamp01((clientY - rect.top) / rect.height);
 }
@@ -148,6 +152,19 @@ export default function ColorWheel({
       const canvas = squareRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
+      // 정사각형이 120px로 작아 드래그가 살짝만 밖으로 나가도 바로 s/v가
+      // 0이나 1로 클램프되곤 했다 — 특히 아래로 조금만 넘쳐도 명도(V)가 0(검정)
+      // 으로 튀어 의도치 않은 색이 그대로 커밋되는 문제가 있었다. 포토샵·
+      // Aseprite처럼 포인터가 사각형 밖으로 나가면 그 지점부터는 더 갱신하지
+      // 않고 마지막으로 안쪽이었던 위치의 값을 그대로 유지한다.
+      if (
+        clientX < rect.left ||
+        clientX > rect.right ||
+        clientY < rect.top ||
+        clientY > rect.bottom
+      ) {
+        return;
+      }
       const s = clamp01((clientX - rect.left) / rect.width);
       const v = clamp01(1 - (clientY - rect.top) / rect.height);
       commit([hue, s, v, alpha]);
@@ -177,6 +194,7 @@ export default function ColorWheel({
       const track = hueTrackRef.current;
       if (!track) return;
       const t = trackValue(clientY, track.getBoundingClientRect());
+      if (t === null) return;
       commit([t * 360, sat, val, alpha]);
     },
     [sat, val, alpha, commit],
@@ -204,6 +222,7 @@ export default function ColorWheel({
       const track = alphaTrackRef.current;
       if (!track) return;
       const t = trackValue(clientY, track.getBoundingClientRect());
+      if (t === null) return;
       commit([hue, sat, val, t]);
     },
     [hue, sat, val, commit],
