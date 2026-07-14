@@ -48,13 +48,13 @@ import {
 } from "./wallpaper";
 
 // 클립스튜디오처럼 여러 파일을 탭으로 동시에 열어둘 수 있다. 활성 탭의 실제
-// 편집 상태(doc/history/이름/hasMetaEdits)만 살아있는 hook 상태로 유지하고,
-// 비활성 탭은 이 스냅샷 형태로만 보관한다(전환 시 되돌리기 스택은 초기화되지만
-// 그림 내용은 그대로 보존된다).
-type Tab = { doc: PixelArt; hasMetaEdits: boolean };
+// 편집 상태(doc/history/이름/hasMetaEdits/pixelsDirty)만 살아있는 hook 상태로
+// 유지하고, 비활성 탭은 이 스냅샷 형태로만 보관한다(전환 시 되돌리기 스택은
+// 초기화되지만 그림 내용은 그대로 보존된다).
+type Tab = { doc: PixelArt; hasMetaEdits: boolean; pixelsDirty: boolean };
 
 // 편집을 멈추고 이 시간(ms)이 지나면 자동 저장한다.
-const AUTOSAVE_DELAY_MS = 3000;
+const AUTOSAVE_DELAY_MS = 3 * 60 * 1000;
 
 // 새 캔버스의 기본 팔레트 — 미리 채워두지 않고 빈 채로 시작해, 색상환에서
 // 직접 고른 색만 팔레트에 쌓이게 한다.
@@ -105,7 +105,9 @@ export default function Editor({
 }) {
   const [initial] = useState(() => resolveInitialDoc(docId));
   const [tabs, setTabs] = useState<Tab[]>(() =>
-    initial.found ? [{ doc: initial.doc, hasMetaEdits: false }] : [],
+    initial.found
+      ? [{ doc: initial.doc, hasMetaEdits: false, pixelsDirty: false }]
+      : [],
   );
   const [activeTabIndex, setActiveTabIndex] = useState(() =>
     initial.found ? 0 : -1,
@@ -114,6 +116,14 @@ export default function Editor({
   const [name, setName] = useState(initial.doc.name);
   const [activeColorIndex, setActiveColorIndex] = useState(0);
   const [hasMetaEdits, setHasMetaEdits] = useState(false);
+  // 그림(픽셀) 자체가 마지막 저장 이후 바뀌었는지 — history.canUndo와 별개로
+  // 둔다. 예전에는 저장할 때마다 history.reset()으로 되돌리기 스택을 통째로
+  // 비워 "저장 안 된 변경 없음" 상태를 만들었는데, 자동저장이 몇 초마다 조용히
+  // 실행취소 이력을 날려버려 방금 그린 것도 되돌릴 수 없는 문제가 있었다.
+  const [pixelsDirty, setPixelsDirty] = useState(false);
+  // 자동저장이 막 끝났다는 안내 문구 — 다음 편집이 시작되면(pixelsDirty나
+  // hasMetaEdits가 다시 true가 되면) 자동으로 사라진다.
+  const [showSavedNotice, setShowSavedNotice] = useState(false);
   const [tool, setTool] = useState<Tool>("pencil");
   const [mirror, setMirror] = useState<MirrorMode>("none");
   const [showGrid, setShowGrid] = useState(true);
@@ -193,20 +203,41 @@ export default function Editor({
   const history = useCanvasHistory(initial.doc.pixels);
   const selection = useSelection();
 
+  // history.push는 되돌리기 스택에 새 항목을 추가할 뿐 "저장 여부"는 모른다 —
+  // 실제로 그림이 바뀔 때마다 이 래퍼로 pixelsDirty도 함께 표시해, 저장(수동·
+  // 자동 모두)이 되돌리기 이력을 지우지 않고도 "저장 안 된 변경"을 정확히
+  // 추적하게 한다.
+  const pushHistory = useCallback(
+    (next: number[]) => {
+      history.push(next);
+      setPixelsDirty(true);
+    },
+    [history],
+  );
+
+  // 픽셀이든 메타(팔레트·이름·크기 등)든 새 편집이 시작되면(pixelsDirty나
+  // hasMetaEdits가 true가 되면) "자동 저장됨" 안내를 지운다 — setHasMetaEdits를
+  // 부르는 모든 곳을 일일이 따라다니지 않고 한 곳에서 처리한다.
+  useEffect(() => {
+    if (pixelsDirty || hasMetaEdits) setShowSavedNotice(false);
+  }, [pixelsDirty, hasMetaEdits]);
+
   useEffect(() => {
     const raf = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(raf);
   }, []);
 
   // 열린 모든 탭 중 하나라도 저장되지 않은 변경이 있으면 창을 닫을 때 경고한다.
-  // 활성 탭은 라이브 상태(history.canUndo/hasMetaEdits)로, 비활성 탭은 마지막으로
-  // 스냅샷에 저장해 둔 hasMetaEdits 플래그로 판단한다.
+  // 활성 탭은 라이브 상태(pixelsDirty/hasMetaEdits)로, 비활성 탭은 마지막으로
+  // 스냅샷에 저장해 둔 값으로 판단한다.
   useEffect(() => {
     const anyDirty = tabs.some((t, i) =>
-      i === activeTabIndex ? history.canUndo || hasMetaEdits : t.hasMetaEdits,
+      i === activeTabIndex
+        ? pixelsDirty || hasMetaEdits
+        : t.pixelsDirty || t.hasMetaEdits,
     );
     onDirtyChange(anyDirty);
-  }, [tabs, activeTabIndex, history.canUndo, hasMetaEdits, onDirtyChange]);
+  }, [tabs, activeTabIndex, pixelsDirty, hasMetaEdits, onDirtyChange]);
 
   // 다른 탭으로 전환하거나 탭을 닫기 전에, 지금 활성 탭의 라이브 편집 상태를
   // tabs 배열의 스냅샷으로 반영한다 — 안 그러면 방금까지 그리던 내용을 잃는다.
@@ -219,12 +250,13 @@ export default function Editor({
         i === activeTabIndex
           ? {
               doc: { ...doc, name, pixels: history.present },
-              hasMetaEdits: hasMetaEdits || history.canUndo,
+              hasMetaEdits,
+              pixelsDirty,
             }
           : t,
       );
     },
-    [activeTabIndex, doc, name, history, hasMetaEdits],
+    [activeTabIndex, doc, name, history, hasMetaEdits, pixelsDirty],
   );
 
   const loadTab = useCallback(
@@ -234,6 +266,8 @@ export default function Editor({
       history.reset(tab.doc.pixels);
       setActiveColorIndex(0);
       setHasMetaEdits(tab.hasMetaEdits);
+      setPixelsDirty(tab.pixelsDirty);
+      setShowSavedNotice(false);
       setActiveTabIndex(index);
     },
     [history],
@@ -253,8 +287,13 @@ export default function Editor({
     (newDoc: PixelArt, options?: { autoImport?: boolean }) => {
       const synced = syncActiveTabSnapshot(tabs);
       const newIndex = synced.length;
-      setTabs([...synced, { doc: newDoc, hasMetaEdits: false }]);
-      loadTab({ doc: newDoc, hasMetaEdits: false }, newIndex);
+      const freshTab: Tab = {
+        doc: newDoc,
+        hasMetaEdits: false,
+        pixelsDirty: false,
+      };
+      setTabs([...synced, freshTab]);
+      loadTab(freshTab, newIndex);
       setWantsAutoImport(!!options?.autoImport);
     },
     [tabs, syncActiveTabSnapshot, loadTab],
@@ -303,16 +342,16 @@ export default function Editor({
 
   const handleStrokeEnd = useCallback(
     (next: number[]) => {
-      history.push(next);
+      pushHistory(next);
     },
-    [history],
+    [pushHistory],
   );
 
   // 실행취소로 되돌릴 수 있으므로(다른 파괴적 동작들과 같은 관례) 별도 확인 없이
   // 바로 전체를 투명하게 지운다.
   const handleClearCanvas = useCallback(() => {
-    history.push(createGrid(doc.width, doc.height));
-  }, [history, doc.width, doc.height]);
+    pushHistory(createGrid(doc.width, doc.height));
+  }, [pushHistory, doc.width, doc.height]);
 
   // 확정 전 텍스트를 실제 픽셀에 굽는다(래스터화 → 커버리지 기반으로 색 결정).
   // gradientFill이면 각 칸의 색을 캔버스 좌표 기준 그라데이션에서 가져오고,
@@ -384,7 +423,7 @@ export default function Editor({
       }
       if (nextPalette !== doc.palette)
         setDoc((d) => ({ ...d, palette: nextPalette }));
-      history.push(next);
+      pushHistory(next);
     },
     [
       doc.width,
@@ -394,7 +433,8 @@ export default function Editor({
       secondaryColorIndex,
       gradientSteps,
       gradientAngleDeg,
-      history,
+      history.present,
+      pushHistory,
     ],
   );
 
@@ -482,13 +522,14 @@ export default function Editor({
       if (result.palette.length !== doc.palette.length) {
         setDoc((d) => ({ ...d, palette: result.palette }));
       }
-      history.push(result.pixels);
+      pushHistory(result.pixels);
     },
     [
       activeColorIndex,
       secondaryColorIndex,
       gradientSteps,
-      history,
+      history.present,
+      pushHistory,
       doc.palette,
       doc.width,
       doc.height,
@@ -527,7 +568,7 @@ export default function Editor({
       }
       if (nextPalette !== doc.palette)
         setDoc((d) => ({ ...d, palette: nextPalette }));
-      history.push(next);
+      pushHistory(next);
     },
     [
       doc.palette,
@@ -537,7 +578,8 @@ export default function Editor({
       secondaryColorIndex,
       gradientSteps,
       gradientAngleDeg,
-      history,
+      history.present,
+      pushHistory,
     ],
   );
 
@@ -556,24 +598,36 @@ export default function Editor({
       return;
     }
     setDoc(toSave);
-    history.reset(toSave.pixels);
+    // 되돌리기 스택은 그대로 둔다 — 저장은 "지금 그림을 디스크에 반영했다"는
+    // 뜻일 뿐, 그 전까지의 편집을 실행취소할 수 없게 만들 이유는 없다. 예전에는
+    // 여기서 history.reset()을 불러 저장할 때마다 되돌리기 이력을 통째로
+    // 비웠는데, 자동저장이 몇 초마다 조용히 이 일을 해버려 방금 그린 것도
+    // 되돌릴 수 없는 문제가 있었다.
     setHasMetaEdits(false);
+    setPixelsDirty(false);
   }, [activeTabIndex, doc, name, history, isWallpaper, flagSaveError]);
 
-  // 자동 저장 — 편집을 멈춘 지 AUTOSAVE_DELAY_MS가 지나면 수동 저장과 동일한
-  // handleSave를 그대로 호출한다. 매 획마다 저장하면 낭비이므로 편집이 있을
-  // 때만 타이머를 다시 건다(디바운스). 완전히 빈 새 캔버스는 history.canUndo도
-  // hasMetaEdits도 false라 애초에 대상이 아니다.
+  // 자동저장이 막 끝났을 때만 안내 문구를 띄운다 — 수동 저장(버튼·Ctrl+S)은
+  // 사용자가 직접 저장을 눌렀다는 걸 이미 알고 있으므로 따로 알리지 않는다.
+  const handleAutosave = useCallback(() => {
+    handleSave();
+    setShowSavedNotice(true);
+  }, [handleSave]);
+
+  // 자동 저장 — 편집을 멈춘 지 AUTOSAVE_DELAY_MS가 지나면 handleAutosave를
+  // 호출한다. 매 획마다 저장하면 낭비이므로 편집이 있을 때만 타이머를 다시
+  // 건다(디바운스). 완전히 빈 새 캔버스는 pixelsDirty도 hasMetaEdits도 false라
+  // 애초에 대상이 아니다.
   const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (activeTabIndex < 0) return;
-    const dirty = history.canUndo || hasMetaEdits;
+    const dirty = pixelsDirty || hasMetaEdits;
     if (!dirty) return;
-    autosaveTimeoutRef.current = setTimeout(handleSave, AUTOSAVE_DELAY_MS);
+    autosaveTimeoutRef.current = setTimeout(handleAutosave, AUTOSAVE_DELAY_MS);
     return () => {
       if (autosaveTimeoutRef.current) clearTimeout(autosaveTimeoutRef.current);
     };
-  }, [activeTabIndex, history.canUndo, hasMetaEdits, handleSave]);
+  }, [activeTabIndex, pixelsDirty, hasMetaEdits, handleAutosave]);
 
   // 다른 이름으로 저장 — 원본(배경화면이라도)은 건드리지 않고 새 id로 일반
   // 픽셀아트 목록에 별도 항목을 만든 뒤, 이후 편집은 그 새 사본을 대상으로 한다.
@@ -598,11 +652,13 @@ export default function Editor({
     }
     setDoc(toSave);
     setName(newName);
-    history.reset(toSave.pixels);
     setHasMetaEdits(false);
+    setPixelsDirty(false);
     setTabs((prev) =>
       prev.map((t, i) =>
-        i === activeTabIndex ? { doc: toSave, hasMetaEdits: false } : t,
+        i === activeTabIndex
+          ? { doc: toSave, hasMetaEdits: false, pixelsDirty: false }
+          : t,
       ),
     );
   }, [activeTabIndex, doc, name, history, isWallpaper, flagSaveError]);
@@ -626,14 +682,14 @@ export default function Editor({
     [doc.width, doc.height, history],
   );
 
-  // 활성 탭은 라이브 상태(history.canUndo/hasMetaEdits)로, 비활성 탭은 마지막
-  // 전환 시점에 스냅샷에 저장해 둔 hasMetaEdits로 저장되지 않은 변경이 있는지 본다.
+  // 활성 탭은 라이브 상태(pixelsDirty/hasMetaEdits)로, 비활성 탭은 마지막
+  // 전환 시점에 스냅샷에 저장해 둔 값으로 저장되지 않은 변경이 있는지 본다.
   const isTabDirty = useCallback(
     (index: number) =>
       index === activeTabIndex
-        ? history.canUndo || hasMetaEdits
-        : (tabs[index]?.hasMetaEdits ?? false),
-    [activeTabIndex, history.canUndo, hasMetaEdits, tabs],
+        ? pixelsDirty || hasMetaEdits
+        : tabs[index]?.pixelsDirty || tabs[index]?.hasMetaEdits || false,
+    [activeTabIndex, pixelsDirty, hasMetaEdits, tabs],
   );
 
   // 탭을 직접 닫을 때(X 클릭)는 즉시 닫지 않고, 저장되지 않은 변경이 있으면
@@ -705,7 +761,7 @@ export default function Editor({
         0,
         0,
       );
-      history.push(next);
+      pushHistory(next);
     },
     onMirrorToggle: setMirror,
     onSave: handleSave,
@@ -722,6 +778,17 @@ export default function Editor({
     },
     [palette],
   );
+
+  // 팔레트가 비어 있는 채로 그리기를 시작하면(activeColorIndex가 가리킬 실제
+  // 색이 없어) 기본 검정 한 칸을 자동으로 추가한다 — 새 캔버스가 빈 팔레트로
+  // 시작하도록 바꾼 뒤, 아무것도 추가하지 않은 채 바로 칠하기 시작하는 경우를
+  // 위한 안전장치다. 팔레트가 이미 있으면 아무 일도 하지 않는다.
+  const handleEnsureFirstColor = useCallback(() => {
+    if (palette.length > 0) return;
+    setDoc((d) => ({ ...d, palette: ["#000000"] }));
+    setActiveColorIndex(0);
+    setHasMetaEdits(true);
+  }, [palette]);
 
   const handleRemoveColor = useCallback(
     (index: number) => {
@@ -869,14 +936,14 @@ export default function Editor({
                 0,
                 0,
               );
-              history.push(next);
+              pushHistory(next);
             },
             disabled: noActiveTab,
           },
         ],
       });
     },
-    [doc, history, selection, activeTabIndex, isWallpaper],
+    [doc, history, selection, activeTabIndex, isWallpaper, pushHistory],
   );
 
   return (
@@ -907,6 +974,11 @@ export default function Editor({
         {saveError && (
           <span className="text-[10px] font-semibold text-red-500">
             저장 실패
+          </span>
+        )}
+        {!saveError && showSavedNotice && (
+          <span className="text-[10px] font-semibold text-green-600">
+            자동 저장됨
           </span>
         )}
         {activeTabIndex >= 0 && (
@@ -1060,6 +1132,7 @@ export default function Editor({
               filledShapes={filledShapes}
               onSelectionChange={selection.setMask}
               onStrokeEnd={handleStrokeEnd}
+              onEnsureColor={handleEnsureFirstColor}
               onPickColor={handlePickColor}
               onTextToolClick={handleTextToolClick}
               pendingText={

@@ -78,6 +78,7 @@ export default function PixelCanvas({
   filledShapes,
   onSelectionChange,
   onStrokeEnd,
+  onEnsureColor,
   onPickColor,
   onTextToolClick,
   pendingText,
@@ -111,6 +112,11 @@ export default function PixelCanvas({
   filledShapes: boolean;
   onSelectionChange: (mask: Set<number> | null) => void;
   onStrokeEnd: (next: number[]) => void;
+  // 팔레트가 비어 있는 채로 그리기(펜슬·채우기·직선/사각형/원의 단색 경로)를
+  // 시작하면 호출된다 — activeColorIndex가 가리킬 실제 색이 있어야 하므로,
+  // Editor가 기본 검정 한 칸을 자동으로 추가한다. 팔레트가 이미 있으면
+  // Editor 쪽에서 아무 일도 하지 않는다.
+  onEnsureColor: () => void;
   onPickColor: (colorIndex: number) => void;
   // 텍스트 도구로 캔버스를 클릭했을 때(그리드 좌표) — pendingText가 없으면 그
   // 자리에 새로 시작하고, 있으면(경계 밖 클릭) Editor가 먼저 커밋한 뒤 새로
@@ -449,11 +455,13 @@ export default function PixelCanvas({
             return;
           }
         }
+        onEnsureColor();
         onTextToolClick(point.x, point.y);
         return;
       }
 
       if (tool === "gradient") {
+        onEnsureColor();
         drawingRef.current = true;
         shapeStartRef.current = point;
         gradientPreviewRef.current = {
@@ -467,6 +475,7 @@ export default function PixelCanvas({
       }
 
       if (tool === "bucket") {
+        onEnsureColor();
         const next = floodFill(
           workingRef.current,
           width,
@@ -519,12 +528,14 @@ export default function PixelCanvas({
       }
 
       if (tool === "line" || tool === "rect" || tool === "circle") {
+        onEnsureColor();
         drawingRef.current = true;
         shapeStartRef.current = point;
         return;
       }
 
       if (tool === "pencil" || tool === "eraser") {
+        if (tool === "pencil") onEnsureColor();
         drawingRef.current = true;
         lastPointRef.current = point;
         const colorIndex = tool === "eraser" ? -1 : activeColorIndex;
@@ -549,6 +560,7 @@ export default function PixelCanvas({
       plotPoint,
       render,
       onStrokeEnd,
+      onEnsureColor,
       onPickColor,
       onTextToolClick,
       pendingText,
