@@ -1,7 +1,7 @@
 "use client";
 
 import { Minus, Plus, Save, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getPixelArt,
   listPixelArt,
@@ -770,6 +770,16 @@ export default function Editor({
 
   const palette = doc.palette;
 
+  // 팔레트에는 있지만 캔버스 어디에도 실제로 칠해진 적 없는 색을 색상환에서
+  // 구분해 보여주기 위해, 지금 픽셀에 쓰이고 있는 팔레트 인덱스를 모은다.
+  const usedColorIndices = useMemo(() => {
+    const used = new Set<number>();
+    for (const index of history.present) {
+      if (index >= 0) used.add(index);
+    }
+    return used;
+  }, [history.present]);
+
   const handleAddColor = useCallback(
     (hex: string) => {
       const newIndex = palette.length;
@@ -1110,6 +1120,7 @@ export default function Editor({
                 onEditSwatchColor={handleEditSwatchColor}
                 onAddColor={handleAddColor}
                 onRemoveColor={handleRemoveColor}
+                usedColorIndices={usedColorIndices}
                 tool={tool}
                 onToolChange={setTool}
                 secondaryColorIndex={secondaryColorIndex}

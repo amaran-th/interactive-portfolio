@@ -29,6 +29,7 @@ export default function ColorWheel({
   onEditSwatchColor,
   onAddColor,
   onRemoveColor,
+  usedColorIndices,
   tool,
   onToolChange,
   secondaryColorIndex,
@@ -50,6 +51,9 @@ export default function ColorWheel({
   onEditSwatchColor: (hex: string) => void;
   onAddColor: (hex: string) => void;
   onRemoveColor: (index: number) => void;
+  // 팔레트에는 있지만 캔버스 어디에도 아직 칠해진 적 없는 색을 구분해
+  // 보여주기 위한 팔레트 인덱스 집합.
+  usedColorIndices: Set<number>;
   tool: Tool;
   onToolChange: (tool: Tool) => void;
   // 그라데이션 끝 색상 — MS페인트의 보조 색상과 같은 개념. -1이면 투명.
@@ -403,6 +407,12 @@ export default function ColorWheel({
             </button>
             {index === secondaryColorIndex && (
               <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-white shadow-[0_0_0_1px_#8b5cf6]" />
+            )}
+            {!usedColorIndices.has(index) && (
+              <span
+                title="아직 캔버스에 칠한 적 없는 색"
+                className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.35)]"
+              />
             )}
           </div>
         ))}

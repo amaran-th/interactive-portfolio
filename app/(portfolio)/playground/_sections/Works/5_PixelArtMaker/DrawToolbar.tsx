@@ -65,73 +65,84 @@ export default function DrawToolbar({
   onToggleShapeGradientFill: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 bg-white px-3 py-2 shadow-sm">
-      <div className="flex gap-1">
-        {DRAW_TOOLS.map(({ tool: t, icon: Icon, label, key }) => (
+    <div className="flex items-start gap-3 px-4 py-3">
+      <div className="flex flex-col gap-1.5 bg-white p-3 shadow-md">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+          그리기
+        </p>
+        <div className="flex gap-1">
+          {DRAW_TOOLS.map(({ tool: t, icon: Icon, label, key }) => (
+            <button
+              key={t}
+              onClick={() => onToolChange(t)}
+              title={`${label} (${key})`}
+              className={`flex h-9 w-8 flex-col items-center justify-center gap-0.5 transition-colors ${
+                tool === t
+                  ? "bg-violet-500 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              <span className="text-[8px] leading-none">{key}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5 bg-white p-3 shadow-md">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+          브러시 크기
+        </p>
+        <div className="flex gap-1">
+          {BRUSH_SIZES.map((size) => (
+            <button
+              key={size}
+              disabled={!BRUSH_SIZE_TOOLS.includes(tool)}
+              onClick={() => onBrushSizeChange(size)}
+              title={`${size}px 브러시`}
+              className={`h-9 w-7 text-[10px] disabled:opacity-30 ${
+                brushSize === size
+                  ? "bg-violet-500 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {size}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5 bg-white p-3 shadow-md">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+          채우기 옵션
+        </p>
+        <div className="flex gap-1">
           <button
-            key={t}
-            onClick={() => onToolChange(t)}
-            title={`${label} (${key})`}
-            className={`flex h-9 w-8 flex-col items-center justify-center gap-0.5 transition-colors ${
-              tool === t
+            disabled={!SHAPE_TOOLS.includes(tool)}
+            onClick={onToggleFilledShapes}
+            title="사각형·원을 채워서 그리기"
+            className={`h-9 px-2 text-[10px] disabled:opacity-30 ${
+              filledShapes
                 ? "bg-violet-500 text-white"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
-            <Icon className="h-3.5 w-3.5" />
-            <span className="text-[8px] leading-none">{key}</span>
+            도형 채우기
           </button>
-        ))}
-      </div>
-
-      <div className="h-8 w-px shrink-0 bg-gray-100" />
-
-      <div className="flex items-center gap-1">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-          브러시
-        </span>
-        {BRUSH_SIZES.map((size) => (
           <button
-            key={size}
-            disabled={!BRUSH_SIZE_TOOLS.includes(tool)}
-            onClick={() => onBrushSizeChange(size)}
-            title={`${size}px 브러시`}
-            className={`h-7 w-7 text-[10px] disabled:opacity-30 ${
-              brushSize === size
+            disabled={!GRADIENT_SHAPE_TOOLS.includes(tool)}
+            onClick={onToggleShapeGradientFill}
+            title="직선·사각형·원을 활성/보조 색상 그라데이션으로 채우기"
+            className={`h-9 px-2 text-[10px] disabled:opacity-30 ${
+              shapeGradientFill
                 ? "bg-violet-500 text-white"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
-            {size}
+            그라데이션 채우기
           </button>
-        ))}
+        </div>
       </div>
-
-      <button
-        disabled={!SHAPE_TOOLS.includes(tool)}
-        onClick={onToggleFilledShapes}
-        title="사각형·원을 채워서 그리기"
-        className={`px-2 py-1.5 text-[10px] disabled:opacity-30 ${
-          filledShapes
-            ? "bg-violet-500 text-white"
-            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-        }`}
-      >
-        도형 채우기
-      </button>
-
-      <button
-        disabled={!GRADIENT_SHAPE_TOOLS.includes(tool)}
-        onClick={onToggleShapeGradientFill}
-        title="직선·사각형·원을 활성/보조 색상 그라데이션으로 채우기"
-        className={`px-2 py-1.5 text-[10px] disabled:opacity-30 ${
-          shapeGradientFill
-            ? "bg-violet-500 text-white"
-            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-        }`}
-      >
-        그라데이션 채우기
-      </button>
     </div>
   );
 }
