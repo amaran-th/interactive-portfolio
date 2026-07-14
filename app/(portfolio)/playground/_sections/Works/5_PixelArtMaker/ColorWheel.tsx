@@ -80,14 +80,22 @@ export default function ColorWheel({
   });
 
   // 스와치를 바꿔 선택했을 때(클릭, 스포이트 등)만 컨트롤을 그 색의 H/S/V/A로
-  // 동기화한다. activeHex가 아니라 activeColorIndex에만 의존해야 한다 — 슬라이더를
-  // 드래그해 같은 스와치의 색을 계속 바꾸는 동안에는 hex→rgb→hsv 왕복 변환에서
-  // 생기는 반올림 오차가 매 커밋마다 누적돼(특히 hue는 채도가 낮을수록 아주
-  // 작은 rgb 반올림에도 크게 흔들린다) 드래그 중 색상이 제멋대로 튀는 버그가 있었다.
+  // 동기화한다. activeHex 전체가 아니라 activeColorIndex와 palette.length에만
+  // 의존해야 한다 — 슬라이더를 드래그해 같은 스와치의 색을 계속 바꾸는 동안에는
+  // hex→rgb→hsv 왕복 변환에서 생기는 반올림 오차가 매 커밋마다 누적돼(특히
+  // hue는 채도가 낮을수록 아주 작은 rgb 반올림에도 크게 흔들린다) 드래그 중
+  // 색상이 제멋대로 튀는 버그가 있었다.
+  //
+  // palette.length는 따로 넣어야 한다 — 선택 중이던 스와치를 삭제하면 그
+  // 뒤쪽 스와치들이 한 칸씩 당겨오면서 activeColorIndex "숫자"는 그대로인데
+  // 그 자리의 실제 색은 바뀐다. activeColorIndex만 보면 이 변화를 놓쳐 색상환이
+  // 방금 지운 색의 값을 계속 들고 있다가, 이후 색상환을 조작하면 그 삭제된
+  // 색이 새 스와치로 되살아나 버렸다(팔레트 변경은 항상 길이도 바뀌므로 추가·
+  // 삭제 모두 이 의존성으로 잡힌다).
   useEffect(() => {
     const [r, g, b, a] = hexToRgba(activeHexRef.current);
     setHsva([...rgbToHsv(r, g, b), a]);
-  }, [activeColorIndex]);
+  }, [activeColorIndex, palette.length]);
 
   const [hue, sat, val, alpha] = hsva;
   const opaqueRgb = hsvToRgb(hue, sat, val);
