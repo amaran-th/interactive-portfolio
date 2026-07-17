@@ -1,4 +1,5 @@
 import { PixelArt } from "../_shared/assetLibrary";
+import { renderToCanvas } from "../_shared/renderPixelArt";
 import { hexToRgba, rgbToHex } from "./hsv";
 
 function triggerDownload(blob: Blob, filename: string) {
@@ -8,23 +9,6 @@ function triggerDownload(blob: Blob, filename: string) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
-}
-
-function renderToCanvas(doc: PixelArt, scale: number): HTMLCanvasElement {
-  const canvas = document.createElement("canvas");
-  canvas.width = doc.width * scale;
-  canvas.height = doc.height * scale;
-  const ctx = canvas.getContext("2d")!;
-  ctx.imageSmoothingEnabled = false;
-  for (let y = 0; y < doc.height; y++) {
-    for (let x = 0; x < doc.width; x++) {
-      const color = doc.pixels[y * doc.width + x];
-      if (color === null) continue;
-      ctx.fillStyle = color;
-      ctx.fillRect(x * scale, y * scale, scale, scale);
-    }
-  }
-  return canvas;
 }
 
 export function exportAsPNG(doc: PixelArt, scale = 8): void {
