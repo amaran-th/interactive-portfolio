@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarRange, ExternalLink, Monitor, Smartphone } from "lucide-react";
+import { CalendarRange, ExternalLink, Monitor, Smartphone, Star } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { WorkItem } from "./Work";
@@ -184,6 +184,9 @@ export default function WorkModal({
                               : "border-white/10 bg-black/20 text-gray-200"
                           }`}
                         >
+                          {platform.specialized ? (
+                            <Star className="h-3.5 w-3.5 fill-current text-gray-700" />
+                          ) : null}
                           {platform.type === "mobile" ? (
                             <Smartphone
                               className={`h-4 w-4 ${platform.specialized ? "text-gray-700" : "text-gray-500"}`}
