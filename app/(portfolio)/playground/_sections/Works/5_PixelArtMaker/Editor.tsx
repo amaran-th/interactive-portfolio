@@ -1,7 +1,7 @@
 "use client";
 
-import { Minus, Plus, Save, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Download, ImagePlus, Minus, Plus, Save, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getPixelArt,
   listPixelArt,
@@ -13,6 +13,8 @@ import Accordion from "./Accordion";
 import ColorWheel from "./ColorWheel";
 import ConfirmDialog from "./ConfirmDialog";
 import ContextMenu, { ContextMenuItem } from "./ContextMenu";
+import { CURSOR_NORMAL, CURSOR_POINTING, CURSOR_TEXT } from "./cursors";
+import { AlertModal, PromptModal } from "./Dialogs";
 import DrawToolbar from "./DrawToolbar";
 import ExportPanel from "./ExportPanel";
 import {
@@ -21,26 +23,56 @@ import {
   exportAsPNG,
   exportAsSVG,
 } from "./exportPixelArt";
+import FileThumbnail from "./FileThumbnail";
 import {
   applyGradient,
   bboxGradientAxis,
   buildGradientSteps,
   projectT,
-  resolvePaletteIndex,
+  rgbaToPixelValue,
   stepColorAt,
 } from "./gradientFill";
-import { mixHex, rgbaToHex } from "./hsv";
+import { mixHex } from "./hsv";
 import ImportPanel from "./ImportPanel";
 import NewCanvasDialog from "./NewCanvasDialog";
-import PixelCanvas from "./PixelCanvas";
-import { createGrid, getPixel, resizeGrid } from "./pixelGrid";
+import ReferenceWindow from "./ReferenceWindow";
+import PixelCanvas, {
+  PendingImage,
+  PendingShape,
+  TextAlign,
+  textDrawX,
+} from "./PixelCanvas";
+import {
+  createGrid,
+  expandPoints,
+  flipHorizontal,
+  flipVertical,
+  getPixel,
+  PixelValue,
+  resamplePixelValues,
+  resizeGrid,
+  rotate90,
+  rotatePixelValuesBy,
+  setPixel,
+  shapeToolPoints,
+} from "./pixelGrid";
+import { isMacPlatform } from "./platform";
 import ResizeCanvasDialog from "./ResizeCanvasDialog";
-import { rasterizeText } from "./textStamp";
-import Toolbar from "./Toolbar";
-import { CANVAS_PRESETS, MirrorMode, Tool } from "./types";
-import { useCanvasHistory } from "./useCanvasHistory";
+import { rasterizeText, rotateAlphaBuffer, Rotation } from "./textStamp";
+import {
+  CANVAS_PRESETS,
+  DEFAULT_CANVAS_BG_COLOR,
+  MAX_CANVAS_SIZE,
+  NARROW_BREAKPOINT,
+  nextZoomStep,
+  SELECT_TOOL_CATEGORY,
+  SelectMode,
+  Tool,
+  ZOOM_STEPS,
+} from "./types";
+import { CanvasSize, useCanvasHistory } from "./useCanvasHistory";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
-import { useSelection } from "./useSelection";
+import { Clip, useSelection } from "./useSelection";
 import {
   getWallpaper,
   saveWallpaper,
@@ -57,9 +89,55 @@ type Tab = { doc: PixelArt; hasMetaEdits: boolean; pixelsDirty: boolean };
 // 편집을 멈추고 이 시간(ms)이 지나면 자동 저장한다.
 const AUTOSAVE_DELAY_MS = 3 * 60 * 1000;
 
-// 새 캔버스의 기본 팔레트 — 미리 채워두지 않고 빈 채로 시작해, 색상환에서
-// 직접 고른 색만 팔레트에 쌓이게 한다.
-const DEFAULT_PALETTE: string[] = [];
+const DEFAULT_ACTIVE_COLOR = "#000000";
+
+// 클립보드(선택 영역을 복사한 결과)를 pendingImage가 다루는 사각형 격자로
+// 편다 — 복사 당시 선택되지 않았던 칸은 투명(null)으로 채운다.
+function clipToGrid(clip: Clip): PixelValue[] {
+  const grid: PixelValue[] = new Array(clip.w * clip.h).fill(null);
+  for (const cell of clip.cells) {
+    grid[cell.dy * clip.w + cell.dx] = cell.color;
+  }
+  return grid;
+}
+
+// exportAsJSON이 그대로 내보낸 PixelArt 구조를 되읽는다 — 형태가 어긋나거나
+// (특히 손으로 고친 파일) 캔버스 크기가 이 앱의 상한을 넘으면 거부한다.
+// 픽셀 값 하나하나가 문자열이 아니면(손상된 값) 조용히 투명으로 대체한다 —
+// 파일 전체를 거부하기보다는 그 칸만 비워두는 편이 사용자에게 낫다.
+function parsePixelArtJSON(raw: unknown): {
+  name: string;
+  width: number;
+  height: number;
+  palette: string[];
+  pixels: PixelValue[];
+} | null {
+  if (!raw || typeof raw !== "object") return null;
+  const d = raw as Record<string, unknown>;
+  if (typeof d.width !== "number" || typeof d.height !== "number") return null;
+  if (
+    !Number.isInteger(d.width) ||
+    !Number.isInteger(d.height) ||
+    d.width < 1 ||
+    d.height < 1 ||
+    d.width > MAX_CANVAS_SIZE ||
+    d.height > MAX_CANVAS_SIZE
+  ) {
+    return null;
+  }
+  if (!Array.isArray(d.pixels) || d.pixels.length !== d.width * d.height) {
+    return null;
+  }
+  return {
+    name: typeof d.name === "string" && d.name.trim() ? d.name : "제목 없음",
+    width: d.width,
+    height: d.height,
+    palette: Array.isArray(d.palette)
+      ? d.palette.filter((c): c is string => typeof c === "string")
+      : [],
+    pixels: d.pixels.map((p) => (typeof p === "string" ? p : null)),
+  };
+}
 
 function blankDoc(width: number, height: number): PixelArt {
   return {
@@ -67,7 +145,9 @@ function blankDoc(width: number, height: number): PixelArt {
     name: "제목 없음",
     width,
     height,
-    palette: [...DEFAULT_PALETTE],
+    // 즐겨찾기 색 목록 — 미리 채워두지 않고 빈 채로 시작해, 색상환에서
+    // 직접 고른 색만 여기에 쌓이게 한다.
+    palette: [],
     pixels: createGrid(width, height),
     createdAt: Date.now(),
   };
@@ -115,7 +195,15 @@ export default function Editor({
   );
   const [doc, setDoc] = useState<PixelArt>(initial.doc);
   const [name, setName] = useState(initial.doc.name);
-  const [activeColorIndex, setActiveColorIndex] = useState(0);
+  // 픽셀은 트루컬러다 — activeColorHex가 "지금 그릴 색"을 직접 들고 있고,
+  // 그린 픽셀은 이 값을 그대로 복사해 저장한다(참조가 아니다). 그래서
+  // 즐겨찾기(doc.palette) 목록을 고치거나 지워도 이미 칠한 픽셀은 절대
+  // 바뀌지 않는다 — 보통의 그림판/에디터가 팔레트를 다루는 방식과 같다.
+  const [activeColorHex, setActiveColorHex] = useState(DEFAULT_ACTIVE_COLOR);
+  // 그라데이션 끝 색 — MS페인트의 보조 색상과 같은 개념. null이면 투명.
+  const [secondaryColorHex, setSecondaryColorHex] = useState<string | null>(
+    null,
+  );
   const [hasMetaEdits, setHasMetaEdits] = useState(false);
   // 그림(픽셀) 자체가 마지막 저장 이후 바뀌었는지 — history.canUndo와 별개로
   // 둔다. 예전에는 저장할 때마다 history.reset()으로 되돌리기 스택을 통째로
@@ -126,13 +214,39 @@ export default function Editor({
   // hasMetaEdits가 다시 true가 되면) 자동으로 사라진다.
   const [showSavedNotice, setShowSavedNotice] = useState(false);
   const [tool, setTool] = useState<Tool>("pencil");
-  const [mirror, setMirror] = useState<MirrorMode>("none");
+  // 편집기 세션 안에서 열고 닫는 일회성 레퍼런스 창 — 캔버스(탭)별이 아니라
+  // 편집기 자체에서 열리고, 여러 개를 동시에 띄울 수 있다. zIndex는 창을
+  // 클릭할 때마다 올려 마지막으로 만지작거린 창이 항상 맨 앞에 오게 하고,
+  // spawnIndex는 새 창이 열릴 때 한 번만 정해 기본 위치를 계단식으로 살짝씩
+  // 어긋나게 배치하는 데 쓴다(포커스가 바뀌어도 이 값 자체는 바뀌지 않는다).
+  const [referenceWindows, setReferenceWindows] = useState<
+    { id: string; zIndex: number; spawnIndex: number }[]
+  >([]);
+  // 60부터 시작 — 캔버스 하단 중앙 보조 툴바(z-30)보다 항상 앞에 오도록 한다.
+  const referenceZRef = useRef(60);
+  const referenceSpawnRef = useRef(0);
+  const openReferenceWindow = useCallback(() => {
+    referenceZRef.current += 1;
+    const spawnIndex = referenceSpawnRef.current;
+    referenceSpawnRef.current += 1;
+    setReferenceWindows((ws) => [
+      ...ws,
+      { id: uid(), zIndex: referenceZRef.current, spawnIndex },
+    ]);
+  }, []);
+  const closeReferenceWindow = useCallback((id: string) => {
+    setReferenceWindows((ws) => ws.filter((w) => w.id !== id));
+  }, []);
+  const bringReferenceWindowToFront = useCallback((id: string) => {
+    referenceZRef.current += 1;
+    const z = referenceZRef.current;
+    setReferenceWindows((ws) =>
+      ws.map((w) => (w.id === id ? { ...w, zIndex: z } : w)),
+    );
+  }, []);
   const [showGrid, setShowGrid] = useState(true);
   const [brushSize, setBrushSize] = useState(1);
   const [filledShapes, setFilledShapes] = useState(false);
-  // 그라데이션 도구의 끝 색상 — 팔레트 인덱스, -1이면 투명. MS페인트의
-  // 주/보조 색상과 같은 개념으로 팔레트 스와치를 우클릭하면 바뀐다.
-  const [secondaryColorIndex, setSecondaryColorIndex] = useState(-1);
   // 텍스트 도구로 캔버스를 클릭하면 그 그리드 좌표에서 시작한다 — 아직 픽셀에
   // 굽지 않은 상태로 캔버스 위에 인라인 입력·미리보기를 띄운다(모달 없음).
   // antialias: 글자 가장자리를 배경과 섞어 부드럽게 굽는다. gradientFill: 활성/
@@ -144,7 +258,15 @@ export default function Editor({
     fontSize: number;
     antialias: boolean;
     gradientFill: boolean;
+    align: TextAlign;
+    rotation: Rotation;
   } | null>(null);
+  // 이미 그려진 캔버스에 이미지를 불러왔을 때도 텍스트처럼 바로 굽지 않고
+  // 위치·크기를 조절한 뒤 확정해야 실제 픽셀에 반영된다.
+  const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
+  // 직선·사각형·원도 같은 이유로 드래그가 끝나도 바로 굽지 않는다 — 채우기·
+  // 그라데이션 설정과 위치·크기를 계속 조절하다가 확정해야 실제 픽셀에 반영된다.
+  const [pendingShape, setPendingShape] = useState<PendingShape | null>(null);
   // 그라데이션 도구·도형 그라데이션 채우기·텍스트 그라데이션 채우기가 공유하는
   // 설정 — 단계 수와 방향(각도). 그라데이션 도구 자체는 드래그로 축을 직접
   // 정하므로 angleDeg의 영향을 받지 않고, 드래그 제스처가 없는 도형·텍스트
@@ -154,8 +276,19 @@ export default function Editor({
   // 직선·사각형·원을 그릴 때 단색 대신 그라데이션으로 채운다.
   const [shapeGradientFill, setShapeGradientFill] = useState(false);
   // PixelCanvas가 Ctrl+스크롤로 자체 관리하는 확대 배율 — 뷰포트 좌측 하단에
-  // 표시만 하기 위해 값을 그대로 올려받는다.
+  // 표시만 하기 위해 값을 그대로 올려받는다. 1은 고정 크기가 아니라 "화면에
+  // 캔버스 전체가 꽉 차게 보이는 배율"이라 탭마다(캔버스 크기가 다르므로)
+  // 새로 열 때 1로 되돌려 항상 화면 맞춤으로 시작하게 한다.
   const [canvasZoom, setCanvasZoom] = useState(1);
+  // 편집기 작업 영역(캔버스가 놓인 주변 여백)의 배경색 — 캔버스 자체가 아니라
+  // 그 바깥을 칠한다. 탭이나 저장 데이터와는 무관한 순수 보기 설정이며, 항상
+  // 불투명 단색이다.
+  const [canvasBgColor, setCanvasBgColor] = useState(DEFAULT_CANVAS_BG_COLOR);
+  // 마법봉이 이어진 영역만 고를지, 캔버스 전체에서 같은 색을 모두 고를지.
+  const [wandGlobal, setWandGlobal] = useState(false);
+  // select·wand 도구가 고르는 영역을 기존 선택과 어떻게 합칠지 — Shift/Alt를
+  // 누르고 있는 대신 버튼으로 켜 둘 수 있다.
+  const [selectMode, setSelectMode] = useState<SelectMode>("new");
   const [menuAnchor, setMenuAnchor] = useState<{
     x: number;
     y: number;
@@ -166,18 +299,55 @@ export default function Editor({
   // 아니라 이 루트 기준 상대좌표로 계산해야 편집창이 letterbox로 작아지거나
   // 가운데 정렬돼도 메뉴가 버튼 바로 아래에 정확히 뜬다.
   const rootRef = useRef<HTMLDivElement>(null);
+  // 편집기 너비가 NARROW_BREAKPOINT보다 좁아지면 DrawToolbar의 도형·텍스트·
+  // 그라데이션 도구뿐 아니라 이미지 불러오기/내보내기 사이드바도 같은 기준
+  // 으로 접힌 UI(아이콘 트리거 + 플로팅 팝업)로 바뀐다. 여기서 한 번만
+  // 측정해 두 컴포넌트에 함께 내려줘야 기준이 서로 어긋나지 않는다.
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const update = () => setNarrow(el.clientWidth < NARROW_BREAKPOINT);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // narrow일 때 이미지 불러오기/내보내기 사이드바가 아이콘 두 개로 줄어들고,
+  // 그 중 하나를 누르면 이 상태에 맞는 패널이 플로팅 팝업으로 뜬다.
+  const [openFloatingPanel, setOpenFloatingPanel] = useState<
+    "import" | "export" | null
+  >(null);
   // 확대 상태에서 스페이스+드래그로 스크롤할 대상 — PixelCanvas에 그대로 내려준다.
   const canvasViewportRef = useRef<HTMLDivElement>(null);
+  // 그리기/선택 도구의 하위 옵션(브러시 크기·채우기·그라데이션·선택 모드 등)을
+  // DrawToolbar가 포털로 그려 넣을 자리 — 캔버스 하단 중앙에 둬서 좌우
+  // 사이드바(색상환·내보내기)를 가리지 않게 한다. 콜백 ref로 상태에 담아야
+  // 마운트된 실제 DOM 노드가 준비된 다음 렌더에서 DrawToolbar에 전달된다.
+  const [secondaryToolbarPortal, setSecondaryToolbarPortal] =
+    useState<HTMLDivElement | null>(null);
+  // "JSON 불러오기" 메뉴 항목은 화면에 보이지 않는 이 input을 대신 클릭시켜
+  // 파일 선택 창을 띄운다.
+  const jsonFileInputRef = useRef<HTMLInputElement>(null);
   const [resizingCanvas, setResizingCanvas] = useState(false);
   const [showNewCanvasDialog, setShowNewCanvasDialog] = useState(
     !initial.found && startMode === "newCanvas",
   );
   const [showOpenDialog, setShowOpenDialog] = useState(false);
-  const [wantsAutoImport, setWantsAutoImport] = useState(false);
+  const [showHelpDialog, setShowHelpDialog] = useState(false);
+  // 단축키 도움말은 실행 중인 기기와 무관하게 Windows/Mac 표기를 직접 전환해
+  // 볼 수 있다 — 예전엔 isMacPlatform()으로 감지한 한쪽만 보여줘서, 예를 들어
+  // Windows에서 Mac 표기를(또는 그 반대) 확인할 방법이 없었다.
+  const [helpPlatform, setHelpPlatform] = useState<"mac" | "windows">(() =>
+    isMacPlatform() ? "mac" : "windows",
+  );
   const [pendingCloseTabIndex, setPendingCloseTabIndex] = useState<
     number | null
   >(null);
   const [pendingExit, setPendingExit] = useState(false);
+  // window.alert/prompt 대신 이 편집기 스타일에 맞는 모달을 쓴다.
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [saveAsPromptOpen, setSaveAsPromptOpen] = useState(false);
   // localStorage 용량 초과 등으로 저장이 실패해도 이 앱은 토스트 UI가 없어
   // 조용히 묻히기 쉽다 — 제목표시줄에 잠깐 빨간 문구로 알려준다.
   const [saveError, setSaveError] = useState(false);
@@ -201,20 +371,91 @@ export default function Editor({
   // 바로 켜진 상태로 나타난다).
   const [mounted, setMounted] = useState(false);
 
-  const history = useCanvasHistory(initial.doc.pixels);
+  const history = useCanvasHistory(initial.doc.pixels, {
+    width: initial.doc.width,
+    height: initial.doc.height,
+  });
   const selection = useSelection();
+
+  // 선택을 만들거나 다루는 도구 묶음(select·lasso·move·wand) 밖으로 나가면
+  // 더 이상 쓸모가 없어진 선택 영역을 자동으로 지운다 — 그 묶음 안에서
+  // 도구만 바꾸는 동안은(예: select로 고르고 move로 옮기기) 그대로 둔다.
+  useEffect(() => {
+    if (!SELECT_TOOL_CATEGORY.includes(tool)) selection.setMask(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool]);
 
   // history.push는 되돌리기 스택에 새 항목을 추가할 뿐 "저장 여부"는 모른다 —
   // 실제로 그림이 바뀔 때마다 이 래퍼로 pixelsDirty도 함께 표시해, 저장(수동·
   // 자동 모두)이 되돌리기 이력을 지우지 않고도 "저장 안 된 변경"을 정확히
-  // 추적하게 한다.
+  // 추적하게 한다. size를 넘기면(회전·캔버스 크기 수정) 그 조작도 되돌릴 수
+  // 있다 — 생략하면 지금 크기를 그대로 유지한다.
+  //
+  // moveOriginalMask는 history의 undo/redo 스택과 정확히 같은 리듬으로(호출
+  // 할 때마다 하나씩) 함께 움직이는 별도 스택에 쌓인다 — 이동 도구 커밋만
+  // 실제 값(이동 전 선택 영역)을 넣고, 그 외 모든 조작(그리기 등)은
+  // undefined를 넣어 "이 되돌리기 단계는 선택 영역을 건드리지 않는다"는
+  // 뜻으로 삼는다. 그러지 않고 모든 조작에 선택 영역을 엮으면, 그리기 이후
+  // 새로 고른 선택이 그 그리기를 되돌릴 때 엉뚱하게 예전 선택으로 되돌아가
+  // 버린다.
+  const moveSelectionUndoRef = useRef<(Set<number> | null | undefined)[]>([]);
+  const moveSelectionRedoRef = useRef<(Set<number> | null | undefined)[]>([]);
+
   const pushHistory = useCallback(
-    (next: number[]) => {
-      history.push(next);
+    (
+      next: PixelValue[],
+      size?: CanvasSize,
+      moveOriginalMask?: Set<number> | null,
+    ) => {
+      history.push(next, size);
+      moveSelectionUndoRef.current.push(moveOriginalMask);
+      if (moveSelectionUndoRef.current.length > 50) {
+        moveSelectionUndoRef.current.shift();
+      }
+      moveSelectionRedoRef.current = [];
       setPixelsDirty(true);
     },
     [history],
   );
+
+  // 실행취소/다시실행 — 픽셀은 history가 그대로 되돌리고, 그 단계가 이동
+  // 도구 커밋이었다면(moveSelectionUndoRef에 실제 Set|null이 쌓여 있다면)
+  // 선택 영역도 그 시점 자리로 함께 되돌린다.
+  const handleUndo = useCallback(() => {
+    if (!history.canUndo) return;
+    const maskEntry = moveSelectionUndoRef.current.pop();
+    moveSelectionRedoRef.current.push(
+      maskEntry === undefined ? undefined : selection.mask,
+    );
+    history.undo();
+    if (maskEntry !== undefined) selection.setMask(maskEntry);
+  }, [history, selection]);
+
+  const handleRedo = useCallback(() => {
+    if (!history.canRedo) return;
+    const maskEntry = moveSelectionRedoRef.current.pop();
+    moveSelectionUndoRef.current.push(
+      maskEntry === undefined ? undefined : selection.mask,
+    );
+    history.redo();
+    if (maskEntry !== undefined) selection.setMask(maskEntry);
+  }, [history, selection]);
+
+  // 되돌리기 스택의 "지금 크기"가 곧 진실이다 — 회전·크기 수정을 되돌리거나
+  // 다시 실행하면 doc.width/height도 자동으로 따라가야, 픽셀 배열 길이와
+  // 캔버스 크기가 어긋나 그림이 깨지는 일이 없다.
+  useEffect(() => {
+    setDoc((d) =>
+      d.width === history.presentSize.width &&
+      d.height === history.presentSize.height
+        ? d
+        : {
+            ...d,
+            width: history.presentSize.width,
+            height: history.presentSize.height,
+          },
+    );
+  }, [history.presentSize]);
 
   // 픽셀이든 메타(팔레트·이름·크기 등)든 새 편집이 시작되면(pixelsDirty나
   // hasMetaEdits가 true가 되면) "자동 저장됨" 안내를 지운다 — setHasMetaEdits를
@@ -264,12 +505,19 @@ export default function Editor({
     (tab: Tab, index: number) => {
       setDoc(tab.doc);
       setName(tab.doc.name);
-      history.reset(tab.doc.pixels);
-      setActiveColorIndex(0);
+      history.reset(tab.doc.pixels, {
+        width: tab.doc.width,
+        height: tab.doc.height,
+      });
+      setActiveColorHex(DEFAULT_ACTIVE_COLOR);
+      setSecondaryColorHex(null);
       setHasMetaEdits(tab.hasMetaEdits);
       setPixelsDirty(tab.pixelsDirty);
       setShowSavedNotice(false);
       setActiveTabIndex(index);
+      // 배율 1 = 화면 맞춤이므로, 탭마다(캔버스 크기가 다를 수 있으니) 항상
+      // 화면 맞춤으로 새로 시작한다.
+      setCanvasZoom(1);
     },
     [history],
   );
@@ -285,7 +533,7 @@ export default function Editor({
   );
 
   const openNewTab = useCallback(
-    (newDoc: PixelArt, options?: { autoImport?: boolean }) => {
+    (newDoc: PixelArt) => {
       const synced = syncActiveTabSnapshot(tabs);
       const newIndex = synced.length;
       const freshTab: Tab = {
@@ -295,9 +543,44 @@ export default function Editor({
       };
       setTabs([...synced, freshTab]);
       loadTab(freshTab, newIndex);
-      setWantsAutoImport(!!options?.autoImport);
     },
     [tabs, syncActiveTabSnapshot, loadTab],
+  );
+
+  // JSON 내보내기(exportAsJSON)의 반대편 — 그 파일을 다시 읽어 새 탭으로 연다.
+  // 내보낸 파일을 그대로 되읽는 것뿐이라 이미지 불러오기처럼 다시 양자화할
+  // 필요가 없다. id/createdAt은 새로 발급한다 — 디스크의 파일과 라이브러리의
+  // 항목은 별개이므로, 원본 id를 그대로 쓰면 나중에 저장할 때 우연히 같은
+  // id를 가진 다른 작품을 덮어쓸 위험이 있다.
+  const handleImportJSONFile = useCallback(
+    (file: File) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        let parsed: ReturnType<typeof parsePixelArtJSON> = null;
+        try {
+          parsed = parsePixelArtJSON(JSON.parse(String(reader.result)));
+        } catch {
+          parsed = null;
+        }
+        if (!parsed) {
+          setAlertMessage(
+            "올바른 픽셀아트 JSON 파일이 아닙니다(내보내기 > JSON으로 만든 파일인지 확인하세요).",
+          );
+          return;
+        }
+        openNewTab({
+          id: uid(),
+          name: parsed.name,
+          width: parsed.width,
+          height: parsed.height,
+          palette: parsed.palette,
+          pixels: parsed.pixels,
+          createdAt: Date.now(),
+        });
+      };
+      reader.readAsText(file);
+    },
+    [openNewTab],
   );
 
   const closeTab = useCallback(
@@ -342,8 +625,8 @@ export default function Editor({
   );
 
   const handleStrokeEnd = useCallback(
-    (next: number[]) => {
-      pushHistory(next);
+    (next: PixelValue[], moveOriginalMask?: Set<number> | null) => {
+      pushHistory(next, undefined, moveOriginalMask);
     },
     [pushHistory],
   );
@@ -354,11 +637,26 @@ export default function Editor({
     pushHistory(createGrid(doc.width, doc.height));
   }, [pushHistory, doc.width, doc.height]);
 
+  // 선택 영역(사각형 선택·마법봉으로 고른 픽셀들)을 활성 색상으로 한 번에
+  // 칠한다 — 마법봉의 "전역 동일색 선택"과 함께 쓰면, 화면 곳곳에 흩어 칠한
+  // 특정 색을 한 번에 다른 색으로 바꾸는 "색상 일괄 수정"으로 쓸 수 있다.
+  // setPixel이 이미 알파 합성을 하므로 반투명 활성 색상도 자연스럽게 섞인다.
+  const handleFillSelection = useCallback(() => {
+    if (!selection.mask || selection.mask.size === 0) return;
+    let next = history.present;
+    selection.mask.forEach((i) => {
+      const x = i % doc.width;
+      const y = Math.floor(i / doc.width);
+      next = setPixel(next, doc.width, x, y, activeColorHex);
+    });
+    pushHistory(next);
+  }, [selection.mask, history.present, doc.width, activeColorHex, pushHistory]);
+
   // 확정 전 텍스트를 실제 픽셀에 굽는다(래스터화 → 커버리지 기반으로 색 결정).
   // gradientFill이면 각 칸의 색을 캔버스 좌표 기준 그라데이션에서 가져오고,
   // 아니면 활성 색상 하나를 쓴다. antialias면 그 색을 커버리지 비율만큼 배경과
-  // 섞어 하나의 불투명 색으로 만든다(인덱스 팔레트라 반투명을 그대로 저장할
-  // 수 없다). 새로 필요한 색은 resolvePaletteIndex로 팔레트에 반영한다.
+  // 섞어 하나의 불투명 색으로 만든다. 픽셀은 트루컬러라 팔레트를 신경 쓸
+  // 필요 없이 계산된 색을 그대로 적어 넣으면 된다.
   const commitPendingText = useCallback(
     (p: {
       x: number;
@@ -367,30 +665,32 @@ export default function Editor({
       fontSize: number;
       antialias: boolean;
       gradientFill: boolean;
+      align: TextAlign;
+      rotation: Rotation;
     }) => {
       if (!p.text.trim()) return;
+      const raw = rasterizeText(p.text, p.fontSize, p.align);
       const {
         width: tw,
         height: th,
         alpha,
-      } = rasterizeText(p.text, p.fontSize);
+      } = rotateAlphaBuffer(raw.alpha, raw.width, raw.height, p.rotation);
+      const drawX = textDrawX(p.x, tw, p.align);
       const next = history.present.slice();
-      let nextPalette = doc.palette;
-      const flatHex = doc.palette[activeColorIndex] ?? "#000000";
-      const startHex = flatHex;
-      const endHex =
-        secondaryColorIndex >= 0
-          ? (doc.palette[secondaryColorIndex] ?? "#00000000")
-          : "#00000000";
+      const flatHex = activeColorHex;
       const stepColors = p.gradientFill
-        ? buildGradientSteps(startHex, endHex, gradientSteps)
+        ? buildGradientSteps(
+            activeColorHex,
+            secondaryColorHex ?? "#00000000",
+            gradientSteps,
+          )
         : null;
       const axis =
         stepColors &&
         bboxGradientAxis(
           [
-            { x: p.x, y: p.y },
-            { x: p.x + tw, y: p.y + th },
+            { x: drawX, y: p.y },
+            { x: drawX + tw, y: p.y + th },
           ],
           gradientAngleDeg,
         );
@@ -399,39 +699,32 @@ export default function Editor({
           const coverage = alpha[ty * tw + tx] / 255;
           if (coverage === 0) continue;
           if (!p.antialias && coverage <= 0.5) continue;
-          const px = p.x + tx;
+          const px = drawX + tx;
           const py = p.y + ty;
           if (px < 0 || py < 0 || px >= doc.width || py >= doc.height) continue;
           const idx = py * doc.width + px;
           let fgHex = flatHex;
           if (stepColors && axis) {
             const t = projectT(px, py, axis.x0, axis.y0, axis.x1, axis.y1);
-            const c = stepColorAt(stepColors, t);
-            if (c[3] <= 0.02) continue; // 완전히 투명한 그라데이션 구간은 건너뛴다
-            fgHex = rgbaToHex(c[0], c[1], c[2], c[3]);
+            const hex = rgbaToPixelValue(stepColorAt(stepColors, t));
+            if (hex === null) continue; // 완전히 투명한 그라데이션 구간은 건너뛴다
+            fgHex = hex;
           }
-          let finalHex = fgHex;
           if (p.antialias) {
-            const bgIndex = next[idx];
-            const bgHex =
-              bgIndex >= 0 ? (nextPalette[bgIndex] ?? "#ffffff") : "#ffffff";
-            finalHex = mixHex(bgHex, fgHex, coverage);
+            const bgHex = next[idx] ?? "#ffffff";
+            next[idx] = mixHex(bgHex, fgHex, coverage);
+          } else {
+            next[idx] = fgHex;
           }
-          const resolved = resolvePaletteIndex(finalHex, nextPalette);
-          nextPalette = resolved.palette;
-          next[idx] = resolved.index;
         }
       }
-      if (nextPalette !== doc.palette)
-        setDoc((d) => ({ ...d, palette: nextPalette }));
       pushHistory(next);
     },
     [
       doc.width,
       doc.height,
-      doc.palette,
-      activeColorIndex,
-      secondaryColorIndex,
+      activeColorHex,
+      secondaryColorHex,
       gradientSteps,
       gradientAngleDeg,
       history.present,
@@ -452,6 +745,8 @@ export default function Editor({
           fontSize: 8,
           antialias: false,
           gradientFill: false,
+          align: "left",
+          rotation: 0,
         };
       });
     },
@@ -477,6 +772,33 @@ export default function Editor({
     setPendingText((p) => (p ? { ...p, gradientFill: !p.gradientFill } : p));
   }, []);
 
+  // 정렬 기준점(x)은 정렬 모드에 따라 텍스트가 그려지는 실제 위치(drawX)를
+  // 다르게 만든다(textDrawX 참고) — 그래서 정렬 버튼을 눌렀을 때 x를 그대로
+  // 두면, 지금 화면에 보이는 텍스트가 정렬이 바뀐 만큼 옆으로 튀어 보였다.
+  // 바뀌기 전 drawX를 그대로 유지하도록 새 정렬 기준의 x를 역산해, 정렬
+  // 버튼은 "지금 위치는 그대로 두고 이후 늘어나는 방향만" 바꾸게 한다.
+  const handlePendingTextSetAlign = useCallback((align: TextAlign) => {
+    setPendingText((p) => {
+      if (!p) return p;
+      const raw = rasterizeText(p.text, p.fontSize, p.align);
+      const tw = p.rotation === 90 || p.rotation === 270 ? raw.height : raw.width;
+      const currentDrawX = textDrawX(p.x, tw, p.align);
+      const nextX =
+        align === "center"
+          ? currentDrawX + Math.floor(tw / 2)
+          : align === "right"
+            ? currentDrawX + tw
+            : currentDrawX;
+      return { ...p, x: nextX, align };
+    });
+  }, []);
+
+  const handlePendingTextRotate = useCallback(() => {
+    setPendingText((p) =>
+      p ? { ...p, rotation: ((p.rotation + 90) % 360) as Rotation } : p,
+    );
+  }, []);
+
   const handlePendingTextCommit = useCallback(() => {
     setPendingText((p) => {
       if (p) commitPendingText(p);
@@ -498,91 +820,214 @@ export default function Editor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool]);
 
+  const handlePendingImageMove = useCallback((x: number, y: number) => {
+    setPendingImage((p) => (p ? { ...p, x, y } : p));
+  }, []);
+
+  const handlePendingImageResize = useCallback(
+    (width: number, height: number) => {
+      setPendingImage((p) => (p ? { ...p, width, height } : p));
+    },
+    [],
+  );
+
+  const handlePendingImageRotate = useCallback(() => {
+    setPendingImage((p) =>
+      p ? { ...p, rotation: ((p.rotation + 90) % 360) as Rotation } : p,
+    );
+  }, []);
+
+  // 지금 배치·크기·회전으로 원본을 리샘플링해 실제 픽셀에 합성한다 — setPixel이
+  // 이미 알파 합성을 하므로 이미지의 반투명 가장자리도 밑그림과 자연스럽게
+  // 섞이고, 밑에 있던 내용을 지우지 않는다(선택 영역 밖으로 나간 부분은
+  // 그냥 건너뛴다).
+  const handlePendingImageCommit = useCallback(() => {
+    setPendingImage((p) => {
+      if (!p) return null;
+      const rotated = rotatePixelValuesBy(
+        p.pixels,
+        p.srcWidth,
+        p.srcHeight,
+        p.rotation,
+      );
+      const resampled = resamplePixelValues(
+        rotated.pixels,
+        rotated.width,
+        rotated.height,
+        p.width,
+        p.height,
+      );
+      let next = history.present;
+      for (let ty = 0; ty < p.height; ty++) {
+        for (let tx = 0; tx < p.width; tx++) {
+          const color = resampled[ty * p.width + tx];
+          if (color === null) continue;
+          const px = p.x + tx;
+          const py = p.y + ty;
+          if (px < 0 || py < 0 || px >= doc.width || py >= doc.height) continue;
+          next = setPixel(next, doc.width, px, py, color);
+        }
+      }
+      pushHistory(next);
+      return null;
+    });
+  }, [history.present, doc.width, doc.height, pushHistory]);
+
+  const handlePendingImageCancel = useCallback(() => {
+    setPendingImage(null);
+  }, []);
+
+  // 붙여넣기도 이미지 불러오기와 똑같이 pendingImage로 띄운다 — 예전에는
+  // 클립보드 내용을 (0,0) 기준으로 바로 픽셀에 합성해버려, 위치를 조정할 수도
+  // 없고 무엇이 방금 붙여넣어졌는지도 알 수 없었다. 텍스트·이미지 요소처럼
+  // 위치를 옮기고 확정해야 실제 픽셀에 반영되며, 그 자체가 곧 "지금 선택된
+  // 요소"를 시각적으로 보여주므로 기존 선택 영역은 비워 혼동을 없앤다.
+  const handlePaste = useCallback(() => {
+    if (!selection.clipboard) return;
+    if (pendingImage) handlePendingImageCommit();
+    const clip = selection.clipboard;
+    setPendingImage({
+      x: Math.floor((doc.width - clip.w) / 2),
+      y: Math.floor((doc.height - clip.h) / 2),
+      width: clip.w,
+      height: clip.h,
+      srcWidth: clip.w,
+      srcHeight: clip.h,
+      pixels: clipToGrid(clip),
+      rotation: 0,
+    });
+    selection.setMask(null);
+  }, [
+    selection,
+    pendingImage,
+    handlePendingImageCommit,
+    doc.width,
+    doc.height,
+  ]);
+
   // 그라데이션 드래그가 끝나면 시작(활성 색상)~끝(보조 색상) 사이를 밴딩해
-  // 채운다 — 필요하면 팔레트를 확장하므로 pixels·palette를 함께 커밋한다.
+  // 채운다. 픽셀은 트루컬러라 팔레트 확장 없이 계산된 색을 그대로 커밋한다.
   const handleGradientToolEnd = useCallback(
     (x0: number, y0: number, x1: number, y1: number) => {
-      const startHex = doc.palette[activeColorIndex] ?? "#000000";
-      const endHex =
-        secondaryColorIndex >= 0
-          ? (doc.palette[secondaryColorIndex] ?? "#00000000")
-          : "#00000000";
       const result = applyGradient(
         history.present,
-        doc.palette,
         doc.width,
         doc.height,
         x0,
         y0,
         x1,
         y1,
-        startHex,
-        endHex,
+        activeColorHex,
+        secondaryColorHex ?? "#00000000",
         gradientSteps,
       );
-      if (result.palette.length !== doc.palette.length) {
-        setDoc((d) => ({ ...d, palette: result.palette }));
-      }
-      pushHistory(result.pixels);
+      pushHistory(result);
     },
     [
-      activeColorIndex,
-      secondaryColorIndex,
+      activeColorHex,
+      secondaryColorHex,
       gradientSteps,
       history.present,
       pushHistory,
-      doc.palette,
       doc.width,
       doc.height,
     ],
   );
 
-  // 직선·사각형·원을 그라데이션으로 채울 때 드래그가 끝나면 호출된다 —
-  // PixelCanvas가 브러시 크기·미러까지 반영해 이미 펼쳐둔 최종 좌표 목록을
-  // 그대로 받아, 각 좌표의 그라데이션 색을 계산해 굽는다(팔레트 확장 포함).
-  const handleShapeGradientEnd = useCallback(
-    (points: { x: number; y: number }[]) => {
-      if (points.length === 0) return;
-      const startHex = doc.palette[activeColorIndex] ?? "#000000";
-      const endHex =
-        secondaryColorIndex >= 0
-          ? (doc.palette[secondaryColorIndex] ?? "#00000000")
-          : "#00000000";
-      const stepColors = buildGradientSteps(startHex, endHex, gradientSteps);
-      const axis = bboxGradientAxis(points, gradientAngleDeg);
-      let nextPalette = doc.palette;
-      const next = history.present.slice();
-      for (const p of points) {
-        if (p.x < 0 || p.y < 0 || p.x >= doc.width || p.y >= doc.height)
-          continue;
-        const t = projectT(p.x, p.y, axis.x0, axis.y0, axis.x1, axis.y1);
-        const c = stepColorAt(stepColors, t);
-        const idx = p.y * doc.width + p.x;
-        if (c[3] <= 0.02) {
-          next[idx] = -1;
-          continue;
-        }
-        const hex = rgbaToHex(c[0], c[1], c[2], c[3]);
-        const resolved = resolvePaletteIndex(hex, nextPalette);
-        nextPalette = resolved.palette;
-        next[idx] = resolved.index;
-      }
-      if (nextPalette !== doc.palette)
-        setDoc((d) => ({ ...d, palette: nextPalette }));
-      pushHistory(next);
+  // 직선·사각형·원 드래그가 끝나면(0 크기가 아닐 때만 PixelCanvas가 호출)
+  // 확정 전 상태로 띄운다 — 이미 다른 pendingShape가 있었다면 PixelCanvas가
+  // pointerdown 시점에 먼저 커밋을 요청하므로 여기서는 그냥 새로 시작한다.
+  const handleShapeDragEnd = useCallback(
+    (
+      tool: "line" | "rect" | "circle",
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+    ) => {
+      setPendingShape({ tool, x0, y0, x1, y1 });
     },
-    [
-      doc.palette,
-      doc.width,
-      doc.height,
-      activeColorIndex,
-      secondaryColorIndex,
-      gradientSteps,
-      gradientAngleDeg,
-      history.present,
-      pushHistory,
-    ],
+    [],
   );
+
+  const handlePendingShapeUpdate = useCallback((next: PendingShape) => {
+    setPendingShape(next);
+  }, []);
+
+  // 지금 확정 전 도형을 실제 픽셀에 굽는다 — 채움·그라데이션 여부·그라데이션
+  // 방향·브러시 크기는 스냅샷이 아니라 지금 이 순간의 값을 쓴다(확정 전에
+  // 이리저리 바꿔본 그대로 반영되어야 한다).
+  const handlePendingShapeCommit = useCallback(() => {
+    setPendingShape((p) => {
+      if (!p) return null;
+      const shapePoints = shapeToolPoints(
+        p.tool,
+        p.x0,
+        p.y0,
+        p.x1,
+        p.y1,
+        filledShapes,
+      );
+      const expanded = expandPoints(
+        shapePoints,
+        doc.width,
+        doc.height,
+        brushSize,
+      );
+      if (shapeGradientFill) {
+        const stepColors = buildGradientSteps(
+          activeColorHex,
+          secondaryColorHex ?? "#00000000",
+          gradientSteps,
+        );
+        const axis = bboxGradientAxis(expanded, gradientAngleDeg);
+        const next = history.present.slice();
+        for (const pt of expanded) {
+          if (pt.x < 0 || pt.y < 0 || pt.x >= doc.width || pt.y >= doc.height)
+            continue;
+          const t = projectT(pt.x, pt.y, axis.x0, axis.y0, axis.x1, axis.y1);
+          next[pt.y * doc.width + pt.x] = rgbaToPixelValue(
+            stepColorAt(stepColors, t),
+          );
+        }
+        pushHistory(next);
+      } else {
+        let next = history.present;
+        for (const pt of expanded) {
+          if (pt.x < 0 || pt.y < 0 || pt.x >= doc.width || pt.y >= doc.height)
+            continue;
+          next = setPixel(next, doc.width, pt.x, pt.y, activeColorHex);
+        }
+        pushHistory(next);
+      }
+      return null;
+    });
+  }, [
+    doc.width,
+    doc.height,
+    filledShapes,
+    brushSize,
+    shapeGradientFill,
+    activeColorHex,
+    secondaryColorHex,
+    gradientSteps,
+    gradientAngleDeg,
+    history.present,
+    pushHistory,
+  ]);
+
+  const handlePendingShapeCancel = useCallback(() => {
+    setPendingShape(null);
+  }, []);
+
+  // 도형 도구를 벗어나면(다른 도구로 전환) 뜬 채로 남아있던 도형을 잃지 않도록
+  // 자동으로 굽는다 — 텍스트 도구의 같은 관례와 동일하다.
+  useEffect(() => {
+    if (pendingShape && tool !== pendingShape.tool) {
+      handlePendingShapeCommit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool]);
 
   const handleSave = useCallback(() => {
     if (activeTabIndex < 0) return;
@@ -634,38 +1079,44 @@ export default function Editor({
   // 픽셀아트 목록에 별도 항목을 만든 뒤, 이후 편집은 그 새 사본을 대상으로 한다.
   const handleSaveAs = useCallback(() => {
     if (activeTabIndex < 0) return;
-    const newName = window.prompt(
-      "다른 이름으로 저장",
-      isWallpaper ? WALLPAPER_NAME : name,
-    );
-    if (!newName) return;
-    const toSave: PixelArt = {
-      ...doc,
-      id: uid(),
-      name: newName,
-      pixels: history.present,
-      createdAt: Date.now(),
-    };
-    const ok = savePixelArt(toSave);
-    if (!ok) {
-      flagSaveError();
-      return;
-    }
-    setDoc(toSave);
-    setName(newName);
-    setHasMetaEdits(false);
-    setPixelsDirty(false);
-    setTabs((prev) =>
-      prev.map((t, i) =>
-        i === activeTabIndex
-          ? { doc: toSave, hasMetaEdits: false, pixelsDirty: false }
-          : t,
-      ),
-    );
-  }, [activeTabIndex, doc, name, history, isWallpaper, flagSaveError]);
+    setSaveAsPromptOpen(true);
+  }, [activeTabIndex]);
+
+  const handleConfirmSaveAs = useCallback(
+    (newName: string) => {
+      setSaveAsPromptOpen(false);
+      const toSave: PixelArt = {
+        ...doc,
+        id: uid(),
+        name: newName,
+        pixels: history.present,
+        createdAt: Date.now(),
+      };
+      const ok = savePixelArt(toSave);
+      if (!ok) {
+        flagSaveError();
+        return;
+      }
+      setDoc(toSave);
+      setName(newName);
+      setHasMetaEdits(false);
+      setPixelsDirty(false);
+      setTabs((prev) =>
+        prev.map((t, i) =>
+          i === activeTabIndex
+            ? { doc: toSave, hasMetaEdits: false, pixelsDirty: false }
+            : t,
+        ),
+      );
+    },
+    [activeTabIndex, doc, history, flagSaveError],
+  );
 
   // 캔버스 크기 수정 — 그림을 다시 늘리거나 줄이지 않고 경계만 바꾼다(왼쪽 위
   // 기준으로 자르거나 투명하게 늘림). 팔레트·이름 등 다른 속성은 그대로 둔다.
+  // 되돌리기 스택에 크기 정보도 함께 실어(pushHistory의 size 인자) 이 조작도
+  // 되돌릴 수 있게 한다 — doc.width/height는 history.presentSize를 따라가는
+  // effect가 알아서 맞춰준다.
   const handleResizeCanvas = useCallback(
     (newWidth: number, newHeight: number) => {
       const resized = resizeGrid(
@@ -675,12 +1126,39 @@ export default function Editor({
         newWidth,
         newHeight,
       );
-      setDoc((d) => ({ ...d, width: newWidth, height: newHeight }));
-      history.reset(resized);
+      pushHistory(resized, { width: newWidth, height: newHeight });
       setResizingCanvas(false);
       setHasMetaEdits(true);
     },
-    [doc.width, doc.height, history],
+    [doc.width, doc.height, history.present, pushHistory],
+  );
+
+  // 상하/좌우 반전과 90도 회전 모두 pushHistory로 되돌리기 스택에 올린다 —
+  // 회전은 크기 자체가 바뀌므로(정사각형이 아닌 캔버스) size 인자를 함께
+  // 넘겨, 되돌리기/다시 실행 때 그 시점의 크기로 정확히 복원되게 한다.
+  const handleFlipHorizontal = useCallback(() => {
+    pushHistory(flipHorizontal(history.present, doc.width, doc.height));
+  }, [history.present, doc.width, doc.height, pushHistory]);
+
+  const handleFlipVertical = useCallback(() => {
+    pushHistory(flipVertical(history.present, doc.width, doc.height));
+  }, [history.present, doc.width, doc.height, pushHistory]);
+
+  const handleRotate90 = useCallback(
+    (direction: 1 | -1) => {
+      const result = rotate90(
+        history.present,
+        doc.width,
+        doc.height,
+        direction,
+      );
+      pushHistory(result.pixels, {
+        width: result.width,
+        height: result.height,
+      });
+      setHasMetaEdits(true);
+    },
+    [history.present, doc.width, doc.height, pushHistory],
   );
 
   // 활성 탭은 라이브 상태(pixelsDirty/hasMetaEdits)로, 비활성 탭은 마지막
@@ -751,111 +1229,65 @@ export default function Editor({
 
   useKeyboardShortcuts({
     onToolChange: setTool,
-    onUndo: history.undo,
-    onRedo: history.redo,
+    onUndo: handleUndo,
+    onRedo: handleRedo,
     onCopy: () => selection.copy(history.present, doc.width),
-    onPaste: () => {
-      const next = selection.paste(
-        history.present,
-        doc.width,
-        doc.height,
-        0,
-        0,
-      );
-      pushHistory(next);
-    },
-    onMirrorToggle: setMirror,
+    onPaste: handlePaste,
     onSave: handleSave,
+    onSaveAs: handleSaveAs,
+    onClearSelection: () => selection.setMask(null),
+    onSetBrushSize: setBrushSize,
+    onRotate: handleRotate90,
+    onFlipHorizontal: handleFlipHorizontal,
+    onFlipVertical: handleFlipVertical,
+    onToggleGrid: () => setShowGrid((g) => !g),
+    onZoomIn: () => setCanvasZoom((z) => nextZoomStep(z, 1)),
+    onZoomOut: () => setCanvasZoom((z) => nextZoomStep(z, -1)),
+    onFillSelection: handleFillSelection,
+    hasPendingImage: !!pendingImage,
+    onCommitPendingImage: handlePendingImageCommit,
+    onCancelPendingImage: handlePendingImageCancel,
+    hasPendingShape: !!pendingShape,
+    onCommitPendingShape: handlePendingShapeCommit,
+    onCancelPendingShape: handlePendingShapeCancel,
   });
 
-  const palette = doc.palette;
-
-  // 팔레트에는 있지만 캔버스 어디에도 실제로 칠해진 적 없는 색을 색상환에서
-  // 구분해 보여주기 위해, 지금 픽셀에 쓰이고 있는 팔레트 인덱스를 모은다.
-  const usedColorIndices = useMemo(() => {
-    const used = new Set<number>();
-    for (const index of history.present) {
-      if (index >= 0) used.add(index);
-    }
-    return used;
-  }, [history.present]);
-
-  const handleAddColor = useCallback(
-    (hex: string) => {
-      const newIndex = palette.length;
-      setDoc((d) => ({ ...d, palette: [...d.palette, hex] }));
-      setActiveColorIndex(newIndex);
-      setHasMetaEdits(true);
-    },
-    [palette],
-  );
-
-  // 팔레트가 비어 있는 채로 그리기를 시작하면(activeColorIndex가 가리킬 실제
-  // 색이 없어) 기본 검정 한 칸을 자동으로 추가한다 — 새 캔버스가 빈 팔레트로
-  // 시작하도록 바꾼 뒤, 아무것도 추가하지 않은 채 바로 칠하기 시작하는 경우를
-  // 위한 안전장치다. 팔레트가 이미 있으면 아무 일도 하지 않는다.
-  const handleEnsureFirstColor = useCallback(() => {
-    if (palette.length > 0) return;
-    setDoc((d) => ({ ...d, palette: ["#000000"] }));
-    setActiveColorIndex(0);
+  // "+" 버튼으로 지금 활성 색상을 즐겨찾기에 명시적으로 추가한다.
+  const handleAddFavorite = useCallback((hex: string) => {
+    setDoc((d) => ({ ...d, palette: [...d.palette, hex] }));
     setHasMetaEdits(true);
-  }, [palette]);
+  }, []);
 
-  const handleRemoveColor = useCallback(
-    (index: number) => {
-      setDoc((d) => ({
-        ...d,
-        palette: d.palette.filter((_, i) => i !== index),
-      }));
-      // 제거된 색보다 뒤에 있던 활성 인덱스는 한 칸씩 당겨오고, 배열 끝을 넘어가면
-      // 새 마지막 인덱스로 당겨온다 — 그대로 두면 활성 인덱스가 배열 밖을 가리켜
-      // 색상환이 엉뚱한 색(기본 검정)을 편집하는 상태가 됐다.
-      setActiveColorIndex((ai) => {
-        const newLength = palette.length - 1;
-        if (newLength <= 0) return 0;
-        if (index < ai) return ai - 1;
-        return Math.min(ai, newLength - 1);
-      });
-      setHasMetaEdits(true);
-    },
-    [palette],
-  );
+  const handleRemoveFavorite = useCallback((index: number) => {
+    setDoc((d) => ({
+      ...d,
+      palette: d.palette.filter((_, i) => i !== index),
+    }));
+    setHasMetaEdits(true);
+  }, []);
 
-  // 색상환으로 특정 스와치를 명시적으로 "편집 모드"에 들어가 고칠 때만 쓰인다
-  // (ColorWheel의 연필 아이콘) — 이미 그 색으로 칠한 픽셀이 있어도 함께 바뀐다.
-  // 의도적인 동작이므로 괜찮다: 일반적인 색상환 조작(편집 모드 아님)은
-  // handleCommitColor가 대신 처리해, 이미 칠해진 스와치를 실수로 바꾸지 않는다.
-  const handleEditSwatchColor = useCallback(
-    (hex: string) => {
-      setDoc((d) => {
-        const nextPalette = d.palette.slice();
-        nextPalette[activeColorIndex] = hex;
-        return { ...d, palette: nextPalette };
-      });
-      setHasMetaEdits(true);
-    },
-    [activeColorIndex],
-  );
+  // 팔레트 세트를 "불러오면" 기존 즐겨찾기에 더하는 게 아니라 세트 색으로
+  // 통째로 바꾼다 — 세트를 즐겨찾기와 뒤섞인 채로 계속 추가만 하다 보면 어느
+  // 세트를 쓰고 있는지 알 수 없어지므로, 세트를 고르는 행동은 항상 "지금
+  // 즐겨찾기를 이 세트로 교체"를 뜻하게 한다.
+  const handleReplaceFavorites = useCallback((colors: string[]) => {
+    setDoc((d) => ({ ...d, palette: colors.slice() }));
+    setHasMetaEdits(true);
+  }, []);
 
-  // 색상환을 조작하고 손을 놓으면 호출된다 — 기존 스와치를 실시간으로 덮어쓰지
-  // 않고, 이미 같은 색이 팔레트에 있으면 그 스와치를 재사용하고 없으면 새
-  // 스와치로 추가한다(가득 찼으면 가장 가까운 기존 색으로 대체). 다른
-  // 픽셀아트 툴들처럼 "색을 섞는 것"과 "팔레트 항목을 고치는 것"을 분리해,
-  // 이미 칠한 색을 색상환 조작만으로 바꿔버리는 문제를 막는다.
-  const handleCommitColor = useCallback(
-    (hex: string) => {
-      const resolved = resolvePaletteIndex(hex, doc.palette);
-      if (resolved.palette !== doc.palette) {
-        setDoc((d) => ({ ...d, palette: resolved.palette }));
-        setHasMetaEdits(true);
-      }
-      setActiveColorIndex(resolved.index);
-    },
-    [doc.palette],
-  );
+  // 즐겨찾기 스와치를 선택한 뒤 색상환을 조작하면 그 스와치의 저장값 자체를
+  // 바꾼다 — 이미 칠한 픽셀은 값을 직접 복사해 저장하므로 이 편집이 그림에
+  // 영향을 주지 않는다.
+  const handleEditFavorite = useCallback((index: number, hex: string) => {
+    setDoc((d) => ({
+      ...d,
+      palette: d.palette.map((c, i) => (i === index ? hex : c)),
+    }));
+    setHasMetaEdits(true);
+  }, []);
 
-  const handlePickColor = useCallback((colorIndex: number) => {
-    setActiveColorIndex(colorIndex);
+  const handlePickColor = useCallback((hex: string) => {
+    setActiveColorHex(hex);
   }, []);
 
   // 진짜 PC 프로그램의 창처럼 제목표시줄(이름+닫기)과 그 아래 파일/편집 메뉴 바를
@@ -872,6 +1304,12 @@ export default function Editor({
         items: [
           { label: "새로 만들기", onClick: () => setShowNewCanvasDialog(true) },
           { label: "열기", onClick: () => setShowOpenDialog(true) },
+          {
+            label: "JSON 불러오기",
+            title:
+              "다른 기기에서 이 편집기로 만든 작품을 내보내기 > JSON으로 저장해뒀다면, 그 파일을 여기서 다시 불러올 수 있습니다.",
+            onClick: () => jsonFileInputRef.current?.click(),
+          },
           { label: "저장", onClick: handleSave, disabled: noActiveTab },
           {
             label: "다른 이름으로 저장",
@@ -892,6 +1330,8 @@ export default function Editor({
               },
               {
                 label: "JSON",
+                title:
+                  "다른 기기에서도 그림을 그대로 이어 그리고 싶을 때 씁니다 — 저장된 이 파일을 그 기기의 파일 > JSON 불러오기로 열면 됩니다.",
                 onClick: () =>
                   exportAsJSON({ ...doc, pixels: history.present }),
               },
@@ -918,12 +1358,12 @@ export default function Editor({
         items: [
           {
             label: "실행취소",
-            onClick: history.undo,
+            onClick: handleUndo,
             disabled: noActiveTab || !history.canUndo,
           },
           {
             label: "다시실행",
-            onClick: history.redo,
+            onClick: handleRedo,
             disabled: noActiveTab || !history.canRedo,
           },
           {
@@ -939,31 +1379,65 @@ export default function Editor({
           },
           {
             label: "붙여넣기",
-            onClick: () => {
-              const next = selection.paste(
-                history.present,
-                doc.width,
-                doc.height,
-                0,
-                0,
-              );
-              pushHistory(next);
-            },
-            disabled: noActiveTab,
+            onClick: handlePaste,
+            disabled: noActiveTab || !selection.clipboard,
           },
         ],
       });
     },
-    [doc, history, selection, activeTabIndex, isWallpaper, pushHistory],
+    [
+      doc,
+      history,
+      selection,
+      activeTabIndex,
+      isWallpaper,
+      handlePaste,
+      handleUndo,
+      handleRedo,
+    ],
   );
+
+  const helpMod = helpPlatform === "mac" ? "⌘" : "Ctrl+";
 
   return (
     <div
       ref={rootRef}
-      className={`relative flex h-full w-full select-none flex-col bg-white text-gray-900 transition-all duration-200 ease-out ${
+      className={`pam-editor relative flex h-full w-full select-none flex-col overflow-hidden bg-white text-gray-900 transition-all duration-200 ease-out ${
         mounted && !closing ? "scale-100 opacity-100" : "scale-95 opacity-0"
       }`}
+      // 입력칸(파일명, 헥스 코드, 픽셀 크기 등)에 값을 넣고 나서 클릭만으로
+      // 캔버스로 넘어가면(캔버스는 포커스를 받는 요소가 아니다) 포커스가
+      // 그 입력칸에 그대로 남아 있었다 — useKeyboardShortcuts가 "지금
+      // 포커스된 요소가 입력칸이면 무시"하는 가드를 갖고 있어서, 실제로는
+      // 캔버스를 만지고 있는데도 도구 단축키가 조용히 먹히지 않는 문제로
+      // 이어졌다. 입력칸이 아닌 곳을 누르는 순간 남아 있는 포커스를 직접
+      // 풀어준다(capture 단계라 다른 요소의 onClick보다 먼저 실행된다).
+      onPointerDownCapture={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+          return;
+        }
+        const active = document.activeElement;
+        if (
+          active instanceof HTMLElement &&
+          (active.tagName === "INPUT" || active.tagName === "TEXTAREA")
+        ) {
+          active.blur();
+        }
+      }}
     >
+      {/* 실제 OS 커서 대신 이 편집기 전용 커스텀 커서를 쓴다 — 기본은 일반
+          화살표, 버튼은 포인팅, 텍스트 입력칸은 텍스트 커서. 캔버스 자체의
+          도구별 커서는 PixelCanvas가 인라인 style로 직접 지정한다(이 규칙보다
+          더 구체적인 선택자라 우선한다). */}
+      <style>{`
+        .pam-editor { cursor: ${CURSOR_NORMAL}; }
+        .pam-editor button:not(:disabled) { cursor: ${CURSOR_POINTING}; }
+        .pam-editor input[type="text"],
+        .pam-editor input:not([type]),
+        .pam-editor input[type="number"],
+        .pam-editor textarea { cursor: ${CURSOR_TEXT}; }
+      `}</style>
       {/* 제목표시줄 — 메뉴 바·캔버스 영역의 무채색 배경과 구분되도록 바이올렛 톤을 준다. */}
       <div className="flex items-center gap-2 bg-violet-100 px-3 py-2">
         {activeTabIndex >= 0 ? (
@@ -1010,6 +1484,21 @@ export default function Editor({
         </button>
       </div>
 
+      {/* "JSON 불러오기" 메뉴 항목이 대신 클릭시키는, 화면에 보이지 않는
+          파일 선택창 — 같은 파일을 다시 골라도 onChange가 또 fire되도록
+          매번 값을 비운다. */}
+      <input
+        ref={jsonFileInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleImportJSONFile(file);
+          e.target.value = "";
+        }}
+      />
+
       {/* 메뉴 바 */}
       <div className="flex items-center gap-0.5 bg-white px-2 py-1 shadow-sm">
         <button
@@ -1023,6 +1512,23 @@ export default function Editor({
           className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
         >
           편집
+        </button>
+        <button
+          onClick={() => setShowHelpDialog(true)}
+          className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
+        >
+          도움말
+        </button>
+        <button
+          onClick={openReferenceWindow}
+          title="참고 이미지 창을 새로 엽니다. 여러 개를 동시에 띄울 수 있습니다(저장되지 않음)"
+          className={`px-2 py-1 text-xs ${
+            referenceWindows.length > 0
+              ? "bg-violet-50 text-violet-700"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          레퍼런스
         </button>
       </div>
 
@@ -1096,95 +1602,137 @@ export default function Editor({
             onToggleFilledShapes={() => setFilledShapes((f) => !f)}
             shapeGradientFill={shapeGradientFill}
             onToggleShapeGradientFill={() => setShapeGradientFill((g) => !g)}
+            gradientSteps={gradientSteps}
+            onGradientStepsChange={setGradientSteps}
+            gradientAngleDeg={gradientAngleDeg}
+            onGradientAngleChange={setGradientAngleDeg}
+            wandGlobal={wandGlobal}
+            onToggleWandGlobal={() => setWandGlobal((g) => !g)}
+            hasSelection={!!selection.mask && selection.mask.size > 0}
+            onFillSelection={handleFillSelection}
+            canvasBgColor={canvasBgColor}
+            selectMode={selectMode}
+            onSelectModeChange={setSelectMode}
+            onClearSelection={() => selection.setMask(null)}
+            canUndo={history.canUndo}
+            canRedo={history.canRedo}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            showGrid={showGrid}
+            onToggleGrid={() => setShowGrid((g) => !g)}
+            onClearCanvas={handleClearCanvas}
+            onFlipHorizontal={handleFlipHorizontal}
+            onFlipVertical={handleFlipVertical}
+            onRotate90={handleRotate90}
+            secondaryPortalTarget={secondaryToolbarPortal}
+            narrow={narrow}
           />
-          <div className="flex flex-1 gap-4 overflow-auto p-4">
-            <div className="flex w-56 shrink-0 flex-col gap-3">
-              <Toolbar
-                tool={tool}
-                onToolChange={setTool}
-                mirror={mirror}
-                onMirrorChange={setMirror}
-                canUndo={history.canUndo}
-                canRedo={history.canRedo}
-                onUndo={history.undo}
-                onRedo={history.redo}
-                showGrid={showGrid}
-                onToggleGrid={() => setShowGrid((g) => !g)}
-                onClearCanvas={handleClearCanvas}
-              />
+          {/* 이 줄(사이드바 두 개 + 캔버스)에는 자체 스크롤을 두지 않는다 —
+              overflow-auto가 있으면 사이드바 내용이 조금만 길어져도 캔버스까지
+              포함한 줄 전체가 세로로 밀려 스크롤됐다(캔버스는 확대·화면맞춤을
+              위한 자기 자신의 스크롤 뷰포트를 이미 갖고 있어 이중으로 스크롤이
+              생기는 셈이었다). 대신 각 사이드바가 필요할 때만 자기 안에서만
+              스크롤되게 한다. */}
+          <div
+            className={`flex flex-1 overflow-hidden ${narrow ? "gap-2 p-2" : "gap-4 p-4"}`}
+            style={{ backgroundColor: canvasBgColor }}
+          >
+            <div
+              className={`flex w-56 shrink-0 flex-col overflow-y-auto ${narrow ? "gap-2" : "gap-3"}`}
+            >
               <ColorWheel
-                palette={palette}
-                activeColorIndex={activeColorIndex}
-                onSelect={setActiveColorIndex}
-                onCommitColor={handleCommitColor}
-                onEditSwatchColor={handleEditSwatchColor}
-                onAddColor={handleAddColor}
-                onRemoveColor={handleRemoveColor}
-                usedColorIndices={usedColorIndices}
+                favorites={doc.palette}
+                activeColorHex={activeColorHex}
+                secondaryColorHex={secondaryColorHex}
+                onChangeActiveColor={setActiveColorHex}
+                onChangeSecondaryColor={setSecondaryColorHex}
+                onAddFavorite={handleAddFavorite}
+                onRemoveFavorite={handleRemoveFavorite}
+                onEditFavorite={handleEditFavorite}
+                onReplaceFavorites={handleReplaceFavorites}
                 tool={tool}
                 onToolChange={setTool}
-                secondaryColorIndex={secondaryColorIndex}
-                onSelectSecondary={setSecondaryColorIndex}
-                gradientSteps={gradientSteps}
-                onGradientStepsChange={setGradientSteps}
-                gradientAngleDeg={gradientAngleDeg}
-                onGradientAngleChange={setGradientAngleDeg}
+                canvasBgColor={canvasBgColor}
+                onChangeCanvasBgColor={setCanvasBgColor}
               />
             </div>
-            <div
-              ref={canvasViewportRef}
-              className="relative flex flex-1 items-center justify-center overflow-auto"
-            >
-              <PixelCanvas
-                width={doc.width}
-                height={doc.height}
-                palette={palette}
-                pixels={history.present}
-                tool={tool}
-                mirror={mirror}
-                activeColorIndex={activeColorIndex}
-                selectionMask={selection.mask}
-                showGrid={showGrid}
-                brushSize={brushSize}
-                filledShapes={filledShapes}
-                onSelectionChange={selection.setMask}
-                onStrokeEnd={handleStrokeEnd}
-                onEnsureColor={handleEnsureFirstColor}
-                onPickColor={handlePickColor}
-                onTextToolClick={handleTextToolClick}
-                pendingText={
-                  pendingText
-                    ? {
-                        ...pendingText,
-                        colorHex: doc.palette[activeColorIndex] ?? "#000000",
-                      }
-                    : null
-                }
-                onPendingTextChange={handlePendingTextChange}
-                onPendingTextMove={handlePendingTextMove}
-                onPendingTextToggleAA={handlePendingTextToggleAA}
-                onPendingTextToggleGradient={handlePendingTextToggleGradient}
-                onPendingTextCommit={handlePendingTextCommit}
-                onPendingTextCancel={handlePendingTextCancel}
-                onGradientToolEnd={handleGradientToolEnd}
-                shapeGradientFill={shapeGradientFill}
-                gradientStartHex={doc.palette[activeColorIndex] ?? "#000000"}
-                gradientEndHex={
-                  secondaryColorIndex >= 0
-                    ? (doc.palette[secondaryColorIndex] ?? "#00000000")
-                    : "#00000000"
-                }
-                gradientSteps={gradientSteps}
-                gradientAngleDeg={gradientAngleDeg}
-                onShapeGradientEnd={handleShapeGradientEnd}
-                zoom={canvasZoom}
-                onZoomChange={setCanvasZoom}
-                viewportRef={canvasViewportRef}
-              />
+            <div className="relative flex flex-1 overflow-hidden">
+              <div
+                ref={canvasViewportRef}
+                // items-center/justify-center로 캔버스가 뷰포트보다 작을 때는
+                // 잘 가운데 놓이지만, 확대해 캔버스가 뷰포트보다 커지면 일반
+                // center 정렬은 넘치는 영역을 "시작 쪽"(왼쪽·위쪽)에서 스크롤로도
+                // 닿을 수 없게 잘라버린다(스크롤 위치는 0인데 실제로는 이미
+                // 가운데 어딘가를 보여주는 flex의 알려진 동작) — 그래서 확대
+                // 직후 캔버스 왼쪽·위쪽이 보이지 않았다. safe center는 내용이
+                // 넘칠 때만 자동으로 시작 정렬로 바뀌어 스크롤로 전체 영역에
+                // 닿을 수 있게 한다(들어갈 때는 그대로 가운데 정렬 유지).
+                className="flex flex-1 overflow-auto [align-items:safe_center] [justify-content:safe_center]"
+              >
+                <PixelCanvas
+                  width={doc.width}
+                  height={doc.height}
+                  pixels={history.present}
+                  tool={tool}
+                  onToolChange={setTool}
+                  activeColorHex={activeColorHex}
+                  selectionMask={selection.mask}
+                  selectMode={selectMode}
+                  showGrid={showGrid}
+                  brushSize={brushSize}
+                  filledShapes={filledShapes}
+                  onSelectionChange={selection.setMask}
+                  onStrokeEnd={handleStrokeEnd}
+                  onPickColor={handlePickColor}
+                  onTextToolClick={handleTextToolClick}
+                  pendingText={
+                    pendingText
+                      ? { ...pendingText, colorHex: activeColorHex }
+                      : null
+                  }
+                  onPendingTextChange={handlePendingTextChange}
+                  onPendingTextMove={handlePendingTextMove}
+                  onPendingTextToggleAA={handlePendingTextToggleAA}
+                  onPendingTextToggleGradient={handlePendingTextToggleGradient}
+                  onPendingTextSetAlign={handlePendingTextSetAlign}
+                  onPendingTextRotate={handlePendingTextRotate}
+                  onPendingTextCommit={handlePendingTextCommit}
+                  onPendingTextCancel={handlePendingTextCancel}
+                  onGradientToolEnd={handleGradientToolEnd}
+                  shapeGradientFill={shapeGradientFill}
+                  gradientStartHex={activeColorHex}
+                  gradientEndHex={secondaryColorHex ?? "#00000000"}
+                  gradientSteps={gradientSteps}
+                  gradientAngleDeg={gradientAngleDeg}
+                  onGradientStepsChange={setGradientSteps}
+                  onGradientAngleChange={setGradientAngleDeg}
+                  zoom={canvasZoom}
+                  onZoomChange={setCanvasZoom}
+                  viewportRef={canvasViewportRef}
+                  wandGlobal={wandGlobal}
+                  pendingImage={pendingImage}
+                  onPendingImageMove={handlePendingImageMove}
+                  onPendingImageResize={handlePendingImageResize}
+                  onPendingImageRotate={handlePendingImageRotate}
+                  onPendingImageCommit={handlePendingImageCommit}
+                  onPendingImageCancel={handlePendingImageCancel}
+                  pendingShape={pendingShape}
+                  onShapeDragEnd={handleShapeDragEnd}
+                  onPendingShapeUpdate={handlePendingShapeUpdate}
+                  onPendingShapeCommit={handlePendingShapeCommit}
+                  onPendingShapeCancel={handlePendingShapeCancel}
+                  bottomToolbarPortalTarget={secondaryToolbarPortal}
+                />
+              </div>
+              {/* 캔버스를 스크롤하는 safe-center flex 컨테이너 밖(이 바깥 relative
+                  래퍼)에 둔다 — 그 안에 있으면 확대되어 스크롤이 생길 때
+                  align-items/justify-content:safe 조합에 따라 컨트롤 위치
+                  계산이 흔들릴 수 있다. 여기서는 뷰포트 자체에 고정돼 확대·
+                  스크롤과 무관하게 항상 같은 자리에 떠 있다. */}
               <div className="absolute bottom-2 left-2 flex items-center gap-0.5">
                 <button
-                  onClick={() => setCanvasZoom((z) => Math.max(1, z - 1))}
-                  disabled={canvasZoom <= 1}
+                  onClick={() => setCanvasZoom((z) => nextZoomStep(z, -1))}
+                  disabled={canvasZoom <= ZOOM_STEPS[0]}
                   title="축소"
                   className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
                 >
@@ -1194,54 +1742,130 @@ export default function Editor({
                   {canvasZoom}x
                 </div>
                 <button
-                  onClick={() => setCanvasZoom((z) => Math.min(8, z + 1))}
-                  disabled={canvasZoom >= 8}
+                  onClick={() => setCanvasZoom((z) => nextZoomStep(z, 1))}
+                  disabled={canvasZoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]}
                   title="확대"
                   className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
                 >
                   <Plus className="h-3 w-3" />
                 </button>
               </div>
+              {/* DrawToolbar가 그리기/선택 도구의 하위 옵션을 포털로 그려 넣는
+                  자리 — 캔버스 하단 중앙에 둬서 좌우 사이드바를 가리지 않는다.
+                  전체 너비를 차지하는 빈 상자라 내용이 없는 양옆(배율 컨트롤
+                  쪽 포함)까지 클릭을 가로챘다 — pointer-events-none으로 이
+                  상자 자체는 클릭을 그대로 통과시키고, 실제로 그려 넣는
+                  내용(DrawToolbar·PixelCanvas 쪽)에서만 pointer-events-auto로
+                  되돌린다. */}
+              <div
+                ref={setSecondaryToolbarPortal}
+                className="pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center px-3"
+              />
             </div>
-            <div className="flex w-60 shrink-0 flex-col gap-3">
-              <Accordion title="이미지 불러오기">
+            {(() => {
+              // key={doc.id} — 탭마다 독립된 상태를 갖게 강제로 리마운트한다.
+              // 키가 없으면 이 패널 하나가 모든 탭이 활성화될 때마다 재사용돼,
+              // 한 탭에서 조정한 미리보기·픽셀 해상도·색상 수 등의 설정이
+              // 다른 탭으로 전환해도 그대로 남아 있었다.
+              const importPanel = (
                 <ImportPanel
-                  autoOpen={wantsAutoImport}
+                  key={doc.id}
+                  existingCanvasSize={{ width: doc.width, height: doc.height }}
+                  containerRef={rootRef}
                   onConfirm={(imported) => {
-                    // wantsAutoImport가 true인 경우는 "새로 만들기 → 이미지로
-                    // 불러오기"로 방금 만든, 아직 아무것도 그리지 않은 빈 캔버스다 —
-                    // 그 자리에 그대로 불러온 이미지 크기로 채운다.
-                    if (wantsAutoImport) {
-                      setDoc((d) => ({
-                        ...d,
-                        width: imported.width,
-                        height: imported.height,
-                        palette: imported.palette,
-                      }));
-                      history.reset(imported.pixels);
-                      setHasMetaEdits(true);
-                      setWantsAutoImport(false);
-                      return;
-                    }
-                    // 그 외에는 지금 열려 있던(이미 그려뒀을 수 있는) 캔버스를 건드리지
-                    // 않고, 불러온 이미지를 새 탭으로 연다 — 이미지 불러오기가 편집
-                    // 중인 캔버스의 크기를 바꾸지 않아야 한다.
-                    openNewTab({
-                      id: uid(),
-                      name: "제목 없음",
+                    // 지금 열려 있던(이미 그려뒀을 수 있는) 캔버스를 바로 덮어쓰지
+                    // 않는다 — 텍스트 도구처럼 위치·크기를 조절할 수 있는 상태로
+                    // 띄워두고, 확정해야만 실제 픽셀에 합성된다. 화면 가운데에서
+                    // 시작한다(캔버스보다 크면 일부만 보여도 그대로 둔다).
+                    setPendingImage({
+                      x: Math.floor((doc.width - imported.width) / 2),
+                      y: Math.floor((doc.height - imported.height) / 2),
                       width: imported.width,
                       height: imported.height,
-                      palette: imported.palette,
+                      srcWidth: imported.width,
+                      srcHeight: imported.height,
                       pixels: imported.pixels,
-                      createdAt: Date.now(),
+                      rotation: 0,
                     });
                   }}
                 />
-              </Accordion>
-              <Accordion title="내보내기">
+              );
+              const exportPanel = (
                 <ExportPanel doc={{ ...doc, pixels: history.present }} />
-              </Accordion>
-            </div>
+              );
+
+              if (!narrow) {
+                return (
+                  <div className="flex w-60 shrink-0 flex-col gap-3">
+                    <Accordion title="이미지 불러오기" defaultOpen={false}>
+                      {importPanel}
+                    </Accordion>
+                    <Accordion title="내보내기" defaultOpen={false}>
+                      {exportPanel}
+                    </Accordion>
+                  </div>
+                );
+              }
+
+              // 편집기가 좁아지면 w-60짜리 사이드바가 캔버스 자리를 너무 많이
+              // 차지해 보여, 아이콘 두 개짜리 얇은 열로 줄이고 실제 내용은
+              // 누른 아이콘 쪽에서만 캔버스 위로 뜨는 플로팅 팝업으로 보여준다.
+              const panelTitle =
+                openFloatingPanel === "import" ? "이미지 불러오기" : "내보내기";
+              return (
+                <div className="relative flex w-10 shrink-0 flex-col items-center gap-2">
+                  <button
+                    onClick={() =>
+                      setOpenFloatingPanel((p) =>
+                        p === "import" ? null : "import",
+                      )
+                    }
+                    title="이미지 불러오기"
+                    className={`flex h-8 w-8 items-center justify-center transition-colors ${
+                      openFloatingPanel === "import"
+                        ? "bg-violet-500 text-white"
+                        : "bg-white text-gray-500 shadow-md hover:bg-gray-50"
+                    }`}
+                  >
+                    <ImagePlus className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() =>
+                      setOpenFloatingPanel((p) =>
+                        p === "export" ? null : "export",
+                      )
+                    }
+                    title="내보내기"
+                    className={`flex h-8 w-8 items-center justify-center transition-colors ${
+                      openFloatingPanel === "export"
+                        ? "bg-violet-500 text-white"
+                        : "bg-white text-gray-500 shadow-md hover:bg-gray-50"
+                    }`}
+                  >
+                    <Download className="h-4 w-4" />
+                  </button>
+                  {openFloatingPanel && (
+                    <div className="absolute top-0 right-full z-40 mr-2 flex max-h-full w-72 flex-col bg-white shadow-xl">
+                      <div className="flex shrink-0 items-center justify-between px-3 py-2 text-xs font-semibold text-gray-500">
+                        {panelTitle}
+                        <button
+                          onClick={() => setOpenFloatingPanel(null)}
+                          title="닫기"
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-3 pt-0">
+                        {openFloatingPanel === "import"
+                          ? importPanel
+                          : exportPanel}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </>
       ) : (
@@ -1269,21 +1893,58 @@ export default function Editor({
       {showNewCanvasDialog && (
         <NewCanvasDialog
           onSelect={handleCreate}
-          onImportImage={() => {
-            const fresh = blankDoc(
-              CANVAS_PRESETS[0].width,
-              CANVAS_PRESETS[0].height,
-            );
-            openNewTab(fresh, { autoImport: true });
+          onImportImage={(imported) => {
+            const needsCrop =
+              imported.canvasWidth !== imported.width ||
+              imported.canvasHeight !== imported.height;
+            if (!needsCrop) {
+              openNewTab({
+                id: uid(),
+                name: imported.name,
+                width: imported.width,
+                height: imported.height,
+                palette: imported.palette,
+                pixels: imported.pixels,
+                createdAt: Date.now(),
+              });
+            } else {
+              // 원본 해상도가 고른 캔버스보다 커서 리샘플 없이 넘어온 경우 —
+              // 캔버스는 목표 크기로 비워 열고, 원본 해상도 그대로 pendingImage로
+              // 띄워 위치를 잡게 한다. 확정(handlePendingImageCommit)하는 순간
+              // 캔버스 밖으로 나간 부분만 잘려나가고 안쪽은 리샘플 없이 그대로
+              // 반영된다 — 기존 캔버스에 다시 불러오기와 같은 방식이다.
+              openNewTab({
+                id: uid(),
+                name: imported.name,
+                width: imported.canvasWidth,
+                height: imported.canvasHeight,
+                palette: imported.palette,
+                pixels: new Array<PixelValue>(
+                  imported.canvasWidth * imported.canvasHeight,
+                ).fill(null),
+                createdAt: Date.now(),
+              });
+              setPendingImage({
+                x: Math.floor((imported.canvasWidth - imported.width) / 2),
+                y: Math.floor((imported.canvasHeight - imported.height) / 2),
+                width: imported.width,
+                height: imported.height,
+                srcWidth: imported.width,
+                srcHeight: imported.height,
+                pixels: imported.pixels,
+                rotation: 0,
+              });
+            }
             setShowNewCanvasDialog(false);
           }}
           onCancel={() => setShowNewCanvasDialog(false)}
+          containerRef={rootRef}
         />
       )}
 
       {showOpenDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="flex max-h-96 w-72 flex-col bg-white p-4 shadow-xl">
+          <div className="flex max-h-96 w-80 flex-col bg-white p-4 shadow-xl">
             <h2 className="mb-3 text-sm font-semibold text-gray-900">열기</h2>
             {listPixelArt().length === 0 ? (
               <p className="text-xs text-gray-400">저장된 작품이 없습니다.</p>
@@ -1293,11 +1954,18 @@ export default function Editor({
                   <button
                     key={art.id}
                     onClick={() => handleOpenExisting(art)}
-                    className="bg-gray-50 px-3 py-2 text-left text-sm text-gray-700 hover:bg-violet-50"
+                    className="flex items-center gap-2 bg-gray-50 px-2 py-2 text-left text-sm text-gray-700 hover:bg-violet-50"
                   >
-                    {art.name}{" "}
-                    <span className="text-gray-400">
-                      ({art.width}×{art.height})
+                    <FileThumbnail
+                      width={art.width}
+                      height={art.height}
+                      pixels={art.pixels}
+                    />
+                    <span className="min-w-0 flex-1 truncate">
+                      {art.name}{" "}
+                      <span className="text-gray-400">
+                        ({art.width}×{art.height})
+                      </span>
                     </span>
                   </button>
                 ))}
@@ -1309,6 +1977,125 @@ export default function Editor({
             >
               취소
             </button>
+          </div>
+        </div>
+      )}
+
+      {showHelpDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          {/* 헤더와 하단 액션(닫기)은 고정하고, 그 사이 본문(단축키 목록)만
+              스크롤한다 — 모달 전체가 overflow-y-auto면 내용이 길어질 때
+              헤더는 물론 닫기 버튼까지 스크롤해야 보이게 된다(NewCanvasDialog와
+              같은 구조). */}
+          <div className="flex max-h-[80%] w-80 flex-col bg-white shadow-xl">
+            <div className="flex items-center justify-between p-4 pb-3">
+              <h2 className="text-sm font-semibold text-gray-900">단축키</h2>
+              {/* 실행 중인 기기와 무관하게 Windows/Mac 표기를 직접 전환해 볼 수
+                  있다 — 지금 이 기기가 어느 쪽이든 다른 쪽 표기도 바로 확인할
+                  수 있게 한다. */}
+              <div className="flex text-[10px]">
+                <button
+                  onClick={() => setHelpPlatform("windows")}
+                  className={`px-2 py-1 ${
+                    helpPlatform === "windows"
+                      ? "bg-violet-500 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  Windows
+                </button>
+                <button
+                  onClick={() => setHelpPlatform("mac")}
+                  className={`px-2 py-1 ${
+                    helpPlatform === "mac"
+                      ? "bg-violet-500 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  Mac
+                </button>
+              </div>
+            </div>
+            <div className="overflow-y-auto px-4 pb-3">
+              <div className="flex flex-col gap-3 text-xs text-gray-600">
+                {[
+                  {
+                    label: "도구",
+                    note: "조합 없이 키 하나만 누르면 된다(다른 프로그램 실행 중이 아니라 이 편집창에 포커스가 있을 때)",
+                    rows: [
+                      ["B / E / G", "펜슬 / 지우개 / 채우기"],
+                      ["U / R / O", "직선 / 사각형 / 원"],
+                      ["T / D", "텍스트 / 그라데이션"],
+                      ["M / L / V / W", "선택 / 올가미 / 이동 / 자동 선택"],
+                      ["I", "스포이트"],
+                    ],
+                  },
+                  {
+                    label: "그리기",
+                    rows: [
+                      ["1 / 2 / 3 / 4", "브러시 크기"],
+                      ["[ / ]", "90도 반시계 / 시계 회전"],
+                      ["Shift+H / Shift+V", "좌우 / 상하 반전"],
+                    ],
+                  },
+                  {
+                    label: "보기",
+                    rows: [
+                      ["Shift+G", "격자 표시 전환"],
+                      ["+ / -", "확대 / 축소"],
+                    ],
+                  },
+                  {
+                    label: "선택",
+                    rows: [
+                      ["Shift+드래그", "선택 영역에 추가"],
+                      ["Alt+드래그", "선택 영역에서 제외"],
+                      [`Alt+Backspace`, "선택 영역을 활성 색상으로 채우기"],
+                      [
+                        "Esc",
+                        "선택 해제(불러온 이미지가 떠 있으면 그것부터 취소)",
+                      ],
+                    ],
+                  },
+                  {
+                    label: "편집",
+                    rows: [
+                      [`${helpMod}Z`, "실행취소"],
+                      [`${helpMod}Y / ${helpMod}Shift+Z`, "다시실행"],
+                      [`${helpMod}C / ${helpMod}V`, "복사 / 붙여넣기"],
+                      [`${helpMod}S`, "저장"],
+                      [`${helpMod}Shift+S`, "다른 이름으로 저장"],
+                      ["Enter", "불러온 이미지 확정(떠 있을 때만)"],
+                    ],
+                  },
+                ].map((group) => (
+                  <div key={group.label} className="flex flex-col gap-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                      {group.label}
+                    </p>
+                    {group.note && (
+                      <p className="text-[10px] text-gray-400">{group.note}</p>
+                    )}
+                    {group.rows.map(([key, desc]) => (
+                      <div key={key} className="flex items-baseline gap-2">
+                        <span className="w-28 shrink-0 font-mono text-[11px] text-gray-900">
+                          {key}
+                        </span>
+                        <span className="min-w-0">{desc}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="p-4 pt-0">
+              <button
+                onClick={() => setShowHelpDialog(false)}
+                className="w-full py-2 text-xs text-gray-400 hover:text-gray-900"
+              >
+                닫기
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1370,6 +2157,33 @@ export default function Editor({
           onCancel={() => setPendingExit(false)}
         />
       )}
+
+      <AlertModal
+        open={alertMessage !== null}
+        message={alertMessage ?? ""}
+        onClose={() => setAlertMessage(null)}
+      />
+
+      <PromptModal
+        open={saveAsPromptOpen}
+        title="다른 이름으로 저장"
+        defaultValue={isWallpaper ? WALLPAPER_NAME : name}
+        onConfirm={handleConfirmSaveAs}
+        onCancel={() => setSaveAsPromptOpen(false)}
+      />
+
+      {referenceWindows.map((w) => (
+        <ReferenceWindow
+          key={w.id}
+          boundsRef={rootRef}
+          eyedropperActive={tool === "eyedropper"}
+          onPickColor={handlePickColor}
+          onClose={() => closeReferenceWindow(w.id)}
+          zIndex={w.zIndex}
+          spawnIndex={w.spawnIndex}
+          onFocus={() => bringReferenceWindowToFront(w.id)}
+        />
+      ))}
     </div>
   );
 }

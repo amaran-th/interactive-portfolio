@@ -1,5 +1,9 @@
 export function hexToRgb(hex: string): [number, number, number] {
-  const n = parseInt(hex.slice(1), 16);
+  // 항상 RRGGBB 6자리만 읽는다 — 알파가 붙은 8자리(#rrggbbaa) 입력이 들어오면
+  // 전체를 하나의 32비트 정수로 파싱하게 되는데, 그러면 JS의 비트 연산이 32비트
+  // "부호 있는" 정수로 다뤄 R 채널이 부호 비트에 걸려 버리고, 시프트 폭(16/8)도
+  // 24비트 레이아웃 기준이라 실제로는 G·B·알파 바이트를 R·G·B로 잘못 읽어온다.
+  const n = parseInt(hex.slice(1, 7), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 

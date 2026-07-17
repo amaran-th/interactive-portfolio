@@ -7,12 +7,22 @@ export type Tool =
   | "rect"
   | "circle"
   | "select"
+  | "lasso"
   | "move"
   | "wand"
   | "text"
   | "gradient";
 
-export type MirrorMode = "none" | "horizontal" | "vertical" | "both";
+// select·wand·lasso 도구가 새로 고른 영역을 기존 선택과 어떻게 합칠지 — Shift/Alt를
+// 누르고 있는 동안만 추가/제외되던 것을, 버튼으로도 같은 동작을 켜 둘 수
+// 있게 한다(누르고 있을 필요 없이 토글).
+export type SelectMode = "new" | "add" | "subtract";
+
+// 선택 영역을 만들거나(select·lasso·wand) 그 선택 내용을 다루는(move) 도구
+// 묶음 — 이 안에서 도구를 바꾸는 동안은 선택 영역이 계속 의미가 있으므로
+// 유지하고, 이 묶음을 벗어나는 순간(다른 그리기 도구로 바뀌거나 처음부터
+// 이 묶음 밖의 도구를 고르면) 더 이상 쓸모가 없어진 선택을 자동으로 지운다.
+export const SELECT_TOOL_CATEGORY: Tool[] = ["select", "lasso", "move", "wand"];
 
 export const CANVAS_PRESETS = [
   { label: "16 × 16", width: 16, height: 16 },
@@ -26,6 +36,31 @@ export const CANVAS_PRESETS = [
 // 새 캔버스·캔버스 크기 수정 모두에서 쓰는 한 변의 최댓값.
 export const MAX_CANVAS_SIZE = 512;
 
-export const MAX_PALETTE_COLORS = 64;
+export const MAX_PALETTE_COLORS = 12;
 
 export type Point = { x: number; y: number };
+
+// 배율 1은 더 이상 "셀당 고정 16px"가 아니라 "캔버스 전체가 화면에 꽉 차게
+// 보이는 크기"(화면 맞춤)를 뜻한다 — PixelCanvas가 뷰포트·캔버스 크기로 그
+// 기준 배율을 직접 계산한다. 이 배열은 그 기준값에 곱하는 상대 배수일 뿐이라,
+// 1 밑으로도(화면 맞춤보다 더 축소) 자유롭게 내려갈 수 있다.
+export const ZOOM_STEPS = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8];
+
+export function nextZoomStep(current: number, direction: 1 | -1): number {
+  if (direction > 0) {
+    const next = ZOOM_STEPS.find((z) => z > current + 1e-6);
+    return next ?? ZOOM_STEPS[ZOOM_STEPS.length - 1];
+  }
+  const prev = [...ZOOM_STEPS].reverse().find((z) => z < current - 1e-6);
+  return prev ?? ZOOM_STEPS[0];
+}
+
+// 편집기 작업 영역(캔버스가 놓인 주변 여백)의 기본 배경색 — 캔버스 자체가
+// 아니라 그 바깥 뷰포트를 칠한다. 항상 불투명 단색이다(투명·체크무늬 없음).
+export const DEFAULT_CANVAS_BG_COLOR = "#9ca3af";
+
+// 편집기(rootRef 기준 너비)가 이 폭보다 좁아지면 DrawToolbar의 도형·텍스트·
+// 그라데이션 도구, 이미지 불러오기/내보내기 사이드바가 모두 같은 기준으로
+// 접힌 UI(더보기/아이콘 트리거)로 바뀐다 — Editor.tsx가 한 번만 측정해
+// 여러 하위 컴포넌트에 내려주는 값이라 기준이 서로 어긋나지 않는다.
+export const NARROW_BREAKPOINT = 820;

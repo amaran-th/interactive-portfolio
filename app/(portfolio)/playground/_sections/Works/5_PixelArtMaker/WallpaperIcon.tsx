@@ -26,13 +26,19 @@ export default function WallpaperIcon({ art }: { art: PixelArt }) {
     const offsetY = (size - art.height * scale) / 2;
     for (let py = 0; py < art.height; py++) {
       for (let px = 0; px < art.width; px++) {
-        const colorIndex = art.pixels[py * art.width + px];
-        if (colorIndex < 0) continue;
-        ctx.fillStyle = art.palette[colorIndex] ?? "#ffffff";
+        const color = art.pixels[py * art.width + px];
+        if (color === null) continue;
+        ctx.fillStyle = color;
         ctx.fillRect(px * scale + offsetX, py * scale + offsetY, scale, scale);
       }
     }
   }, [art]);
 
-  return <canvas ref={canvasRef} className="shadow-sm" style={{ imageRendering: "pixelated" }} />;
+  return (
+    <canvas
+      ref={canvasRef}
+      className="shadow-sm"
+      style={{ imageRendering: "pixelated" }}
+    />
+  );
 }

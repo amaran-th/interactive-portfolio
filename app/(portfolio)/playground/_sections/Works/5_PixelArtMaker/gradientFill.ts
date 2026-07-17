@@ -1,44 +1,8 @@
 import { hexToRgba, rgbaToHex } from "./hsv";
-import { MAX_PALETTE_COLORS, Point } from "./types";
+import { PixelValue } from "./pixelGrid";
+import { Point } from "./types";
 
 export type Rgba = [number, number, number, number];
-
-function colorDistance(a: Rgba, b: Rgba): number {
-  return Math.sqrt(
-    (a[0] - b[0]) ** 2 +
-      (a[1] - b[1]) ** 2 +
-      (a[2] - b[2]) ** 2 +
-      ((a[3] - b[3]) * 255) ** 2,
-  );
-}
-
-// 색을 팔레트 인덱스로 바꾼다 — 이미 있으면 재사용하고, 없으면 새로 추가하되
-// MAX_PALETTE_COLORS를 넘기지 않도록 가장 가까운 기존 색으로 대체한다.
-// 그라데이션·텍스트 안티에일리어싱·도형 그라데이션 채우기가 모두 이 규칙을
-// 공유한다(팔레트가 무한정 늘어나지 않도록 하는 이 프로젝트의 기본 원칙).
-export function resolvePaletteIndex(
-  hex: string,
-  palette: string[],
-): { index: number; palette: string[] } {
-  const existing = palette.findIndex(
-    (p) => p.toLowerCase() === hex.toLowerCase(),
-  );
-  if (existing >= 0) return { index: existing, palette };
-  if (palette.length < MAX_PALETTE_COLORS) {
-    return { index: palette.length, palette: [...palette, hex] };
-  }
-  const target = hexToRgba(hex);
-  let bestIdx = 0;
-  let bestDist = Infinity;
-  palette.forEach((p, i) => {
-    const d = colorDistance(hexToRgba(p), target);
-    if (d < bestDist) {
-      bestDist = d;
-      bestIdx = i;
-    }
-  });
-  return { index: bestIdx, palette };
-}
 
 // 시작·끝 색을 steps단계로 나눠 밴딩된 색 목록을 만든다 — 픽셀아트는 색상 수가
 // 적어 부드러운 그라데이션보다 계단식이 매체 특성에 더 맞는다.
@@ -86,6 +50,12 @@ export function stepColorAt(stepColors: Rgba[], t: number): Rgba {
   return stepColors[idx];
 }
 
+// 완전히 투명한(alpha≈0) 계단은 null(투명 픽셀)로, 그 외에는 실제 hex 색으로 바꾼다.
+export function rgbaToPixelValue(c: Rgba): PixelValue {
+  if (c[3] <= 0.02) return null;
+  return rgbaToHex(c[0], c[1], c[2], c[3]);
+}
+
 // 점 집합의 바운딩 박스 중심을 지나는, angleDeg 방향의 그라데이션 축을 만든다 —
 // 도형·텍스트처럼 드래그로 축을 직접 지정하지 않는 그라데이션 채우기에 쓴다.
 export function bboxGradientAxis(
@@ -117,10 +87,9 @@ export function bboxGradientAxis(
 }
 
 // 드래그 시작·끝 색을 steps단계로 나눠 밴딩된 그라데이션을 캔버스 전체에 채운다.
-// 각 계단색은 resolvePaletteIndex로 팔레트에 반영한다.
+// 픽셀은 트루컬러라 팔레트를 신경 쓸 필요 없이 계산된 색을 그대로 적어 넣는다.
 export function applyGradient(
-  pixels: number[],
-  palette: string[],
+  pixels: PixelValue[],
   width: number,
   height: number,
   x0: number,
@@ -130,26 +99,14 @@ export function applyGradient(
   startHex: string,
   endHex: string,
   steps = 8,
-): { pixels: number[]; palette: string[] } {
+): PixelValue[] {
   const stepColors = buildGradientSteps(startHex, endHex, steps);
-
-  let nextPalette = palette.slice();
-  const stepIndices: number[] = stepColors.map((c) => {
-    if (c[3] <= 0.02) return -1; // 거의 완전히 투명하면 인덱스 없이 -1로 취급
-    const hex = rgbaToHex(c[0], c[1], c[2], c[3]);
-    const resolved = resolvePaletteIndex(hex, nextPalette);
-    nextPalette = resolved.palette;
-    return resolved.index;
-  });
-
   const nextPixels = pixels.slice();
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const t = projectT(x, y, x0, y0, x1, y1);
-      const stepIdx = Math.min(steps - 1, Math.floor(t * steps));
-      nextPixels[y * width + x] = stepIndices[stepIdx];
+      nextPixels[y * width + x] = rgbaToPixelValue(stepColorAt(stepColors, t));
     }
   }
-
-  return { pixels: nextPixels, palette: nextPalette };
+  return nextPixels;
 }

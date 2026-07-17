@@ -24,11 +24,13 @@ import {
   exportAsSVG,
 } from "./exportPixelArt";
 import {
+  cleanUpLayout,
   getIconPosition,
   getStoredPosition,
   removeIconPositions,
   resetDesktopLayout,
   setIconPosition,
+  setIconPositions,
 } from "./useDesktopLayout";
 import { getWallpaper, resetWallpaper, WALLPAPER_ID } from "./wallpaper";
 
@@ -49,6 +51,29 @@ const SPECIAL_ICON_IDS = [
   WALLPAPER_ID,
   LAUNCHER_ID,
 ] as const;
+
+// 아직 한 번도 옮긴 적 없는 특수 아이콘은 positions에 값이 없고 CSS 코너
+// 클래스(bottom-4 right-4 등)로만 배치된다 — "정리하기"가 이들도 똑같이
+// 격자에 맞춰 정리하려면 지금 화면에 보이는 실제 좌표가 필요하므로, 그
+// 코너 클래스와 정확히 같은 값을 여기서 계산해준다.
+function defaultSpecialCorner(
+  id: string,
+  containerWidth: number,
+  containerHeight: number,
+): { x: number; y: number } {
+  const right = containerWidth - ICON_FOOTPRINT - 16;
+  const bottom = containerHeight - ICON_FOOTPRINT - 16;
+  switch (id) {
+    case TRASH_ID:
+      return { x: right, y: bottom };
+    case FORMAT_ID:
+      return { x: 16, y: bottom };
+    case WALLPAPER_ID:
+      return { x: right, y: 16 };
+    default:
+      return { x: 16, y: 16 };
+  }
+}
 
 export default function Desktop({
   refreshSignal,
@@ -90,18 +115,6 @@ export default function Desktop({
   // 발생해도(예: 휴지통 위로 아이콘을 놓는 삭제 동작) 위치 이동으로만 처리해야 한다.
   const draggingSpecialRef = useRef<string | null>(null);
 
-  // 창 크기가 줄어들었을 때 아이콘/휴지통/포맷이 보이는 영역 밖으로 나가지 않도록
-  // 컨테이너의 현재 실제 크기 기준으로 좌표를 안쪽으로 당겨온다.
-  const clampToContainer = useCallback((pos: { x: number; y: number }) => {
-    const rect = containerRef.current?.getBoundingClientRect();
-    const maxX = Math.max(0, (rect?.width ?? 0) - ICON_FOOTPRINT);
-    const maxY = Math.max(0, (rect?.height ?? 0) - ICON_FOOTPRINT);
-    return {
-      x: Math.min(Math.max(pos.x, 0), maxX),
-      y: Math.min(Math.max(pos.y, 0), maxY),
-    };
-  }, []);
-
   // 데스크탑 자체의 가로세로 비율을 배경화면 이미지 비율에 맞춘다 — 뷰포트를
   // 꽉 채우도록 배경화면을 늘리거나 자르는 대신, 데스크탑을 배경화면 비율의
   // 상자로 만들어 가능한 공간 안에 최대한 크게(letterbox) 가운데 정렬한다.
@@ -132,20 +145,18 @@ export default function Desktop({
     setWallpaper(getWallpaper());
     const containerWidth = containerRef.current?.getBoundingClientRect().width;
     const pos: Record<string, { x: number; y: number }> = {};
-    list.forEach((art, i) => {
-      pos[art.id] = clampToContainer(
-        getIconPosition(art.id, i, containerWidth),
-      );
+    list.forEach((art) => {
+      pos[art.id] = getIconPosition(art.id, containerWidth);
     });
     // 특수 아이콘은 아직 옮긴 적이 없으면(저장된 위치 없음) positions에 아예 넣지
     // 않는다 — 렌더링에서 이 경우 CSS 코너 클래스(bottom-4 right-4 등)로 기본
     // 배치하고, 첫 드래그 시점에 실제 화면 위치를 시작점으로 삼는다.
     for (const id of SPECIAL_ICON_IDS) {
       const stored = getStoredPosition(id);
-      if (stored) pos[id] = clampToContainer(stored);
+      if (stored) pos[id] = stored;
     }
     setPositions(pos);
-  }, [clampToContainer]);
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -155,32 +166,12 @@ export default function Desktop({
     // 저장소를 다시 읽어온다(그러지 않으면 방금 저장한 작품이 반영되지 않는다).
   }, [refresh, refreshSignal]);
 
-  // 창 크기 변경 시 화면 밖으로 나간 아이콘/휴지통/포맷을 안쪽으로 보정해 보여준다.
-  // 저장된 원래 위치(localStorage)는 건드리지 않고 매번 그 값을 다시 읽어 현재
-  // 창 크기로 클램프만 하므로, 창을 다시 키우면 원래 위치로 돌아온다 — 이미
-  // 클램프된 state 값을 또 클램프하면 창을 키워도 좁아진 위치에 그대로 고정되는
-  // 문제가 있었다. 위치가 실제로 바뀌는 건 드래그로 옮길 때뿐이다.
-  useEffect(() => {
-    const handleResize = () => {
-      const containerWidth =
-        containerRef.current?.getBoundingClientRect().width;
-      setPositions(() => {
-        const next: Record<string, { x: number; y: number }> = {};
-        items.forEach((art, i) => {
-          next[art.id] = clampToContainer(
-            getIconPosition(art.id, i, containerWidth),
-          );
-        });
-        for (const id of SPECIAL_ICON_IDS) {
-          const stored = getStoredPosition(id);
-          if (stored) next[id] = clampToContainer(stored);
-        }
-        return next;
-      });
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [items, clampToContainer]);
+  // 저장된 위치는 그 어떤 값이든(컨테이너 밖으로 벗어나는 값도) 그대로 존중한다
+  // — 컨테이너 자체의 overflow-hidden이 넘어간 부분을 시각적으로 가려주므로,
+  // 창 크기가 줄어들어 아이콘이 안 보이는 영역으로 밀려도 강제로 안쪽으로
+  // 당겨오지 않는다(그렇게 당겨오면 편집기를 여닫기만 해도, 혹은 창 크기가
+  // 아주 살짝만 바뀌어도 아이콘이 슬쩍 옮겨진 것처럼 보였다). 다시 보이게
+  // 하려면 "정리하기"로 되찾으면 된다.
 
   const startBoxSelect = useCallback(
     (e: React.PointerEvent) => {
@@ -273,10 +264,18 @@ export default function Desktop({
 
       const startX = e.clientX;
       const startY = e.clientY;
+      // 더블클릭으로 열 때도 매번 pointerdown이 이 핸들러를 거치는데, 두 번의
+      // 클릭 사이 손이 한두 픽셀만 흔들려도 즉시 드래그로 취급해 아이콘이
+      // 저장되지 않은 미세한 위치로 슬쩍 옮겨져 버렸다 — 일정 거리 이상
+      // 움직였을 때만 실제로 드래그로 보고, 그 전까지는 위치를 건드리지 않는다.
+      const MOVE_THRESHOLD = 4;
+      let moved = false;
 
       const move = (ev: PointerEvent) => {
         const dx = ev.clientX - startX;
         const dy = ev.clientY - startY;
+        if (!moved && Math.hypot(dx, dy) < MOVE_THRESHOLD) return;
+        moved = true;
         setPositions((prev) => {
           const next = { ...prev };
           for (const sp of startPositions)
@@ -288,13 +287,15 @@ export default function Desktop({
         window.removeEventListener("pointermove", move);
         window.removeEventListener("pointerup", up);
         window.removeEventListener("pointercancel", up);
-        setPositions((prev) => {
-          for (const sp of startPositions) {
-            const p = prev[sp.id];
-            if (p) setIconPosition(sp.id, p.x, p.y);
-          }
-          return prev;
-        });
+        if (moved) {
+          setPositions((prev) => {
+            for (const sp of startPositions) {
+              const p = prev[sp.id];
+              if (p) setIconPosition(sp.id, p.x, p.y);
+            }
+            return prev;
+          });
+        }
         if (isSpecial) draggingSpecialRef.current = null;
       };
       window.addEventListener("pointermove", move);
@@ -321,6 +322,29 @@ export default function Desktop({
     setPendingDelete(null);
     refresh();
   }, [pendingDelete, refresh]);
+
+  // macOS의 "정리하기"처럼, 일반 파일과 특수 아이콘(휴지통/포맷/배경화면/편집기)
+  // 모두를 예외 없이 지금 위치에서 가장 가까운 격자 칸으로 스냅한다. 여러
+  // 아이콘이 같은 칸에 대응되면 먼저 처리된 쪽이 그 칸을 차지하고 나머지는
+  // 그 뒤로 순차적으로 다음 빈 칸에 배치된다(cleanUpLayout 참고).
+  const handleCleanUp = useCallback(() => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const containerWidth = rect?.width ?? 0;
+    const containerHeight = rect?.height ?? 0;
+    const entries = [
+      ...items.map((art) => ({
+        id: art.id,
+        ...(positions[art.id] ?? { x: 0, y: 0 }),
+      })),
+      ...SPECIAL_ICON_IDS.map((id) => ({
+        id,
+        ...(positions[id] ??
+          defaultSpecialCorner(id, containerWidth, containerHeight)),
+      })),
+    ];
+    setIconPositions(cleanUpLayout(entries, containerWidth, containerHeight));
+    refresh();
+  }, [items, positions, refresh]);
 
   const confirmFormat = useCallback(() => {
     resetAllPixelArt();
@@ -357,7 +381,10 @@ export default function Desktop({
           setMenu({
             x: e.clientX,
             y: e.clientY,
-            items: [{ label: "새로 만들기", onClick: onCreate }],
+            items: [
+              { label: "새로 만들기", onClick: onCreate },
+              { label: "정리하기", onClick: handleCleanUp },
+            ],
           });
         }}
       >

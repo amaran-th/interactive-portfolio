@@ -34,7 +34,10 @@ export default function PixelArtMaker() {
   // 편집창도 데스크탑(배경화면)과 같은 letterbox 상자 크기를 쓰도록 Desktop이
   // 계산한 fittedSize를 그대로 물려받는다 — 그래야 편집창이 뷰포트 전체가 아니라
   // 배경화면 컨테이너와 정확히 같은 크기·비율로 뜬다.
-  const [fittedSize, setFittedSize] = useState<{ width: number; height: number } | null>(null);
+  const [fittedSize, setFittedSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
   // desktop이 이제 편집창 아래 계속 마운트된 채로 남아있어(더 이상 화면 전환마다
   // 다시 마운트되지 않음) 편집창을 닫을 때 이 값을 올려 desktop이 저장소를 다시
   // 읽도록 한다 — 안 그러면 저장한 새 작품이 데스크탑에 반영되지 않는다.
@@ -48,22 +51,26 @@ export default function PixelArtMaker() {
     };
   }, []);
 
-  const openEditor = useCallback((docId: string | null, startMode: "newCanvas" | "empty" = "newCanvas") => {
-    if (closeTimeoutRef.current) {
-      clearTimeout(closeTimeoutRef.current);
-      closeTimeoutRef.current = null;
-    }
-    setIsDirty(false);
-    setClosing(false);
-    setScreen({ view: "editor", docId, startMode });
-    setEditorQueryParam(true);
-  }, []);
+  const openEditor = useCallback(
+    (docId: string | null, startMode: "newCanvas" | "empty" = "newCanvas") => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+        closeTimeoutRef.current = null;
+      }
+      setIsDirty(false);
+      setClosing(false);
+      setScreen({ view: "editor", docId, startMode });
+      setEditorQueryParam(true);
+    },
+    [],
+  );
 
   // 처음 들어왔을 때 쿼리스트링에 편집기가 켜져있어야 한다고 표시돼 있으면
   // (예: ?editor=on) 데스크탑을 거치지 않고 곧바로 빈 편집창을 연다.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get(EDITOR_QUERY_PARAM) === EDITOR_QUERY_VALUE) openEditor(null, "empty");
+    if (params.get(EDITOR_QUERY_PARAM) === EDITOR_QUERY_VALUE)
+      openEditor(null, "empty");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -84,7 +91,9 @@ export default function PixelArtMaker() {
   }, []);
 
   return (
-    <div className={`${monaFont.className} relative h-full w-full overflow-hidden`}>
+    <div
+      className={`${monaFont.className} relative h-full w-full overflow-hidden`}
+    >
       <Desktop
         refreshSignal={refreshSignal}
         onOpen={(id) => openEditor(id)}
@@ -96,7 +105,11 @@ export default function PixelArtMaker() {
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
           <div
             className="pointer-events-auto h-full w-full"
-            style={fittedSize ? { width: fittedSize.width, height: fittedSize.height } : undefined}
+            style={
+              fittedSize
+                ? { width: fittedSize.width, height: fittedSize.height }
+                : undefined
+            }
           >
             <Editor
               docId={screen.docId}

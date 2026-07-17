@@ -9,6 +9,9 @@ export type ContextMenuItem = {
   disabled?: boolean;
   danger?: boolean;
   submenu?: ContextMenuItem[];
+  // 라벨만으로는 뜻이 분명하지 않은 항목(예: "JSON 불러오기"가 정확히 무엇을
+  // 하는지)을 위한 툴팁 — 마우스를 올리면 브라우저 기본 title 툴팁으로 보여준다.
+  title?: string;
 };
 
 function itemClassName(item: ContextMenuItem) {
@@ -44,16 +47,25 @@ export default function ContextMenu({
   }, [onClose]);
 
   return (
-    <div ref={ref} style={{ left: x, top: y }} className="fixed z-50 w-40 bg-white py-1 shadow-xl">
+    <div
+      ref={ref}
+      style={{ left: x, top: y }}
+      className="fixed z-50 w-40 bg-white py-1 shadow-xl"
+    >
       {items.map((item) => (
         <div
           key={item.label}
           className="relative"
-          onMouseEnter={() => item.submenu && !item.disabled && setOpenSubmenu(item.label)}
-          onMouseLeave={() => setOpenSubmenu((cur) => (cur === item.label ? null : cur))}
+          onMouseEnter={() =>
+            item.submenu && !item.disabled && setOpenSubmenu(item.label)
+          }
+          onMouseLeave={() =>
+            setOpenSubmenu((cur) => (cur === item.label ? null : cur))
+          }
         >
           <button
             disabled={item.disabled}
+            title={item.title}
             onClick={() => {
               if (item.disabled || item.submenu) return;
               item.onClick?.();
@@ -62,7 +74,9 @@ export default function ContextMenu({
             className={itemClassName(item)}
           >
             {item.label}
-            {item.submenu && <ChevronRight className="h-3 w-3 shrink-0 text-gray-300" />}
+            {item.submenu && (
+              <ChevronRight className="h-3 w-3 shrink-0 text-gray-300" />
+            )}
           </button>
           {item.submenu && openSubmenu === item.label && (
             <div className="absolute left-full top-0 w-40 overflow-hidden bg-white py-1 shadow-xl">
@@ -70,6 +84,7 @@ export default function ContextMenu({
                 <button
                   key={sub.label}
                   disabled={sub.disabled}
+                  title={sub.title}
                   onClick={() => {
                     if (sub.disabled) return;
                     sub.onClick?.();

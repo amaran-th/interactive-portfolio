@@ -18,9 +18,9 @@ function renderToCanvas(doc: PixelArt, scale: number): HTMLCanvasElement {
   ctx.imageSmoothingEnabled = false;
   for (let y = 0; y < doc.height; y++) {
     for (let x = 0; x < doc.width; x++) {
-      const colorIndex = doc.pixels[y * doc.width + x];
-      if (colorIndex < 0) continue;
-      ctx.fillStyle = doc.palette[colorIndex] ?? "#ff00ff";
+      const color = doc.pixels[y * doc.width + x];
+      if (color === null) continue;
+      ctx.fillStyle = color;
       ctx.fillRect(x * scale, y * scale, scale, scale);
     }
   }
@@ -40,9 +40,13 @@ export function exportAsJPG(doc: PixelArt, scale = 8): void {
   ctx.globalCompositeOperation = "destination-over";
   ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  canvas.toBlob((blob) => {
-    if (blob) triggerDownload(blob, `${doc.name}.jpg`);
-  }, "image/jpeg", 0.92);
+  canvas.toBlob(
+    (blob) => {
+      if (blob) triggerDownload(blob, `${doc.name}.jpg`);
+    },
+    "image/jpeg",
+    0.92,
+  );
 }
 
 // 파일 다운로드와 "코드 복사"(클립보드에 텍스트로 복사) 양쪽에서 같은 SVG
@@ -51,32 +55,45 @@ export function buildSvgString(doc: PixelArt): string {
   const rects: string[] = [];
   for (let y = 0; y < doc.height; y++) {
     for (let x = 0; x < doc.width; x++) {
-      const colorIndex = doc.pixels[y * doc.width + x];
-      if (colorIndex < 0) continue;
+      const color = doc.pixels[y * doc.width + x];
+      if (color === null) continue;
       // SVG의 fill 속성은 8자리(#rrggbbaa) hex를 신뢰성 있게 지원하지 않는 뷰어가
       // 있어, 알파가 있으면 fill-opacity로 분리해 내보낸다.
-      const [r, g, b, a] = hexToRgba(doc.palette[colorIndex] ?? "#ff00ff");
+      const [r, g, b, a] = hexToRgba(color);
       const opacity = a < 1 ? ` fill-opacity="${a.toFixed(3)}"` : "";
-      rects.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="${rgbToHex(r, g, b)}"${opacity}/>`);
+      rects.push(
+        `<rect x="${x}" y="${y}" width="1" height="1" fill="${rgbToHex(r, g, b)}"${opacity}/>`,
+      );
     }
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${doc.width} ${doc.height}" shape-rendering="crispEdges">${rects.join("")}</svg>`;
 }
 
 export function exportAsSVG(doc: PixelArt): void {
-  triggerDownload(new Blob([buildSvgString(doc)], { type: "image/svg+xml" }), `${doc.name}.svg`);
+  triggerDownload(
+    new Blob([buildSvgString(doc)], { type: "image/svg+xml" }),
+    `${doc.name}.svg`,
+  );
 }
 
 export function exportAsJSON(doc: PixelArt): void {
-  triggerDownload(new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" }), `${doc.name}.json`);
+  triggerDownload(
+    new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" }),
+    `${doc.name}.json`,
+  );
 }
 
 // PNG만 클립보드 이미지로 신뢰성 있게 지원된다(대부분 브라우저의 ClipboardItem은
 // image/png만 받는다) — JPG는 파일 저장만 제공한다.
-export async function copyPngToClipboard(doc: PixelArt, scale = 8): Promise<boolean> {
+export async function copyPngToClipboard(
+  doc: PixelArt,
+  scale = 8,
+): Promise<boolean> {
   try {
     const canvas = renderToCanvas(doc, scale);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/png"),
+    );
     if (!blob) return false;
     await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
     return true;

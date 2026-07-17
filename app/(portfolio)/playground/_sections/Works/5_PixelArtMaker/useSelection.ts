@@ -1,10 +1,10 @@
 import { useCallback, useState } from "react";
-import { setPixel } from "./pixelGrid";
+import { PixelValue } from "./pixelGrid";
 
-type Clip = {
+export type Clip = {
   w: number;
   h: number;
-  cells: { dx: number; dy: number; colorIndex: number }[];
+  cells: { dx: number; dy: number; color: PixelValue }[];
 };
 
 export function useSelection() {
@@ -12,7 +12,7 @@ export function useSelection() {
   const [clipboard, setClipboard] = useState<Clip | null>(null);
 
   const copy = useCallback(
-    (pixels: number[], width: number) => {
+    (pixels: PixelValue[], width: number) => {
       if (!mask || mask.size === 0) return;
       const xs: number[] = [];
       const ys: number[] = [];
@@ -25,7 +25,7 @@ export function useSelection() {
       const cells = Array.from(mask).map((i) => {
         const x = i % width;
         const y = Math.floor(i / width);
-        return { dx: x - minX, dy: y - minY, colorIndex: pixels[i] };
+        return { dx: x - minX, dy: y - minY, color: pixels[i] };
       });
       const w = Math.max(...xs) - minX + 1;
       const h = Math.max(...ys) - minY + 1;
@@ -34,26 +34,5 @@ export function useSelection() {
     [mask],
   );
 
-  const paste = useCallback(
-    (
-      pixels: number[],
-      width: number,
-      height: number,
-      atX: number,
-      atY: number,
-    ): number[] => {
-      if (!clipboard) return pixels;
-      let next = pixels;
-      for (const cell of clipboard.cells) {
-        const x = atX + cell.dx;
-        const y = atY + cell.dy;
-        if (x < 0 || y < 0 || x >= width || y >= height) continue;
-        next = setPixel(next, width, x, y, cell.colorIndex);
-      }
-      return next;
-    },
-    [clipboard],
-  );
-
-  return { mask, setMask, clipboard, copy, paste };
+  return { mask, setMask, clipboard, copy };
 }

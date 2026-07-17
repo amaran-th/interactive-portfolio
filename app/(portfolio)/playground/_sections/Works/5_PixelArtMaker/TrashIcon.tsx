@@ -59,5 +59,11 @@ export default function TrashIcon({ active }: { active: boolean }) {
     }
   }, [active]);
 
-  return <canvas ref={canvasRef} className="shadow-sm" style={{ imageRendering: "pixelated" }} />;
+  return (
+    <canvas
+      ref={canvasRef}
+      className="shadow-sm"
+      style={{ imageRendering: "pixelated" }}
+    />
+  );
 }

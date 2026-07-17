@@ -141,6 +141,28 @@ export function mergeColors(
   return { palette: nextPalette, pixels: nextPixels };
 }
 
+// 팔레트에 완전히 똑같은 hex가 여러 번 들어 있으면(스와치를 직접 다른 색과
+// 같은 값으로 고쳤을 때 등) 자동으로 하나로 합친다. j를 뒤에서부터 훑어야
+// mergeColors가 indexB(j) 위쪽 인덱스를 한 칸씩 당길 때도 아직 검사하지 않은
+// 낮은 인덱스가 밀리지 않아 안전하다.
+export function dedupePalette(
+  palette: string[],
+  pixels: number[],
+): { palette: string[]; pixels: number[] } {
+  let curPalette = palette.slice();
+  let curPixels = pixels.slice();
+  for (let i = 0; i < curPalette.length; i++) {
+    for (let j = curPalette.length - 1; j > i; j--) {
+      if (curPalette[j] === curPalette[i]) {
+        const merged = mergeColors(curPalette, curPixels, i, j);
+        curPalette = merged.palette;
+        curPixels = merged.pixels;
+      }
+    }
+  }
+  return { palette: curPalette, pixels: curPixels };
+}
+
 // srcWidth x srcHeight 픽셀 그리드를 dstWidth x dstHeight로 최근접 이웃 방식으로
 // 재배치한다. 이미지를 픽셀아트로 변환할 때 "픽셀 해상도"(비트 규격, 몇 칸으로
 // 샘플링할지)와 "실제 캔버스 크기"(최종 결과물의 격자 크기)를 독립적으로 정할 수

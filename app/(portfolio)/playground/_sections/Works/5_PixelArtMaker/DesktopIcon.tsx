@@ -58,9 +58,9 @@ export default function DesktopIcon({
     const offsetY = (size - art.height * scale) / 2;
     for (let py = 0; py < art.height; py++) {
       for (let px = 0; px < art.width; px++) {
-        const colorIndex = art.pixels[py * art.width + px];
-        if (colorIndex < 0) continue;
-        ctx.fillStyle = art.palette[colorIndex] ?? "#ff00ff";
+        const color = art.pixels[py * art.width + px];
+        if (color === null) continue;
+        ctx.fillStyle = color;
         ctx.fillRect(px * scale + offsetX, py * scale + offsetY, scale, scale);
       }
     }
@@ -80,7 +80,11 @@ export default function DesktopIcon({
       onDoubleClick={editing ? undefined : onDoubleClick}
       onContextMenu={editing ? undefined : onContextMenu}
     >
-      <canvas ref={canvasRef} className="shadow-sm" style={{ imageRendering: "pixelated" }} />
+      <canvas
+        ref={canvasRef}
+        className="shadow-sm"
+        style={{ imageRendering: "pixelated" }}
+      />
       {editing ? (
         <input
           ref={inputRef}
@@ -95,7 +99,9 @@ export default function DesktopIcon({
           className="w-full bg-white text-center text-[10px] text-gray-900 shadow-[0_0_0_1px_#8b5cf6] outline-none"
         />
       ) : (
-        <span className="w-full truncate text-center text-[10px] text-gray-600">{art.name}</span>
+        <span className="w-full truncate text-center text-[10px] text-gray-600">
+          {art.name}
+        </span>
       )}
     </div>
   );

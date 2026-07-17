@@ -47,5 +47,11 @@ export default function LauncherIcon() {
     }
   }, []);
 
-  return <canvas ref={canvasRef} className="shadow-sm" style={{ imageRendering: "pixelated" }} />;
+  return (
+    <canvas
+      ref={canvasRef}
+      className="shadow-sm"
+      style={{ imageRendering: "pixelated" }}
+    />
+  );
 }

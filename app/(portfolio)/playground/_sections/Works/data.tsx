@@ -92,20 +92,20 @@ export const works: WorkItem[] = [
   },
   {
     id: 5,
-    title: "픽셀아트 메이커",
-    description: `게임적 장치 없이, 단축키·이미지 import·내보내기가 잘 된 실사용 가능한 픽셀아트 편집기입니다. 저장한 작품이 PC 바탕화면처럼 아이콘으로 쌓입니다.
+    title: "네모네모빔",
+    description: `레트로 PC 컨셉으로 디자인된 픽셀아트 편집기입니다. 저장한 작품이 PC 바탕화면처럼 아이콘으로 쌓입니다.
 
-  🖥️ 바탕화면 UI: 저장된 작품이 아이콘으로 표시되고, 더블클릭하면 편집창이 열립니다. 빈 곳을 우클릭하면 새 작업을 시작할 수 있습니다.
+  🖥️ 바탕화면 UI: 저장된 작품이 아이콘으로 표시되고, 더블클릭하면 편집창이 열립니다. 빈 곳을 우클릭하거나 편집기 프로그램을 더블클릭하면 새 작업을 시작할 수 있습니다.
 
   🖌️ 편집 도구: 펜슬·지우개·채우기·스포이트, 직선·사각형·원 도형 툴, 좌우/상하 대칭 드로잉, 선택·이동·복사-붙여넣기, 색상/알파 기준 자동 선택을 지원합니다. 단축키로 대부분의 작업이 가능합니다.
 
   📷 이미지 import: 사진을 업로드하면 픽셀 크기와 안티에일리어싱을 조절하며 미리보기로 확인한 뒤 가져올 수 있습니다. 추출된 색상은 대표색 개수로 자동/수동 병합해 팔레트를 정리합니다.
 
   💾 내보내기: PNG·SVG·JSON·JPG로 내보낼 수 있고, 저장한 작품은 비주얼 노벨 스튜디오 등 다른 Work에서 그대로 재사용됩니다.`,
-    period: "2026.07.10 - ",
+    period: "2026.07.10 - 07.17",
     platforms: [{ type: "pc", specialized: true }, { type: "mobile" }],
     content: <PixelArtMaker />,
-    thumbnail: "/playground/pixel-art-maker.png",
-    path: "/pixel-art-maker",
+    thumbnail: "/playground/nemo-beam.png",
+    path: "/nemo-nemo-beam",
   },
 ];

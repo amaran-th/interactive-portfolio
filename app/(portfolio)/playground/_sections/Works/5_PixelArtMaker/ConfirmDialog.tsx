@@ -14,10 +14,16 @@ export default function ConfirmDialog({
       <div className="w-72 bg-white p-4 shadow-xl">
         <p className="mb-4 text-sm text-gray-900">{message}</p>
         <div className="flex justify-end gap-2">
-          <button onClick={onCancel} className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-900">
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-900"
+          >
             취소
           </button>
-          <button onClick={onConfirm} className="bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600">
+          <button
+            onClick={onConfirm}
+            className="bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600"
+          >
             삭제
           </button>
         </div>

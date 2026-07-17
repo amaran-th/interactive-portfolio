@@ -2,28 +2,28 @@ import PixelArtMaker from "@/app/(portfolio)/playground/_sections/Works/5_PixelA
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "픽셀아트 메이커",
+  title: "네모네모빔",
   description: "바탕화면처럼 저장된 픽셀아트를 관리하고 편집하는 도구입니다.",
   icons: {
-    icon: "/playground/pixel-art-maker.svg",
+    icon: "/playground/nemo-beam.svg",
   },
 
   openGraph: {
-    title: `픽셀아트 메이커`,
+    title: `네모네모빔`,
     description: "바탕화면처럼 저장된 픽셀아트를 관리하고 편집하는 도구입니다.",
     images: [
       {
-        url: "/playground/pixel-art-maker.png",
-        alt: "픽셀아트 메이커",
+        url: "/playground/nemo-beam.png",
+        alt: "네모네모빔",
       },
     ],
   },
 
   twitter: {
     card: "summary_large_image",
-    title: `픽셀아트 메이커`,
+    title: `네모네모빔`,
     description: "바탕화면처럼 저장된 픽셀아트를 관리하고 편집하는 도구입니다.",
-    images: ["/playground/pixel-art-maker.png"],
+    images: ["/playground/nemo-beam.png"],
   },
 };
 

@@ -14,9 +14,9 @@ function renderDataUrl(art: PixelArt): string {
   ctx.imageSmoothingEnabled = false;
   for (let y = 0; y < art.height; y++) {
     for (let x = 0; x < art.width; x++) {
-      const colorIndex = art.pixels[y * art.width + x];
-      if (colorIndex < 0) continue;
-      ctx.fillStyle = art.palette[colorIndex] ?? "#ffffff";
+      const color = art.pixels[y * art.width + x];
+      if (color === null) continue;
+      ctx.fillStyle = color;
       ctx.fillRect(x, y, 1, 1);
     }
   }

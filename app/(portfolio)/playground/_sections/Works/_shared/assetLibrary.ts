@@ -1,37 +1,126 @@
 const LIBRARY_KEY = "playground-asset-library";
 
+// 픽셀은 항상 자기 색을 직접 저장하는 트루컬러다(hex 문자열, 투명은 null) —
+// palette는 더 이상 픽셀이 참조하는 대상이 아니라, 빠르게 다시 쓸 수 있도록
+// 모아둔 즐겨찾기 색 목록일 뿐이다. 그래서 팔레트 스와치를 고치거나 지워도
+// 이미 칠한 픽셀은 절대 바뀌지 않는다.
 export type PixelArt = {
   id: string;
   name: string;
   width: number;
   height: number;
-  palette: string[]; // hex 색상
-  pixels: number[]; // length = width*height, palette 인덱스, -1 = 투명
+  palette: string[]; // 즐겨찾기 색 목록 — 그림 데이터 자체와는 무관하다.
+  pixels: (string | null)[];
   createdAt: number;
 };
 
-// 픽셀 배열을 그대로 JSON.stringify하면 픽셀당 콤마+최대 3자(예: "-1,")가 붙어
-// localStorage 용량을 낭비한다 — 팔레트 인덱스(0~35, MAX_PALETTE_COLORS보다 넉넉한
-// 여유)를 36진수 한 글자로, 투명(-1)은 구분자 없이 "." 한 글자로 압축해 저장한다.
-// 픽셀당 1글자로 고정되므로 원래 배열 대비 대략 2~3배 더 작다. 저장된 원본은 항상
-// 문자열이지만, 이 포맷을 도입하기 전에 저장된 값은 그대로 숫자 배열일 수 있어
-// unpackPixels에서 둘 다 받아들인다(하위 호환).
-const TRANSPARENT_CHAR = ".";
+const BASE62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-export function packPixels(pixels: number[]): string {
-  return pixels.map((v) => (v < 0 ? TRANSPARENT_CHAR : v.toString(36))).join("");
+function encodeIndex(n: number, width: number): string {
+  let s = "";
+  let rest = n;
+  for (let i = 0; i < width; i++) {
+    s = BASE62[rest % 62] + s;
+    rest = Math.floor(rest / 62);
+  }
+  return s;
 }
 
-export function unpackPixels(packed: string | number[]): number[] {
-  if (Array.isArray(packed)) return packed;
-  const out = new Array<number>(packed.length);
-  for (let i = 0; i < packed.length; i++) {
-    out[i] = packed[i] === TRANSPARENT_CHAR ? -1 : parseInt(packed[i], 36);
+function decodeIndex(s: string): number {
+  let n = 0;
+  for (let i = 0; i < s.length; i++) n = n * 62 + BASE62.indexOf(s[i]);
+  return n;
+}
+
+// 62^1=62, 62^2=3844, 62^3=238328, 62^4=14776336 — 512×512 캔버스의 최대
+// 픽셀 수(262144)보다 62^4이 훨씬 크므로 4글자면 어떤 경우에도 항상 충분하다.
+function charWidthFor(distinctCountIncludingTransparent: number): number {
+  if (distinctCountIncludingTransparent <= 62) return 1;
+  if (distinctCountIncludingTransparent <= 3844) return 2;
+  if (distinctCountIncludingTransparent <= 238328) return 3;
+  return 4;
+}
+
+export type PackedPixels = {
+  packed: string;
+  dict: string[];
+  charWidth: number;
+};
+
+// 저장할 때만 이 그림에서 실제로 쓰인 색을 모아 사전을 만들고, 그 사전의
+// 인덱스를 압축해 담는다(0은 투명 전용, 실제 색은 1부터) — 대부분의 픽셀아트는
+// 서로 다른 색이 62개를 넘지 않아 예전 인덱스 팔레트 방식과 같은 1글자/픽셀
+// 크기를 그대로 유지한다. 편집 중(메모리)에는 이 사전과 무관하게 각 픽셀이
+// 자기 색을 그대로 들고 있다 — 이건 오직 localStorage에 적을 때만의 압축이다.
+export function packPixels(pixels: (string | null)[]): PackedPixels {
+  const dict: string[] = [];
+  const indexOf = new Map<string, number>();
+  for (const p of pixels) {
+    if (p !== null && !indexOf.has(p)) {
+      indexOf.set(p, dict.length + 1);
+      dict.push(p);
+    }
+  }
+  const charWidth = charWidthFor(dict.length + 1);
+  const packed = pixels
+    .map((p) => encodeIndex(p === null ? 0 : (indexOf.get(p) ?? 0), charWidth))
+    .join("");
+  return { packed, dict, charWidth };
+}
+
+export function unpackPixels(data: PackedPixels): (string | null)[] {
+  const { packed, dict, charWidth } = data;
+  const out = new Array<string | null>(packed.length / charWidth);
+  for (let i = 0; i < out.length; i++) {
+    const n = decodeIndex(
+      packed.slice(i * charWidth, i * charWidth + charWidth),
+    );
+    out[i] = n === 0 ? null : (dict[n - 1] ?? null);
   }
   return out;
 }
 
-type StoredPixelArt = Omit<PixelArt, "pixels"> & { pixels: string | number[] };
+// --- 이전(인덱스 팔레트) 포맷 마이그레이션 ---
+// 예전에는 pixels가 팔레트 인덱스였고(문자 하나가 36진수 인덱스, "."이 투명),
+// palette가 그 인덱스의 실제 참조처였다. 지금 그 파일을 열면 인덱스를 palette로
+// 풀어 실제 hex로 바꾸고, 예전 palette는 그대로 즐겨찾기 목록으로 이어받는다.
+const LEGACY_TRANSPARENT_CHAR = ".";
+
+function legacyUnpack(
+  packed: string | number[],
+  legacyPalette: string[],
+): (string | null)[] {
+  const indices: number[] = Array.isArray(packed)
+    ? packed
+    : Array.from(packed, (ch) =>
+        ch === LEGACY_TRANSPARENT_CHAR ? -1 : parseInt(ch, 36),
+      );
+  return indices.map((i) => (i < 0 ? null : (legacyPalette[i] ?? null)));
+}
+
+type StoredPixelArtV2 = Omit<PixelArt, "pixels"> & {
+  pixels: PackedPixels;
+  version: 2;
+};
+type StoredPixelArtV1 = Omit<PixelArt, "pixels"> & {
+  pixels: string | number[];
+};
+type StoredPixelArt = StoredPixelArtV2 | StoredPixelArtV1;
+
+function isV2(stored: StoredPixelArt): stored is StoredPixelArtV2 {
+  return (stored as StoredPixelArtV2).version === 2;
+}
+
+function decodeStored(stored: StoredPixelArt): PixelArt {
+  if (isV2(stored)) {
+    return { ...stored, pixels: unpackPixels(stored.pixels) };
+  }
+  return { ...stored, pixels: legacyUnpack(stored.pixels, stored.palette) };
+}
+
+export function encodeStored(art: PixelArt): StoredPixelArtV2 {
+  return { ...art, pixels: packPixels(art.pixels), version: 2 };
+}
 
 export type BeatTrack = {
   wave: "square" | "triangle" | "noise";
@@ -61,9 +150,12 @@ function loadLibrary(): AssetLibrary {
   try {
     const raw = localStorage.getItem(LIBRARY_KEY);
     if (!raw) return { pixelArt: [], beatPatterns: [] };
-    const parsed = JSON.parse(raw) as Partial<{ pixelArt: StoredPixelArt[]; beatPatterns: BeatPattern[] }>;
+    const parsed = JSON.parse(raw) as Partial<{
+      pixelArt: StoredPixelArt[];
+      beatPatterns: BeatPattern[];
+    }>;
     return {
-      pixelArt: (parsed.pixelArt ?? []).map((p) => ({ ...p, pixels: unpackPixels(p.pixels) })),
+      pixelArt: (parsed.pixelArt ?? []).map(decodeStored),
       beatPatterns: parsed.beatPatterns ?? [],
     };
   } catch {
@@ -73,8 +165,11 @@ function loadLibrary(): AssetLibrary {
 
 function saveLibrary(lib: AssetLibrary): boolean {
   try {
-    const stored: { pixelArt: StoredPixelArt[]; beatPatterns: BeatPattern[] } = {
-      pixelArt: lib.pixelArt.map((p) => ({ ...p, pixels: packPixels(p.pixels) })),
+    const stored: {
+      pixelArt: StoredPixelArtV2[];
+      beatPatterns: BeatPattern[];
+    } = {
+      pixelArt: lib.pixelArt.map(encodeStored),
       beatPatterns: lib.beatPatterns,
     };
     localStorage.setItem(LIBRARY_KEY, JSON.stringify(stored));

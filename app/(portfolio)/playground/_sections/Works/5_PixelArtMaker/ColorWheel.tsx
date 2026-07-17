@@ -1,412 +1,331 @@
 "use client";
 
-import { Pencil, Pipette } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { hexToRgba, hsvToRgb, rgbaToHex, rgbToHsv } from "./hsv";
-import { MAX_PALETTE_COLORS, Tool } from "./types";
+import { Settings, X } from "lucide-react";
+import { useCallback, useState } from "react";
+import ColorPicker, { CHECKER_STYLE } from "./ColorPicker";
+import { PromptModal } from "./Dialogs";
+import {
+  createPaletteSet,
+  deletePaletteSet,
+  listPaletteSets,
+  PaletteSet,
+  updatePaletteSetColors,
+} from "./paletteSets";
+import { DEFAULT_CANVAS_BG_COLOR, MAX_PALETTE_COLORS, Tool } from "./types";
 
-const SQUARE_SIZE = 120;
+// 지금 어느 색을 색상환으로 조작하고 있는지 — MS페인트의 주/보조 색상
+// 사각형과 같은 개념. 스와치를 좌클릭하면 primary가, 우클릭하면 secondary가
+// 함께 활성화된다(둘 다 동시에 방금 지정한 대상을 색상환에 바로 보여준다).
+// canvasBg는 편집기 캔버스 배경색 스와치를 클릭했을 때 활성화된다.
+type ArmedTarget = "primary" | "secondary" | "canvasBg";
 
-function clamp01(n: number): number {
-  return Math.max(0, Math.min(1, n));
-}
-
-// 세로 트랙(색상/알파 슬라이더) 위 pointer 좌표를 0~1 값으로 환산한다. 트랙
-// 밖으로 나가도 0 또는 1로 클램프해 계속 그 방향 끝을 따라가게 한다 —
-// 드래그 중 트랙을 벗어나면 마커가 그 자리에 멈춰버려 어색했다.
-function trackValue(clientY: number, rect: DOMRect): number {
-  if (rect.height === 0) return 0;
-  return clamp01((clientY - rect.top) / rect.height);
-}
+const TRANSPARENT_HEX = "#00000000";
 
 export default function ColorWheel({
-  palette,
-  activeColorIndex,
-  onSelect,
-  onCommitColor,
-  onEditSwatchColor,
-  onAddColor,
-  onRemoveColor,
-  usedColorIndices,
+  favorites,
+  activeColorHex,
+  secondaryColorHex,
+  onChangeActiveColor,
+  onChangeSecondaryColor,
+  onAddFavorite,
+  onRemoveFavorite,
+  onEditFavorite,
+  onReplaceFavorites,
   tool,
   onToolChange,
-  secondaryColorIndex,
-  onSelectSecondary,
-  gradientSteps,
-  onGradientStepsChange,
-  gradientAngleDeg,
-  onGradientAngleChange,
+  canvasBgColor,
+  onChangeCanvasBgColor,
 }: {
-  palette: string[];
-  activeColorIndex: number;
-  onSelect: (index: number) => void;
-  // 색상환을 조작하고 손을 놓으면(드래그 종료) 호출된다 — 이미 있는 색이면 그
-  // 스와치를 재사용하고, 없으면 새 스와치로 추가한다. 기존 스와치를 실시간으로
-  // 덮어쓰지 않으므로 이미 칠해진 픽셀은 건드리지 않는다.
-  onCommitColor: (hex: string) => void;
-  // 스와치의 연필 아이콘으로 명시적으로 "편집 모드"에 들어갔을 때만 쓰인다 —
-  // 이때는 의도적으로 그 스와치 자체(와 이미 칠한 픽셀)를 실시간으로 바꾼다.
-  onEditSwatchColor: (hex: string) => void;
-  onAddColor: (hex: string) => void;
-  onRemoveColor: (index: number) => void;
-  // 팔레트에는 있지만 캔버스 어디에도 아직 칠해진 적 없는 색을 구분해
-  // 보여주기 위한 팔레트 인덱스 집합.
-  usedColorIndices: Set<number>;
+  favorites: string[];
+  activeColorHex: string;
+  // 그라데이션 끝 색상 — MS페인트의 보조 색상과 같은 개념. null이면 투명.
+  secondaryColorHex: string | null;
+  onChangeActiveColor: (hex: string) => void;
+  onChangeSecondaryColor: (hex: string | null) => void;
+  onAddFavorite: (hex: string) => void;
+  onRemoveFavorite: (index: number) => void;
+  // 즐겨찾기 스와치를 선택한 뒤 색상환을 조작하면 그 스와치의 저장값 자체를
+  // 바꾼다(다른 에디터의 팔레트 편집과 같은 방식) — 이미 칠한 픽셀은 값을
+  // 직접 복사해 저장하므로 이 편집에 영향받지 않는다.
+  onEditFavorite: (index: number, hex: string) => void;
+  // 팔레트 세트를 "불러오면" 지금 즐겨찾기 전체를 그 세트 색으로 바꾼다.
+  onReplaceFavorites: (colors: string[]) => void;
   tool: Tool;
   onToolChange: (tool: Tool) => void;
-  // 그라데이션 끝 색상 — MS페인트의 보조 색상과 같은 개념. -1이면 투명.
-  secondaryColorIndex: number;
-  onSelectSecondary: (index: number) => void;
-  // 그라데이션 도구·도형/텍스트 그라데이션 채우기가 공유하는 단계 수·방향.
-  gradientSteps: number;
-  onGradientStepsChange: (steps: number) => void;
-  gradientAngleDeg: number;
-  onGradientAngleChange: (deg: number) => void;
+  // 편집기 작업 영역(캔버스가 놓인 주변 여백)의 배경색 — 캔버스 자체가 아니라
+  // 그 바깥을 칠한다. 항상 불투명 단색이라 같은 색상환의 알파만 무시하고 쓴다.
+  canvasBgColor: string;
+  onChangeCanvasBgColor: (hex: string) => void;
 }) {
-  // null이면 색상환은 "지금 그릴 색"만 미리보기로 바꾼다(드래그가 끝나야 팔레트에
-  // 반영). 특정 인덱스면 그 스와치를 색상환으로 직접 편집하는 중 — 연필
-  // 아이콘으로만 들어가고, 다른 스와치를 클릭하면 빠져나온다.
-  const [editingSwatch, setEditingSwatch] = useState<number | null>(null);
-  const squareRef = useRef<HTMLCanvasElement>(null);
-  const draggingRef = useRef<"square" | "hue" | "alpha" | null>(null);
-  const hueTrackRef = useRef<HTMLDivElement>(null);
-  const alphaTrackRef = useRef<HTMLDivElement>(null);
-  const activeHex = palette[activeColorIndex] ?? "#000000";
-  const activeHexRef = useRef(activeHex);
-  const [hsva, setHsva] = useState<[number, number, number, number]>(() => {
-    const [r, g, b, a] = hexToRgba(activeHex);
-    return [...rgbToHsv(r, g, b), a];
-  });
+  const [armedTarget, setArmedTarget] = useState<ArmedTarget>("primary");
 
-  // 매 렌더 후 최신 activeHex를 ref에 반영한다(렌더 도중 ref를 직접 쓰면 안 되므로
-  // effect에서 갱신). 아래 activeColorIndex 동기화 effect가 항상 최신 값을 읽도록
-  // 이 effect가 먼저 선언돼 있어야 한다(effect는 선언 순서대로 실행된다).
-  useEffect(() => {
-    activeHexRef.current = activeHex;
-  });
+  // 지금 활성/보조 색상과 "연결된" 즐겨찾기 스와치 — 스와치를 클릭해 고르면
+  // 연결되고, 연결된 동안 색상환을 조작하면 활성/보조 색상뿐 아니라 그
+  // 스와치의 저장값도 함께 바뀐다(다른 에디터의 팔레트 편집처럼). 스포이트 등
+  // 색상환을 거치지 않은 다른 경로로 활성/보조 색상이 바뀌면 그 스와치와 값이
+  // 어긋나므로, 렌더링 중 즉시 연결을 끊는다 — 그래야 우연히 같은 색이어도
+  // 스와치를 직접 고르지 않았다면 강조 표시되지 않는다.
+  const [primaryFavoriteIndex, setPrimaryFavoriteIndex] = useState<
+    number | null
+  >(null);
+  const [secondaryFavoriteIndex, setSecondaryFavoriteIndex] = useState<
+    number | null
+  >(null);
+  if (
+    primaryFavoriteIndex !== null &&
+    favorites[primaryFavoriteIndex] !== activeColorHex
+  ) {
+    setPrimaryFavoriteIndex(null);
+  }
+  if (
+    secondaryFavoriteIndex !== null &&
+    favorites[secondaryFavoriteIndex] !== secondaryColorHex
+  ) {
+    setSecondaryFavoriteIndex(null);
+  }
 
-  // 스와치를 바꿔 선택했을 때(클릭, 스포이트 등)만 컨트롤을 그 색의 H/S/V/A로
-  // 동기화한다. activeHex 전체가 아니라 activeColorIndex와 palette.length에만
-  // 의존해야 한다 — 슬라이더를 드래그해 같은 스와치의 색을 계속 바꾸는 동안에는
-  // hex→rgb→hsv 왕복 변환에서 생기는 반올림 오차가 매 커밋마다 누적돼(특히
-  // hue는 채도가 낮을수록 아주 작은 rgb 반올림에도 크게 흔들린다) 드래그 중
-  // 색상이 제멋대로 튀는 버그가 있었다.
-  //
-  // palette.length는 따로 넣어야 한다 — 선택 중이던 스와치를 삭제하면 그
-  // 뒤쪽 스와치들이 한 칸씩 당겨오면서 activeColorIndex "숫자"는 그대로인데
-  // 그 자리의 실제 색은 바뀐다. activeColorIndex만 보면 이 변화를 놓쳐 색상환이
-  // 방금 지운 색의 값을 계속 들고 있다가, 이후 색상환을 조작하면 그 삭제된
-  // 색이 새 스와치로 되살아나 버렸다(팔레트 변경은 항상 길이도 바뀌므로 추가·
-  // 삭제 모두 이 의존성으로 잡힌다).
-  useEffect(() => {
-    const [r, g, b, a] = hexToRgba(activeHexRef.current);
-    setHsva([...rgbToHsv(r, g, b), a]);
-  }, [activeColorIndex, palette.length]);
+  // 특정 파일이 아니라 편집기 자체에 저장되는 팔레트 세트 — 다른 작품을 열어도
+  // 그대로 남아 있고, 즐겨찾기로 불러오거나 지금 즐겨찾기를 새 세트로 저장할 수
+  // 있다. listPaletteSets 자체가 서버 환경(window 없음)을 가드하므로 초기
+  // useState 지연 초기화 함수에서 바로 읽어도 안전하다.
+  const [paletteSets, setPaletteSets] = useState<PaletteSet[]>(() =>
+    listPaletteSets(),
+  );
+  const [selectedSetId, setSelectedSetId] = useState("");
+  const [saveSetPromptOpen, setSaveSetPromptOpen] = useState(false);
+  // 세트 불러오기/저장/삭제는 즐겨찾기 색을 고르는 것만큼 자주 쓰지 않는다 —
+  // 기본은 접어 두고, "즐겨찾기" 라벨 옆 톱니바퀴를 눌러야 펼쳐지게 한다.
+  const [showPaletteManager, setShowPaletteManager] = useState(false);
 
-  const [hue, sat, val, alpha] = hsva;
-  const opaqueRgb = hsvToRgb(hue, sat, val);
+  // 항상 새 세트를 만든다(기존 세트를 고르고 있어도 덮어쓰지 않는다) — 세트를
+  // 덮어쓰는 행동은 이름이 명확한 handleOverwriteSet으로 따로 뺐다.
+  const handleSaveAsNewSet = useCallback(() => {
+    if (favorites.length === 0) return;
+    setSaveSetPromptOpen(true);
+  }, [favorites.length]);
 
-  // SV 정사각형 — 가로축 채도(왼쪽 0 → 오른쪽 1), 세로축 명도(위 1 → 아래 0).
-  // 색상(hue)은 아래 슬라이더가 정하고, 정사각형은 그 hue의 채도·명도 평면만 그린다.
-  const drawSquare = useCallback((h: number) => {
-    const canvas = squareRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const size = SQUARE_SIZE;
-    const imageData = ctx.createImageData(size, size);
-    for (let y = 0; y < size; y++) {
-      const v = 1 - y / (size - 1);
-      for (let x = 0; x < size; x++) {
-        const s = x / (size - 1);
-        const [r, g, b] = hsvToRgb(h, s, v);
-        const i = (y * size + x) * 4;
-        imageData.data[i] = r;
-        imageData.data[i + 1] = g;
-        imageData.data[i + 2] = b;
-        imageData.data[i + 3] = 255;
+  const handleConfirmSaveAsNewSet = useCallback(
+    (name: string) => {
+      setSaveSetPromptOpen(false);
+      const created = createPaletteSet(name, favorites);
+      setPaletteSets(listPaletteSets());
+      setSelectedSetId(created.id);
+    },
+    [favorites],
+  );
+
+  // 고른 세트가 있을 때만 그 세트의 저장값을 지금 즐겨찾기로 덮어쓴다.
+  const handleOverwriteSet = useCallback(() => {
+    if (!selectedSetId) return;
+    updatePaletteSetColors(selectedSetId, favorites);
+    setPaletteSets(listPaletteSets());
+  }, [selectedSetId, favorites]);
+
+  // 불러오기는 지금 즐겨찾기에 세트 색을 더하는 게 아니라, 즐겨찾기 전체를
+  // 세트 색으로 통째로 바꾼다 — "이 세트를 쓴다"는 뜻이 분명해지도록.
+  const handleLoadSet = useCallback(() => {
+    const set = paletteSets.find((s) => s.id === selectedSetId);
+    if (!set) return;
+    onReplaceFavorites(set.colors);
+  }, [paletteSets, selectedSetId, onReplaceFavorites]);
+
+  const handleDeleteSet = useCallback(() => {
+    if (!selectedSetId) return;
+    deletePaletteSet(selectedSetId);
+    setPaletteSets(listPaletteSets());
+    setSelectedSetId("");
+  }, [selectedSetId]);
+
+  const targetHex =
+    armedTarget === "primary"
+      ? activeColorHex
+      : armedTarget === "secondary"
+        ? (secondaryColorHex ?? TRANSPARENT_HEX)
+        : canvasBgColor;
+
+  const handlePickerChange = useCallback(
+    (hex: string) => {
+      if (armedTarget === "primary") {
+        onChangeActiveColor(hex);
+        if (primaryFavoriteIndex !== null)
+          onEditFavorite(primaryFavoriteIndex, hex);
+      } else if (armedTarget === "secondary") {
+        onChangeSecondaryColor(hex);
+        if (secondaryFavoriteIndex !== null)
+          onEditFavorite(secondaryFavoriteIndex, hex);
+      } else {
+        onChangeCanvasBgColor(hex);
       }
-    }
-    ctx.putImageData(imageData, 0, 0);
-  }, []);
+    },
+    [
+      armedTarget,
+      primaryFavoriteIndex,
+      secondaryFavoriteIndex,
+      onChangeActiveColor,
+      onChangeSecondaryColor,
+      onChangeCanvasBgColor,
+      onEditFavorite,
+    ],
+  );
 
-  useEffect(() => {
-    drawSquare(hue);
-  }, [hue, drawSquare]);
+  // "즐겨찾기에 추가" 버튼은 지금 색상환이 보여주는 값을 그대로 쓴다 — 이를 위해
+  // targetHex를 hsv로 한 번 더 풀 필요 없이, 편집기에서 실제로 칠할 색은 항상
+  // activeColorHex(주 색상)이므로 그 값을 추가 대상으로 삼는다.
+  const isFull = favorites.length >= MAX_PALETTE_COLORS;
 
-  // 드래그 중에는 항상 hsva(마커·슬라이더 위치)만 갱신한다. 편집 모드일 때만
-  // 실시간으로 그 스와치 자체(onEditSwatchColor)를 바꾼다 — 편집 모드가 아니면
-  // 드래그가 끝날 때(handleDragEnd) 딱 한 번만 팔레트에 반영해, 매 이동마다
-  // 스와치가 늘어나거나 활성 색상이 계속 튀던 예전 문제를 피한다.
-  const commit = useCallback(
-    (next: [number, number, number, number]) => {
-      setHsva(next);
-      if (editingSwatch === activeColorIndex) {
-        const [r, g, b] = hsvToRgb(next[0], next[1], next[2]);
-        onEditSwatchColor(rgbaToHex(r, g, b, next[3]));
+  // 스와치를 좌클릭하면 활성(주) 색상을, 우클릭하면 보조 색상(그라데이션 끝)을
+  // "고르기만" 한다 — 스와치와 연결하지는 않으므로, 고른 뒤 색상환을 움직여도
+  // 그 스와치의 저장값은 그대로다(그림을 그리다 살짝 색을 조정했는데 팔레트
+  // 자체가 조용히 바뀌어버리는 사고를 막는다). 이전에 다른 스와치가 편집
+  // 연결돼 있었다면 그 연결도 함께 끊는다.
+  const pickFavorite = useCallback(
+    (hex: string, target: ArmedTarget) => {
+      setArmedTarget(target);
+      if (target === "primary") {
+        onChangeActiveColor(hex);
+        setPrimaryFavoriteIndex(null);
+      } else {
+        onChangeSecondaryColor(hex);
+        setSecondaryFavoriteIndex(null);
       }
     },
-    [editingSwatch, activeColorIndex, onEditSwatchColor],
+    [onChangeActiveColor, onChangeSecondaryColor],
   );
 
-  const applySquarePoint = useCallback(
-    (clientX: number, clientY: number) => {
-      const canvas = squareRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      // 정사각형 밖으로 나가도 s/v를 0~1로 계속 클램프해, 마우스가 있는
-      // 방향의 가장자리를 계속 따라가게 한다(포토샵·Aseprite와 같은 방식) —
-      // 드래그 중 사각형을 벗어나면 마커가 그 자리에 멈춰버려 어색했다.
-      const s = clamp01((clientX - rect.left) / rect.width);
-      const v = clamp01(1 - (clientY - rect.top) / rect.height);
-      commit([hue, s, v, alpha]);
+  // 더블클릭하면 그 스와치를 색상환에 "연결"한다 — 연결된 동안 색상환을
+  // 움직이면 활성 색상뿐 아니라 이 스와치의 저장값 자체도 함께 바뀐다(다른
+  // 에디터의 팔레트 색상 편집과 같은 방식). 색을 고르기만 할 때(단일 클릭)와
+  // 분명히 구분되도록 별도 제스처로 뺐다.
+  const pickFavoriteForEdit = useCallback(
+    (hex: string, index: number) => {
+      setArmedTarget("primary");
+      setPrimaryFavoriteIndex(index);
+      onChangeActiveColor(hex);
     },
-    [hue, alpha, commit],
+    [onChangeActiveColor],
   );
-
-  const handleSquareDown = useCallback(
-    (e: React.PointerEvent<HTMLCanvasElement>) => {
-      draggingRef.current = "square";
-      squareRef.current?.setPointerCapture(e.pointerId);
-      applySquarePoint(e.clientX, e.clientY);
-    },
-    [applySquarePoint],
-  );
-
-  const handleSquareMove = useCallback(
-    (e: React.PointerEvent<HTMLCanvasElement>) => {
-      if (draggingRef.current !== "square") return;
-      applySquarePoint(e.clientX, e.clientY);
-    },
-    [applySquarePoint],
-  );
-
-  const applyHuePoint = useCallback(
-    (clientY: number) => {
-      const track = hueTrackRef.current;
-      if (!track) return;
-      const t = trackValue(clientY, track.getBoundingClientRect());
-      commit([t * 360, sat, val, alpha]);
-    },
-    [sat, val, alpha, commit],
-  );
-
-  const handleHueDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      draggingRef.current = "hue";
-      hueTrackRef.current?.setPointerCapture(e.pointerId);
-      applyHuePoint(e.clientY);
-    },
-    [applyHuePoint],
-  );
-
-  const handleHueMove = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (draggingRef.current !== "hue") return;
-      applyHuePoint(e.clientY);
-    },
-    [applyHuePoint],
-  );
-
-  const applyAlphaPoint = useCallback(
-    (clientY: number) => {
-      const track = alphaTrackRef.current;
-      if (!track) return;
-      const t = trackValue(clientY, track.getBoundingClientRect());
-      commit([hue, sat, val, t]);
-    },
-    [hue, sat, val, commit],
-  );
-
-  const handleAlphaDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      draggingRef.current = "alpha";
-      alphaTrackRef.current?.setPointerCapture(e.pointerId);
-      applyAlphaPoint(e.clientY);
-    },
-    [applyAlphaPoint],
-  );
-
-  const handleAlphaMove = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (draggingRef.current !== "alpha") return;
-      applyAlphaPoint(e.clientY);
-    },
-    [applyAlphaPoint],
-  );
-
-  const handleDragEnd = useCallback(() => {
-    draggingRef.current = null;
-    if (editingSwatch !== activeColorIndex) {
-      const [r, g, b] = hsvToRgb(hue, sat, val);
-      onCommitColor(rgbaToHex(r, g, b, alpha));
-    }
-  }, [editingSwatch, activeColorIndex, hue, sat, val, alpha, onCommitColor]);
-
-  const isFull = palette.length >= MAX_PALETTE_COLORS;
-  const markerX = sat * SQUARE_SIZE;
-  const markerY = (1 - val) * SQUARE_SIZE;
-  const opaqueHex = `rgb(${opaqueRgb[0]}, ${opaqueRgb[1]}, ${opaqueRgb[2]})`;
 
   return (
     <div className="flex flex-col items-center gap-3 bg-white p-3 shadow-md">
       <div className="flex gap-2">
-        {/* SV 정사각형 */}
-        <div
-          className="relative"
-          style={{ width: SQUARE_SIZE, height: SQUARE_SIZE }}
-        >
-          <canvas
-            ref={squareRef}
-            width={SQUARE_SIZE}
-            height={SQUARE_SIZE}
-            className="cursor-crosshair touch-none shadow-sm"
-            onPointerDown={handleSquareDown}
-            onPointerMove={handleSquareMove}
-            onPointerUp={handleDragEnd}
-            onPointerCancel={handleDragEnd}
-          />
-          <div
-            className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_0_2px_#ffffff,0_1px_3px_rgba(0,0,0,0.35)]"
-            style={{ left: markerX, top: markerY, backgroundColor: opaqueHex }}
-          />
-        </div>
-
-        {/* 스포이트(위) + 색상·알파 세로 슬라이더(아래, 나란히) */}
-        <div className="flex flex-col gap-1.5" style={{ height: SQUARE_SIZE }}>
-          <button
-            onClick={() => onToolChange("eyedropper")}
-            title="스포이트 (I)"
-            className={`flex h-7 w-7 shrink-0 items-center justify-center transition-colors ${
-              tool === "eyedropper"
-                ? "bg-violet-500 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            <Pipette className="h-4 w-4" />
-          </button>
-          <div className="flex flex-1 gap-1.5">
-            {/* 색상(hue) 세로 슬라이더 */}
-            <div
-              ref={hueTrackRef}
-              onPointerDown={handleHueDown}
-              onPointerMove={handleHueMove}
-              onPointerUp={handleDragEnd}
-              onPointerCancel={handleDragEnd}
-              className="relative h-full w-3.5 cursor-pointer touch-none shadow-sm"
-              style={{
-                background:
-                  "linear-gradient(to bottom, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
-              }}
-            >
-              <div
-                className="pointer-events-none absolute left-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_0_2px_#ffffff,0_1px_3px_rgba(0,0,0,0.35)]"
-                style={{
-                  top: `${(hue / 360) * 100}%`,
-                  backgroundColor: opaqueHex,
-                }}
-              />
-            </div>
-            {/* 알파(투명도) 세로 슬라이더 */}
-            <div
-              ref={alphaTrackRef}
-              onPointerDown={handleAlphaDown}
-              onPointerMove={handleAlphaMove}
-              onPointerUp={handleDragEnd}
-              onPointerCancel={handleDragEnd}
-              className="relative h-full w-3.5 cursor-pointer touch-none shadow-sm"
-              style={{
-                backgroundImage:
-                  "linear-gradient(45deg, #d4d4d8 25%, transparent 25%), linear-gradient(-45deg, #d4d4d8 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d4d4d8 75%), linear-gradient(-45deg, transparent 75%, #d4d4d8 75%)",
-                backgroundSize: "8px 8px",
-                backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0px",
-              }}
-            >
-              <div
-                className="pointer-events-none absolute inset-0"
-                style={{
-                  background: `linear-gradient(to bottom, transparent, ${opaqueHex})`,
-                }}
-              />
-              <div
-                className="pointer-events-none absolute left-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_0_2px_#ffffff,0_1px_3px_rgba(0,0,0,0.35)]"
-                style={{ top: `${alpha * 100}%`, backgroundColor: opaqueHex }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex w-full items-center gap-1.5 text-[10px] text-gray-500">
-        <div
-          className="h-4 w-4 shrink-0 shadow-[0_0_0_1px_rgba(0,0,0,0.15)]"
-          style={{ backgroundColor: rgbaToHex(...opaqueRgb, alpha) }}
+        <ColorPicker
+          value={targetHex}
+          onChange={handlePickerChange}
+          alphaDisabled={armedTarget === "canvasBg"}
+          eyedropperActive={tool === "eyedropper"}
+          onEyedropperClick={() => onToolChange("eyedropper")}
         />
-        {editingSwatch === activeColorIndex ? (
-          <span className="text-amber-600">
-            스와치 직접 수정 중 — 이미 칠한 픽셀도 함께 바뀝니다
-          </span>
-        ) : (
-          <span>
-            놓으면 팔레트에 반영됩니다
-            {isFull ? " (가득 차 가장 비슷한 색으로 대체)" : ""}
-          </span>
-        )}
+
+        {/* MS페인트식 주/보조 색상 겹침 사각형 — 클릭한 쪽이 지금 색상환으로
+            조작하는 대상이 된다. 그 아래 직사각형은 편집기 캔버스 배경색으로,
+            같은 색상환을 그대로 재사용해 편집한다. */}
+        <div
+          className="flex shrink-0 flex-col items-center gap-1.5"
+          style={{ marginTop: 2 }}
+        >
+          <div className="relative h-11 w-11">
+            <button
+              onClick={() => setArmedTarget("secondary")}
+              title="보조 색상(그라데이션 끝) — 클릭해 색상환으로 편집, 없으면 투명"
+              className={`absolute right-0 bottom-0 h-7 w-7 ${
+                armedTarget === "secondary"
+                  ? "ring-2 ring-violet-500"
+                  : "ring-1 ring-black/15"
+              }`}
+              style={
+                secondaryColorHex
+                  ? { backgroundColor: secondaryColorHex }
+                  : CHECKER_STYLE
+              }
+            />
+            <button
+              onClick={() => setArmedTarget("primary")}
+              title="활성 색상 — 클릭해 색상환으로 편집"
+              className={`absolute top-0 left-0 h-7 w-7 ${
+                armedTarget === "primary"
+                  ? "ring-2 ring-violet-500"
+                  : "ring-1 ring-black/15"
+              }`}
+              style={{ backgroundColor: activeColorHex }}
+            />
+          </div>
+          <button
+            onClick={() => setArmedTarget("canvasBg")}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              onChangeCanvasBgColor(DEFAULT_CANVAS_BG_COLOR);
+            }}
+            title="편집기 작업 영역 배경색(캔버스 주변) — 클릭해 색상환으로 편집 · 우클릭으로 기본 회색으로 초기화"
+            className={`h-4 w-11 ${
+              armedTarget === "canvasBg"
+                ? "ring-2 ring-violet-500"
+                : "ring-1 ring-black/15"
+            }`}
+            style={{ backgroundColor: canvasBgColor }}
+          />
+        </div>
       </div>
 
-      <p className="text-xs font-semibold text-gray-500">
-        팔레트 ({palette.length}/{MAX_PALETTE_COLORS})
-      </p>
+      <div className="flex w-full items-center justify-between">
+        <p className="text-xs font-semibold text-gray-500">즐겨찾기</p>
+        <button
+          onClick={() => setShowPaletteManager((v) => !v)}
+          title="즐겨찾기 관리(팔레트 세트 불러오기·저장·삭제)"
+          className={`flex h-5 w-5 items-center justify-center ${
+            showPaletteManager
+              ? "bg-violet-500 text-white"
+              : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          }`}
+        >
+          <Settings className="h-3 w-3" />
+        </button>
+      </div>
+
       <div className="grid grid-cols-6 gap-1.5">
-        {palette.map((color, index) => (
+        {favorites.map((color, index) => (
           <div key={index} className="group relative h-6 w-6">
             <button
-              onClick={() => {
-                onSelect(index);
-                setEditingSwatch(null);
-              }}
-              onDoubleClick={() => onRemoveColor(index)}
+              onClick={() => pickFavorite(color, "primary")}
+              onDoubleClick={() => pickFavoriteForEdit(color, index)}
               onContextMenu={(e) => {
                 e.preventDefault();
-                onSelectSecondary(index);
+                pickFavorite(color, "secondary");
               }}
-              title={`${color} — 클릭: 선택 · 더블클릭: 제거 · 우클릭: 그라데이션 끝 색상으로 지정`}
+              title={`${color} — 클릭: 활성 색상으로 선택 · 더블클릭: 색상환으로 이 스와치 편집 · 우클릭: 보조 색상`}
               className={`h-6 w-6 ${
-                editingSwatch === index
-                  ? "ring-2 ring-amber-500"
-                  : index === activeColorIndex
-                    ? "ring-2 ring-violet-500"
-                    : "ring-1 ring-black/10"
+                primaryFavoriteIndex === index
+                  ? "ring-2 ring-violet-500"
+                  : "ring-1 ring-black/10"
               }`}
               style={{ backgroundColor: color }}
             />
+            {secondaryFavoriteIndex === index && (
+              <span className="absolute -right-0.5 -bottom-0.5 h-2 w-2 rounded-full bg-white shadow-[0_0_0_1px_#8b5cf6]" />
+            )}
+            {/* 다른 에디터의 스와치 패널처럼, 지우기는 눌러야 보이는 실수
+                방지용 더블클릭 대신 마우스를 올렸을 때만 나타나는 × 버튼으로 뺀다. */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onSelect(index);
-                setEditingSwatch((cur) => (cur === index ? null : index));
+                onRemoveFavorite(index);
               }}
-              title="이 스와치를 색상환으로 직접 수정(이미 칠한 픽셀도 함께 바뀜)"
-              className="absolute -top-1 -left-1 hidden h-3.5 w-3.5 items-center justify-center bg-gray-700 text-white group-hover:flex"
+              title="즐겨찾기에서 제거"
+              className="absolute -top-1 -right-1 hidden h-3.5 w-3.5 items-center justify-center rounded-full bg-gray-700 text-white hover:bg-red-500 group-hover:flex"
             >
-              <Pencil className="h-2 w-2" />
+              <X className="h-2.5 w-2.5" />
             </button>
-            {index === secondaryColorIndex && (
-              <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-white shadow-[0_0_0_1px_#8b5cf6]" />
-            )}
-            {!usedColorIndices.has(index) && (
-              <span
-                title="아직 캔버스에 칠한 적 없는 색"
-                className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.35)]"
-              />
-            )}
           </div>
         ))}
         <button
           disabled={isFull}
-          onClick={() => onAddColor(rgbaToHex(...opaqueRgb, alpha))}
+          onClick={() => {
+            // 방금 추가한 스와치를 바로 활성 색상과 연결한다 — 추가하자마자
+            // 색상환으로 이어서 다듬을 수 있다.
+            setPrimaryFavoriteIndex(favorites.length);
+            onAddFavorite(activeColorHex);
+          }}
           title={
-            isFull ? "팔레트가 가득 찼습니다" : "현재 값을 새 스와치로 추가"
+            isFull ? "즐겨찾기가 가득 찼습니다" : "현재 값을 즐겨찾기에 추가"
           }
           className="flex h-6 w-6 items-center justify-center bg-gray-100 text-xs text-gray-500 shadow-sm disabled:opacity-30"
         >
@@ -414,63 +333,70 @@ export default function ColorWheel({
         </button>
       </div>
 
-      <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
-        <span>그라데이션 끝</span>
-        <div
-          className="h-4 w-4 shrink-0 shadow-[0_0_0_1px_rgba(0,0,0,0.15)]"
-          style={
-            secondaryColorIndex >= 0
-              ? { backgroundColor: palette[secondaryColorIndex] }
-              : {
-                  backgroundImage:
-                    "linear-gradient(45deg, #d4d4d8 25%, transparent 25%), linear-gradient(-45deg, #d4d4d8 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d4d4d8 75%), linear-gradient(-45deg, transparent 75%, #d4d4d8 75%)",
-                  backgroundSize: "6px 6px",
-                  backgroundPosition: "0 0, 0 3px, 3px -3px, -3px 0px",
-                }
-          }
-        />
-        <span className="text-gray-400">(스와치 우클릭으로 지정)</span>
-        <button
-          onClick={() => onSelectSecondary(-1)}
-          className="ml-auto text-violet-500 hover:underline"
-        >
-          투명으로
-        </button>
-      </div>
+      {/* 팔레트 세트 — 파일이 아니라 편집기 자체에 저장돼 다른 작품을 열어도
+          남아 있다. 위 즐겨찾기와는 분리된 저장소로, 즐겨찾기를 이름 붙여
+          저장해뒀다가 나중에 통째로 불러와 쓴다. 자주 쓰는 기능이 아니라
+          "즐겨찾기" 라벨 옆 톱니바퀴를 눌러야만 보인다. */}
+      {showPaletteManager && (
+        <div className="flex w-full flex-col gap-1 border-t border-gray-100 pt-2">
+          <p className="text-xs font-semibold text-gray-500">즐겨찾기 관리</p>
+          <select
+            value={selectedSetId}
+            onChange={(e) => setSelectedSetId(e.target.value)}
+            title="편집기에 저장된 팔레트 세트(파일과 무관) — 즐겨찾기를 이름 붙여 저장해둔 것"
+            className="w-full bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600"
+          >
+            <option value="">(선택 없음)</option>
+            {paletteSets.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} ({s.colors.length})
+              </option>
+            ))}
+          </select>
+          <div className="flex flex-wrap gap-1">
+            <button
+              onClick={handleLoadSet}
+              disabled={!selectedSetId}
+              title="즐겨찾기 전체를 선택한 세트 색으로 교체"
+              className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+            >
+              불러오기(교체)
+            </button>
+            <button
+              onClick={handleOverwriteSet}
+              disabled={!selectedSetId}
+              title="선택한 세트를 지금 즐겨찾기 내용으로 덮어쓰기"
+              className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+            >
+              덮어쓰기
+            </button>
+            <button
+              onClick={handleSaveAsNewSet}
+              disabled={favorites.length === 0}
+              title="지금 즐겨찾기를 새 이름의 팔레트 세트로 저장"
+              className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+            >
+              새로 저장
+            </button>
+            <button
+              onClick={handleDeleteSet}
+              disabled={!selectedSetId}
+              title="선택한 세트 삭제"
+              className="bg-gray-100 px-1.5 py-1 text-[10px] text-red-500 hover:bg-red-50 disabled:opacity-30"
+            >
+              삭제
+            </button>
+          </div>
+        </div>
+      )}
 
-      <label className="flex w-full items-center justify-between text-[10px] text-gray-500">
-        <span>그라데이션 단계</span>
-        <span className="flex items-center gap-1.5">
-          <input
-            type="range"
-            min={2}
-            max={32}
-            value={gradientSteps}
-            onChange={(e) => onGradientStepsChange(Number(e.target.value))}
-          />
-          <span className="w-5 text-right tabular-nums text-gray-400">
-            {gradientSteps}
-          </span>
-        </span>
-      </label>
-      <label
-        className="flex w-full items-center justify-between text-[10px] text-gray-500"
-        title="그라데이션 도구는 드래그 방향을 그대로 쓰고, 도형·텍스트 그라데이션 채우기만 이 각도를 따른다"
-      >
-        <span>그라데이션 방향</span>
-        <span className="flex items-center gap-1.5">
-          <input
-            type="range"
-            min={0}
-            max={359}
-            value={gradientAngleDeg}
-            onChange={(e) => onGradientAngleChange(Number(e.target.value))}
-          />
-          <span className="w-7 text-right tabular-nums text-gray-400">
-            {gradientAngleDeg}°
-          </span>
-        </span>
-      </label>
+      <PromptModal
+        open={saveSetPromptOpen}
+        title="팔레트 세트 이름"
+        defaultValue={`세트 ${paletteSets.length + 1}`}
+        onConfirm={handleConfirmSaveAsNewSet}
+        onCancel={() => setSaveSetPromptOpen(false)}
+      />
     </div>
   );
 }
