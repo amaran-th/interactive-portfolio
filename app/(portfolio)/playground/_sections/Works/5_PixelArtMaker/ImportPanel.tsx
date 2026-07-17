@@ -13,7 +13,7 @@ import {
   reducePaletteFast,
   resamplePixelGrid,
 } from "./pixelate";
-import { CANVAS_PRESETS, MAX_CANVAS_SIZE } from "./types";
+import { CANVAS_PRESET_GROUPS, MAX_CANVAS_SIZE } from "./types";
 
 // 색상 추출·병합 알고리즘은 내부적으로 계속 인덱스 팔레트를 쓴다(대표색
 // 개수 기준 병합은 인덱스 단위가 자연스럽다) — onConfirm 경계에서만 각 픽셀에
@@ -640,34 +640,41 @@ export default function ImportPanel({
           ) : (
             <div>
               <p className="mb-1 text-xs text-gray-600">캔버스 크기</p>
-              <div className="mb-1.5 grid grid-cols-3 gap-1">
-                <button
-                  onClick={() => setCanvasPreset(null)}
-                  className={`px-1.5 py-1 text-[10px] ${
-                    !canvasPreset
-                      ? "bg-violet-50 text-violet-700 shadow-[0_0_0_1.5px_#8b5cf6]"
-                      : "bg-gray-50 text-gray-600 hover:bg-violet-50"
-                  }`}
-                >
-                  픽셀 해상도와 동일
-                </button>
-                {CANVAS_PRESETS.map((p) => (
-                  <button
-                    key={p.label}
-                    onClick={() =>
-                      setCanvasPreset({ width: p.width, height: p.height })
-                    }
-                    className={`px-1.5 py-1 text-[10px] ${
-                      canvasPreset?.width === p.width &&
-                      canvasPreset?.height === p.height
-                        ? "bg-violet-50 text-violet-700 shadow-[0_0_0_1.5px_#8b5cf6]"
-                        : "bg-gray-50 text-gray-600 hover:bg-violet-50"
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
+              <button
+                onClick={() => setCanvasPreset(null)}
+                className={`mb-1.5 w-full px-1.5 py-1 text-[10px] ${
+                  !canvasPreset
+                    ? "bg-violet-50 text-violet-700 shadow-[0_0_0_1.5px_#8b5cf6]"
+                    : "bg-gray-50 text-gray-600 hover:bg-violet-50"
+                }`}
+              >
+                픽셀 해상도와 동일
+              </button>
+              {CANVAS_PRESET_GROUPS.map(({ group, presets }) => (
+                <div key={group} className="mb-1.5">
+                  <p className="mb-0.5 text-[9px] font-semibold text-gray-400">
+                    {group}
+                  </p>
+                  <div className="grid grid-cols-3 gap-1">
+                    {presets.map((p) => (
+                      <button
+                        key={p.label}
+                        onClick={() =>
+                          setCanvasPreset({ width: p.width, height: p.height })
+                        }
+                        className={`px-1.5 py-1 text-[10px] ${
+                          canvasPreset?.width === p.width &&
+                          canvasPreset?.height === p.height
+                            ? "bg-violet-50 text-violet-700 shadow-[0_0_0_1.5px_#8b5cf6]"
+                            : "bg-gray-50 text-gray-600 hover:bg-violet-50"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
               <div className="flex items-center gap-1.5">
                 <input
                   type="number"

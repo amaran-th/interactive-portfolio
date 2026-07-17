@@ -24,14 +24,49 @@ export type SelectMode = "new" | "add" | "subtract";
 // 이 묶음 밖의 도구를 고르면) 더 이상 쓸모가 없어진 선택을 자동으로 지운다.
 export const SELECT_TOOL_CATEGORY: Tool[] = ["select", "lasso", "move", "wand"];
 
-export const CANVAS_PRESETS = [
-  { label: "16 × 16", width: 16, height: 16 },
-  { label: "32 × 32", width: 32, height: 32 },
-  { label: "64 × 64", width: 64, height: 64 },
-  { label: "128 × 128", width: 128, height: 128 },
-  { label: "256 × 256", width: 256, height: 256 },
-  { label: "512 × 512", width: 512, height: 512 },
-] as const;
+export type CanvasPreset = { label: string; width: number; height: number };
+
+// 비주얼 노벨 스튜디오(2_VisualNovelStudio)에서 그대로 쓰기 좋도록, 일반
+// 정사각형 프리셋 외에 그 화면 비율에 맞춘 규격도 묶어 둔다 — 배경은
+// VNDisplay의 장면 프레임 비율(16:9, `aspect-video`)에 맞추고, 캐릭터는
+// 세로로 긴 서 있는 인물 실루엣에 흔한 2:5 비율로 여러 크기를 제공한다.
+export const CANVAS_PRESET_GROUPS: { group: string; presets: CanvasPreset[] }[] =
+  [
+    {
+      group: "일반",
+      presets: [
+        { label: "16 × 16", width: 16, height: 16 },
+        { label: "32 × 32", width: 32, height: 32 },
+        { label: "64 × 64", width: 64, height: 64 },
+        { label: "128 × 128", width: 128, height: 128 },
+        { label: "256 × 256", width: 256, height: 256 },
+        { label: "512 × 512", width: 512, height: 512 },
+      ],
+    },
+    {
+      group: "배경 (16:9)",
+      presets: [
+        { label: "160 × 90", width: 160, height: 90 },
+        { label: "256 × 144", width: 256, height: 144 },
+        { label: "320 × 180", width: 320, height: 180 },
+        { label: "480 × 270", width: 480, height: 270 },
+      ],
+    },
+    {
+      group: "캐릭터 (2:5)",
+      presets: [
+        { label: "64 × 160", width: 64, height: 160 },
+        { label: "96 × 240", width: 96, height: 240 },
+        { label: "128 × 320", width: 128, height: 320 },
+        { label: "160 × 400", width: 160, height: 400 },
+      ],
+    },
+  ];
+
+// 그룹 구분이 필요 없는 곳(기본값 등)에서 쓰는 평탄화된 목록.
+export const CANVAS_PRESETS: CanvasPreset[] = CANVAS_PRESET_GROUPS.flatMap(
+  (g) => g.presets,
+);
 
 // 새 캔버스·캔버스 크기 수정 모두에서 쓰는 한 변의 최댓값.
 export const MAX_CANVAS_SIZE = 512;

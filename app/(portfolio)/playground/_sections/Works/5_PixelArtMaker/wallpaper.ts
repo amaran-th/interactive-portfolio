@@ -1,4 +1,3 @@
-import { createGrid } from "./pixelGrid";
 import {
   encodeStored,
   PackedPixels,
@@ -18,6 +17,83 @@ export const WALLPAPER_NAME = "배경화면";
 const WALLPAPER_WIDTH = 32;
 const WALLPAPER_HEIGHT = 18;
 
+// 사용자가 직접 그려 준비한 기본 배경화면 픽셀 데이터(32×18, 576개) — 아래
+// 절차적 체크 패턴 대신 이 그림이 최초 배경화면으로 쓰인다.
+const WALLPAPER_PIXELS: (string | null)[] = [
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#ffffff", "#cbedff", "#cbedff", "#547fc0", "#547fc0", "#547fc0", "#cbedff",
+      "#cbedff", "#547fc0", "#cbedff", "#cbedff", "#ffffff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#ffffff", "#ffffff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#ffffff", "#cbedff", "#ffffff", "#cbedff", "#547fc0", "#547fc0", "#547fc0", "#547fc0",
+      "#547fc0", "#547fc0", "#cbedff", "#ffffff", "#cbedff", "#ffffff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#ffffff", "#cbedff", "#cbedff", "#ffffff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#ffffff",
+      "#cbedff", "#cbedff", "#cbedff", "#ffffff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#ffffff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#ffffff", "#cbedff", "#cbedff", "#cbedff", "#ffffff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#ffffff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#ffffff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#ffffff", "#cbedff", "#cbedff", "#ffffff", "#cbedff",
+      "#cbedff", "#ffffff", "#ffffff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#ffffff",
+      "#cbedff", "#cbedff", "#cbedff", "#ffffff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#ffffff", "#ffffff", "#cbedff", "#cbedff",
+      "#ffffff", "#cbedff", "#ffffff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#ffffff", "#cbedff", "#ffffff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#ffffff", "#ffffff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#ffffff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#cbedff", "#cbedff",
+      "#cbedff", "#547fc0", "#cbedff", "#547fc0", "#547fc0", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#ffb0e5",
+      "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#cbedff",
+      "#cbedff", "#547fc0", "#547fc0", "#547fc0", "#547fc0", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#ffffff", "#ffffff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#ffffff", "#cbedff", "#cbedff", "#cbedff", "#ffb0e5",
+      "#000000", "#ffb0e5", "#ffb0e5", "#000000", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#ffffff", "#cbedff", "#ffffff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#c72b94", "#ffb0e5",
+      "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#547fc0", "#547fc0", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#ffffff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#c72b94", "#ffb0e5",
+      "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#ffb0e5",
+      "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#ffb0e5", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#cbedff", "#f9d0b6",
+      "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6",
+      "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6",
+      "#ffb0e5", "#f9d0b6", "#ffb0e5", "#cbedff", "#ffb0e5", "#ffb0e5", "#cbedff", "#cbedff",
+      "#cbedff", "#cbedff", "#cbedff", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6",
+      "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6",
+      "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#ffb0e5",
+      "#f9d0b6", "#f9d0b6", "#ffb0e5", "#f9d0b6", "#ffb0e5", "#f9d0b6", "#ffb0e5", "#f9d0b6",
+      "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6",
+      "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6",
+      "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#ffb0e5", "#f9d0b6",
+      "#f9d0b6", "#ffb0e5", "#f9d0b6", "#f9d0b6", "#ffb0e5", "#f9d0b6", "#f9d0b6", "#ffb0e5",
+      "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6",
+      "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6",
+      "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6",
+      "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6",
+      "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6",
+      "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6",
+      "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6",
+      "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6", "#f9d0b6",
+];
+
 function defaultWallpaper(): PixelArt {
   return {
     id: WALLPAPER_ID,
@@ -25,13 +101,7 @@ function defaultWallpaper(): PixelArt {
     width: WALLPAPER_WIDTH,
     height: WALLPAPER_HEIGHT,
     palette: [],
-    pixels: createGrid(WALLPAPER_WIDTH, WALLPAPER_HEIGHT).map((_, i) => {
-      // 은은한 두 색 체크 패턴 기본값 — 완전히 빈 화면보다 "배경화면이 존재한다"는
-      // 게 눈에 띄고, 사용자가 직접 그려 덮어쓰기도 쉽다.
-      const x = i % WALLPAPER_WIDTH;
-      const y = Math.floor(i / WALLPAPER_WIDTH);
-      return (x + y) % 6 < 3 ? "#f4f4f5" : "#e4e4e7";
-    }),
+    pixels: WALLPAPER_PIXELS,
     createdAt: Date.now(),
   };
 }

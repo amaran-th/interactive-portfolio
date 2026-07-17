@@ -1374,8 +1374,7 @@ export default function Editor({
           {
             label: "캔버스 크기 수정",
             onClick: () => setResizingCanvas(true),
-            // 배경화면은 데스크탑 전체를 채우는 용도라 크기가 고정이어야 한다.
-            disabled: noActiveTab || isWallpaper,
+            disabled: noActiveTab,
           },
           {
             label: "붙여넣기",
@@ -1385,16 +1384,7 @@ export default function Editor({
         ],
       });
     },
-    [
-      doc,
-      history,
-      selection,
-      activeTabIndex,
-      isWallpaper,
-      handlePaste,
-      handleUndo,
-      handleRedo,
-    ],
+    [doc, history, selection, activeTabIndex, handlePaste, handleUndo, handleRedo],
   );
 
   const helpMod = helpPlatform === "mac" ? "⌘" : "Ctrl+";
@@ -2104,6 +2094,10 @@ export default function Editor({
         <ResizeCanvasDialog
           width={doc.width}
           height={doc.height}
+          // 배경화면은 데스크탑 전체를 채우는 용도라(WallpaperBackground의
+          // object-cover), 가로세로 비율이 크게 바뀌면 화면에 보이는 부분이
+          // 의도와 달라진다 — 해상도는 바꿀 수 있게 허용하되 비율만 고정한다.
+          lockAspectRatio={isWallpaper}
           onConfirm={handleResizeCanvas}
           onCancel={() => setResizingCanvas(false)}
         />
