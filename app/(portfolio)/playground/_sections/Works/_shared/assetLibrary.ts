@@ -1,3 +1,5 @@
+import { findBuiltin } from "./builtinAssets";
+
 const LIBRARY_KEY = "playground-asset-library";
 
 // 픽셀은 항상 자기 색을 직접 저장하는 트루컬러다(hex 문자열, 투명은 null) —
@@ -185,6 +187,12 @@ export function listPixelArt(): PixelArt[] {
 
 export function getPixelArt(id: string): PixelArt | undefined {
   return loadLibrary().pixelArt.find((p) => p.id === id);
+}
+
+// 사용자 라이브러리에서 먼저 찾고, 없으면 기본 제공 세트에서 찾는다.
+// 둘 다 없으면 undefined — 호출부는 참조가 끊긴(삭제된) 리소스로 처리해야 한다.
+export function resolvePixelArt(id: string): PixelArt | undefined {
+  return getPixelArt(id) ?? findBuiltin(id);
 }
 
 export function savePixelArt(art: PixelArt): boolean {
