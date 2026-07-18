@@ -243,12 +243,14 @@ export default function EditorScreen({
                     : "border border-white/15 text-gray-400 hover:border-white/30 hover:text-white"
                 }`}
               >
-                <img
-                  src={bg.imageUrl}
-                  alt={bg.name}
-                  className="h-4 w-4 rounded object-cover"
-                  style={{ imageRendering: "pixelated" }}
-                />
+                {bg.imageUrl && (
+                  <img
+                    src={bg.imageUrl}
+                    alt={bg.name}
+                    className="h-4 w-4 rounded object-cover"
+                    style={{ imageRendering: "pixelated" }}
+                  />
+                )}
                 {bg.name}
               </button>
             ))}

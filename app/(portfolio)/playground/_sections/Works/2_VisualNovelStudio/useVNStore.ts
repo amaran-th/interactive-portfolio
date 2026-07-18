@@ -4,6 +4,8 @@ import { pixelArtToDataUrl } from "../_shared/renderPixelArt";
 import { deleteBlob, loadBlobUrls, saveBlob } from "./imageStore";
 import { AudioTrack, AudioTrackType, Background, Character, Cut } from "./types";
 
+// 5: 캐릭터/배경 이미지가 업로드 파일 대신 pixelArtId 참조로 바뀌면서
+// 구버전(4 이하) 슬롯의 이미지 참조와 호환되지 않아 폐기한다.
 const STORAGE_VERSION = 5;
 
 const uid = () => Math.random().toString(36).slice(2, 9);

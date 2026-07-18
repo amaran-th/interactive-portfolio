@@ -45,7 +45,14 @@ function Thumb({ art, onClick }: { art: PixelArt; onClick: () => void }) {
 }
 
 export default function ResourcePicker({ open, kind, onClose, onSelect }: Props) {
-  const [tab, setTab] = useState<Tab>("builtin");
+  // 기본 제공 세트가 비어 있는 동안은 "네모네모빔 리소스" 탭을 먼저 보여준다 —
+  // 콘텐츠가 채워지면(builtinAssets.ts) 자연스럽게 "기본 제공"이 기본값이 된다.
+  const [tab, setTab] = useState<Tab>(() =>
+    (kind === "character" ? BUILTIN_CHARACTER_IMAGES : BUILTIN_BACKGROUNDS)
+      .length === 0
+      ? "library"
+      : "builtin",
+  );
   const [libraryArt, setLibraryArt] = useState<PixelArt[]>([]);
 
   useEffect(() => {
