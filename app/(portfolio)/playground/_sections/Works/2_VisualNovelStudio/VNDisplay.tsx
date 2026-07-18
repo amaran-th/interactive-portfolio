@@ -126,7 +126,7 @@ export default function VNDisplay({
         <div className="absolute bottom-0 inset-x-0 z-10 p-1 sm:px-3 sm:pb-3">
           {speakerNames && (
             <div>
-              <span className="inline-flex items-center gap-1.5 rounded-2xl bg-black/60 px-2 py-1 sm:px-3.5 sm:py-1.5 text-[9px] sm:text-sm font-bold tracking-wide text-white border border-white/20 ring-1 ring-inset ring-white/5">
+              <span className="inline-flex items-center gap-1.5 rounded-t-lg bg-black/60 px-2 py-1 sm:px-3.5 sm:py-1.5 text-[9px] sm:text-sm font-bold tracking-wide text-white border border-white/20 ring-1 ring-inset ring-white/5 rounded-b-none">
                 {speakerNames}
               </span>
             </div>
