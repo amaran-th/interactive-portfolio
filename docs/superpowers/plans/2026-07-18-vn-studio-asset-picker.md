@@ -1538,6 +1538,8 @@ git commit -m "feat: VN 스튜디오 캐릭터·배경 이미지를 파일 업�
 
 **추가 수정 사항 (Task 4 수동 검증 중 발견):** 원래 캐릭터 `<img>`는 `maxHeight`/`maxWidth`(상한선일 뿐 실제 크기 지정이 아님)만 쓰고 `height`를 지정하지 않았다. 업로드된 사진처럼 원본 픽셀 크기가 큰 이미지에서는 문제가 안 됐지만, 픽셀아트는 16×16처럼 원본이 아주 작을 수 있어 이 경우 `<img>`가 확대되지 않고 원본 픽셀 크기 그대로(예: 16×16 CSS px) 렌더링되는 게 실제로 확인됐다(`getBoundingClientRect()`로 측정). 배경은 `h-full w-full`로 크기를 강제해서 문제없었다. 아래 Step 1 코드에서는 `maxHeight`를 `height`로 바꿔 이 문제를 해결한다(`maxWidth`는 그대로 유지 — 가로세로 비율이 이상한 이미지가 캐릭터로 쓰였을 때 폭이 과도하게 넓어지지 않도록 하는 안전장치).
 
+**추가 수정 사항 2 (Task 5 실제 구현 중 발견 — 위 `height` 변경만으로는 부족했다):** `height: 88%` 같은 퍼센트 높이는 부모(containing block)가 확정된 높이를 가질 때만 계산된다. 캐릭터 `<img>`의 부모인 "side" div(아래 코드의 `flex flex-1 items-end ...`)는 그 위 "Characters" 행 div가 `items-end`이기 때문에 stretch되지 않고 자기 콘텐츠 크기만큼만(auto) 높이를 갖는다 — 즉 부모 높이가 미확정 상태라 `height: 88%`가 다시 `auto` 취급되어 무시되고, 결국 `<img>`가 원본 픽셀 크기 그대로 렌더링된다("삭제된 리소스" 플레이스홀더도 부모를 공유하므로 동일 문제). 해결책은 side div에 `self-stretch`를 추가해 그 자신을 "Characters" 행(이미 `aspect-video` 부모 아래 `flex-1`로 확정 높이를 가짐)의 전체 높이로 채우는 것이다 — `self-stretch`는 개별 flex 아이템에서 부모의 `items-end`를 오버라이드하므로, side div 자신은 꽉 채워지면서도 side div의 `items-end`는 그대로 남아 그 안의 캐릭터 이미지를 바닥에 붙여 정렬한다. 이렇게 하면 `height: 88%`가 확정된 부모를 갖게 되어 실제로 계산되고, 캐릭터가 원본 이미지 크기와 무관하게 항상 배율껏(88%/75%) 표시된다.
+
 - [ ] **Step 1: `VNDisplay.tsx` 전체 교체**
 
 ```tsx
@@ -1620,7 +1622,7 @@ export default function VNDisplay({
           return (
             <div
               key={side}
-              className={`flex flex-1 items-end ${side === "left" ? "justify-start" : "justify-end"}`}
+              className={`flex flex-1 self-stretch items-end ${side === "left" ? "justify-start" : "justify-end"}`}
             >
               {sideChars.map((char, idx) => {
                 const isSpeaker = cut.speakerIds.includes(char.id);
