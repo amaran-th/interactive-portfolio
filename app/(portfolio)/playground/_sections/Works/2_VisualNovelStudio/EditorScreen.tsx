@@ -247,6 +247,7 @@ export default function EditorScreen({
                   src={bg.imageUrl}
                   alt={bg.name}
                   className="h-4 w-4 rounded object-cover"
+                  style={{ imageRendering: "pixelated" }}
                 />
                 {bg.name}
               </button>
