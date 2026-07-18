@@ -2,6 +2,9 @@
 
 import { Pause, Play } from "lucide-react";
 import { useRef, useState } from "react";
+import { PixelArt } from "../_shared/assetLibrary";
+import { pixelArtToDataUrl } from "../_shared/renderPixelArt";
+import ResourcePicker from "./ResourcePicker";
 import { AudioTrack, AudioTrackType, Background, Character } from "./types";
 
 interface Props {
@@ -10,9 +13,9 @@ interface Props {
   audioTracks: AudioTrack[];
   onAddCharacter: (
     name: string,
-    images: { label: string; file: File }[],
+    images: { label: string; pixelArtId: string }[],
   ) => void;
-  onAddCharacterImage: (charId: string, label: string, file: File) => void;
+  onAddCharacterImage: (charId: string, label: string, pixelArtId: string) => void;
   onRemoveCharacterImage: (charId: string, imageId: string) => void;
   onRenameCharacter: (charId: string, name: string) => void;
   onRelabelCharacterImage: (
@@ -21,89 +24,13 @@ interface Props {
     label: string,
   ) => void;
   onRemoveCharacter: (id: string) => void;
-  onAddBackground: (name: string, file: File) => void;
+  onAddBackground: (name: string, pixelArtId: string) => void;
   onRemoveBackground: (id: string) => void;
   onAddAudioTrack: (name: string, type: AudioTrackType, file: File) => void;
   onRemoveAudioTrack: (id: string) => void;
 }
 
 type Tab = "characters" | "backgrounds" | "music";
-
-function DropImageArea({
-  preview,
-  placeholder,
-  multiple,
-  onFiles,
-  className,
-}: {
-  preview?: string | null;
-  placeholder?: string;
-  multiple?: boolean;
-  onFiles: (files: File[]) => void;
-  className?: string;
-}) {
-  const [isDragOver, setIsDragOver] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []).filter((f) =>
-      f.type.startsWith("image/"),
-    );
-    if (files.length) onFiles(files);
-    e.target.value = "";
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const files = Array.from(e.dataTransfer.files).filter((f) =>
-      f.type.startsWith("image/"),
-    );
-    if (files.length) onFiles(files);
-  };
-
-  return (
-    <div
-      onClick={() => fileRef.current?.click()}
-      onDrop={handleDrop}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setIsDragOver(true);
-      }}
-      onDragLeave={() => setIsDragOver(false)}
-      className={`flex cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed transition-colors ${
-        isDragOver
-          ? "border-white/50 bg-white/10"
-          : "border-white/20 bg-white/5 hover:bg-white/8"
-      } ${className ?? ""}`}
-    >
-      {preview ? (
-        <img
-          src={preview}
-          alt="preview"
-          className="h-full w-full object-contain p-1"
-        />
-      ) : (
-        <div className="flex flex-col items-center gap-1.5 px-4 py-3 text-center">
-          <span className="text-xl opacity-40">🖼️</span>
-          <span className="text-xs text-gray-500">
-            {isDragOver
-              ? "여기에 놓기"
-              : (placeholder ?? "클릭 또는 드래그&드롭")}
-          </span>
-        </div>
-      )}
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        multiple={multiple}
-        className="hidden"
-        onChange={handleChange}
-      />
-    </div>
-  );
-}
 
 function InlineInput({
   value,
@@ -166,42 +93,13 @@ function CharacterCard({
   onRemove,
 }: {
   char: Character;
-  onAddImage: (label: string, file: File) => void;
+  onAddImage: (label: string, pixelArtId: string) => void;
   onRemoveImage: (imageId: string) => void;
   onRename: (name: string) => void;
   onRelabel: (imageId: string, label: string) => void;
   onRemove: () => void;
 }) {
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [pendingPreview, setPendingPreview] = useState<string | null>(null);
-  const [pendingLabel, setPendingLabel] = useState("");
-  const [showPicker, setShowPicker] = useState(false);
-
-  const handlePickFile = (files: File[]) => {
-    const f = files[0];
-    if (!f) return;
-    if (pendingPreview) URL.revokeObjectURL(pendingPreview);
-    setPendingFile(f);
-    setPendingPreview(URL.createObjectURL(f));
-  };
-
-  const handleAdd = () => {
-    if (!pendingFile) return;
-    onAddImage(pendingLabel.trim(), pendingFile);
-    setPendingFile(null);
-    if (pendingPreview) URL.revokeObjectURL(pendingPreview);
-    setPendingPreview(null);
-    setPendingLabel("");
-    setShowPicker(false);
-  };
-
-  const handleCancel = () => {
-    setShowPicker(false);
-    setPendingFile(null);
-    if (pendingPreview) URL.revokeObjectURL(pendingPreview);
-    setPendingPreview(null);
-    setPendingLabel("");
-  };
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   return (
     <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/5 p-3">
@@ -230,6 +128,7 @@ function CharacterCard({
                   src={img.imageUrl}
                   alt={img.label}
                   className="h-full w-full object-contain"
+                  style={{ imageRendering: "pixelated" }}
                 />
               )}
               {char.images.length > 1 && (
@@ -248,114 +147,69 @@ function CharacterCard({
             />
           </div>
         ))}
-        {/* Add image button */}
-        {!showPicker ? (
-          <button
-            onClick={() => setShowPicker(true)}
-            className="flex h-16 w-12 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/20 text-gray-600 hover:border-white/30 hover:text-gray-400"
-          >
-            <span className="text-lg">+</span>
-          </button>
-        ) : (
-          <div className="flex w-full flex-col gap-2 rounded-xl border border-white/10 bg-white/5 p-2">
-            <DropImageArea
-              preview={pendingPreview}
-              onFiles={handlePickFile}
-              className="h-20"
-            />
-            <input
-              type="text"
-              placeholder="유형"
-              value={pendingLabel}
-              onChange={(e) => setPendingLabel(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white placeholder:text-gray-600 outline-none focus:border-white/30"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={handleAdd}
-                disabled={!pendingFile}
-                className="flex-1 rounded-lg bg-white/10 py-1.5 text-xs font-medium text-white hover:bg-white/15 disabled:opacity-30"
-              >
-                추가
-              </button>
-              <button
-                onClick={handleCancel}
-                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-gray-400 hover:bg-white/5"
-              >
-                취소
-              </button>
-            </div>
-          </div>
-        )}
+        <button
+          onClick={() => setPickerOpen(true)}
+          className="flex h-16 w-12 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/20 text-gray-600 hover:border-white/30 hover:text-gray-400"
+        >
+          <span className="text-lg">+</span>
+        </button>
       </div>
+      <ResourcePicker
+        open={pickerOpen}
+        kind="character"
+        onClose={() => setPickerOpen(false)}
+        onSelect={(art) => {
+          onAddImage(art.name || "표정", art.id);
+          setPickerOpen(false);
+        }}
+      />
     </div>
   );
 }
 
-type PendingImage = { id: string; label: string; file: File; preview: string };
+type PendingImage = {
+  id: string;
+  label: string;
+  pixelArtId: string;
+  previewUrl: string;
+};
 
 function CharacterForm({
   count,
   onAdd,
 }: {
   count: number;
-  onAdd: (name: string, images: { label: string; file: File }[]) => void;
+  onAdd: (name: string, images: { label: string; pixelArtId: string }[]) => void;
 }) {
   const [name, setName] = useState(() => `캐릭터${count + 1}`);
   const [pending, setPending] = useState<PendingImage[]>([]);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  const addFiles = (files: File[]) => {
+  const handlePick = (art: PixelArt) => {
     setPending((prev) => [
       ...prev,
-      ...files.map((file, index) => ({
+      {
         id: Math.random().toString(36).slice(2),
-        label: `유형${prev.length + index + 1}`,
-        file,
-        preview: URL.createObjectURL(file),
-      })),
+        label: art.name || `유형${prev.length + 1}`,
+        pixelArtId: art.id,
+        previewUrl: pixelArtToDataUrl(art),
+      },
     ]);
-  };
-
-  const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-    addFiles(
-      Array.from(e.target.files ?? []).filter((f) =>
-        f.type.startsWith("image/"),
-      ),
-    );
-    e.target.value = "";
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    addFiles(
-      Array.from(e.dataTransfer.files).filter((f) =>
-        f.type.startsWith("image/"),
-      ),
-    );
+    setPickerOpen(false);
   };
 
   const updateLabel = (id: string, label: string) =>
     setPending((prev) => prev.map((p) => (p.id === id ? { ...p, label } : p)));
 
-  const removeImage = (id: string) => {
-    setPending((prev) => {
-      const item = prev.find((p) => p.id === id);
-      if (item) URL.revokeObjectURL(item.preview);
-      return prev.filter((p) => p.id !== id);
-    });
-  };
+  const removeImage = (id: string) =>
+    setPending((prev) => prev.filter((p) => p.id !== id));
 
   const handleAdd = () => {
     if (!name.trim() || pending.length === 0) return;
     onAdd(
       name.trim(),
-      pending.map(({ label, file }) => ({ label, file })),
+      pending.map(({ label, pixelArtId }) => ({ label, pixelArtId })),
     );
-    pending.forEach((p) => URL.revokeObjectURL(p.preview));
     setName(`캐릭터${count + 2}`);
     setPending([]);
   };
@@ -369,24 +223,15 @@ function CharacterForm({
         onChange={(e) => setName(e.target.value)}
         className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-600 outline-none focus:border-white/30"
       />
-      <div
-        onDrop={handleDrop}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setIsDragOver(true);
-        }}
-        onDragLeave={() => setIsDragOver(false)}
-        className={`flex flex-wrap gap-2 rounded-xl p-1.5 transition-colors ${
-          isDragOver ? "bg-white/8 ring-1 ring-white/30" : ""
-        }`}
-      >
+      <div className="flex flex-wrap gap-2 rounded-xl p-1.5">
         {pending.map((p) => (
           <div key={p.id} className="flex flex-col items-center gap-1">
             <div className="relative">
               <img
-                src={p.preview}
+                src={p.previewUrl}
                 alt=""
                 className="h-32 w-14 rounded-lg bg-white/5 object-contain"
+                style={{ imageRendering: "pixelated" }}
               />
               <button
                 onClick={() => removeImage(p.id)}
@@ -405,7 +250,7 @@ function CharacterForm({
           </div>
         ))}
         <button
-          onClick={() => fileRef.current?.click()}
+          onClick={() => setPickerOpen(true)}
           className="flex h-32 w-14 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/20 text-gray-600 hover:border-white/30 hover:text-gray-400"
         >
           <span className="text-xl leading-none">+</span>
@@ -413,16 +258,8 @@ function CharacterForm({
             {pending.length === 0 ? "이미지" : "추가"}
           </span>
         </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={handleFiles}
-        />
       </div>
-      <p className="text-xs text-gray-600">권장 비율 2:5 · 드래그&드롭 가능</p>
+      <p className="text-xs text-gray-600">권장 비율 2:5</p>
 
       <button
         onClick={handleAdd}
@@ -431,6 +268,12 @@ function CharacterForm({
       >
         등록
       </button>
+      <ResourcePicker
+        open={pickerOpen}
+        kind="character"
+        onClose={() => setPickerOpen(false)}
+        onSelect={handlePick}
+      />
     </div>
   );
 }
@@ -440,27 +283,19 @@ function BackgroundForm({
   onAdd,
 }: {
   count: number;
-  onAdd: (name: string, file: File) => void;
+  onAdd: (name: string, pixelArtId: string) => void;
 }) {
   const [name, setName] = useState(() => `배경${count + 1}`);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
-
-  const handleFile = (files: File[]) => {
-    const f = files[0];
-    if (!f) return;
-    if (preview) URL.revokeObjectURL(preview);
-    setFile(f);
-    setPreview(URL.createObjectURL(f));
-  };
+  const [picked, setPicked] = useState<{ art: PixelArt; previewUrl: string } | null>(
+    null,
+  );
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const handleAdd = () => {
-    if (!name.trim() || !file) return;
-    onAdd(name.trim(), file);
+    if (!name.trim() || !picked) return;
+    onAdd(name.trim(), picked.art.id);
     setName(`배경${count + 2}`);
-    setFile(null);
-    if (preview) URL.revokeObjectURL(preview);
-    setPreview(null);
+    setPicked(null);
   };
 
   return (
@@ -474,22 +309,42 @@ function BackgroundForm({
           onKeyDown={(e) => e.key === "Enter" && handleAdd()}
           className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-600 outline-none focus:border-white/30 sm:col-start-1 sm:row-start-1"
         />
-        {/* Image area — row 2 on desktop, row 2 on mobile (middle) */}
-        <DropImageArea
-          preview={preview}
-          onFiles={handleFile}
-          className="aspect-video sm:col-span-2 sm:col-start-1 sm:row-start-2"
-        />
-        {/* Button — row 1 col 2 on desktop, last on mobile */}
+        <button
+          onClick={() => setPickerOpen(true)}
+          className="flex aspect-video cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-white/20 bg-white/5 hover:bg-white/8 sm:col-span-2 sm:col-start-1 sm:row-start-2"
+        >
+          {picked ? (
+            <img
+              src={picked.previewUrl}
+              alt=""
+              className="h-full w-full object-contain p-1"
+              style={{ imageRendering: "pixelated" }}
+            />
+          ) : (
+            <div className="flex flex-col items-center gap-1.5 px-4 py-3 text-center">
+              <span className="text-xl opacity-40">🖼️</span>
+              <span className="text-xs text-gray-500">클릭해서 리소스 선택</span>
+            </div>
+          )}
+        </button>
       </div>
       <p className="text-xs text-gray-600">권장 이미지 비율: 16:9</p>
       <button
         onClick={handleAdd}
-        disabled={!name.trim() || !file}
+        disabled={!name.trim() || !picked}
         className="order-last rounded-lg bg-white/10 py-2 px-4 text-sm font-medium text-white hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-30 sm:order-none sm:col-start-2 sm:row-start-1 sm:self-stretch"
       >
         등록
       </button>
+      <ResourcePicker
+        open={pickerOpen}
+        kind="background"
+        onClose={() => setPickerOpen(false)}
+        onSelect={(art) => {
+          setPicked({ art, previewUrl: pixelArtToDataUrl(art) });
+          setPickerOpen(false);
+        }}
+      />
     </div>
   );
 }
@@ -665,8 +520,8 @@ export default function AssetUploader({
                 <CharacterCard
                   key={char.id}
                   char={char}
-                  onAddImage={(label, file) =>
-                    onAddCharacterImage(char.id, label, file)
+                  onAddImage={(label, pixelArtId) =>
+                    onAddCharacterImage(char.id, label, pixelArtId)
                   }
                   onRemoveImage={(imageId) =>
                     onRemoveCharacterImage(char.id, imageId)
@@ -698,6 +553,7 @@ export default function AssetUploader({
                       src={bg.imageUrl}
                       alt={bg.name}
                       className="h-16 w-full object-contain"
+                      style={{ imageRendering: "pixelated" }}
                     />
                   )}
                   <span className="text-xs text-gray-300">{bg.name}</span>

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { deleteBlob, deleteBlobs, loadBlobUrls, saveBlob } from "./imageStore";
+import { resolvePixelArt } from "../_shared/assetLibrary";
+import { pixelArtToDataUrl } from "../_shared/renderPixelArt";
+import { deleteBlob, loadBlobUrls, saveBlob } from "./imageStore";
 import { AudioTrack, AudioTrackType, Background, Character, Cut } from "./types";
 
-const STORAGE_VERSION = 4;
+const STORAGE_VERSION = 5;
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 const blankCut = (): Cut => ({
@@ -18,9 +20,14 @@ const blankCut = (): Cut => ({
   sfxId: null,
 });
 
-type StoredImage = { id: string; label: string };
+function resolveImageUrl(pixelArtId: string): string {
+  const art = resolvePixelArt(pixelArtId);
+  return art ? pixelArtToDataUrl(art) : "";
+}
+
+type StoredImage = { id: string; label: string; pixelArtId: string };
 type StoredCharacter = { id: string; name: string; images: StoredImage[] };
-type StoredBackground = { id: string; name: string };
+type StoredBackground = { id: string; name: string; pixelArtId: string };
 type StoredAudioTrack = { id: string; name: string; type: AudioTrackType };
 type StoredState = {
   version: number;
@@ -35,7 +42,7 @@ function loadMeta(key: string): StoredState | null {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<StoredState> & { version: number };
-    if (parsed.version < 3) return null;
+    if (parsed.version < STORAGE_VERSION) return null;
     return {
       version: STORAGE_VERSION,
       characters: parsed.characters ?? [],
@@ -60,9 +67,17 @@ function saveMeta(
     characters: characters.map((c) => ({
       id: c.id,
       name: c.name,
-      images: c.images.map((img) => ({ id: img.id, label: img.label })),
+      images: c.images.map((img) => ({
+        id: img.id,
+        label: img.label,
+        pixelArtId: img.pixelArtId,
+      })),
     })),
-    backgrounds: backgrounds.map((bg) => ({ id: bg.id, name: bg.name })),
+    backgrounds: backgrounds.map((bg) => ({
+      id: bg.id,
+      name: bg.name,
+      pixelArtId: bg.pixelArtId,
+    })),
     audioTracks: audioTracks.map((a) => ({ id: a.id, name: a.name, type: a.type })),
     cuts,
   };
@@ -79,11 +94,18 @@ export function useVNStore(slotId: string) {
     () =>
       initialMeta?.characters.map((c) => ({
         ...c,
-        images: c.images.map((img) => ({ ...img, imageUrl: "" })),
+        images: c.images.map((img) => ({
+          ...img,
+          imageUrl: resolveImageUrl(img.pixelArtId),
+        })),
       })) ?? [],
   );
   const [backgrounds, setBackgrounds] = useState<Background[]>(
-    () => initialMeta?.backgrounds.map((bg) => ({ ...bg, imageUrl: "" })) ?? [],
+    () =>
+      initialMeta?.backgrounds.map((bg) => ({
+        ...bg,
+        imageUrl: resolveImageUrl(bg.pixelArtId),
+      })) ?? [],
   );
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>(
     () => initialMeta?.audioTracks.map((a) => ({ ...a, audioUrl: "" })) ?? [],
@@ -100,43 +122,16 @@ export function useVNStore(slotId: string) {
   );
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Restore blob URLs from IDB on mount
+  // 오디오만 IndexedDB에서 blob URL을 비동기로 복원한다 — 이미지는 이제
+  // pixelArtId를 동기적으로 렌더링하므로 위 useState 초기화에서 이미 끝났다.
   useEffect(() => {
-    const meta = initialMeta;
-    const imageIds = [
-      ...(meta?.characters.flatMap((c) => c.images.map((img) => img.id)) ?? []),
-      ...(meta?.backgrounds.map((bg) => bg.id) ?? []),
-    ];
-    const audioIds = meta?.audioTracks.map((a) => a.id) ?? [];
-
-    const imagePromise =
-      imageIds.length > 0
-        ? loadBlobUrls(imageIds).then((urlMap) => {
-            setCharacters((prev) =>
-              prev.map((c) => ({
-                ...c,
-                images: c.images.map((img) => ({
-                  ...img,
-                  imageUrl: urlMap.get(img.id) ?? "",
-                })),
-              })),
-            );
-            setBackgrounds((prev) =>
-              prev.map((bg) => ({ ...bg, imageUrl: urlMap.get(bg.id) ?? "" })),
-            );
-          })
-        : Promise.resolve();
-
-    const audioPromise =
-      audioIds.length > 0
-        ? loadBlobUrls(audioIds).then((urlMap) => {
-            setAudioTracks((prev) =>
-              prev.map((a) => ({ ...a, audioUrl: urlMap.get(a.id) ?? "" })),
-            );
-          })
-        : Promise.resolve();
-
-    Promise.all([imagePromise, audioPromise]);
+    const audioIds = initialMeta?.audioTracks.map((a) => a.id) ?? [];
+    if (audioIds.length === 0) return;
+    loadBlobUrls(audioIds).then((urlMap) => {
+      setAudioTracks((prev) =>
+        prev.map((a) => ({ ...a, audioUrl: urlMap.get(a.id) ?? "" })),
+      );
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -144,28 +139,26 @@ export function useVNStore(slotId: string) {
   }, [characters, backgrounds, audioTracks, cuts, storageKey]);
 
   const addCharacter = useCallback(
-    async (name: string, images: { label: string; file: File }[]) => {
-      const newImages = await Promise.all(
-        images.map(async ({ label, file }) => {
-          const id = uid();
-          await saveBlob(id, file);
-          return { id, label, imageUrl: URL.createObjectURL(file) };
-        }),
-      );
+    (name: string, images: { label: string; pixelArtId: string }[]) => {
+      const newImages = images.map(({ label, pixelArtId }) => ({
+        id: uid(),
+        label,
+        pixelArtId,
+        imageUrl: resolveImageUrl(pixelArtId),
+      }));
       setCharacters((prev) => [...prev, { id: uid(), name, images: newImages }]);
     },
     [],
   );
 
   const addCharacterImage = useCallback(
-    async (charId: string, label: string, file: File) => {
+    (charId: string, label: string, pixelArtId: string) => {
       const id = uid();
-      await saveBlob(id, file);
-      const imageUrl = URL.createObjectURL(file);
+      const imageUrl = resolveImageUrl(pixelArtId);
       setCharacters((prev) =>
         prev.map((c) =>
           c.id === charId
-            ? { ...c, images: [...c.images, { id, label, imageUrl }] }
+            ? { ...c, images: [...c.images, { id, label, pixelArtId, imageUrl }] }
             : c,
         ),
       );
@@ -177,9 +170,6 @@ export function useVNStore(slotId: string) {
     setCharacters((prev) =>
       prev.map((c) => {
         if (c.id !== charId || c.images.length <= 1) return c;
-        const img = c.images.find((i) => i.id === imageId);
-        if (img?.imageUrl) URL.revokeObjectURL(img.imageUrl);
-        deleteBlob(imageId);
         return { ...c, images: c.images.filter((i) => i.id !== imageId) };
       }),
     );
@@ -218,16 +208,7 @@ export function useVNStore(slotId: string) {
   );
 
   const removeCharacter = useCallback((charId: string) => {
-    setCharacters((prev) => {
-      const char = prev.find((c) => c.id === charId);
-      if (char) {
-        char.images.forEach((img) => {
-          if (img.imageUrl) URL.revokeObjectURL(img.imageUrl);
-        });
-        deleteBlobs(char.images.map((img) => img.id));
-      }
-      return prev.filter((c) => c.id !== charId);
-    });
+    setCharacters((prev) => prev.filter((c) => c.id !== charId));
     setCuts((prev) =>
       prev.map((cut) => {
         const characterPositions = { ...cut.characterPositions };
@@ -245,20 +226,14 @@ export function useVNStore(slotId: string) {
     );
   }, []);
 
-  const addBackground = useCallback(async (name: string, file: File) => {
+  const addBackground = useCallback((name: string, pixelArtId: string) => {
     const id = uid();
-    await saveBlob(id, file);
-    const imageUrl = URL.createObjectURL(file);
-    setBackgrounds((prev) => [...prev, { id, name, imageUrl }]);
+    const imageUrl = resolveImageUrl(pixelArtId);
+    setBackgrounds((prev) => [...prev, { id, name, pixelArtId, imageUrl }]);
   }, []);
 
   const removeBackground = useCallback((bgId: string) => {
-    setBackgrounds((prev) => {
-      const bg = prev.find((b) => b.id === bgId);
-      if (bg?.imageUrl) URL.revokeObjectURL(bg.imageUrl);
-      deleteBlob(bgId);
-      return prev.filter((b) => b.id !== bgId);
-    });
+    setBackgrounds((prev) => prev.filter((b) => b.id !== bgId));
     setCuts((prev) =>
       prev.map((cut) => ({
         ...cut,

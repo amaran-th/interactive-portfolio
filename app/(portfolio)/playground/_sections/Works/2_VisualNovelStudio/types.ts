@@ -1,7 +1,8 @@
 export type CharacterImage = {
   id: string;
   label: string;
-  imageUrl: string;
+  pixelArtId: string;
+  imageUrl: string; // 저장되지 않는 런타임 값 — pixelArtId를 렌더링한 결과
 };
 
 export type Character = {
@@ -13,7 +14,8 @@ export type Character = {
 export type Background = {
   id: string;
   name: string;
-  imageUrl: string;
+  pixelArtId: string;
+  imageUrl: string; // 저장되지 않는 런타임 값 — pixelArtId를 렌더링한 결과
 };
 
 export type AudioTrackType = "bgm" | "sfx";

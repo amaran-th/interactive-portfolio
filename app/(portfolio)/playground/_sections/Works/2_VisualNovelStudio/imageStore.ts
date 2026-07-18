@@ -50,14 +50,3 @@ export async function deleteBlob(id: string): Promise<void> {
     tx.onerror = () => reject(tx.error);
   });
 }
-
-export async function deleteBlobs(ids: string[]): Promise<void> {
-  if (ids.length === 0) return;
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, "readwrite");
-    ids.forEach((id) => tx.objectStore(STORE).delete(id));
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
