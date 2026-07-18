@@ -1536,6 +1536,8 @@ git commit -m "feat: VN 스튜디오 캐릭터·배경 이미지를 파일 업�
 **Interfaces:**
 - Consumes: `CharacterImage.imageUrl`, `Background.imageUrl` (Task 4에서 이미 pixelArtId 기반으로 채워짐 — 이 태스크는 소비하는 쪽 렌더링만 손본다)
 
+**추가 수정 사항 (Task 4 수동 검증 중 발견):** 원래 캐릭터 `<img>`는 `maxHeight`/`maxWidth`(상한선일 뿐 실제 크기 지정이 아님)만 쓰고 `height`를 지정하지 않았다. 업로드된 사진처럼 원본 픽셀 크기가 큰 이미지에서는 문제가 안 됐지만, 픽셀아트는 16×16처럼 원본이 아주 작을 수 있어 이 경우 `<img>`가 확대되지 않고 원본 픽셀 크기 그대로(예: 16×16 CSS px) 렌더링되는 게 실제로 확인됐다(`getBoundingClientRect()`로 측정). 배경은 `h-full w-full`로 크기를 강제해서 문제없었다. 아래 Step 1 코드에서는 `maxHeight`를 `height`로 바꿔 이 문제를 해결한다(`maxWidth`는 그대로 유지 — 가로세로 비율이 이상한 이미지가 캐릭터로 쓰였을 때 폭이 과도하게 넓어지지 않도록 하는 안전장치).
+
 - [ ] **Step 1: `VNDisplay.tsx` 전체 교체**
 
 ```tsx
@@ -1633,7 +1635,7 @@ export default function VNDisplay({
                     alt={char.name}
                     className="object-contain transition-opacity duration-300"
                     style={{
-                      maxHeight: compact ? "75%" : "88%",
+                      height: compact ? "75%" : "88%",
                       maxWidth: compact ? "67.5%" : "79%",
                       opacity: dimmed ? 0.35 : 1,
                       marginLeft: idx === 0 ? 0 : overlapML,
