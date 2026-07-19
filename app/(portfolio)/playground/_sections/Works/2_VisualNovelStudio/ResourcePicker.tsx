@@ -24,9 +24,9 @@ function Thumb({ art, onClick }: { art: PixelArt; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 p-2 text-left transition-colors hover:border-white/30 hover:bg-white/10"
+      className="flex flex-col items-center gap-1.5 border border-gray-200 bg-white p-2 text-left transition-colors hover:border-gray-400 hover:bg-gray-50"
     >
-      <div className="flex h-16 w-full items-center justify-center overflow-hidden rounded-lg bg-black/20">
+      <div className="flex h-16 w-full items-center justify-center overflow-hidden bg-gray-100">
         {url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -37,7 +37,7 @@ function Thumb({ art, onClick }: { art: PixelArt; onClick: () => void }) {
           />
         )}
       </div>
-      <span className="w-full truncate text-center text-xs text-gray-300">
+      <span className="w-full truncate text-center text-xs text-gray-700">
         {art.name}
       </span>
     </button>
@@ -72,18 +72,18 @@ export default function ResourcePicker({ open, kind, onClose, onSelect }: Props)
       onClick={onClose}
     >
       <div
-        className="flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/10 bg-gray-950"
+        className="flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden border border-gray-200 bg-white"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex border-b border-white/10">
+        <div className="flex border-b border-gray-200">
           {(["builtin", "library"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`flex-1 py-3 text-xs font-medium transition-colors ${
                 tab === t
-                  ? "border-b-2 border-white text-white"
-                  : "text-gray-500 hover:text-gray-300"
+                  ? "border-b-2 border-[#2f3a8f] text-[#2f3a8f]"
+                  : "text-gray-500 hover:text-gray-700"
               }`}
             >
               {t === "builtin" ? "기본 제공" : "네모네모빔 리소스"}
@@ -92,7 +92,7 @@ export default function ResourcePicker({ open, kind, onClose, onSelect }: Props)
         </div>
         <div className="flex-1 overflow-auto p-3">
           {items.length === 0 ? (
-            <p className="py-8 text-center text-xs italic text-gray-600">
+            <p className="py-8 text-center text-xs italic text-gray-400">
               {tab === "builtin"
                 ? "기본 제공 리소스가 없습니다."
                 : "네모네모빔에서 만든 그림이 없습니다. 먼저 그림을 그려서 저장해보세요."}
@@ -105,10 +105,10 @@ export default function ResourcePicker({ open, kind, onClose, onSelect }: Props)
             </div>
           )}
         </div>
-        <div className="border-t border-white/10 p-2">
+        <div className="border-t border-gray-200 p-2">
           <button
             onClick={onClose}
-            className="w-full rounded-lg px-3 py-2 text-xs text-gray-400 hover:bg-white/5 hover:text-white"
+            className="w-full px-3 py-2 text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-900"
           >
             취소
           </button>
