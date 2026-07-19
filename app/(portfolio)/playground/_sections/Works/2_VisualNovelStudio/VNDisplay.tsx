@@ -42,7 +42,7 @@ export default function VNDisplay({
   const hasText = cut.text.trim().length > 0;
 
   return (
-    <div className="relative flex w-full aspect-video flex-col overflow-hidden bg-gray-900">
+    <div className="relative flex w-full aspect-video flex-col overflow-hidden bg-white">
       {/* Background */}
       {bg ? (
         bg.imageUrl ? (
@@ -54,18 +54,18 @@ export default function VNDisplay({
             style={{ imageRendering: "pixelated" }}
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center border border-dashed border-white/10 bg-gray-900">
-            <span className="text-xs text-white/20">삭제된 리소스</span>
+          <div className="absolute inset-0 flex items-center justify-center border border-dashed border-gray-300 bg-gray-100">
+            <span className="text-xs text-gray-400">삭제된 리소스</span>
           </div>
         )
       ) : (
-        <div className="absolute inset-0 bg-linear-to-b from-gray-800 to-gray-950" />
+        <div className="absolute inset-0 bg-linear-to-b from-gray-100 to-gray-200" />
       )}
 
       {/* Characters */}
       <div className="relative flex flex-1 items-end px-2 pb-2">
         {visibleChars.length === 0 && !bg && (
-          <span className="mb-8 w-full text-center text-xs text-white/20">
+          <span className="mb-8 w-full text-center text-xs text-gray-400">
             캐릭터 없음
           </span>
         )}
@@ -103,7 +103,7 @@ export default function VNDisplay({
                 ) : (
                   <div
                     key={char.id}
-                    className="flex items-center justify-center border border-dashed border-white/10 text-center text-[9px] text-white/20"
+                    className="flex items-center justify-center border border-dashed border-gray-300 text-center text-[9px] text-gray-400"
                     style={{
                       height: compact ? "75%" : "88%",
                       width: compact ? "40%" : "45%",
@@ -121,7 +121,9 @@ export default function VNDisplay({
         })}
       </div>
 
-      {/* Text box — absolute, hidden when no speaker */}
+      {/* Text box — absolute, hidden when no speaker. 대사박스는 예외:
+          사용자가 그린 임의 색 배경/캐릭터 위에 겹치므로 라이트 톤을 따르지
+          않고 지금의 반투명 어두운 스타일을 그대로 유지한다. */}
       {cut.speakerIds.length > 0 && (
         <div className="absolute bottom-0 inset-x-0 z-10 p-1 sm:px-3 sm:pb-3">
           {speakerNames && (
