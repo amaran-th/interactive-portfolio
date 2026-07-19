@@ -65,7 +65,7 @@ function InlineInput({
             setEditing(false);
           }
         }}
-        className={`rounded border border-white/20 bg-white/10 px-1.5 py-0.5 text-white outline-none ${className ?? ""}`}
+        className={`border border-gray-300 bg-gray-50 px-1.5 py-0.5 text-gray-900 outline-none ${className ?? ""}`}
       />
     );
   }
@@ -102,16 +102,16 @@ function CharacterCard({
   const [pickerOpen, setPickerOpen] = useState(false);
 
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/5 p-3">
+    <div className="flex flex-col gap-2 border border-gray-200 bg-white p-3">
       <div className="flex items-center justify-between">
         <InlineInput
           value={char.name}
           onCommit={onRename}
-          className="text-sm font-medium text-white"
+          className="text-sm font-medium text-gray-900"
         />
         <button
           onClick={onRemove}
-          className="text-xs text-gray-600 transition-colors hover:text-red-400"
+          className="text-xs text-gray-400 transition-colors hover:text-red-600"
         >
           삭제
         </button>
@@ -122,7 +122,7 @@ function CharacterCard({
             key={img.id}
             className="relative flex flex-col items-center gap-1"
           >
-            <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-xl border border-white/10">
+            <div className="relative h-16 w-12 shrink-0 overflow-hidden border border-gray-200">
               {img.imageUrl && (
                 <img
                   src={img.imageUrl}
@@ -134,7 +134,7 @@ function CharacterCard({
               {char.images.length > 1 && (
                 <button
                   onClick={() => onRemoveImage(img.id)}
-                  className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/70 text-gray-400 hover:text-red-400"
+                  className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center bg-black/70 text-gray-400 hover:text-red-400"
                 >
                   ×
                 </button>
@@ -149,7 +149,7 @@ function CharacterCard({
         ))}
         <button
           onClick={() => setPickerOpen(true)}
-          className="flex h-16 w-12 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/20 text-gray-600 hover:border-white/30 hover:text-gray-400"
+          className="flex h-16 w-12 shrink-0 flex-col items-center justify-center gap-1 border border-dashed border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-600"
         >
           <span className="text-lg">+</span>
         </button>
@@ -215,27 +215,27 @@ function CharacterForm({
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+    <div className="flex flex-col gap-3 border border-gray-200 bg-white p-4">
       <input
         type="text"
         placeholder="캐릭터 이름"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-600 outline-none focus:border-white/30"
+        className="border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-gray-400"
       />
-      <div className="flex flex-wrap gap-2 rounded-xl p-1.5">
+      <div className="flex flex-wrap gap-2 p-1.5">
         {pending.map((p) => (
           <div key={p.id} className="flex flex-col items-center gap-1">
             <div className="relative">
               <img
                 src={p.previewUrl}
                 alt=""
-                className="h-32 w-14 rounded-lg bg-white/5 object-contain"
+                className="h-32 w-14 bg-gray-100 object-contain"
                 style={{ imageRendering: "pixelated" }}
               />
               <button
                 onClick={() => removeImage(p.id)}
-                className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/70 text-xs text-gray-400 hover:text-red-400"
+                className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center bg-black/70 text-xs text-gray-400 hover:text-red-400"
               >
                 ×
               </button>
@@ -245,13 +245,13 @@ function CharacterForm({
               placeholder="유형"
               value={p.label}
               onChange={(e) => updateLabel(p.id, e.target.value)}
-              className="w-12 rounded-md border border-white/10 bg-white/5 px-1 py-1 text-center text-xs text-white placeholder:text-gray-600 outline-none focus:border-white/30"
+              className="w-12 border border-gray-200 bg-white px-1 py-1 text-center text-xs text-gray-900 placeholder:text-gray-400 outline-none focus:border-gray-400"
             />
           </div>
         ))}
         <button
           onClick={() => setPickerOpen(true)}
-          className="flex h-32 w-14 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/20 text-gray-600 hover:border-white/30 hover:text-gray-400"
+          className="flex h-32 w-14 shrink-0 flex-col items-center justify-center gap-1 border border-dashed border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-600"
         >
           <span className="text-xl leading-none">+</span>
           <span className="text-[10px]">
@@ -259,12 +259,12 @@ function CharacterForm({
           </span>
         </button>
       </div>
-      <p className="text-xs text-gray-600">권장 비율 2:5</p>
+      <p className="text-xs text-gray-400">권장 비율 2:5</p>
 
       <button
         onClick={handleAdd}
         disabled={!name.trim() || pending.length === 0}
-        className="rounded-lg bg-white/10 py-2 text-sm font-medium text-white hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-30"
+        className="bg-[#2f3a8f]/10 py-2 text-sm font-medium text-[#2f3a8f] hover:bg-[#2f3a8f]/15 disabled:cursor-not-allowed disabled:opacity-40"
       >
         등록
       </button>
@@ -299,7 +299,7 @@ function BackgroundForm({
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+    <div className="flex flex-col gap-3 border border-gray-200 bg-white p-4">
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
         <input
           type="text"
@@ -307,11 +307,11 @@ function BackgroundForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-          className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-600 outline-none focus:border-white/30 sm:col-start-1 sm:row-start-1"
+          className="border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-gray-400 sm:col-start-1 sm:row-start-1"
         />
         <button
           onClick={() => setPickerOpen(true)}
-          className="flex aspect-video cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-white/20 bg-white/5 hover:bg-white/8 sm:col-span-2 sm:col-start-1 sm:row-start-2"
+          className="flex aspect-video cursor-pointer items-center justify-center overflow-hidden border border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100 sm:col-span-2 sm:col-start-1 sm:row-start-2"
         >
           {picked ? (
             <img
@@ -328,11 +328,11 @@ function BackgroundForm({
           )}
         </button>
       </div>
-      <p className="text-xs text-gray-600">권장 이미지 비율: 16:9</p>
+      <p className="text-xs text-gray-400">권장 이미지 비율: 16:9</p>
       <button
         onClick={handleAdd}
         disabled={!name.trim() || !picked}
-        className="order-last rounded-lg bg-white/10 py-2 px-4 text-sm font-medium text-white hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-30 sm:order-none sm:col-start-2 sm:row-start-1 sm:self-stretch"
+        className="order-last bg-[#2f3a8f]/10 py-2 px-4 text-sm font-medium text-[#2f3a8f] hover:bg-[#2f3a8f]/15 disabled:cursor-not-allowed disabled:opacity-40 sm:order-none sm:col-start-2 sm:row-start-1 sm:self-stretch"
       >
         등록
       </button>
@@ -376,19 +376,19 @@ function AudioTrackItem({
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
+    <div className="flex items-center gap-3 border border-gray-200 bg-white px-3 py-2.5">
       <button
         onClick={toggle}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+        className="flex h-7 w-7 shrink-0 items-center justify-center bg-gray-100 text-gray-700 hover:bg-gray-200"
       >
         {playing ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
       </button>
-      <span className="min-w-0 flex-1 truncate text-xs text-gray-300">
+      <span className="min-w-0 flex-1 truncate text-xs text-gray-700">
         {track.name}
       </span>
       <button
         onClick={onRemove}
-        className="shrink-0 text-xs text-gray-600 hover:text-red-400"
+        className="shrink-0 text-xs text-gray-400 hover:text-red-600"
       >
         삭제
       </button>
@@ -429,7 +429,7 @@ function AudioSection({
         </p>
         <button
           onClick={() => fileRef.current?.click()}
-          className="rounded-full border border-white/15 px-3 py-1 text-xs text-gray-400 hover:border-white/30 hover:text-white"
+          className="border border-gray-200 px-3 py-1 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-900"
         >
           + 추가
         </button>
@@ -442,7 +442,7 @@ function AudioSection({
         />
       </div>
       {tracks.length === 0 ? (
-        <p className="text-xs italic text-gray-700">없음</p>
+        <p className="text-xs italic text-gray-400">없음</p>
       ) : (
         <div className="flex flex-col gap-1.5">
           {tracks.map((t) => (
@@ -486,15 +486,15 @@ export default function AssetUploader({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex border-b border-white/10">
+      <div className="flex border-b border-gray-200">
         {(["characters", "backgrounds", "music"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`flex-1 py-3 text-xs font-medium transition-colors ${
               tab === t
-                ? "border-b-2 border-white text-white"
-                : "text-gray-500 hover:text-gray-300"
+                ? "border-b-2 border-[#2f3a8f] text-[#2f3a8f]"
+                : "text-gray-500 hover:text-gray-700"
             }`}
           >
             {TAB_LABELS[t]}
@@ -546,7 +546,7 @@ export default function AssetUploader({
               {backgrounds.map((bg) => (
                 <div
                   key={bg.id}
-                  className="relative flex flex-col items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 p-3"
+                  className="relative flex flex-col items-center gap-1.5 border border-gray-200 bg-white p-3"
                 >
                   {bg.imageUrl && (
                     <img
@@ -556,10 +556,10 @@ export default function AssetUploader({
                       style={{ imageRendering: "pixelated" }}
                     />
                   )}
-                  <span className="text-xs text-gray-300">{bg.name}</span>
+                  <span className="text-xs text-gray-700">{bg.name}</span>
                   <button
                     onClick={() => onRemoveBackground(bg.id)}
-                    className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-xs text-gray-500 hover:bg-red-900/50 hover:text-red-300"
+                    className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center bg-gray-100 text-xs text-gray-500 hover:bg-red-50 hover:text-red-600"
                   >
                     ×
                   </button>
