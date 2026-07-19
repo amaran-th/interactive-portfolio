@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useUnsavedChangesWarning } from "../_shared/useUnsavedChangesWarning";
 import Desktop from "./Desktop";
 import Editor from "./Editor";
-import { monaFont } from "./fonts";
+import { monaFont } from "../_shared/fonts";
 
 type Screen =
   | { view: "desktop" }
