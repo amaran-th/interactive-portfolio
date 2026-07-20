@@ -118,26 +118,26 @@ export default function PlayScreen({
   }, [handleAdvance, onBack]);
 
   return (
-    <div className="flex h-full w-full flex-col bg-gray-950">
+    <div className="flex h-full w-full flex-col bg-[#f7f6f3]">
       {/* Header */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 py-3">
+      <div className="flex shrink-0 items-center gap-3 border-b border-gray-200 px-4 py-3">
         <button
           onClick={onGoHome}
-          className="flex items-center justify-center rounded-full p-2 text-gray-500 transition-colors hover:bg-white/8 hover:text-white"
+          className="flex items-center justify-center p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-900"
         >
           <House className="h-4 w-4" />
         </button>
         <div>
-          <h1 className="text-sm font-semibold text-white">플레이</h1>
+          <h1 className="text-sm font-semibold text-gray-900">플레이</h1>
           <p className="text-xs text-gray-500">클릭 또는 스페이스로 진행</p>
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <span className="font-mono text-xs text-white/30">
+          <span className="font-mono text-xs text-gray-300">
             {currentIndex + 1} / {cuts.length}
           </span>
           <button
             onClick={onBack}
-            className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-xs text-white/60 hover:bg-white/5 hover:text-white"
+            className="flex items-center gap-1.5 border border-gray-200 px-3 py-2 text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-900"
           >
             <Pencil className="h-3 w-3" />
             편집
@@ -146,16 +146,16 @@ export default function PlayScreen({
       </div>
 
       {/* Cut list */}
-      <div className="flex shrink-0 items-center gap-1 border-b border-white/10 bg-black/20 px-3 py-2">
+      <div className="flex shrink-0 items-center gap-1 border-b border-gray-200 bg-gray-100 px-3 py-2">
         <div className="flex flex-1 items-center gap-1 overflow-x-auto">
           {cuts.map((_, i) => (
             <button
               key={i}
               onClick={() => onSelectCut(i)}
-              className={`flex h-7 min-w-7 shrink-0 items-center justify-center rounded-lg px-2 font-mono text-xs transition-all ${
+              className={`flex h-7 min-w-7 shrink-0 items-center justify-center px-2 font-mono text-xs transition-all ${
                 i === currentIndex
-                  ? "bg-white font-bold text-gray-950"
-                  : "text-gray-500 hover:bg-white/10 hover:text-white"
+                  ? "bg-[#2f3a8f] font-bold text-white"
+                  : "text-gray-500 hover:bg-gray-200 hover:text-gray-900"
               }`}
             >
               {i + 1}
