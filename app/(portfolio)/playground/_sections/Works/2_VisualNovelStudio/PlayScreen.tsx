@@ -132,7 +132,7 @@ export default function PlayScreen({
           <p className="text-xs text-gray-500">클릭 또는 스페이스로 진행</p>
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <span className="font-mono text-xs text-gray-300">
+          <span className="font-mono text-xs text-gray-500">
             {currentIndex + 1} / {cuts.length}
           </span>
           <button
