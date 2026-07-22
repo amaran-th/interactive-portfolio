@@ -110,28 +110,28 @@ export default function EditorScreen({
   };
 
   return (
-    <div className="flex h-full flex-col bg-[#f7f6f3] text-gray-900">
+    <div className="flex h-full flex-col bg-[#818181] text-black">
       {/* Header */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-gray-200 px-4 py-3">
+      <div className="flex shrink-0 items-center gap-2 border-b-2 border-black px-4 py-3">
         <button
           onClick={onGoHome}
-          className="flex items-center justify-center p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-900"
+          className="flex items-center justify-center rounded-full p-2 text-black transition-colors hover:bg-black/5"
         >
           <House className="h-4 w-4" />
         </button>
-        <span className="text-sm font-semibold text-gray-900">편집</span>
-        <span className="text-xs text-gray-400">{cuts.length}컷</span>
+        <span className="text-sm font-semibold text-black">편집</span>
+        <span className="text-xs text-black/70">{cuts.length}컷</span>
         <div className="ml-auto flex gap-1.5">
           <button
             onClick={onBack}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+            className="flex items-center gap-1.5 rounded-full border-2 border-black px-3 py-1.5 text-xs text-black transition-colors hover:bg-black/5"
           >
             <Images className="h-3.5 w-3.5" />
             리소스 편집
           </button>
           <button
             onClick={onPlay}
-            className="flex items-center gap-1.5 bg-[#2f3a8f] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
+            className="flex items-center gap-1.5 rounded-full border-2 border-black bg-[#264986] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
           >
             <Play className="h-3 w-3" />
             플레이
@@ -150,7 +150,7 @@ export default function EditorScreen({
       </div>
 
       {/* Cut list */}
-      <div className="flex shrink-0 items-center gap-1 border-b border-gray-200 bg-gray-100 px-3 py-2">
+      <div className="flex shrink-0 items-center gap-1 border-b-2 border-black bg-[#d9d9d9] px-3 py-2">
         <div className="flex flex-1 items-center gap-1 overflow-x-auto">
           {cuts.map((_, i) => (
             <button
@@ -175,12 +175,12 @@ export default function EditorScreen({
                 dragFromRef.current = null;
               }}
               onClick={() => onSelectCut(i)}
-              className={`flex h-7 min-w-7 shrink-0 cursor-grab items-center justify-center px-2 font-mono text-xs transition-all active:cursor-grabbing ${
+              className={`flex h-7 min-w-7 shrink-0 cursor-grab items-center justify-center rounded-full border-2 px-2 font-mono text-xs transition-all active:cursor-grabbing ${
                 i === currentIndex
-                  ? "bg-[#2f3a8f] font-bold text-white"
+                  ? "border-black bg-[#264986] font-bold text-white"
                   : dragOver === i
-                    ? "scale-110 bg-[#2f3a8f]/10 text-[#2f3a8f]"
-                    : "text-gray-500 hover:bg-gray-200 hover:text-gray-900"
+                    ? "scale-110 border-black bg-[#264986]/15 text-[#264986]"
+                    : "border-transparent text-gray-700 hover:bg-black/5"
               }`}
             >
               {i + 1}
@@ -188,15 +188,15 @@ export default function EditorScreen({
           ))}
           <button
             onClick={() => onAddCutAfter(currentIndex)}
-            className="flex h-7 w-7 shrink-0 items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-gray-900"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-black hover:bg-black/5"
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="flex shrink-0 items-center gap-1 border-l border-gray-300 pl-2">
+        <div className="flex shrink-0 items-center gap-1 border-l-2 border-black pl-2">
           <button
             onClick={() => onDuplicateCut(currentIndex)}
-            className="flex h-7 w-7 items-center justify-center text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-900"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-black transition-colors hover:bg-black/5"
             title="컷 복제"
           >
             <Copy className="h-3.5 w-3.5" />
@@ -204,7 +204,7 @@ export default function EditorScreen({
           {cuts.length > 1 && (
             <button
               onClick={() => onDeleteCut(currentIndex)}
-              className="flex h-7 w-7 items-center justify-center text-red-300 transition-colors hover:bg-red-50 hover:text-red-600"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-gray-700 transition-colors hover:bg-red-50 hover:text-[#ac1717]"
               title="컷 삭제"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -217,16 +217,16 @@ export default function EditorScreen({
       <div className="flex-1 space-y-5 overflow-y-auto p-4">
         {/* Background */}
         <section className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-widest text-gray-500">
+          <p className="text-xs font-medium uppercase tracking-widest text-black">
             배경
           </p>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => onUpdateCut(currentIndex, { backgroundId: null })}
-              className={`px-3 py-1.5 text-xs transition-colors ${
+              className={`rounded-full border-2 px-3 py-1.5 text-xs transition-colors ${
                 cut.backgroundId === null
-                  ? "bg-[#2f3a8f]/10 font-medium text-[#2f3a8f]"
-                  : "border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-900"
+                  ? "border-black bg-[#264986]/15 font-medium text-[#264986]"
+                  : "border-black text-gray-700 hover:bg-black/5"
               }`}
             >
               없음
@@ -237,17 +237,17 @@ export default function EditorScreen({
                 onClick={() =>
                   onUpdateCut(currentIndex, { backgroundId: bg.id })
                 }
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
+                className={`flex items-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-xs transition-colors ${
                   cut.backgroundId === bg.id
-                    ? "bg-[#2f3a8f]/10 font-medium text-[#2f3a8f]"
-                    : "border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-900"
+                    ? "border-black bg-[#264986]/15 font-medium text-[#264986]"
+                    : "border-black text-gray-700 hover:bg-black/5"
                 }`}
               >
                 {bg.imageUrl && (
                   <img
                     src={bg.imageUrl}
                     alt={bg.name}
-                    className="h-4 w-4 object-cover"
+                    className="h-4 w-4 rounded-full object-cover"
                     style={{ imageRendering: "pixelated" }}
                   />
                 )}
@@ -259,11 +259,11 @@ export default function EditorScreen({
 
         {/* Characters on screen */}
         <section className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-widest text-gray-500">
+          <p className="text-xs font-medium uppercase tracking-widest text-black">
             등장 캐릭터
           </p>
           {characters.length === 0 ? (
-            <p className="text-xs italic text-gray-400">등록된 캐릭터 없음</p>
+            <p className="text-xs italic text-gray-700">등록된 캐릭터 없음</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {characters.map((char) => {
@@ -274,14 +274,12 @@ export default function EditorScreen({
                 return (
                   <div
                     key={char.id}
-                    className={`flex items-center overflow-hidden border transition-colors ${
-                      active ? "border-transparent" : "border-gray-200"
-                    }`}
+                    className="flex items-center overflow-hidden rounded-full border-2 border-black transition-colors"
                   >
                     <button
                       onClick={() => toggleCharacter(char.id)}
                       className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                        active ? "bg-[#2f3a8f] text-white" : "text-gray-500 hover:text-gray-900"
+                        active ? "bg-[#264986] text-white" : "text-gray-700 hover:bg-black/5"
                       }`}
                     >
                       {char.name}
@@ -290,10 +288,10 @@ export default function EditorScreen({
                       <select
                         value={selectedImageId}
                         onChange={(e) => selectImage(char.id, e.target.value)}
-                        className="border-l border-black/10 bg-white py-1.5 pr-2 pl-2 text-xs text-gray-600 outline-none"
+                        className="border-l-2 border-black bg-[#d9d9d9] py-1.5 pr-2 pl-2 text-xs text-black outline-none"
                       >
                         {char.images.map((img) => (
-                          <option key={img.id} value={img.id} className="bg-white text-gray-900">
+                          <option key={img.id} value={img.id} className="bg-white text-black">
                             {img.label || "—"}
                           </option>
                         ))}
@@ -302,7 +300,7 @@ export default function EditorScreen({
                     {active && (
                       <button
                         onClick={() => togglePosition(char.id)}
-                        className="border-l border-black/10 bg-white px-2.5 py-1.5 text-xs text-gray-500 hover:bg-gray-100"
+                        className="border-l-2 border-black bg-[#d9d9d9] px-2.5 py-1.5 text-xs text-black hover:bg-black/10"
                       >
                         {pos === "left" ? "←" : "→"}
                       </button>
@@ -316,7 +314,7 @@ export default function EditorScreen({
 
         {/* Speaker */}
         <section className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-widest text-gray-500">
+          <p className="text-xs font-medium uppercase tracking-widest text-black">
             발화자
           </p>
           <div className="flex flex-wrap gap-2">
@@ -324,10 +322,10 @@ export default function EditorScreen({
               <button
                 key={char.id}
                 onClick={() => toggleSpeaker(char.id)}
-                className={`px-3 py-1.5 text-xs transition-colors ${
+                className={`rounded-full border-2 px-3 py-1.5 text-xs transition-colors ${
                   cut.speakerIds.includes(char.id)
-                    ? "bg-blue-500 font-medium text-white"
-                    : "border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-900"
+                    ? "border-black bg-blue-500 font-medium text-white"
+                    : "border-black text-gray-700 hover:bg-black/5"
                 }`}
               >
                 {char.name}
@@ -335,20 +333,20 @@ export default function EditorScreen({
             ))}
             <button
               onClick={toggleNarrator}
-              className={`px-3 py-1.5 text-xs transition-colors ${
+              className={`rounded-full border-2 px-3 py-1.5 text-xs transition-colors ${
                 cut.speakerIds.includes("narrator")
-                  ? "bg-amber-500 font-medium text-white"
-                  : "border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-900"
+                  ? "border-black bg-amber-500 font-medium text-white"
+                  : "border-black text-gray-700 hover:bg-black/5"
               }`}
             >
               나레이션
             </button>
             <button
               onClick={() => onUpdateCut(currentIndex, { speakerIds: [] })}
-              className={`px-3 py-1.5 text-xs transition-colors ${
+              className={`rounded-full border-2 px-3 py-1.5 text-xs transition-colors ${
                 cut.speakerIds.length === 0
-                  ? "bg-[#2f3a8f]/10 font-medium text-[#2f3a8f]"
-                  : "border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-900"
+                  ? "border-black bg-[#264986]/15 font-medium text-[#264986]"
+                  : "border-black text-gray-700 hover:bg-black/5"
               }`}
             >
               없음
@@ -359,7 +357,7 @@ export default function EditorScreen({
         {/* Dialogue */}
         <section className="space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-widest text-gray-500">
+            <p className="text-xs font-medium uppercase tracking-widest text-black">
               {cut.speakerIds.includes("narrator") ? "나레이션" : "대사"}
             </p>
             {cut.speakerIds.length > 0 && (
@@ -368,10 +366,10 @@ export default function EditorScreen({
                   <button
                     key={effect}
                     onClick={() => onUpdateCut(currentIndex, { textEffect: effect })}
-                    className={`px-2.5 py-1 text-xs transition-colors ${
+                    className={`rounded-full border-2 px-2.5 py-1 text-xs transition-colors ${
                       (cut.textEffect ?? "default") === effect
-                        ? "bg-[#2f3a8f]/10 text-[#2f3a8f]"
-                        : "border border-gray-200 text-gray-500 hover:text-gray-900"
+                        ? "border-black bg-[#264986]/15 text-[#264986]"
+                        : "border-black text-gray-700 hover:bg-black/5"
                     }`}
                   >
                     {effect === "default" ? "기본" : effect === "whisper" ? "중얼거림" : "소리치기"}
@@ -391,7 +389,7 @@ export default function EditorScreen({
                 : "대사를 입력하세요..."
             }
             rows={3}
-            className="w-full resize-none border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-gray-400"
+            className="w-full resize-none rounded-lg border-2 border-black bg-[#d9d9d9] px-3 py-2.5 text-sm text-black placeholder:text-gray-600 outline-none"
           />
         </section>
 
@@ -401,10 +399,10 @@ export default function EditorScreen({
           const sfxTracks = audioTracks.filter((a) => a.type === "sfx");
           return (
             <section className="space-y-3">
-              <p className="text-xs font-medium uppercase tracking-widest text-gray-500">음악</p>
+              <p className="text-xs font-medium uppercase tracking-widest text-black">음악</p>
               {bgmTracks.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-xs text-gray-400">배경음악</p>
+                  <p className="text-xs text-gray-700">배경음악</p>
                   <div className="flex flex-wrap gap-2">
                     {[
                       { id: null, label: "계속" },
@@ -414,10 +412,10 @@ export default function EditorScreen({
                       <button
                         key={id ?? "_continue"}
                         onClick={() => onUpdateCut(currentIndex, { bgmId: id })}
-                        className={`px-3 py-1.5 text-xs transition-colors ${
+                        className={`rounded-full border-2 px-3 py-1.5 text-xs transition-colors ${
                           cut.bgmId === id
-                            ? "bg-[#2f3a8f]/10 font-medium text-[#2f3a8f]"
-                            : "border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-900"
+                            ? "border-black bg-[#264986]/15 font-medium text-[#264986]"
+                            : "border-black text-gray-700 hover:bg-black/5"
                         }`}
                       >
                         {label}
@@ -428,7 +426,7 @@ export default function EditorScreen({
               )}
               {sfxTracks.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-xs text-gray-400">효과음</p>
+                  <p className="text-xs text-gray-700">효과음</p>
                   <div className="flex flex-wrap gap-2">
                     {[
                       { id: null, label: "없음" },
@@ -437,10 +435,10 @@ export default function EditorScreen({
                       <button
                         key={id ?? "_none"}
                         onClick={() => onUpdateCut(currentIndex, { sfxId: id })}
-                        className={`px-3 py-1.5 text-xs transition-colors ${
+                        className={`rounded-full border-2 px-3 py-1.5 text-xs transition-colors ${
                           cut.sfxId === id
-                            ? "bg-[#2f3a8f]/10 font-medium text-[#2f3a8f]"
-                            : "border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-900"
+                            ? "border-black bg-[#264986]/15 font-medium text-[#264986]"
+                            : "border-black text-gray-700 hover:bg-black/5"
                         }`}
                       >
                         {label}
@@ -458,24 +456,24 @@ export default function EditorScreen({
           <button
             onClick={() => onSelectCut(currentIndex - 1)}
             disabled={currentIndex === 0}
-            className="flex h-9 w-9 items-center justify-center border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 disabled:pointer-events-none disabled:opacity-30"
+            className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-black text-black transition-colors hover:bg-black/5 disabled:pointer-events-none disabled:opacity-30"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="flex-1 text-center font-mono text-xs text-gray-500">
+          <span className="flex-1 text-center font-mono text-xs text-black">
             {currentIndex + 1} / {cuts.length}
           </span>
           {currentIndex < cuts.length - 1 ? (
             <button
               onClick={() => onSelectCut(currentIndex + 1)}
-              className="flex h-9 w-9 items-center justify-center border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900"
+              className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-black text-black transition-colors hover:bg-black/5"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
           ) : (
             <button
               onClick={() => onAddCutAfter(currentIndex)}
-              className="flex h-9 w-9 items-center justify-center border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900"
+              className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-black text-black transition-colors hover:bg-black/5"
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
