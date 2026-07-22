@@ -22,14 +22,14 @@ function EmptySlotCard({
   return (
     <button
       onClick={onStart}
-      className="flex items-center gap-4 border-2 border-dashed border-gray-300 bg-white px-5 py-5 text-left transition-all hover:border-gray-400 hover:bg-gray-50"
+      className="flex items-center gap-4 rounded-2xl border-2 border-dashed border-black bg-[#d9d9d9] px-5 py-5 text-left transition-all hover:bg-black/5"
     >
-      <div className="flex size-10 shrink-0 items-center justify-center border border-dashed border-gray-300">
-        <Plus className="size-4 text-gray-400" />
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-black">
+        <Plus className="size-4 text-black" />
       </div>
       <div>
-        <p className="text-sm font-medium text-gray-500">새 작품</p>
-        <p className="mt-0.5 text-xs text-gray-400">슬롯 {index + 1}</p>
+        <p className="text-sm font-medium text-black">새 작품</p>
+        <p className="mt-0.5 text-xs text-gray-700">슬롯 {index + 1}</p>
       </div>
     </button>
   );
@@ -62,9 +62,9 @@ function FilledSlotCard({
   };
 
   return (
-    <div className="relative flex items-center gap-4 border-2 border-gray-200 bg-white px-5 py-5 transition-all hover:border-gray-300 hover:bg-gray-50">
+    <div className="relative flex items-center gap-4 rounded-2xl border-2 border-black bg-[#d9d9d9] px-5 py-5 transition-all hover:bg-black/5">
       {/* Slot number badge */}
-      <div className="flex size-10 shrink-0 items-center justify-center bg-gray-100 font-mono text-xs text-gray-400">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-full border-2 border-black bg-white font-mono text-xs text-black">
         {String(index + 1).padStart(2, "0")}
       </div>
 
@@ -83,7 +83,7 @@ function FilledSlotCard({
                 setEditing(false);
               }
             }}
-            className="w-full border border-gray-300 bg-gray-50 px-2 py-0.5 text-sm font-semibold text-gray-900 outline-none"
+            className="w-full rounded-lg border-2 border-black bg-white px-2 py-0.5 text-sm font-semibold text-black outline-none"
           />
         ) : (
           <button
@@ -91,20 +91,20 @@ function FilledSlotCard({
               setDraft(slot.title);
               setEditing(true);
             }}
-            className="truncate text-left text-sm font-semibold text-gray-900 hover:opacity-70"
+            className="truncate text-left text-sm font-semibold text-black hover:opacity-70"
             title="클릭해서 제목 수정"
           >
             {slot.title}
           </button>
         )}
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          <span className="bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+          <span className="rounded-full border-2 border-black bg-white px-2 py-0.5 text-xs text-black">
             {slot.cutCount}컷
           </span>
-          <span className="bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+          <span className="rounded-full border-2 border-black bg-white px-2 py-0.5 text-xs text-black">
             {slot.characterCount}캐릭터
           </span>
-          <span className="text-xs text-gray-400">{relativeTime(slot.updatedAt)}</span>
+          <span className="text-xs text-gray-700">{relativeTime(slot.updatedAt)}</span>
         </div>
       </div>
 
@@ -114,13 +114,13 @@ function FilledSlotCard({
           <>
             <button
               onClick={() => setConfirmDelete(false)}
-              className="border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
+              className="rounded-lg border-2 border-black px-3 py-1.5 text-xs text-black hover:bg-black/5"
             >
               취소
             </button>
             <button
               onClick={onDelete}
-              className="bg-red-500 px-3 py-1.5 text-xs text-white hover:bg-red-600"
+              className="rounded-lg border-2 border-black bg-[#ac1717] px-3 py-1.5 text-xs text-white hover:opacity-90"
             >
               삭제
             </button>
@@ -129,19 +129,19 @@ function FilledSlotCard({
           <>
             <button
               onClick={() => setConfirmDelete(true)}
-              className="border border-gray-200 px-2.5 py-1.5 text-xs text-gray-400 transition-colors hover:border-red-300 hover:text-red-600"
+              className="rounded-lg border-2 border-black px-2.5 py-1.5 text-xs text-gray-700 transition-colors hover:bg-red-50 hover:text-[#ac1717]"
             >
               삭제
             </button>
             <button
               onClick={onPlay}
-              className="border border-gray-200 px-3 py-1.5 text-xs text-gray-700 transition-colors hover:border-gray-400 hover:text-gray-900"
+              className="rounded-full border-2 border-black px-3 py-1.5 text-xs text-black transition-colors hover:bg-black/5"
             >
               ▶
             </button>
             <button
               onClick={onSelect}
-              className="bg-[#2f3a8f] px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:opacity-90"
+              className="rounded-lg border-2 border-black bg-[#264986] px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:opacity-90"
             >
               편집 →
             </button>
@@ -172,11 +172,11 @@ export default function HomeScreen({
   onDeleteSlot,
 }: Props) {
   return (
-    <div className="flex h-full flex-col bg-[#f7f6f3] text-gray-900">
+    <div className="flex h-full flex-col bg-[#818181] text-black">
       {/* Header */}
       <div className="shrink-0 px-6 pt-8 pb-6">
         <h1 className="text-xl font-bold tracking-tight">비주얼 노벨 메이커</h1>
-        <p className="mt-1 text-xs text-gray-500">작품을 선택하거나 새로 만드세요.</p>
+        <p className="mt-1 text-xs text-black/70">작품을 선택하거나 새로 만드세요.</p>
       </div>
 
       {/* Slot list */}
