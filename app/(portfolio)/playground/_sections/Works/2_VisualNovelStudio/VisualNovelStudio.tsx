@@ -60,17 +60,17 @@ function VNMakerWithSlot({
 
   if (phase === "setup") {
     return (
-      <div className="flex h-full flex-col bg-[#f7f6f3] text-gray-900">
-        <div className="shrink-0 flex items-center gap-3 border-b border-gray-200 px-4 py-3">
+      <div className="flex h-full flex-col bg-[#818181] text-black">
+        <div className="shrink-0 flex items-center gap-3 border-b-2 border-black px-4 py-3">
           <button
             onClick={handleBack}
-            className="flex items-center justify-center p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-900"
+            className="flex items-center justify-center rounded-full p-2 text-black transition-colors hover:bg-black/5"
           >
             <House className="h-4 w-4" />
           </button>
           <div>
-            <h1 className="text-sm font-semibold text-gray-900">리소스 편집</h1>
-            <p className="text-xs text-gray-500">캐릭터와 배경 이미지를 등록하세요.</p>
+            <h1 className="text-sm font-semibold text-black">리소스 편집</h1>
+            <p className="text-xs text-black/70">캐릭터와 배경 이미지를 등록하세요.</p>
           </div>
         </div>
 
@@ -92,10 +92,10 @@ function VNMakerWithSlot({
           />
         </div>
 
-        <div className="shrink-0 border-t border-gray-200 p-4 flex gap-2">
+        <div className="shrink-0 border-t-2 border-black p-4 flex gap-2">
           <button
             onClick={() => setPhase("editor")}
-            className="flex-1 bg-[#2f3a8f] py-3 text-sm font-semibold text-white transition-colors hover:opacity-90"
+            className="flex-1 rounded-lg border-2 border-black bg-[#264986] py-3 text-sm font-semibold text-white transition-colors hover:opacity-90"
           >
             {hasWork ? "편집 계속하기" : "편집 시작"}
           </button>
