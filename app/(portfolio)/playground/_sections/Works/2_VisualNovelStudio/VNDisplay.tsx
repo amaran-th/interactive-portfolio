@@ -1,5 +1,8 @@
 "use client";
 
+// 이 스테이지는 주변 편집 UI가 라이트/만화 테마 등으로 바뀌어도 의도적으로
+// 손대지 않는다 — 배경·캐릭터가 사용자가 그린 픽셀아트라서, 두꺼운 만화
+// 아웃라인 같은 강한 UI 톤을 입히면 픽셀아트와 시각적으로 충돌할 수 있다.
 import { Background, Character, Cut } from "./types";
 
 interface Props {

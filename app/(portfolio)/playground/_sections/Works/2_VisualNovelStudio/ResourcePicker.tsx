@@ -26,7 +26,7 @@ function Thumb({ art, onClick }: { art: PixelArt; onClick: () => void }) {
       onClick={onClick}
       className="flex flex-col items-center gap-1.5 rounded-lg border-2 border-black bg-white p-2 text-left transition-colors hover:bg-black/5"
     >
-      <div className="flex h-16 w-full items-center justify-center overflow-hidden rounded border-2 border-black bg-[#d9d9d9]">
+      <div className="flex h-16 w-full items-center justify-center overflow-hidden rounded-lg border-2 border-black bg-[#d9d9d9]">
         {url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
