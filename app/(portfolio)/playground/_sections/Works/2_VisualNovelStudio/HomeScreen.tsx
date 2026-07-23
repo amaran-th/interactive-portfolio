@@ -37,14 +37,12 @@ function EmptySlotCard({
 
 function FilledSlotCard({
   slot,
-  index,
   onSelect,
   onPlay,
   onRename,
   onDelete,
 }: {
   slot: SlotMeta;
-  index: number;
   onSelect: () => void;
   onPlay: () => void;
   onRename: (title: string) => void;
@@ -63,10 +61,13 @@ function FilledSlotCard({
 
   return (
     <div className="relative flex items-center gap-4 rounded-2xl border-2 border-black bg-[#d9d9d9] px-5 py-5 transition-all hover:bg-black/5">
-      {/* Slot number badge */}
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-full border-2 border-black bg-white font-mono text-xs text-black">
-        {String(index + 1).padStart(2, "0")}
-      </div>
+      {/* Play */}
+      <button
+        onClick={onPlay}
+        className="flex size-10 shrink-0 items-center justify-center rounded-full border-2 border-black bg-white text-black transition-colors hover:bg-black/5"
+      >
+        <Play className="h-4 w-4" />
+      </button>
 
       {/* Info */}
       <div className="min-w-0 flex-1">
@@ -134,12 +135,6 @@ function FilledSlotCard({
               삭제
             </button>
             <button
-              onClick={onPlay}
-              className="flex items-center justify-center rounded-full border-2 border-black p-1.5 text-black transition-colors hover:bg-black/5"
-            >
-              <Play className="h-3 w-3" />
-            </button>
-            <button
               onClick={onSelect}
               className="rounded-lg border-2 border-black bg-[#264986] px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:opacity-90"
             >
@@ -189,7 +184,6 @@ export default function HomeScreen({
                 <FilledSlotCard
                   key={slot.id}
                   slot={slot}
-                  index={i}
                   onSelect={() => onSelectSlot(slot)}
                   onPlay={() => onPlaySlot(slot)}
                   onRename={(title) => onRenameSlot(slot.id, title)}
