@@ -14,12 +14,22 @@ interface Props {
   onSelect: (art: PixelArt) => void;
 }
 
+const THUMB_BOX = 64; // h-16과 동일한 값 — 아래 배율 계산의 기준
+
 function Thumb({ art, onClick }: { art: PixelArt; onClick: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
     setUrl(pixelArtToDataUrl(art));
   }, [art]);
+
+  // 높이·너비 중 하나가 박스에 꽉 차도록 그림의 원래 가로세로 비율 그대로
+  // 키운다(object-contain과 동일한 letterbox 계산) — 정확한 픽셀 수는 아래
+  // 텍스트 라벨이 알려주므로, 여기서는 정사각형이 아닌 그림(배경 16:9 등)의
+  // 실제 비율만 정직하게 보여주면 된다.
+  const scale = (THUMB_BOX - 8) / Math.max(art.width, art.height);
+  const displayWidth = Math.max(1, Math.round(art.width * scale));
+  const displayHeight = Math.max(1, Math.round(art.height * scale));
 
   return (
     <button
@@ -28,17 +38,25 @@ function Thumb({ art, onClick }: { art: PixelArt; onClick: () => void }) {
     >
       <div className="flex h-16 w-full items-center justify-center overflow-hidden rounded-lg border-2 border-black bg-[#d9d9d9]">
         {url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={url}
-            alt={art.name}
-            className="h-full w-full object-contain"
-            style={{ imageRendering: "pixelated" }}
-          />
+          <div
+            className="shrink-0 bg-white"
+            style={{ width: displayWidth, height: displayHeight }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={url}
+              alt={art.name}
+              className="h-full w-full object-contain"
+              style={{ imageRendering: "pixelated" }}
+            />
+          </div>
         )}
       </div>
       <span className="w-full truncate text-center text-xs text-black">
         {art.name}
+      </span>
+      <span className="font-mono text-[10px] text-gray-700">
+        {art.width} × {art.height}
       </span>
     </button>
   );
