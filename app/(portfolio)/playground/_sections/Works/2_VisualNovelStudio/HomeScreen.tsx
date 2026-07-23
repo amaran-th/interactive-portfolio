@@ -176,7 +176,7 @@ export default function HomeScreen({
       {/* Header */}
       <div className="shrink-0 px-6 pt-8 pb-6">
         <h1 className="text-xl font-bold tracking-tight">비주얼 노벨 메이커</h1>
-        <p className="mt-1 text-xs text-black/70">작품을 선택하거나 새로 만드세요.</p>
+        <p className="mt-1 text-xs text-black/85">작품을 선택하거나 새로 만드세요.</p>
       </div>
 
       {/* Slot list */}

@@ -120,7 +120,7 @@ export default function EditorScreen({
           <House className="h-4 w-4" />
         </button>
         <span className="text-sm font-semibold text-black">편집</span>
-        <span className="text-xs text-black/70">{cuts.length}컷</span>
+        <span className="text-xs text-black/85">{cuts.length}컷</span>
         <div className="ml-auto flex gap-1.5">
           <button
             onClick={onBack}
@@ -226,7 +226,7 @@ export default function EditorScreen({
               className={`rounded-full border-2 px-3 py-1.5 text-xs transition-colors ${
                 cut.backgroundId === null
                   ? "border-black bg-[#264986]/15 font-medium text-[#264986]"
-                  : "border-black text-gray-700 hover:bg-black/5"
+                  : "border-black text-black/85 hover:bg-black/5"
               }`}
             >
               없음
@@ -240,7 +240,7 @@ export default function EditorScreen({
                 className={`flex items-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-xs transition-colors ${
                   cut.backgroundId === bg.id
                     ? "border-black bg-[#264986]/15 font-medium text-[#264986]"
-                    : "border-black text-gray-700 hover:bg-black/5"
+                    : "border-black text-black/85 hover:bg-black/5"
                 }`}
               >
                 {bg.imageUrl && (
@@ -263,7 +263,7 @@ export default function EditorScreen({
             등장 캐릭터
           </p>
           {characters.length === 0 ? (
-            <p className="text-xs italic text-gray-700">등록된 캐릭터 없음</p>
+            <p className="text-xs italic text-black/85">등록된 캐릭터 없음</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {characters.map((char) => {
@@ -279,7 +279,7 @@ export default function EditorScreen({
                     <button
                       onClick={() => toggleCharacter(char.id)}
                       className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                        active ? "bg-[#264986] text-white" : "text-gray-700 hover:bg-black/5"
+                        active ? "bg-[#264986] text-white" : "text-black/85 hover:bg-black/5"
                       }`}
                     >
                       {char.name}
@@ -325,7 +325,7 @@ export default function EditorScreen({
                 className={`rounded-full border-2 px-3 py-1.5 text-xs transition-colors ${
                   cut.speakerIds.includes(char.id)
                     ? "border-black bg-blue-500 font-medium text-white"
-                    : "border-black text-gray-700 hover:bg-black/5"
+                    : "border-black text-black/85 hover:bg-black/5"
                 }`}
               >
                 {char.name}
@@ -336,7 +336,7 @@ export default function EditorScreen({
               className={`rounded-full border-2 px-3 py-1.5 text-xs transition-colors ${
                 cut.speakerIds.includes("narrator")
                   ? "border-black bg-amber-500 font-medium text-white"
-                  : "border-black text-gray-700 hover:bg-black/5"
+                  : "border-black text-black/85 hover:bg-black/5"
               }`}
             >
               나레이션
@@ -346,7 +346,7 @@ export default function EditorScreen({
               className={`rounded-full border-2 px-3 py-1.5 text-xs transition-colors ${
                 cut.speakerIds.length === 0
                   ? "border-black bg-[#264986]/15 font-medium text-[#264986]"
-                  : "border-black text-gray-700 hover:bg-black/5"
+                  : "border-black text-black/85 hover:bg-black/5"
               }`}
             >
               없음
@@ -369,7 +369,7 @@ export default function EditorScreen({
                     className={`rounded-full border-2 px-2.5 py-1 text-xs transition-colors ${
                       (cut.textEffect ?? "default") === effect
                         ? "border-black bg-[#264986]/15 text-[#264986]"
-                        : "border-black text-gray-700 hover:bg-black/5"
+                        : "border-black text-black/85 hover:bg-black/5"
                     }`}
                   >
                     {effect === "default" ? "기본" : effect === "whisper" ? "중얼거림" : "소리치기"}
@@ -402,7 +402,7 @@ export default function EditorScreen({
               <p className="text-xs font-medium uppercase tracking-widest text-black">음악</p>
               {bgmTracks.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-xs text-gray-700">배경음악</p>
+                  <p className="text-xs text-black/85">배경음악</p>
                   <div className="flex flex-wrap gap-2">
                     {[
                       { id: null, label: "계속" },
@@ -415,7 +415,7 @@ export default function EditorScreen({
                         className={`rounded-full border-2 px-3 py-1.5 text-xs transition-colors ${
                           cut.bgmId === id
                             ? "border-black bg-[#264986]/15 font-medium text-[#264986]"
-                            : "border-black text-gray-700 hover:bg-black/5"
+                            : "border-black text-black/85 hover:bg-black/5"
                         }`}
                       >
                         {label}
@@ -426,7 +426,7 @@ export default function EditorScreen({
               )}
               {sfxTracks.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-xs text-gray-700">효과음</p>
+                  <p className="text-xs text-black/85">효과음</p>
                   <div className="flex flex-wrap gap-2">
                     {[
                       { id: null, label: "없음" },
@@ -438,7 +438,7 @@ export default function EditorScreen({
                         className={`rounded-full border-2 px-3 py-1.5 text-xs transition-colors ${
                           cut.sfxId === id
                             ? "border-black bg-[#264986]/15 font-medium text-[#264986]"
-                            : "border-black text-gray-700 hover:bg-black/5"
+                            : "border-black text-black/85 hover:bg-black/5"
                         }`}
                       >
                         {label}

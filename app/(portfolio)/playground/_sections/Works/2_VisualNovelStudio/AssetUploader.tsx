@@ -442,7 +442,7 @@ function AudioSection({
         />
       </div>
       {tracks.length === 0 ? (
-        <p className="text-xs italic text-gray-700">없음</p>
+        <p className="text-xs italic text-black/85">없음</p>
       ) : (
         <div className="flex flex-col gap-1.5">
           {tracks.map((t) => (
@@ -494,7 +494,7 @@ export default function AssetUploader({
             className={`flex-1 py-3 text-xs font-medium transition-colors ${
               tab === t
                 ? "border-b-2 border-[#264986] text-[#264986]"
-                : "text-gray-700 hover:text-black"
+                : "text-black/85 hover:text-black"
             }`}
           >
             {TAB_LABELS[t]}

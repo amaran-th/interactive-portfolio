@@ -70,7 +70,7 @@ function VNMakerWithSlot({
           </button>
           <div>
             <h1 className="text-sm font-semibold text-black">리소스 편집</h1>
-            <p className="text-xs text-black/70">캐릭터와 배경 이미지를 등록하세요.</p>
+            <p className="text-xs text-black/85">캐릭터와 배경 이미지를 등록하세요.</p>
           </div>
         </div>
 
