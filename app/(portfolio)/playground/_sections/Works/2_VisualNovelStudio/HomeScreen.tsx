@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Play, Plus } from "lucide-react";
 import { useState } from "react";
 import { SlotMeta } from "./useSlots";
 
@@ -135,9 +135,9 @@ function FilledSlotCard({
             </button>
             <button
               onClick={onPlay}
-              className="rounded-full border-2 border-black px-3 py-1.5 text-xs text-black transition-colors hover:bg-black/5"
+              className="flex items-center justify-center rounded-full border-2 border-black p-1.5 text-black transition-colors hover:bg-black/5"
             >
-              ▶
+              <Play className="h-3 w-3" />
             </button>
             <button
               onClick={onSelect}

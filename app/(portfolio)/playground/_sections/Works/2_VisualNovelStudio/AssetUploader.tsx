@@ -1,6 +1,6 @@
 "use client";
 
-import { Pause, Play } from "lucide-react";
+import { Image as ImageIcon, Pause, Play } from "lucide-react";
 import { useRef, useState } from "react";
 import { PixelArt } from "../_shared/assetLibrary";
 import { pixelArtToDataUrl } from "../_shared/renderPixelArt";
@@ -322,7 +322,7 @@ function BackgroundForm({
             />
           ) : (
             <div className="flex flex-col items-center gap-1.5 px-4 py-3 text-center">
-              <span className="text-xl opacity-40">🖼️</span>
+              <ImageIcon className="h-5 w-5 text-black opacity-40" />
               <span className="text-xs text-gray-700">클릭해서 리소스 선택</span>
             </div>
           )}
