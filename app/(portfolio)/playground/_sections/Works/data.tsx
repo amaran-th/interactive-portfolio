@@ -42,7 +42,7 @@ export const works: WorkItem[] = [
   ✂️ 컷 편집: 컷마다 배경 선택, 등장 캐릭터 선택, 발화자(캐릭터 또는 나레이션) 지정, 대사 입력이 가능합니다.
 
   ▶️ 재생 모드: 완성된 비주얼 노벨을 순서대로 감상합니다. 클릭 또는 키보드로 컷을 넘길 수 있습니다.`,
-    period: "2026.04.20 - ",
+    period: "2026.04.20 - 07.24",
     platforms: [{ type: "pc", specialized: true }, { type: "mobile" }],
     content: <VisualNovelStudio />,
     thumbnail: "/playground/visual-novel-studio.png",
