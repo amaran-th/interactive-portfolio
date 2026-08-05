@@ -1,5 +1,7 @@
-import { PixelArt } from "../_shared/assetLibrary";
+import { GIFEncoder, applyPalette, quantize } from "gifenc";
+import { PixelArt, PixelLayer } from "../_shared/assetLibrary";
 import { renderToCanvas } from "../_shared/renderPixelArt";
+import { DEFAULT_FRAME_DURATION_MS } from "./types";
 import { hexToRgba, rgbToHex } from "./hsv";
 
 function triggerDownload(blob: Blob, filename: string) {
@@ -93,4 +95,76 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// 프레임 모드 전용 — 보이는 프레임만, doc.layers에 저장된 순서(아래→위 =
+// 왼쪽→오른쪽) 그대로 돌려준다.
+function visibleFrames(doc: PixelArt): PixelLayer[] {
+  return (doc.layers ?? []).filter((l) => l.visible);
+}
+
+// 보이는 프레임을 왼쪽부터 가로로 이어붙인 PNG 한 장 — 그리드(여러 행)는
+// 지원하지 않는다. 각 프레임은 다른 레이어와 합성하지 않고 그 프레임 자신의
+// 픽셀만 그린다.
+export function exportAsSpriteSheet(doc: PixelArt, scale = 8): void {
+  const frames = visibleFrames(doc);
+  if (frames.length === 0) return;
+  const canvas = document.createElement("canvas");
+  canvas.width = doc.width * scale * frames.length;
+  canvas.height = doc.height * scale;
+  const ctx = canvas.getContext("2d")!;
+  ctx.imageSmoothingEnabled = false;
+  frames.forEach((frame, i) => {
+    const frameCanvas = renderToCanvas({ ...doc, pixels: frame.pixels }, scale);
+    ctx.drawImage(frameCanvas, i * doc.width * scale, 0);
+  });
+  canvas.toBlob((blob) => {
+    if (blob) triggerDownload(blob, `${doc.name}_sprite.png`);
+  }, "image/png");
+}
+
+// 보이는 프레임을 순서대로 재생하는 애니메이션 GIF로 내보낸다. 프레임마다
+// 따로 양자화하면 프레임 사이에 색이 미세하게 달라져 깜빡이므로, 모든
+// 프레임의 RGBA를 한 번에 합쳐 전역 팔레트 하나만 만들고 프레임마다
+// 재사용한다.
+export async function exportAsGIF(doc: PixelArt, scale = 8): Promise<void> {
+  const frames = visibleFrames(doc);
+  if (frames.length === 0) return;
+  const width = doc.width * scale;
+  const height = doc.height * scale;
+
+  const frameRGBA = frames.map((frame) => {
+    const canvas = renderToCanvas({ ...doc, pixels: frame.pixels }, scale);
+    const ctx = canvas.getContext("2d")!;
+    return ctx.getImageData(0, 0, width, height).data;
+  });
+
+  const combined = new Uint8Array(
+    frameRGBA.reduce((sum, d) => sum + d.length, 0),
+  );
+  let offset = 0;
+  for (const data of frameRGBA) {
+    combined.set(data, offset);
+    offset += data.length;
+  }
+  // rgba4444 포맷이라야 완전 투명 픽셀이 팔레트에 알파 0인 항목으로 남는다.
+  const globalPalette = quantize(combined, 256, { format: "rgba4444" });
+  const transparentIndex = globalPalette.findIndex((c) => (c[3] ?? 255) === 0);
+
+  const gif = GIFEncoder();
+  frameRGBA.forEach((data, i) => {
+    const index = applyPalette(data, globalPalette, "rgba4444");
+    gif.writeFrame(index, width, height, {
+      palette: i === 0 ? globalPalette : undefined,
+      delay: frames[i].frameDurationMs ?? DEFAULT_FRAME_DURATION_MS,
+      repeat: 0,
+      transparent: transparentIndex >= 0,
+      transparentIndex: transparentIndex >= 0 ? transparentIndex : 0,
+    });
+  });
+  gif.finish();
+  triggerDownload(
+    new Blob([gif.bytes().slice()], { type: "image/gif" }),
+    `${doc.name}.gif`,
+  );
 }
