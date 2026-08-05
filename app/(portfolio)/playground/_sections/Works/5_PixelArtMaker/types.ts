@@ -77,6 +77,14 @@ export const MAX_PALETTE_COLORS = 12;
 // 50개 기준), 레이어 수에 상한을 둬 메모리 사용량을 억제한다.
 export const MAX_LAYERS = 20;
 
+// 프레임 모드에서 지속시간을 지정하지 않은 프레임(레이어)의 기본 재생 시간.
+export const DEFAULT_FRAME_DURATION_MS = 100;
+export const MIN_FRAME_DURATION_MS = 20; // 50fps 상한
+export const MAX_FRAME_DURATION_MS = 5000; // 5초 하한(더 느리게는 의미 없음)
+
+// 프레임 모드 + 어니언 스킨에서 이전/다음 프레임을 겹쳐 보여줄 때 쓰는 고정 투명도.
+export const ONION_SKIN_OPACITY = 0.25;
+
 export type Point = { x: number; y: number };
 
 // 배율 1은 더 이상 "셀당 고정 16px"가 아니라 "캔버스 전체가 화면에 꽉 차게
