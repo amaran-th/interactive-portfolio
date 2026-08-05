@@ -47,6 +47,7 @@ export function useKeyboardShortcuts({
   onFlipHorizontal,
   onFlipVertical,
   onToggleGrid,
+  onToggleCrosshair,
   onZoomIn,
   onZoomOut,
   onFillSelection,
@@ -71,6 +72,7 @@ export function useKeyboardShortcuts({
   onFlipHorizontal?: () => void;
   onFlipVertical?: () => void;
   onToggleGrid?: () => void;
+  onToggleCrosshair?: () => void;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
   onFillSelection?: () => void;
@@ -142,6 +144,10 @@ export function useKeyboardShortcuts({
         onToggleGrid?.();
         return;
       }
+      if (e.shiftKey && e.code === "KeyC") {
+        onToggleCrosshair?.();
+        return;
+      }
       if (e.code === "BracketLeft") {
         onRotate?.(-1);
         return;
@@ -197,6 +203,7 @@ export function useKeyboardShortcuts({
     onFlipHorizontal,
     onFlipVertical,
     onToggleGrid,
+    onToggleCrosshair,
     onZoomIn,
     onZoomOut,
     onFillSelection,

@@ -245,6 +245,7 @@ export default function Editor({
     );
   }, []);
   const [showGrid, setShowGrid] = useState(true);
+  const [showCrosshair, setShowCrosshair] = useState(false);
   const [brushSize, setBrushSize] = useState(1);
   const [filledShapes, setFilledShapes] = useState(false);
   // 텍스트 도구로 캔버스를 클릭하면 그 그리드 좌표에서 시작한다 — 아직 픽셀에
@@ -1241,6 +1242,7 @@ export default function Editor({
     onFlipHorizontal: handleFlipHorizontal,
     onFlipVertical: handleFlipVertical,
     onToggleGrid: () => setShowGrid((g) => !g),
+    onToggleCrosshair: () => setShowCrosshair((c) => !c),
     onZoomIn: () => setCanvasZoom((z) => nextZoomStep(z, 1)),
     onZoomOut: () => setCanvasZoom((z) => nextZoomStep(z, -1)),
     onFillSelection: handleFillSelection,
@@ -1427,6 +1429,33 @@ export default function Editor({
         .pam-editor input:not([type]),
         .pam-editor input[type="number"],
         .pam-editor textarea { cursor: ${CURSOR_TEXT}; }
+        /* input[type=file]은 브라우저 UA 스타일시트가 cursor:default를 직접
+           박아둬서 상속만으로는 안 먹는다 — 요소 자체와, 실제 클릭 대상인
+           "파일 선택" 버튼 pseudo-element(표준/webkit 별칭 둘 다) 모두에
+           명시적으로 지정해야 한다. */
+        .pam-editor input[type="file"] { cursor: ${CURSOR_POINTING}; }
+        .pam-editor input[type="file"]::file-selector-button,
+        .pam-editor input[type="file"]::-webkit-file-upload-button {
+          cursor: ${CURSOR_POINTING};
+        }
+        /* range·checkbox·select도 file input과 같은 이유로 UA 스타일시트가
+           cursor:default를 직접 박아둔다 — range는 트랙 자체와 실제로 잡고
+           끄는 thumb이 서로 다른 pseudo-element라 둘 다 지정해야 한다. */
+        .pam-editor input[type="range"],
+        .pam-editor input[type="checkbox"],
+        .pam-editor select { cursor: ${CURSOR_POINTING}; }
+        .pam-editor input[type="range"]::-webkit-slider-thumb,
+        .pam-editor input[type="range"]::-webkit-slider-runnable-track,
+        .pam-editor input[type="range"]::-moz-range-thumb,
+        .pam-editor input[type="range"]::-moz-range-track {
+          cursor: ${CURSOR_POINTING};
+        }
+        /* 비활성(:disabled) 폼 요소는 브라우저가 cursor CSS를 아예 무시하고
+           항상 기본 화살표를 그린다 — pointer-events를 꺼서 호버 자체를
+           부모로 흘려보내야 부모의 커스텀 커서가 그대로 보인다. button 외에
+           input·select 등 다른 폼 요소가 나중에 disabled로 추가돼도 이
+           규칙 하나로 그대로 커버된다. */
+        .pam-editor :disabled { pointer-events: none; cursor: ${CURSOR_NORMAL}; }
       `}</style>
       {/* 제목표시줄 — 메뉴 바·캔버스 영역의 무채색 배경과 구분되도록 바이올렛 톤을 준다. */}
       <div className="flex items-center gap-2 bg-violet-100 px-3 py-2">
@@ -1439,7 +1468,8 @@ export default function Editor({
               setName(e.target.value);
               setHasMetaEdits(true);
             }}
-            className={`flex-1 select-text bg-transparent text-sm font-semibold text-gray-900 outline-none ${isWallpaper ? "cursor-default" : ""}`}
+            className="flex-1 select-text bg-transparent text-sm font-semibold text-gray-900 outline-none"
+            style={isWallpaper ? { cursor: CURSOR_NORMAL } : undefined}
           />
         ) : (
           <span className="flex-1 text-sm font-semibold text-gray-400">
@@ -1529,11 +1559,12 @@ export default function Editor({
             <div
               key={tab.doc.id}
               onClick={() => switchToTab(i)}
-              className={`group flex shrink-0 cursor-pointer items-center gap-1.5 px-2.5 py-1 text-xs ${
+              className={`group flex shrink-0 items-center gap-1.5 px-2.5 py-1 text-xs ${
                 i === activeTabIndex
                   ? "bg-white text-gray-900 shadow-sm"
                   : "text-gray-500 hover:bg-gray-100"
               }`}
+              style={{ cursor: CURSOR_POINTING }}
             >
               <span className="max-w-[100px] truncate">
                 {i === activeTabIndex ? name : tab.doc.name}
@@ -1610,6 +1641,8 @@ export default function Editor({
             onRedo={handleRedo}
             showGrid={showGrid}
             onToggleGrid={() => setShowGrid((g) => !g)}
+            showCrosshair={showCrosshair}
+            onToggleCrosshair={() => setShowCrosshair((c) => !c)}
             onClearCanvas={handleClearCanvas}
             onFlipHorizontal={handleFlipHorizontal}
             onFlipVertical={handleFlipVertical}
@@ -1669,6 +1702,7 @@ export default function Editor({
                   selectionMask={selection.mask}
                   selectMode={selectMode}
                   showGrid={showGrid}
+                  showCrosshair={showCrosshair}
                   brushSize={brushSize}
                   filledShapes={filledShapes}
                   onSelectionChange={selection.setMask}

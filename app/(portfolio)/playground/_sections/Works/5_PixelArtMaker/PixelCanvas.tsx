@@ -98,6 +98,21 @@ export type PendingShape = {
 // 컨텍스트 메뉴 대신 기본 도구(선택)로 되돌아간다.
 const SPECIAL_TOOLS: Tool[] = ["eyedropper"];
 
+// scale이 정수가 아니면(뷰포트에 맞춘 배율은 대부분 소수) x*scale, (x+1)*scale이
+// 정수 픽셀 경계에 딱 떨어지지 않아, 이웃한 칸의 fillRect 가장자리가 서로 어긋나며
+// 안티에일리어싱된 실선이 생겼다 — 그리드를 꺼도 격자무늬처럼 보이던 원인. 각
+// 변을 미리 반올림해 이웃 칸끼리 경계가 정확히 맞닿게 한다.
+function cellRect(x: number, y: number, scale: number) {
+  const left = Math.round(x * scale);
+  const top = Math.round(y * scale);
+  return {
+    left,
+    top,
+    width: Math.round((x + 1) * scale) - left,
+    height: Math.round((y + 1) * scale) - top,
+  };
+}
+
 export default function PixelCanvas({
   width,
   height,
@@ -108,6 +123,7 @@ export default function PixelCanvas({
   selectionMask,
   selectMode,
   showGrid,
+  showCrosshair,
   brushSize,
   filledShapes,
   onSelectionChange,
@@ -163,6 +179,7 @@ export default function PixelCanvas({
   // OR로 합쳐서 쓴다(둘 중 하나만 참이어도 추가/제외로 취급).
   selectMode: SelectMode;
   showGrid: boolean;
+  showCrosshair: boolean;
   brushSize: number;
   filledShapes: boolean;
   onSelectionChange: (mask: Set<number> | null) => void;
@@ -412,7 +429,8 @@ export default function PixelCanvas({
           // 그렸는데, 체크무늬 자체를 없앤 지금은 어떤 배경색을 고르든 그
           // 색과 합성돼야 하므로(흰색 고정 X) 그 코드가 오히려 틀렸다.
           ctx.fillStyle = color;
-          ctx.fillRect(x * scale, y * scale, scale, scale);
+          const r = cellRect(x, y, scale);
+          ctx.fillRect(r.left, r.top, r.width, r.height);
         }
       }
       if (showGrid) {
@@ -430,6 +448,26 @@ export default function PixelCanvas({
           ctx.stroke();
         }
       }
+      // 캔버스 중앙을 지나는 고정 십자선 — 구도를 좌우/상하 대칭으로 잡을 때
+      // 쓰는 보조선이다. canvasBgColor를 자유롭게 바꿀 수 있어 고정 회색으로는
+      // 어두운 배경에서 안 보이는 문제가 있었다 — difference 블렌드로 그리면
+      // 밑바탕 색을 반전시켜서 배경이 무슨 색이든 항상 대비가 생긴다. 0.5를
+      // 더해 반픽셀 경계에 걸치게 하면 1px 선이 안티에일리어싱 없이 또렷하다.
+      if (showCrosshair) {
+        const cx = Math.round(canvas.width / 2) + 0.5;
+        const cy = Math.round(canvas.height / 2) + 0.5;
+        ctx.save();
+        ctx.globalCompositeOperation = "difference";
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx, 0);
+        ctx.lineTo(cx, canvas.height);
+        ctx.moveTo(0, cy);
+        ctx.lineTo(canvas.width, cy);
+        ctx.stroke();
+        ctx.restore();
+      }
       // 선택 영역을 시각적으로 표시한다 — select/wand 도구로 선택해도 화면에
       // 아무 표시가 없어 무엇이 선택됐는지 알 수 없었다(최종 whole-branch 리뷰에서 발견).
       // ref에서 읽어 move 드래그 중 빠른 pointermove 연속 호출에서도 항상 최신 마스크를 그린다.
@@ -441,7 +479,8 @@ export default function PixelCanvas({
         mask.forEach((i) => {
           const x = i % width;
           const y = Math.floor(i / width);
-          ctx.fillRect(x * scale, y * scale, scale, scale);
+          const r = cellRect(x, y, scale);
+          ctx.fillRect(r.left, r.top, r.width, r.height);
           ctx.strokeRect(
             x * scale + 0.5,
             y * scale + 0.5,
@@ -510,12 +549,14 @@ export default function PixelCanvas({
             const hex = rgbaToPixelValue(stepColorAt(stepColors, t));
             if (hex === null) continue;
             ctx.fillStyle = hex;
-            ctx.fillRect(p.x * scale, p.y * scale, scale, scale);
+            const r = cellRect(p.x, p.y, scale);
+            ctx.fillRect(r.left, r.top, r.width, r.height);
           }
         } else {
           ctx.fillStyle = activeColorHex;
           for (const p of expanded) {
-            ctx.fillRect(p.x * scale, p.y * scale, scale, scale);
+            const r = cellRect(p.x, p.y, scale);
+            ctx.fillRect(r.left, r.top, r.width, r.height);
           }
         }
         ctx.globalAlpha = 1;
@@ -612,7 +653,8 @@ export default function PixelCanvas({
             } else {
               ctx.fillStyle = fgHex;
             }
-            ctx.fillRect(px * scale, py * scale, scale, scale);
+            const r = cellRect(px, py, scale);
+            ctx.fillRect(r.left, r.top, r.width, r.height);
           }
         }
         ctx.strokeStyle = "rgba(139, 92, 246, 0.9)";
@@ -651,7 +693,8 @@ export default function PixelCanvas({
             const py = pendingImage.y + ty;
             if (px < 0 || py < 0 || px >= width || py >= height) continue;
             ctx.fillStyle = color;
-            ctx.fillRect(px * scale, py * scale, scale, scale);
+            const r = cellRect(px, py, scale);
+            ctx.fillRect(r.left, r.top, r.width, r.height);
           }
         }
         ctx.globalAlpha = 1;
@@ -669,6 +712,7 @@ export default function PixelCanvas({
       width,
       height,
       showGrid,
+      showCrosshair,
       pendingText,
       pendingImage,
       pendingShape,
