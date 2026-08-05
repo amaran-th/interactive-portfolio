@@ -12,6 +12,7 @@
   "dependencies": {
     "@chenglou/pretext": "^0.0.4",
     "@tanstack/react-virtual": "^3.13.23",
+    "gifenc": "^1.0.3",
     "html-to-image": "^1.11.13",
     "lucide-react": "^1.7.0",
     "next": "16.1.6",
@@ -27,6 +28,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "playwright": "^1.61.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
