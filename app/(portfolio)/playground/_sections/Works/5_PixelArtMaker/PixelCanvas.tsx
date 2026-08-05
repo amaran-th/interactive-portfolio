@@ -22,8 +22,9 @@ import {
   stepColorAt,
 } from "./gradientFill";
 import {
+  compositeOnto,
+  createGrid,
   expandPoints,
-  floodFill,
   getPixel,
   lassoMask,
   linePoints,
@@ -105,6 +106,20 @@ export type PendingShape = {
 // 컨텍스트 메뉴 대신 기본 도구(선택)로 되돌아간다.
 const SPECIAL_TOOLS: Tool[] = ["eyedropper"];
 
+// 활성 레이어가 잠겨 있으면 이 도구들은 아무 것도 하지 않는다 — 스포이트·
+// 선택류(select·lasso·wand)는 그리지 않으므로 잠금과 무관하게 계속 동작한다.
+const LOCK_BLOCKED_TOOLS: Tool[] = [
+  "pencil",
+  "eraser",
+  "bucket",
+  "line",
+  "rect",
+  "circle",
+  "text",
+  "gradient",
+  "move",
+];
+
 // scale이 정수가 아니면(뷰포트에 맞춘 배율은 대부분 소수) x*scale, (x+1)*scale이
 // 정수 픽셀 경계에 딱 떨어지지 않아, 이웃한 칸의 fillRect 가장자리가 서로 어긋나며
 // 안티에일리어싱된 실선이 생겼다 — 그리드를 꺼도 격자무늬처럼 보이던 원인. 각
@@ -170,6 +185,10 @@ export default function PixelCanvas({
   onPendingShapeCommit,
   onPendingShapeCancel,
   bottomToolbarPortalTarget,
+  belowComposite,
+  aboveComposite,
+  activeLayerOpacity,
+  activeLayerLocked,
 }: {
   width: number;
   height: number;
@@ -260,6 +279,15 @@ export default function PixelCanvas({
   // 텍스트 편집 툴바도 그리기/선택 하위 옵션과 같은 자리(캔버스 하단 중앙)에
   // 뜨게 한다 — DrawToolbar가 쓰는 것과 같은 포털 타겟을 그대로 받는다.
   bottomToolbarPortalTarget: HTMLDivElement | null;
+  // 활성 레이어 아래/위에 있는, 보이는 다른 레이어들을 미리 합성해둔 배경·
+  // 전경 — 레이어 구조가 바뀔 때만(그리는 동안에는 그대로) Editor가 새로
+  // 계산해 내려준다. 활성 레이어가 맨 아래/맨 위면 각각 null.
+  belowComposite: PixelValue[] | null;
+  aboveComposite: PixelValue[] | null;
+  // 활성 레이어 자체의 투명도 — 렌더링에서 belowComposite 위에 얹을 때만 쓴다.
+  activeLayerOpacity: number;
+  // true면 이 캔버스는 그리기 도구를 전부 무시한다(스포이트·선택류는 계속 동작).
+  activeLayerLocked: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // 트랙패드 스크롤/핀치는 짧은 시간 안에 작은 deltaY를 가진 wheel 이벤트를 수십 번
@@ -424,9 +452,25 @@ export default function PixelCanvas({
       if (!ctx) return;
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // 화면에는 belowComposite → 활성 레이어(자기 투명도 적용) →
+      // aboveComposite 순서로 겹쳐 보여준다 — 실제로 편집되는 대상은
+      // data(활성 레이어)뿐이고, 이 두 밴드는 시각적 맥락일 뿐이다.
+      const visibleBase =
+        belowComposite || aboveComposite || activeLayerOpacity < 1
+          ? compositeOnto(
+              belowComposite
+                ? belowComposite.slice()
+                : createGrid(width, height),
+              data,
+              activeLayerOpacity,
+            )
+          : data;
+      const visibleWithAbove = aboveComposite
+        ? compositeOnto(visibleBase, aboveComposite, 1)
+        : visibleBase;
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-          const color = getPixel(data, width, x, y);
+          const color = getPixel(visibleWithAbove, width, x, y);
           if (color === null) continue;
           // PixelValue는 완전 불투명이면 6자리(#rrggbb), 알파가 있으면
           // 8자리(#rrggbbaa) hex다 — Canvas2D의 fillStyle이 8자리 hex를
@@ -730,6 +774,9 @@ export default function PixelCanvas({
       gradientEndHex,
       gradientSteps,
       gradientAngleDeg,
+      belowComposite,
+      aboveComposite,
+      activeLayerOpacity,
     ],
   );
 
@@ -791,6 +838,21 @@ export default function PixelCanvas({
     [width, height, brushSize],
   );
 
+  // 스포이트·마법봉·페인트통은 화면에 보이는 그대로(합성 기준)로 판정해야
+  // 한다 — belowComposite + 활성 레이어(지금 workingRef 값, 자기 투명도
+  // 적용) + aboveComposite를 그 순간에만 한 번 합성한다. 매 프레임 계산하지
+  // 않고 이 세 도구가 실제로 클릭될 때만 부른다.
+  const getFullComposite = useCallback((): PixelValue[] => {
+    if (!belowComposite && !aboveComposite && activeLayerOpacity >= 1) {
+      return workingRef.current;
+    }
+    const base = belowComposite
+      ? belowComposite.slice()
+      : createGrid(width, height);
+    const withActive = compositeOnto(base, workingRef.current, activeLayerOpacity);
+    return aboveComposite ? compositeOnto(withActive, aboveComposite, 1) : withActive;
+  }, [belowComposite, aboveComposite, activeLayerOpacity, width, height]);
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
       if (e.button !== 0) return;
@@ -810,12 +872,14 @@ export default function PixelCanvas({
         return;
       }
 
+      if (activeLayerLocked && LOCK_BLOCKED_TOOLS.includes(tool)) return;
+
       const point = toGridPoint(e);
       if (!point) return;
       canvasRef.current?.setPointerCapture(e.pointerId);
 
       if (tool === "eyedropper") {
-        const color = getPixel(workingRef.current, width, point.x, point.y);
+        const color = getPixel(getFullComposite(), width, point.x, point.y);
         if (color !== null) onPickColor(color);
         return;
       }
@@ -878,15 +942,14 @@ export default function PixelCanvas({
       }
 
       if (tool === "bucket") {
-        const next = floodFill(
-          workingRef.current,
-          width,
-          height,
-          point.x,
-          point.y,
-          activeColorHex,
-        );
-        if (next !== workingRef.current) {
+        const mask = wandMask(getFullComposite(), width, height, point.x, point.y);
+        if (mask.size > 0) {
+          let next = workingRef.current;
+          mask.forEach((i) => {
+            const x = i % width;
+            const y = Math.floor(i / width);
+            next = setPixel(next, width, x, y, activeColorHex);
+          });
           workingRef.current = next;
           render(next);
           onStrokeEnd(next);
@@ -899,8 +962,8 @@ export default function PixelCanvas({
         // 모두 고른다 — 화면 곳곳에 흩어 칠한 같은 색을 한 번에 선택해 일괄
         // 색상 수정 같은 작업에 쓰기 위함이다.
         const clicked = wandGlobal
-          ? wandMaskGlobal(workingRef.current, width, point.x, point.y)
-          : wandMask(workingRef.current, width, height, point.x, point.y);
+          ? wandMaskGlobal(getFullComposite(), width, point.x, point.y)
+          : wandMask(getFullComposite(), width, height, point.x, point.y);
         const current = selectionMaskRef.current;
         // Shift(또는 "추가" 모드 버튼) = 기존 선택 영역에 추가, Alt/Option(또는
         // "제외" 모드 버튼) = 기존 선택 영역에서 제외. 둘 다 아니면 기존과
@@ -1002,6 +1065,11 @@ export default function PixelCanvas({
       selectMode,
       pendingShape,
       onPendingShapeCommit,
+      belowComposite,
+      aboveComposite,
+      activeLayerOpacity,
+      activeLayerLocked,
+      getFullComposite,
     ],
   );
 
