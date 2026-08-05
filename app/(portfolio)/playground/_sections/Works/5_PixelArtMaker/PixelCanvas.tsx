@@ -23,6 +23,7 @@ import {
 } from "./gradientFill";
 import {
   compositeOnto,
+  compositePixel,
   createGrid,
   expandPoints,
   getPixel,
@@ -942,13 +943,20 @@ export default function PixelCanvas({
       }
 
       if (tool === "bucket") {
-        const mask = wandMask(getFullComposite(), width, height, point.x, point.y);
+        const composite = getFullComposite();
+        // 클릭한 자리의 색이 이미 활성 색상과 같으면(화면에 보이는 그대로
+        // 기준) 마스크 계산도, 되돌리기 이력 추가도 없이 그냥 아무 것도
+        // 하지 않는다 — 큰 캔버스에서 이미 채운 영역을 다시 눌러도 즉시 끝난다.
+        const clickedColor = getPixel(composite, width, point.x, point.y);
+        if (clickedColor === activeColorHex) return;
+        const mask = wandMask(composite, width, height, point.x, point.y);
         if (mask.size > 0) {
-          let next = workingRef.current;
+          // setPixel은 호출마다 배열 전체를 slice하므로(마스크 크기 ×
+          // 캔버스 크기로 커진다) 여기서는 한 번만 slice한 뒤 인덱스로 직접
+          // 쓰고, 알파 합성만 compositePixel로 픽셀 단위로 적용한다.
+          const next = workingRef.current.slice();
           mask.forEach((i) => {
-            const x = i % width;
-            const y = Math.floor(i / width);
-            next = setPixel(next, width, x, y, activeColorHex);
+            next[i] = compositePixel(next[i], activeColorHex);
           });
           workingRef.current = next;
           render(next);
