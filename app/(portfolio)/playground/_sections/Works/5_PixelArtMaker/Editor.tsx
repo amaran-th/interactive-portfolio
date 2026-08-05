@@ -76,10 +76,12 @@ import { rasterizeText, rotateAlphaBuffer, Rotation } from "./textStamp";
 import {
   CANVAS_PRESETS,
   DEFAULT_CANVAS_BG_COLOR,
+  DEFAULT_FRAME_DURATION_MS,
   MAX_CANVAS_SIZE,
   MAX_LAYERS,
   NARROW_BREAKPOINT,
   nextZoomStep,
+  ONION_SKIN_OPACITY,
   SELECT_TOOL_CATEGORY,
   SelectMode,
   Tool,
@@ -128,6 +130,7 @@ function parsePixelArtJSON(raw: unknown): {
   pixels: PixelValue[];
   layers?: PixelLayer[];
   activeLayerId?: string;
+  layerMode?: "layers" | "frames";
 } | null {
   if (!raw || typeof raw !== "object") return null;
   const d = raw as Record<string, unknown>;
@@ -167,6 +170,10 @@ function parsePixelArtJSON(raw: unknown): {
           ? l.opacity
           : 1,
       locked: typeof l.locked === "boolean" ? l.locked : false,
+      frameDurationMs:
+        typeof l.frameDurationMs === "number" && l.frameDurationMs > 0
+          ? l.frameDurationMs
+          : undefined,
     }))
     // 손으로 고쳤거나 다른 곳에서 만든 파일이 MAX_LAYERS를 넘는 레이어를
     // 담고 있을 수 있다 — 파일 전체를 거부하지 않고 앞쪽(아래) 레이어부터
@@ -184,6 +191,10 @@ function parsePixelArtJSON(raw: unknown): {
     layers: parsedLayers.length > 0 ? parsedLayers : undefined,
     activeLayerId:
       typeof d.activeLayerId === "string" ? d.activeLayerId : undefined,
+    layerMode:
+      d.layerMode === "layers" || d.layerMode === "frames"
+        ? d.layerMode
+        : undefined,
   };
 }
 
@@ -240,6 +251,39 @@ function layersFromDoc(doc: PixelArt): {
     locked: false,
   };
   return { layers: [layer], activeLayerId: layer.id };
+}
+
+// layers는 아래→위(=필름스트립 왼쪽→오른쪽) 순서. currentId 다음으로
+// "보이는" 레이어를 찾는다 — 끝에 닿았을 때 loop면 처음(보이는 첫 레이어)
+// 으로, 아니면 null(재생 정지 신호)을 돌려준다. 어니언 스킨의 "다음 보이는
+// 프레임"에도 loop=false로 재사용한다.
+function nextVisibleFrame(
+  layers: PixelLayer[],
+  currentId: string,
+  loop: boolean,
+): PixelLayer | null {
+  const currentIndex = layers.findIndex((l) => l.id === currentId);
+  for (let i = currentIndex + 1; i < layers.length; i++) {
+    if (layers[i].visible) return layers[i];
+  }
+  if (!loop) return null;
+  for (let i = 0; i <= currentIndex; i++) {
+    if (layers[i].visible) return layers[i];
+  }
+  return null;
+}
+
+// 어니언 스킨의 "이전 보이는 프레임" — 재생과 달리 순환하지 않는다(이전
+// 프레임이 없으면 그냥 안 보여준다).
+function prevVisibleFrame(
+  layers: PixelLayer[],
+  currentId: string,
+): PixelLayer | null {
+  const currentIndex = layers.findIndex((l) => l.id === currentId);
+  for (let i = currentIndex - 1; i >= 0; i--) {
+    if (layers[i].visible) return layers[i];
+  }
+  return null;
 }
 
 export default function Editor({
@@ -446,6 +490,14 @@ export default function Editor({
   // 바로 켜진 상태로 나타난다).
   const [mounted, setMounted] = useState(false);
 
+  // 같은 layers 배열을 레이어로 볼지 프레임으로 볼지 — doc에 실려 저장되므로
+  // palette/name처럼 setDoc으로 갱신한다(실행취소 대상이 아니다, 도구를
+  // 바꾸는 것과 같은 성격).
+  const layerMode = doc.layerMode ?? "layers";
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [loopPlayback, setLoopPlayback] = useState(true);
+  const [onionSkin, setOnionSkin] = useState(true);
+
   const initialLayerState = layersFromDoc(initial.doc);
   const history = useCanvasHistory(
     initialLayerState.layers,
@@ -467,28 +519,60 @@ export default function Editor({
   const activeLayer =
     history.presentLayers[activeLayerIndex] ??
     history.presentLayers[history.presentLayers.length - 1];
-  const belowComposite = useMemo(
-    () =>
-      compositeLayerRange(
-        history.presentLayers,
-        0,
-        activeLayerIndex - 1,
+  const belowComposite = useMemo(() => {
+    if (layerMode === "frames") {
+      if (!onionSkin) return null;
+      const prev = prevVisibleFrame(history.presentLayers, history.activeLayerId);
+      if (!prev) return null;
+      return compositeLayers(
+        [{ ...prev, opacity: ONION_SKIN_OPACITY }],
         doc.width,
         doc.height,
-      ),
-    [history.presentLayers, activeLayerIndex, doc.width, doc.height],
-  );
-  const aboveComposite = useMemo(
-    () =>
-      compositeLayerRange(
-        history.presentLayers,
-        activeLayerIndex + 1,
-        history.presentLayers.length - 1,
+      );
+    }
+    return compositeLayerRange(
+      history.presentLayers,
+      0,
+      activeLayerIndex - 1,
+      doc.width,
+      doc.height,
+    );
+  }, [
+    layerMode,
+    onionSkin,
+    history.presentLayers,
+    history.activeLayerId,
+    activeLayerIndex,
+    doc.width,
+    doc.height,
+  ]);
+  const aboveComposite = useMemo(() => {
+    if (layerMode === "frames") {
+      if (!onionSkin) return null;
+      const next = nextVisibleFrame(history.presentLayers, history.activeLayerId, false);
+      if (!next) return null;
+      return compositeLayers(
+        [{ ...next, opacity: ONION_SKIN_OPACITY }],
         doc.width,
         doc.height,
-      ),
-    [history.presentLayers, activeLayerIndex, doc.width, doc.height],
-  );
+      );
+    }
+    return compositeLayerRange(
+      history.presentLayers,
+      activeLayerIndex + 1,
+      history.presentLayers.length - 1,
+      doc.width,
+      doc.height,
+    );
+  }, [
+    layerMode,
+    onionSkin,
+    history.presentLayers,
+    history.activeLayerId,
+    activeLayerIndex,
+    doc.width,
+    doc.height,
+  ]);
 
   // 선택을 만들거나 다루는 도구 묶음(select·lasso·move·wand) 밖으로 나가면
   // 더 이상 쓸모가 없어진 선택 영역을 자동으로 지운다 — 그 묶음 안에서
@@ -583,6 +667,75 @@ export default function Editor({
     },
     [history],
   );
+
+  const handleLayerModeChange = useCallback((mode: "layers" | "frames") => {
+    // 모드를 바꾸는 순간 재생 중이었다면 멈춘다 — 레이어 모드로 돌아가면
+    // "재생"이라는 개념 자체가 없다.
+    setIsPlaying(false);
+    setDoc((d) => ({ ...d, layerMode: mode }));
+    setHasMetaEdits(true);
+  }, []);
+
+  const handleTogglePlay = useCallback(() => setIsPlaying((p) => !p), []);
+  const handleToggleLoop = useCallback(() => setLoopPlayback((l) => !l), []);
+  const handleToggleOnionSkin = useCallback(() => setOnionSkin((o) => !o), []);
+
+  // 재생 루프(requestAnimationFrame) 안에서 항상 최신 값을 읽기 위한 ref들 —
+  // history.presentLayers/activeLayerId는 재생 중 프레임이 바뀔 때마다
+  // 바뀌므로, 이 값들을 useEffect 의존성에 직접 넣으면 프레임이 바뀔 때마다
+  // 루프가 처음부터 재시작돼(경과 시간 누적이 매번 끊겨) 재생이 멈춘 것처럼
+  // 보이거나 불규칙해진다. 대신 ref로만 최신값을 따라가고, useEffect
+  // 자체는 isPlaying이 바뀔 때만(재생 시작/정지) 재시작한다.
+  const playbackLayersRef = useRef(history.presentLayers);
+  const playbackActiveIdRef = useRef(history.activeLayerId);
+  const playbackLoopRef = useRef(loopPlayback);
+  useEffect(() => {
+    playbackLayersRef.current = history.presentLayers;
+  }, [history.presentLayers]);
+  useEffect(() => {
+    playbackActiveIdRef.current = history.activeLayerId;
+  }, [history.activeLayerId]);
+  useEffect(() => {
+    playbackLoopRef.current = loopPlayback;
+  }, [loopPlayback]);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    let rafId: number;
+    let lastTime = performance.now();
+    let elapsed = 0;
+    const tick = (now: number) => {
+      const delta = now - lastTime;
+      lastTime = now;
+      elapsed += delta;
+      const currentId = playbackActiveIdRef.current;
+      const currentLayer = playbackLayersRef.current.find(
+        (l) => l.id === currentId,
+      );
+      const duration = currentLayer?.frameDurationMs ?? DEFAULT_FRAME_DURATION_MS;
+      if (elapsed >= duration) {
+        elapsed = 0;
+        const next = nextVisibleFrame(
+          playbackLayersRef.current,
+          currentId,
+          playbackLoopRef.current,
+        );
+        if (next) {
+          history.setActiveLayerId(next.id);
+        } else {
+          setIsPlaying(false);
+          return;
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+    // history 객체 자체는 매 렌더 새로 만들어지므로 의존성에 넣지 않는다 —
+    // history.setActiveLayerId는 useCanvasHistory 안에서 deps: []인
+    // useCallback이라 참조가 안정적이다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, history.setActiveLayerId]);
 
   // 실행취소/다시실행 — 픽셀은 history가 그대로 되돌리고, 그 단계가 이동
   // 도구 커밋이었다면(moveSelectionUndoRef에 실제 Set|null이 쌓여 있다면)
@@ -700,6 +853,8 @@ export default function Editor({
       // 배율 1 = 화면 맞춤이므로, 탭마다(캔버스 크기가 다를 수 있으니) 항상
       // 화면 맞춤으로 새로 시작한다.
       setCanvasZoom(1);
+      // 다른 탭으로 넘어가면 재생 중이던 애니메이션은 의미가 없다.
+      setIsPlaying(false);
     },
     [history],
   );
@@ -759,6 +914,7 @@ export default function Editor({
           pixels: parsed.pixels,
           layers: parsed.layers,
           activeLayerId: parsed.activeLayerId,
+          layerMode: parsed.layerMode,
           createdAt: Date.now(),
         });
       };
