@@ -73,6 +73,10 @@ export const MAX_CANVAS_SIZE = 512;
 
 export const MAX_PALETTE_COLORS = 12;
 
+// 레이어 스냅숏 하나가 레이어 수만큼의 평면 배열을 담으므로(실행취소 스택
+// 50개 기준), 레이어 수에 상한을 둬 메모리 사용량을 억제한다.
+export const MAX_LAYERS = 20;
+
 export type Point = { x: number; y: number };
 
 // 배율 1은 더 이상 "셀당 고정 16px"가 아니라 "캔버스 전체가 화면에 꽉 차게
