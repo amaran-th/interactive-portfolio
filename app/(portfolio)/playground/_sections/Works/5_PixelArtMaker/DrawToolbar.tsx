@@ -4,6 +4,7 @@ import {
   Blend,
   ChevronDown,
   Circle,
+  Crosshair,
   Droplet,
   Eraser,
   FlipHorizontal2,
@@ -172,6 +173,8 @@ export default function DrawToolbar({
   onRedo,
   showGrid,
   onToggleGrid,
+  showCrosshair,
+  onToggleCrosshair,
   onClearCanvas,
   onFlipHorizontal,
   onFlipVertical,
@@ -210,6 +213,8 @@ export default function DrawToolbar({
   onRedo: () => void;
   showGrid: boolean;
   onToggleGrid: () => void;
+  showCrosshair: boolean;
+  onToggleCrosshair: () => void;
   onClearCanvas: () => void;
   // 좌우/상하 반전은 캔버스 크기를 바꾸지 않아 되돌리기가 되지만, 90도 회전은
   // 정사각형이 아닌 캔버스에서 가로세로가 바뀌어 되돌리기 스택이 초기화된다.
@@ -525,6 +530,13 @@ export default function DrawToolbar({
                 className={`flex h-8 w-8 items-center justify-center ${showGrid ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600"}`}
               >
                 <Grid3x3 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={onToggleCrosshair}
+                title="중앙 십자 보조선"
+                className={`flex h-8 w-8 items-center justify-center ${showCrosshair ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600"}`}
+              >
+                <Crosshair className="h-4 w-4" />
               </button>
               <button
                 onClick={onClearCanvas}
