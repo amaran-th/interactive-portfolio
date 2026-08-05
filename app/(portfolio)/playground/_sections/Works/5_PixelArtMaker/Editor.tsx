@@ -1,11 +1,12 @@
 "use client";
 
 import { Download, ImagePlus, Minus, Plus, Save, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getPixelArt,
   listPixelArt,
   PixelArt,
+  PixelLayer,
   savePixelArt,
   uid,
 } from "../_shared/assetLibrary";
@@ -43,7 +44,11 @@ import PixelCanvas, {
   textDrawX,
 } from "./PixelCanvas";
 import {
+  compositeLayerRange,
+  compositeLayers,
+  compositeOnto,
   createGrid,
+  createLayer,
   expandPoints,
   flipHorizontal,
   flipVertical,
@@ -63,6 +68,7 @@ import {
   CANVAS_PRESETS,
   DEFAULT_CANVAS_BG_COLOR,
   MAX_CANVAS_SIZE,
+  MAX_LAYERS,
   NARROW_BREAKPOINT,
   nextZoomStep,
   SELECT_TOOL_CATEGORY,
@@ -111,6 +117,8 @@ function parsePixelArtJSON(raw: unknown): {
   height: number;
   palette: string[];
   pixels: PixelValue[];
+  layers?: PixelLayer[];
+  activeLayerId?: string;
 } | null {
   if (!raw || typeof raw !== "object") return null;
   const d = raw as Record<string, unknown>;
@@ -128,6 +136,29 @@ function parsePixelArtJSON(raw: unknown): {
   if (!Array.isArray(d.pixels) || d.pixels.length !== d.width * d.height) {
     return null;
   }
+  const cellCount = d.width * d.height;
+  const rawLayers = Array.isArray(d.layers) ? d.layers : [];
+  const parsedLayers: PixelLayer[] = rawLayers
+    .filter((l): l is Record<string, unknown> => {
+      if (!l || typeof l !== "object") return false;
+      const layer = l as Record<string, unknown>;
+      return (
+        typeof layer.id === "string" &&
+        Array.isArray(layer.pixels) &&
+        layer.pixels.length === cellCount
+      );
+    })
+    .map((l) => ({
+      id: l.id as string,
+      name: typeof l.name === "string" && l.name.trim() ? l.name : "레이어",
+      pixels: (l.pixels as unknown[]).map((p) => (typeof p === "string" ? p : null)),
+      visible: typeof l.visible === "boolean" ? l.visible : true,
+      opacity:
+        typeof l.opacity === "number" && l.opacity >= 0 && l.opacity <= 1
+          ? l.opacity
+          : 1,
+      locked: typeof l.locked === "boolean" ? l.locked : false,
+    }));
   return {
     name: typeof d.name === "string" && d.name.trim() ? d.name : "제목 없음",
     width: d.width,
@@ -136,6 +167,9 @@ function parsePixelArtJSON(raw: unknown): {
       ? d.palette.filter((c): c is string => typeof c === "string")
       : [],
     pixels: d.pixels.map((p) => (typeof p === "string" ? p : null)),
+    layers: parsedLayers.length > 0 ? parsedLayers : undefined,
+    activeLayerId:
+      typeof d.activeLayerId === "string" ? d.activeLayerId : undefined,
   };
 }
 
@@ -166,6 +200,32 @@ function resolveInitialDoc(docId: string | null): {
     doc: blankDoc(CANVAS_PRESETS[0].width, CANVAS_PRESETS[0].height),
     found: false,
   };
+}
+
+// 문서를 열 때 레이어 스택을 확정한다 — layers가 있으면(V3 이후 저장분)
+// 그대로 쓰고, 없으면(V2 이하 구파일이거나 JSON에서 레이어 없이 불러온 경우)
+// pixels를 감싼 단일 레이어로 그 자리에서 만든다(자동 마이그레이션, 저장하기
+// 전까지는 원본에 반영되지 않는다).
+function layersFromDoc(doc: PixelArt): {
+  layers: PixelLayer[];
+  activeLayerId: string;
+} {
+  if (doc.layers && doc.layers.length > 0) {
+    const activeLayerId =
+      doc.activeLayerId && doc.layers.some((l) => l.id === doc.activeLayerId)
+        ? doc.activeLayerId
+        : doc.layers[doc.layers.length - 1].id;
+    return { layers: doc.layers, activeLayerId };
+  }
+  const layer: PixelLayer = {
+    id: uid(),
+    name: "레이어 1",
+    pixels: doc.pixels,
+    visible: true,
+    opacity: 1,
+    locked: false,
+  };
+  return { layers: [layer], activeLayerId: layer.id };
 }
 
 export default function Editor({
@@ -372,11 +432,49 @@ export default function Editor({
   // 바로 켜진 상태로 나타난다).
   const [mounted, setMounted] = useState(false);
 
-  const history = useCanvasHistory(initial.doc.pixels, {
-    width: initial.doc.width,
-    height: initial.doc.height,
-  });
+  const initialLayerState = layersFromDoc(initial.doc);
+  const history = useCanvasHistory(
+    initialLayerState.layers,
+    initialLayerState.activeLayerId,
+    { width: initial.doc.width, height: initial.doc.height },
+  );
   const selection = useSelection();
+
+  // 저장·내보내기·탭 스냅숏 등 레이어를 모르는 모든 곳은 이 값(모든 레이어를
+  // 합성한 최종 결과)만 쓴다 — PixelCanvas에 넘기는 history.present(활성
+  // 레이어)와는 다른 값이다.
+  const compositePixels = useMemo(
+    () => compositeLayers(history.presentLayers, doc.width, doc.height),
+    [history.presentLayers, doc.width, doc.height],
+  );
+  const activeLayerIndex = history.presentLayers.findIndex(
+    (l) => l.id === history.activeLayerId,
+  );
+  const activeLayer =
+    history.presentLayers[activeLayerIndex] ??
+    history.presentLayers[history.presentLayers.length - 1];
+  const belowComposite = useMemo(
+    () =>
+      compositeLayerRange(
+        history.presentLayers,
+        0,
+        activeLayerIndex - 1,
+        doc.width,
+        doc.height,
+      ),
+    [history.presentLayers, activeLayerIndex, doc.width, doc.height],
+  );
+  const aboveComposite = useMemo(
+    () =>
+      compositeLayerRange(
+        history.presentLayers,
+        activeLayerIndex + 1,
+        history.presentLayers.length - 1,
+        doc.width,
+        doc.height,
+      ),
+    [history.presentLayers, activeLayerIndex, doc.width, doc.height],
+  );
 
   // 선택을 만들거나 다루는 도구 묶음(select·lasso·move·wand) 밖으로 나가면
   // 더 이상 쓸모가 없어진 선택 영역을 자동으로 지운다 — 그 묶음 안에서
@@ -410,6 +508,23 @@ export default function Editor({
     ) => {
       history.push(next, size);
       moveSelectionUndoRef.current.push(moveOriginalMask);
+      if (moveSelectionUndoRef.current.length > 50) {
+        moveSelectionUndoRef.current.shift();
+      }
+      moveSelectionRedoRef.current = [];
+      setPixelsDirty(true);
+    },
+    [history],
+  );
+
+  // 캔버스 전체 변형(리사이즈·반전·회전)처럼 모든 레이어의 픽셀이 한꺼번에
+  // 바뀌는 조작 전용 — pushHistory(활성 레이어만 교체)와 달리 레이어 배열
+  // 전체를 새로 받는다. moveSelectionUndoRef 관리는 pushHistory와 동일하게
+  // "이 되돌리기 단계는 선택 영역을 건드리지 않는다"(undefined)로 채운다.
+  const pushHistoryAllLayers = useCallback(
+    (nextLayers: PixelLayer[], nextSize?: CanvasSize) => {
+      history.pushLayers(nextLayers, history.activeLayerId, nextSize);
+      moveSelectionUndoRef.current.push(undefined);
       if (moveSelectionUndoRef.current.length > 50) {
         moveSelectionUndoRef.current.shift();
       }
@@ -492,21 +607,37 @@ export default function Editor({
       return list.map((t, i) =>
         i === activeTabIndex
           ? {
-              doc: { ...doc, name, pixels: history.present },
+              doc: {
+                ...doc,
+                name,
+                pixels: compositePixels,
+                layers: history.presentLayers,
+                activeLayerId: history.activeLayerId,
+              },
               hasMetaEdits,
               pixelsDirty,
             }
           : t,
       );
     },
-    [activeTabIndex, doc, name, history, hasMetaEdits, pixelsDirty],
+    [
+      activeTabIndex,
+      doc,
+      name,
+      compositePixels,
+      history.presentLayers,
+      history.activeLayerId,
+      hasMetaEdits,
+      pixelsDirty,
+    ],
   );
 
   const loadTab = useCallback(
     (tab: Tab, index: number) => {
       setDoc(tab.doc);
       setName(tab.doc.name);
-      history.reset(tab.doc.pixels, {
+      const { layers, activeLayerId } = layersFromDoc(tab.doc);
+      history.reset(layers, activeLayerId, {
         width: tab.doc.width,
         height: tab.doc.height,
       });
@@ -576,6 +707,8 @@ export default function Editor({
           height: parsed.height,
           palette: parsed.palette,
           pixels: parsed.pixels,
+          layers: parsed.layers,
+          activeLayerId: parsed.activeLayerId,
           createdAt: Date.now(),
         });
       };
@@ -1037,7 +1170,9 @@ export default function Editor({
     const toSave: PixelArt = {
       ...doc,
       name: isWallpaper ? WALLPAPER_NAME : name,
-      pixels: history.present,
+      pixels: compositePixels,
+      layers: history.presentLayers,
+      activeLayerId: history.activeLayerId,
     };
     const ok = isWallpaper ? saveWallpaper(toSave) : savePixelArt(toSave);
     if (!ok) {
@@ -1052,7 +1187,16 @@ export default function Editor({
     // 되돌릴 수 없는 문제가 있었다.
     setHasMetaEdits(false);
     setPixelsDirty(false);
-  }, [activeTabIndex, doc, name, history, isWallpaper, flagSaveError]);
+  }, [
+    activeTabIndex,
+    doc,
+    name,
+    compositePixels,
+    history.presentLayers,
+    history.activeLayerId,
+    isWallpaper,
+    flagSaveError,
+  ]);
 
   // 자동저장이 막 끝났을 때만 안내 문구를 띄운다 — 수동 저장(버튼·Ctrl+S)은
   // 사용자가 직접 저장을 눌렀다는 걸 이미 알고 있으므로 따로 알리지 않는다.
@@ -1090,7 +1234,9 @@ export default function Editor({
         ...doc,
         id: uid(),
         name: newName,
-        pixels: history.present,
+        pixels: compositePixels,
+        layers: history.presentLayers,
+        activeLayerId: history.activeLayerId,
         createdAt: Date.now(),
       };
       const ok = savePixelArt(toSave);
@@ -1110,7 +1256,14 @@ export default function Editor({
         ),
       );
     },
-    [activeTabIndex, doc, history, flagSaveError],
+    [
+      activeTabIndex,
+      doc,
+      compositePixels,
+      history.presentLayers,
+      history.activeLayerId,
+      flagSaveError,
+    ],
   );
 
   // 캔버스 크기 수정 — 그림을 다시 늘리거나 줄이지 않고 경계만 바꾼다(왼쪽 위
@@ -1120,46 +1273,50 @@ export default function Editor({
   // effect가 알아서 맞춰준다.
   const handleResizeCanvas = useCallback(
     (newWidth: number, newHeight: number) => {
-      const resized = resizeGrid(
-        history.present,
-        doc.width,
-        doc.height,
-        newWidth,
-        newHeight,
-      );
-      pushHistory(resized, { width: newWidth, height: newHeight });
+      const nextLayers = history.presentLayers.map((l) => ({
+        ...l,
+        pixels: resizeGrid(l.pixels, doc.width, doc.height, newWidth, newHeight),
+      }));
+      pushHistoryAllLayers(nextLayers, { width: newWidth, height: newHeight });
       setResizingCanvas(false);
       setHasMetaEdits(true);
     },
-    [doc.width, doc.height, history.present, pushHistory],
+    [doc.width, doc.height, history.presentLayers, pushHistoryAllLayers],
   );
 
-  // 상하/좌우 반전과 90도 회전 모두 pushHistory로 되돌리기 스택에 올린다 —
-  // 회전은 크기 자체가 바뀌므로(정사각형이 아닌 캔버스) size 인자를 함께
-  // 넘겨, 되돌리기/다시 실행 때 그 시점의 크기로 정확히 복원되게 한다.
+  // 상하/좌우 반전과 90도 회전 모두 pushHistoryAllLayers로 되돌리기 스택에
+  // 올린다 — 회전은 크기 자체가 바뀌므로(정사각형이 아닌 캔버스) size 인자를
+  // 함께 넘겨, 되돌리기/다시 실행 때 그 시점의 크기로 정확히 복원되게 한다.
   const handleFlipHorizontal = useCallback(() => {
-    pushHistory(flipHorizontal(history.present, doc.width, doc.height));
-  }, [history.present, doc.width, doc.height, pushHistory]);
+    const nextLayers = history.presentLayers.map((l) => ({
+      ...l,
+      pixels: flipHorizontal(l.pixels, doc.width, doc.height),
+    }));
+    pushHistoryAllLayers(nextLayers);
+  }, [history.presentLayers, doc.width, doc.height, pushHistoryAllLayers]);
 
   const handleFlipVertical = useCallback(() => {
-    pushHistory(flipVertical(history.present, doc.width, doc.height));
-  }, [history.present, doc.width, doc.height, pushHistory]);
+    const nextLayers = history.presentLayers.map((l) => ({
+      ...l,
+      pixels: flipVertical(l.pixels, doc.width, doc.height),
+    }));
+    pushHistoryAllLayers(nextLayers);
+  }, [history.presentLayers, doc.width, doc.height, pushHistoryAllLayers]);
 
   const handleRotate90 = useCallback(
     (direction: 1 | -1) => {
-      const result = rotate90(
-        history.present,
-        doc.width,
-        doc.height,
-        direction,
-      );
-      pushHistory(result.pixels, {
-        width: result.width,
-        height: result.height,
+      let newWidth = doc.height;
+      let newHeight = doc.width;
+      const nextLayers = history.presentLayers.map((l) => {
+        const rotated = rotate90(l.pixels, doc.width, doc.height, direction);
+        newWidth = rotated.width;
+        newHeight = rotated.height;
+        return { ...l, pixels: rotated.pixels };
       });
+      pushHistoryAllLayers(nextLayers, { width: newWidth, height: newHeight });
       setHasMetaEdits(true);
     },
-    [history.present, doc.width, doc.height, pushHistory],
+    [history.presentLayers, doc.width, doc.height, pushHistoryAllLayers],
   );
 
   // 활성 탭은 라이브 상태(pixelsDirty/hasMetaEdits)로, 비활성 탭은 마지막
@@ -1324,29 +1481,32 @@ export default function Editor({
             submenu: [
               {
                 label: "PNG",
-                onClick: () => exportAsPNG({ ...doc, pixels: history.present }),
+                onClick: () =>
+                  exportAsPNG({ ...doc, pixels: compositePixels }),
               },
               {
                 label: "SVG",
-                onClick: () => exportAsSVG({ ...doc, pixels: history.present }),
+                onClick: () =>
+                  exportAsSVG({ ...doc, pixels: compositePixels }),
               },
               {
                 label: "JSON",
                 title:
                   "다른 기기에서도 그림을 그대로 이어 그리고 싶을 때 씁니다 — 저장된 이 파일을 그 기기의 파일 > JSON 불러오기로 열면 됩니다.",
                 onClick: () =>
-                  exportAsJSON({ ...doc, pixels: history.present }),
+                  exportAsJSON({ ...doc, pixels: compositePixels }),
               },
               {
                 label: "JPG (손실 압축)",
-                onClick: () => exportAsJPG({ ...doc, pixels: history.present }),
+                onClick: () =>
+                  exportAsJPG({ ...doc, pixels: compositePixels }),
               },
             ],
           },
         ],
       });
     },
-    [doc, history, handleSave, handleSaveAs, activeTabIndex],
+    [doc, compositePixels, handleSave, handleSaveAs, activeTabIndex],
   );
 
   const openEditMenu = useCallback(
@@ -1815,7 +1975,7 @@ export default function Editor({
                 />
               );
               const exportPanel = (
-                <ExportPanel doc={{ ...doc, pixels: history.present }} />
+                <ExportPanel doc={{ ...doc, pixels: compositePixels }} />
               );
 
               if (!narrow) {
