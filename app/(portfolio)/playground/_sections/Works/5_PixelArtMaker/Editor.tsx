@@ -1,6 +1,14 @@
 "use client";
 
-import { Download, ImagePlus, Minus, Plus, Save, X } from "lucide-react";
+import {
+  Download,
+  ImagePlus,
+  Layers as LayersIcon,
+  Minus,
+  Plus,
+  Save,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getPixelArt,
@@ -35,6 +43,7 @@ import {
 } from "./gradientFill";
 import { mixHex } from "./hsv";
 import ImportPanel from "./ImportPanel";
+import LayerPanel from "./LayerPanel";
 import NewCanvasDialog from "./NewCanvasDialog";
 import ReferenceWindow from "./ReferenceWindow";
 import PixelCanvas, {
@@ -377,7 +386,7 @@ export default function Editor({
   // narrow일 때 이미지 불러오기/내보내기 사이드바가 아이콘 두 개로 줄어들고,
   // 그 중 하나를 누르면 이 상태에 맞는 패널이 플로팅 팝업으로 뜬다.
   const [openFloatingPanel, setOpenFloatingPanel] = useState<
-    "import" | "export" | null
+    "layers" | "import" | "export" | null
   >(null);
   // 확대 상태에서 스페이스+드래그로 스크롤할 대상 — PixelCanvas에 그대로 내려준다.
   const canvasViewportRef = useRef<HTMLDivElement>(null);
@@ -524,6 +533,21 @@ export default function Editor({
   const pushHistoryAllLayers = useCallback(
     (nextLayers: PixelLayer[], nextSize?: CanvasSize) => {
       history.pushLayers(nextLayers, history.activeLayerId, nextSize);
+      moveSelectionUndoRef.current.push(undefined);
+      if (moveSelectionUndoRef.current.length > 50) {
+        moveSelectionUndoRef.current.shift();
+      }
+      moveSelectionRedoRef.current = [];
+      setPixelsDirty(true);
+    },
+    [history],
+  );
+
+  // 레이어 구조 변경(추가·삭제·순서변경·병합·복제·보이기·투명도·잠금·이름)
+  // 전용 — pushHistoryAllLayers와 동작은 같지만 호출부 의도를 이름으로 구분한다.
+  const pushLayerOp = useCallback(
+    (nextLayers: PixelLayer[], nextActiveLayerId: string) => {
+      history.pushLayers(nextLayers, nextActiveLayerId);
       moveSelectionUndoRef.current.push(undefined);
       if (moveSelectionUndoRef.current.length > 50) {
         moveSelectionUndoRef.current.shift();
@@ -1449,6 +1473,154 @@ export default function Editor({
     setActiveColorHex(hex);
   }, []);
 
+  const handleSelectLayer = useCallback(
+    (id: string) => history.setActiveLayerId(id),
+    [history],
+  );
+
+  const handleAddLayer = useCallback(() => {
+    if (history.presentLayers.length >= MAX_LAYERS) return;
+    const newLayer = createLayer(
+      uid(),
+      `레이어 ${history.presentLayers.length + 1}`,
+      doc.width,
+      doc.height,
+    );
+    const insertAt = activeLayerIndex + 1;
+    const nextLayers = [
+      ...history.presentLayers.slice(0, insertAt),
+      newLayer,
+      ...history.presentLayers.slice(insertAt),
+    ];
+    pushLayerOp(nextLayers, newLayer.id);
+  }, [history.presentLayers, activeLayerIndex, doc.width, doc.height, pushLayerOp]);
+
+  const handleDuplicateLayer = useCallback(
+    (id: string) => {
+      const index = history.presentLayers.findIndex((l) => l.id === id);
+      if (index < 0) return;
+      const source = history.presentLayers[index];
+      const copy: PixelLayer = {
+        ...source,
+        id: uid(),
+        name: `${source.name} 사본`,
+        pixels: source.pixels.slice(),
+      };
+      const nextLayers = [
+        ...history.presentLayers.slice(0, index + 1),
+        copy,
+        ...history.presentLayers.slice(index + 1),
+      ];
+      pushLayerOp(nextLayers, copy.id);
+    },
+    [history.presentLayers, pushLayerOp],
+  );
+
+  const handleDeleteLayer = useCallback(
+    (id: string) => {
+      if (history.presentLayers.length <= 1) return;
+      const index = history.presentLayers.findIndex((l) => l.id === id);
+      if (index < 0) return;
+      const nextLayers = history.presentLayers.filter((l) => l.id !== id);
+      const nextActiveIndex = Math.min(index, nextLayers.length - 1);
+      pushLayerOp(nextLayers, nextLayers[nextActiveIndex].id);
+    },
+    [history.presentLayers, pushLayerOp],
+  );
+
+  // 병합 대상(id)의 내용을 바로 아래 레이어 위에 합성해 그 아래 레이어에
+  // 반영하고, 병합된(위) 레이어는 배열에서 없앤다 — 아래 레이어의 투명도는
+  // 그대로 둔다(내용만 받는다).
+  const handleMergeDown = useCallback(
+    (id: string) => {
+      const index = history.presentLayers.findIndex((l) => l.id === id);
+      if (index <= 0) return;
+      const layer = history.presentLayers[index];
+      const below = history.presentLayers[index - 1];
+      const merged: PixelLayer = {
+        ...below,
+        pixels: compositeOnto(below.pixels, layer.pixels, layer.opacity),
+      };
+      const nextLayers = [
+        ...history.presentLayers.slice(0, index - 1),
+        merged,
+        ...history.presentLayers.slice(index + 1),
+      ];
+      pushLayerOp(nextLayers, merged.id);
+    },
+    [history.presentLayers, pushLayerOp],
+  );
+
+  const handleMoveLayer = useCallback(
+    (id: string, direction: 1 | -1) => {
+      const index = history.presentLayers.findIndex((l) => l.id === id);
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= history.presentLayers.length) {
+        return;
+      }
+      const nextLayers = history.presentLayers.slice();
+      [nextLayers[index], nextLayers[target]] = [
+        nextLayers[target],
+        nextLayers[index],
+      ];
+      pushLayerOp(nextLayers, id);
+    },
+    [history.presentLayers, pushLayerOp],
+  );
+
+  const handleRenameLayer = useCallback(
+    (id: string, layerName: string) => {
+      const nextLayers = history.presentLayers.map((l) =>
+        l.id === id ? { ...l, name: layerName } : l,
+      );
+      pushLayerOp(nextLayers, history.activeLayerId);
+    },
+    [history.presentLayers, history.activeLayerId, pushLayerOp],
+  );
+
+  const handleToggleLayerVisible = useCallback(
+    (id: string) => {
+      const nextLayers = history.presentLayers.map((l) =>
+        l.id === id ? { ...l, visible: !l.visible } : l,
+      );
+      pushLayerOp(nextLayers, history.activeLayerId);
+    },
+    [history.presentLayers, history.activeLayerId, pushLayerOp],
+  );
+
+  const handleToggleLayerLocked = useCallback(
+    (id: string) => {
+      const nextLayers = history.presentLayers.map((l) =>
+        l.id === id ? { ...l, locked: !l.locked } : l,
+      );
+      pushLayerOp(nextLayers, history.activeLayerId);
+    },
+    [history.presentLayers, history.activeLayerId, pushLayerOp],
+  );
+
+  const handleLayerOpacityChange = useCallback(
+    (id: string, opacity: number) => {
+      const nextLayers = history.presentLayers.map((l) =>
+        l.id === id ? { ...l, opacity } : l,
+      );
+      pushLayerOp(nextLayers, history.activeLayerId);
+    },
+    [history.presentLayers, history.activeLayerId, pushLayerOp],
+  );
+
+  const handleFlattenLayers = useCallback(() => {
+    if (history.presentLayers.length <= 1) return;
+    const flat: PixelLayer = {
+      id: uid(),
+      name: "레이어 1",
+      pixels: compositeLayers(history.presentLayers, doc.width, doc.height),
+      visible: true,
+      opacity: 1,
+      locked: false,
+    };
+    pushLayerOp([flat], flat.id);
+  }, [history.presentLayers, doc.width, doc.height, pushLayerOp]);
+
   // 진짜 PC 프로그램의 창처럼 제목표시줄(이름+닫기)과 그 아래 파일/편집 메뉴 바를
   // 분리한다 — 저장·내보내기·실행취소 같은 동작은 더 이상 제목표시줄에 흩어진
   // 버튼이 아니라 메뉴 항목으로 모은다. ContextMenu를 버튼 아래쪽에 앵커해 재사용한다.
@@ -1856,6 +2028,10 @@ export default function Editor({
                   width={doc.width}
                   height={doc.height}
                   pixels={history.present}
+                  belowComposite={belowComposite}
+                  aboveComposite={aboveComposite}
+                  activeLayerOpacity={activeLayer.opacity}
+                  activeLayerLocked={activeLayer.locked}
                   tool={tool}
                   onToolChange={setTool}
                   activeColorHex={activeColorHex}
@@ -1981,6 +2157,24 @@ export default function Editor({
               if (!narrow) {
                 return (
                   <div className="flex w-60 shrink-0 flex-col gap-3">
+                    <LayerPanel
+                      layers={history.presentLayers}
+                      activeLayerId={history.activeLayerId}
+                      width={doc.width}
+                      height={doc.height}
+                      onSelect={handleSelectLayer}
+                      onAdd={handleAddLayer}
+                      onDuplicate={handleDuplicateLayer}
+                      onDelete={handleDeleteLayer}
+                      onMergeDown={handleMergeDown}
+                      onMoveUp={(id) => handleMoveLayer(id, 1)}
+                      onMoveDown={(id) => handleMoveLayer(id, -1)}
+                      onRename={handleRenameLayer}
+                      onToggleVisible={handleToggleLayerVisible}
+                      onToggleLocked={handleToggleLayerLocked}
+                      onOpacityChange={handleLayerOpacityChange}
+                      onFlatten={handleFlattenLayers}
+                    />
                     <Accordion title="이미지 불러오기" defaultOpen={false}>
                       {importPanel}
                     </Accordion>
@@ -1992,12 +2186,51 @@ export default function Editor({
               }
 
               // 편집기가 좁아지면 w-60짜리 사이드바가 캔버스 자리를 너무 많이
-              // 차지해 보여, 아이콘 두 개짜리 얇은 열로 줄이고 실제 내용은
+              // 차지해 보여, 아이콘 세 개짜리 얇은 열로 줄이고 실제 내용은
               // 누른 아이콘 쪽에서만 캔버스 위로 뜨는 플로팅 팝업으로 보여준다.
               const panelTitle =
-                openFloatingPanel === "import" ? "이미지 불러오기" : "내보내기";
+                openFloatingPanel === "layers"
+                  ? "레이어"
+                  : openFloatingPanel === "import"
+                    ? "이미지 불러오기"
+                    : "내보내기";
+              const layerPanel = (
+                <LayerPanel
+                  layers={history.presentLayers}
+                  activeLayerId={history.activeLayerId}
+                  width={doc.width}
+                  height={doc.height}
+                  onSelect={handleSelectLayer}
+                  onAdd={handleAddLayer}
+                  onDuplicate={handleDuplicateLayer}
+                  onDelete={handleDeleteLayer}
+                  onMergeDown={handleMergeDown}
+                  onMoveUp={(id) => handleMoveLayer(id, 1)}
+                  onMoveDown={(id) => handleMoveLayer(id, -1)}
+                  onRename={handleRenameLayer}
+                  onToggleVisible={handleToggleLayerVisible}
+                  onToggleLocked={handleToggleLayerLocked}
+                  onOpacityChange={handleLayerOpacityChange}
+                  onFlatten={handleFlattenLayers}
+                />
+              );
               return (
                 <div className="relative flex w-10 shrink-0 flex-col items-center gap-2">
+                  <button
+                    onClick={() =>
+                      setOpenFloatingPanel((p) =>
+                        p === "layers" ? null : "layers",
+                      )
+                    }
+                    title="레이어"
+                    className={`flex h-8 w-8 items-center justify-center transition-colors ${
+                      openFloatingPanel === "layers"
+                        ? "bg-violet-500 text-white"
+                        : "bg-white text-gray-500 shadow-md hover:bg-gray-50"
+                    }`}
+                  >
+                    <LayersIcon className="h-4 w-4" />
+                  </button>
                   <button
                     onClick={() =>
                       setOpenFloatingPanel((p) =>
@@ -2041,9 +2274,11 @@ export default function Editor({
                         </button>
                       </div>
                       <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-3 pt-0">
-                        {openFloatingPanel === "import"
-                          ? importPanel
-                          : exportPanel}
+                        {openFloatingPanel === "layers"
+                          ? layerPanel
+                          : openFloatingPanel === "import"
+                            ? importPanel
+                            : exportPanel}
                       </div>
                     </div>
                   )}
