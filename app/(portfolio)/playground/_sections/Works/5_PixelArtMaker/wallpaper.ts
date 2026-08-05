@@ -2,6 +2,7 @@ import {
   encodeStored,
   PackedPixels,
   PixelArt,
+  PixelLayer,
   unpackPixels,
 } from "../_shared/assetLibrary";
 
@@ -106,6 +107,11 @@ function defaultWallpaper(): PixelArt {
   };
 }
 
+type StoredWallpaperV3 = Omit<PixelArt, "pixels" | "layers"> & {
+  pixels: PackedPixels;
+  layers?: (Omit<PixelLayer, "pixels"> & { pixels: PackedPixels })[];
+  version: 3;
+};
 type StoredWallpaperV2 = Omit<PixelArt, "pixels"> & {
   pixels: PackedPixels;
   version: 2;
@@ -119,7 +125,20 @@ export function getWallpaper(): PixelArt {
   try {
     const raw = localStorage.getItem(WALLPAPER_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as StoredWallpaperV2 | StoredWallpaperV1;
+      const parsed = JSON.parse(raw) as
+        | StoredWallpaperV3
+        | StoredWallpaperV2
+        | StoredWallpaperV1;
+      if ("version" in parsed && parsed.version === 3) {
+        return {
+          ...parsed,
+          pixels: unpackPixels(parsed.pixels),
+          layers: parsed.layers?.map((l) => ({
+            ...l,
+            pixels: unpackPixels(l.pixels),
+          })),
+        };
+      }
       if ("version" in parsed && parsed.version === 2) {
         return { ...parsed, pixels: unpackPixels(parsed.pixels) };
       }
