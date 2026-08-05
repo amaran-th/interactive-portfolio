@@ -1,5 +1,6 @@
 import { hexToRgba, rgbaToHex } from "./hsv";
 import type { Point } from "./types";
+import type { PixelLayer } from "../_shared/assetLibrary";
 
 // 픽셀은 트루컬러다 — hex 문자열이거나, 투명이면 null.
 export type PixelValue = string | null;
@@ -7,7 +8,7 @@ export type PixelValue = string | null;
 // 알파가 있는 색을 이미 칠해진 픽셀 위에 다시 찍으면 두 색이 합성된다(표준
 // src-over 알파 합성) — 새 색이 완전 불투명이거나 기존 픽셀이 비어 있으면
 // 굳이 섞을 필요 없이 그대로 얹는 것과 결과가 같아 지름길로 처리한다.
-function compositePixel(dst: PixelValue, src: string): PixelValue {
+export function compositePixel(dst: PixelValue, src: string): PixelValue {
   const [, , , srcA] = hexToRgba(src);
   if (srcA >= 1 || dst === null) return src;
   const [dr, dg, db, dstA] = hexToRgba(dst);
@@ -24,6 +25,85 @@ function compositePixel(dst: PixelValue, src: string): PixelValue {
 
 export function createGrid(width: number, height: number): PixelValue[] {
   return new Array(width * height).fill(null);
+}
+
+// 레이어 투명도를 픽셀 알파에 곱해 적용한다 — opacity가 1이면 원본 그대로,
+// 0이면(완전 투명) 합성에 아무 영향이 없다.
+export function applyOpacityToPixel(
+  value: PixelValue,
+  opacity: number,
+): PixelValue {
+  if (value === null || opacity >= 1) return value;
+  if (opacity <= 0) return null;
+  const [r, g, b, a] = hexToRgba(value);
+  return rgbaToHex(r, g, b, a * opacity);
+}
+
+// src 레이어를 자신의 투명도(srcOpacity)까지 반영해 dst 위에 겹쳐 합성한다 —
+// 레이어 하나를 그 아래 결과 위에 얹는 기본 단위 연산.
+export function compositeOnto(
+  dst: PixelValue[],
+  src: PixelValue[],
+  srcOpacity: number,
+): PixelValue[] {
+  const out = dst.slice();
+  for (let i = 0; i < src.length; i++) {
+    const s = applyOpacityToPixel(src[i], srcOpacity);
+    if (s !== null) out[i] = compositePixel(out[i], s);
+  }
+  return out;
+}
+
+// 보이는 레이어만, 배열 순서(아래→위)대로 차례로 겹쳐 하나의 평면 이미지로
+// 합성한다 — 저장·내보내기·썸네일처럼 레이어를 모르는 곳에서 쓰는 최종 결과.
+export function compositeLayers(
+  layers: PixelLayer[],
+  width: number,
+  height: number,
+): PixelValue[] {
+  let out = createGrid(width, height);
+  for (const layer of layers) {
+    if (!layer.visible) continue;
+    out = compositeOnto(out, layer.pixels, layer.opacity);
+  }
+  return out;
+}
+
+// layers(아래→위 순서) 중 [fromIndex, toIndex] 구간만 합성한다 — PixelCanvas가
+// 활성 레이어 아래/위의 배경·전경을 미리 만들어둘 때 쓴다. 구간에 보이는
+// 레이어가 하나도 없으면(범위를 벗어나거나 전부 숨김) null을 돌려준다.
+export function compositeLayerRange(
+  layers: PixelLayer[],
+  fromIndex: number,
+  toIndex: number,
+  width: number,
+  height: number,
+): PixelValue[] | null {
+  if (fromIndex > toIndex || fromIndex >= layers.length || toIndex < 0) {
+    return null;
+  }
+  const slice = layers
+    .slice(Math.max(0, fromIndex), Math.min(layers.length, toIndex + 1))
+    .filter((l) => l.visible);
+  if (slice.length === 0) return null;
+  return compositeLayers(slice, width, height);
+}
+
+// 빈 레이어 하나를 만든다 — id는 호출부(Editor)가 uid()로 발급해 넘긴다.
+export function createLayer(
+  id: string,
+  name: string,
+  width: number,
+  height: number,
+): PixelLayer {
+  return {
+    id,
+    name,
+    pixels: createGrid(width, height),
+    visible: true,
+    opacity: 1,
+    locked: false,
+  };
 }
 
 // 최근접 이웃 리샘플링 — 이미지 불러오기로 캔버스에 띄운 이미지를 드래그로
