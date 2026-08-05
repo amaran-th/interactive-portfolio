@@ -86,6 +86,23 @@ export function useCanvasHistory(
     );
   }, []);
 
+  // 투명도 슬라이더처럼 한 번의 드래그/상호작용 동안 연속으로 값이 바뀌는
+  // 편집을 위한 것 — setActiveLayerId와 같은 패턴("스택은 건드리지 않고
+  // presentSnap만 바꾼다")이지만 레이어 배열/활성 id 전체를 바꾼다. 호출부가
+  // "지금이 드래그의 첫 틱인지 이어지는 틱인지"를 판단해, 첫 틱은 여전히
+  // pushLayers로 실행취소 경계를 만들고 이어지는 틱만 이 함수를 써야 한다 —
+  // 안 그러면 드래그 전체가 실행취소 스택에서 통째로 사라진다.
+  const replacePresentLayers = useCallback(
+    (nextLayers: PixelLayer[], nextActiveLayerId: string) => {
+      setPresentSnap((s) => ({
+        ...s,
+        layers: nextLayers,
+        activeLayerId: nextActiveLayerId,
+      }));
+    },
+    [],
+  );
+
   const undo = useCallback(() => {
     const prev = undoStack.current.pop();
     if (!prev) return;
@@ -135,6 +152,7 @@ export function useCanvasHistory(
     push,
     pushLayers,
     setActiveLayerId,
+    replacePresentLayers,
     undo,
     redo,
     reset,
