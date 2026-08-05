@@ -17,6 +17,10 @@ export type PixelLayer = {
   visible: boolean;
   opacity: number;
   locked: boolean;
+  // 프레임 모드에서 이 레이어(프레임)가 화면에 머무는 시간(ms). 없으면
+  // DEFAULT_FRAME_DURATION_MS(5_PixelArtMaker/types.ts)로 취급한다 — 레이어
+  // 모드에선 읽지 않는다.
+  frameDurationMs?: number;
 };
 
 export type PixelArt = {
@@ -33,6 +37,11 @@ export type PixelArt = {
   // 이 파일이 아니라 Editor.tsx가 문서를 열 때 담당한다(아래 참고).
   layers?: PixelLayer[];
   activeLayerId?: string;
+  // 같은 layers 배열을 "레이어"(합성해서 보여줌)로 볼지 "프레임"(순서대로
+  // 재생)으로 볼지. 없으면 "layers"로 취급한다(레이어 기능만 있던 구파일과
+  // 호환). encodeStored/decodeStored는 이미 객체 스프레드로 이 필드를 그대로
+  // 저장·복원하므로 저장 포맷 버전을 올릴 필요가 없다.
+  layerMode?: "layers" | "frames";
   createdAt: number;
 };
 
