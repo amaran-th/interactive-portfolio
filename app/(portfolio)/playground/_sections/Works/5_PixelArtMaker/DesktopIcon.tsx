@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { PixelArt } from "../_shared/assetLibrary";
+import { CURSOR_POINTING, CURSOR_TEXT } from "./cursors";
 
 export default function DesktopIcon({
   art,
@@ -74,7 +75,12 @@ export default function DesktopIcon({
 
   return (
     <div
-      style={{ left: x, top: y, position: "absolute" }}
+      style={{
+        left: x,
+        top: y,
+        position: "absolute",
+        cursor: editing ? undefined : CURSOR_POINTING,
+      }}
       className={`flex w-20 flex-col items-center gap-1 p-2 ${selected ? "bg-violet-500/15" : "hover:bg-black/5"}`}
       onPointerDown={editing ? undefined : onPointerDownIcon}
       onDoubleClick={editing ? undefined : onDoubleClick}
@@ -97,6 +103,7 @@ export default function DesktopIcon({
             else if (e.key === "Escape") onRenameCancel();
           }}
           className="w-full bg-white text-center text-[10px] text-gray-900 shadow-[0_0_0_1px_#8b5cf6] outline-none"
+          style={{ cursor: CURSOR_TEXT }}
         />
       ) : (
         <span className="w-full truncate text-center text-[10px] text-gray-600">

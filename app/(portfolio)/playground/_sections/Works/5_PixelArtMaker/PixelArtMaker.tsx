@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useUnsavedChangesWarning } from "../_shared/useUnsavedChangesWarning";
+import { CURSOR_NORMAL, CURSOR_POINTING } from "./cursors";
 import Desktop from "./Desktop";
 import Editor from "./Editor";
 import { monaFont } from "../_shared/fonts";
@@ -92,8 +93,19 @@ export default function PixelArtMaker() {
 
   return (
     <div
-      className={`${monaFont.className} relative h-full w-full overflow-hidden`}
+      className={`pam-app ${monaFont.className} relative h-full w-full overflow-hidden`}
     >
+      {/* 데스크탑(바탕화면)은 편집기 밖에 있어 .pam-editor의 커서 규칙이 닿지
+          않는다 — 여기서 기본 커서를 따로 깔아준다. 아이콘 등 개별 상호작용
+          요소는 각자 인라인 style로 더 구체적인 커서를 얹는다. */}
+      <style>{`
+        .pam-app { cursor: ${CURSOR_NORMAL}; }
+        .pam-app button:not(:disabled) { cursor: ${CURSOR_POINTING}; }
+        /* 비활성(:disabled) 폼 요소는 브라우저가 cursor CSS를 무시하고 항상
+           기본 화살표를 그린다 — pointer-events를 꺼서 호버를 부모로
+           흘려보내 부모의 커스텀 커서가 대신 보이게 한다. */
+        .pam-app :disabled { pointer-events: none; cursor: ${CURSOR_NORMAL}; }
+      `}</style>
       <Desktop
         refreshSignal={refreshSignal}
         onOpen={(id) => openEditor(id)}

@@ -2,6 +2,7 @@
 
 import { Pipette } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { CURSOR_CROSSHAIR, CURSOR_NORMAL, CURSOR_POINTING } from "./cursors";
 import { hexToRgba, hsvToRgb, rgbaToHex, rgbToHsv } from "./hsv";
 
 export const COLOR_PICKER_SQUARE_SIZE = 120;
@@ -265,7 +266,8 @@ export default function ColorPicker({
             ref={squareRef}
             width={SQUARE_SIZE}
             height={SQUARE_SIZE}
-            className="cursor-crosshair touch-none shadow-sm"
+            className="touch-none shadow-sm"
+            style={{ cursor: CURSOR_CROSSHAIR }}
             onPointerDown={handleSquareDown}
             onPointerMove={handleSquareMove}
             onPointerUp={handleDragEnd}
@@ -288,6 +290,7 @@ export default function ColorPicker({
                   ? "bg-violet-500 text-white"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
+              style={{ cursor: CURSOR_POINTING }}
             >
               <Pipette className="h-4 w-4" />
             </button>
@@ -300,8 +303,9 @@ export default function ColorPicker({
               onPointerMove={handleHueMove}
               onPointerUp={handleDragEnd}
               onPointerCancel={handleDragEnd}
-              className="relative h-full w-3.5 cursor-pointer touch-none shadow-sm"
+              className="relative h-full w-3.5 touch-none shadow-sm"
               style={{
+                cursor: CURSOR_POINTING,
                 background:
                   "linear-gradient(to bottom, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
               }}
@@ -323,11 +327,12 @@ export default function ColorPicker({
               onPointerCancel={handleDragEnd}
               title={alphaDisabled ? "이 대상은 항상 불투명합니다" : undefined}
               className={`relative h-full w-3.5 touch-none shadow-sm ${
-                alphaDisabled
-                  ? "cursor-not-allowed opacity-40"
-                  : "cursor-pointer"
+                alphaDisabled ? "opacity-40" : ""
               }`}
-              style={CHECKER_STYLE}
+              style={{
+                ...CHECKER_STYLE,
+                cursor: alphaDisabled ? CURSOR_NORMAL : CURSOR_POINTING,
+              }}
             >
               <div
                 className="pointer-events-none absolute inset-0"

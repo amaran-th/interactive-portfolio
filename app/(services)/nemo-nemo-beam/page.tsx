@@ -1,4 +1,5 @@
 import PixelArtMaker from "@/app/(portfolio)/playground/_sections/Works/5_PixelArtMaker/PixelArtMaker";
+import { CURSOR_NORMAL } from "@/app/(portfolio)/playground/_sections/Works/5_PixelArtMaker/cursors";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -29,7 +30,10 @@ export const metadata: Metadata = {
 
 export default function PixelArtMakerPage() {
   return (
-    <main className="h-dvh w-full overflow-hidden p-4">
+    <main
+      className="h-dvh w-full overflow-hidden p-4"
+      style={{ cursor: CURSOR_NORMAL }}
+    >
       <PixelArtMaker />
     </main>
   );

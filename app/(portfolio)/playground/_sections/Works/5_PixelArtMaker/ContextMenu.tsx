@@ -17,7 +17,7 @@ export type ContextMenuItem = {
 function itemClassName(item: ContextMenuItem) {
   return `flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs ${
     item.disabled
-      ? "cursor-not-allowed text-gray-300"
+      ? "text-gray-300"
       : item.danger
         ? "text-red-500 hover:bg-red-50"
         : "text-gray-700 hover:bg-violet-50"

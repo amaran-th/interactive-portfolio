@@ -3,6 +3,7 @@
 import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import ColorPicker from "./ColorPicker";
+import { CURSOR_CROSSHAIR, CURSOR_NORMAL, CURSOR_POINTING } from "./cursors";
 import Magnifier, { MAGNIFIER_RADIUS, MagnifierGrid } from "./Magnifier";
 import { PixelValue } from "./pixelGrid";
 import {
@@ -478,6 +479,7 @@ export default function ImportPanel({
           accept="image/*"
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
           className="text-xs text-gray-600"
+          style={{ cursor: CURSOR_POINTING }}
         />
         <button
           onClick={handlePasteFromClipboard}
@@ -500,7 +502,7 @@ export default function ImportPanel({
               }
               style={{
                 imageRendering: "pixelated",
-                cursor: eyedropperActive ? "crosshair" : "default",
+                cursor: eyedropperActive ? CURSOR_CROSSHAIR : CURSOR_NORMAL,
                 width:
                   preview.width *
                   Math.min(
@@ -789,7 +791,11 @@ export default function ImportPanel({
                 <div
                   ref={popoverRef}
                   className="fixed z-50 w-max bg-white p-2 shadow-xl"
-                  style={{ left: popoverPos.left, top: popoverPos.top }}
+                  style={{
+                    left: popoverPos.left,
+                    top: popoverPos.top,
+                    cursor: CURSOR_NORMAL,
+                  }}
                 >
                   <ColorPicker
                     value={preview.palette[armedColorIndex]}

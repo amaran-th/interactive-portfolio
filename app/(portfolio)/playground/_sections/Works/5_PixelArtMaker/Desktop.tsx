@@ -11,6 +11,7 @@ import {
 } from "../_shared/assetLibrary";
 import ConfirmDialog from "./ConfirmDialog";
 import ContextMenu, { ContextMenuItem } from "./ContextMenu";
+import { CURSOR_POINTING } from "./cursors";
 import DesktopIcon from "./DesktopIcon";
 import FormatIcon from "./FormatIcon";
 import LauncherIcon from "./LauncherIcon";
@@ -482,11 +483,12 @@ export default function Desktop({
             setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
           }}
           className={`absolute flex w-20 flex-col items-center gap-1 p-2 ${positions[TRASH_ID] ? "" : "bottom-4 right-4"}`}
-          style={
-            positions[TRASH_ID]
+          style={{
+            cursor: CURSOR_POINTING,
+            ...(positions[TRASH_ID]
               ? { left: positions[TRASH_ID].x, top: positions[TRASH_ID].y }
-              : undefined
-          }
+              : undefined),
+          }}
           title="선택한 아이콘을 여기로 드래그해 삭제 · 드래그해서 위치 이동 가능"
         >
           <TrashIcon active={trashHover} />
@@ -504,11 +506,12 @@ export default function Desktop({
             setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
           }}
           className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-black/5 ${positions[FORMAT_ID] ? "" : "bottom-4 left-4"}`}
-          style={
-            positions[FORMAT_ID]
+          style={{
+            cursor: CURSOR_POINTING,
+            ...(positions[FORMAT_ID]
               ? { left: positions[FORMAT_ID].x, top: positions[FORMAT_ID].y }
-              : undefined
-          }
+              : undefined),
+          }}
           title="더블클릭하면 이 프로젝트의 저장된 모든 작품과 배치를 초기화합니다 · 드래그해서 위치 이동 가능"
         >
           <FormatIcon />
@@ -526,14 +529,15 @@ export default function Desktop({
             setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
           }}
           className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-black/5 ${positions[WALLPAPER_ID] ? "" : "top-4 right-4"}`}
-          style={
-            positions[WALLPAPER_ID]
+          style={{
+            cursor: CURSOR_POINTING,
+            ...(positions[WALLPAPER_ID]
               ? {
                   left: positions[WALLPAPER_ID].x,
                   top: positions[WALLPAPER_ID].y,
                 }
-              : undefined
-          }
+              : undefined),
+          }}
           title="더블클릭하면 배경화면을 편집합니다 · 드래그해서 위치 이동 가능"
         >
           <WallpaperIcon art={wallpaper} />
@@ -551,14 +555,15 @@ export default function Desktop({
             setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
           }}
           className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-black/5 ${positions[LAUNCHER_ID] ? "" : "top-4 left-4"}`}
-          style={
-            positions[LAUNCHER_ID]
+          style={{
+            cursor: CURSOR_POINTING,
+            ...(positions[LAUNCHER_ID]
               ? {
                   left: positions[LAUNCHER_ID].x,
                   top: positions[LAUNCHER_ID].y,
                 }
-              : undefined
-          }
+              : undefined),
+          }}
           title="더블클릭하면 새로 만들기·기존 파일 열기·이미지 불러오기를 선택할 수 있습니다 · 드래그해서 위치 이동 가능"
         >
           <LauncherIcon />

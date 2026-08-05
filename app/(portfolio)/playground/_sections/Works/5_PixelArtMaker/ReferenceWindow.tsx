@@ -2,6 +2,13 @@
 
 import { Minus, Plus, X } from "lucide-react";
 import { RefObject, useCallback, useEffect, useRef, useState } from "react";
+import {
+  CURSOR_CROSSHAIR,
+  CURSOR_GRAB,
+  CURSOR_MOVE,
+  CURSOR_NWSE_RESIZE,
+  CURSOR_POINTING,
+} from "./cursors";
 import Magnifier, { MAGNIFIER_RADIUS, MagnifierGrid } from "./Magnifier";
 
 const DEFAULT_WIDTH = 420;
@@ -419,7 +426,7 @@ export default function ReferenceWindow({
         onPointerUp={handleTitleUp}
         onPointerCancel={handleTitleUp}
         className="flex touch-none items-center justify-between bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700"
-        style={{ cursor: "move" }}
+        style={{ cursor: CURSOR_MOVE }}
       >
         <span>레퍼런스</span>
         <div className="flex items-center gap-1">
@@ -466,6 +473,7 @@ export default function ReferenceWindow({
                   e.target.files?.[0] && loadFile(e.target.files[0])
                 }
                 className="text-xs text-gray-600"
+                style={{ cursor: CURSOR_POINTING }}
               />
               <button
                 onClick={handlePasteFromClipboard}
@@ -492,7 +500,7 @@ export default function ReferenceWindow({
                     imageRendering: "pixelated",
                     width: image.naturalWidth * fitScale * zoom,
                     height: image.naturalHeight * fitScale * zoom,
-                    cursor: eyedropperActive ? "crosshair" : "grab",
+                    cursor: eyedropperActive ? CURSOR_CROSSHAIR : CURSOR_GRAB,
                   }}
                 />
               </div>
@@ -565,7 +573,7 @@ export default function ReferenceWindow({
             title="드래그해서 창 크기 조절"
             className="absolute right-0 bottom-0 h-4 w-4 touch-none"
             style={{
-              cursor: "nwse-resize",
+              cursor: CURSOR_NWSE_RESIZE,
               background:
                 "linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.2) 50%)",
             }}

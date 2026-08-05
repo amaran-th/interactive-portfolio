@@ -5,7 +5,6 @@ import {
   ChevronDown,
   Circle,
   Crosshair,
-  Droplet,
   Eraser,
   FlipHorizontal2,
   FlipVertical2,
@@ -295,7 +294,7 @@ export default function DrawToolbar({
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
-                  <Droplet className="h-3.5 w-3.5" />
+                  <PaintBucket className="h-3.5 w-3.5" />
                 </button>
               )}
               <button

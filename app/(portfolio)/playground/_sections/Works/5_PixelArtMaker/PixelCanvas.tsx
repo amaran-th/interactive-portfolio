@@ -3,7 +3,14 @@
 import { AlignCenter, AlignLeft, AlignRight, RotateCw } from "lucide-react";
 import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CURSOR_DRAGGING, CURSOR_GRAB, cursorForTool } from "./cursors";
+import {
+  CURSOR_DRAGGING,
+  CURSOR_EW_RESIZE,
+  CURSOR_GRAB,
+  CURSOR_MOVE,
+  CURSOR_NWSE_RESIZE,
+  cursorForTool,
+} from "./cursors";
 import GradientDial from "./GradientDial";
 import { mixHex } from "./hsv";
 import Magnifier, { MAGNIFIER_RADIUS, MagnifierGrid } from "./Magnifier";
@@ -1705,7 +1712,7 @@ export default function PixelCanvas({
             {/* 크기 조절 — 우하단 모서리를 드래그하면 왼쪽 위를 기준으로 늘고 준다. */}
             <div
               className="absolute -right-1.5 -bottom-1.5 h-4 w-4 touch-none rounded-full bg-violet-500 shadow-[0_0_0_2px_#ffffff]"
-              style={{ cursor: "nwse-resize" }}
+              style={{ cursor: CURSOR_NWSE_RESIZE }}
               onPointerDown={handleImageResizeDown}
               onPointerMove={handleImageResizeMove}
               onPointerUp={handleImageDragEnd}
@@ -1797,7 +1804,7 @@ export default function PixelCanvas({
                 style={{
                   left: pendingShape.x0 * scale + scale / 2 - 7,
                   top: pendingShape.y0 * scale + scale / 2 - 7,
-                  cursor: "move",
+                  cursor: CURSOR_MOVE,
                 }}
                 onPointerDown={handleShapeHandle0Down}
                 onPointerMove={handleShapeHandle0Move}
@@ -1811,8 +1818,8 @@ export default function PixelCanvas({
                   top: pendingShape.y1 * scale + scale / 2 - 7,
                   cursor:
                     pendingShape.tool === "circle"
-                      ? "ew-resize"
-                      : "nwse-resize",
+                      ? CURSOR_EW_RESIZE
+                      : CURSOR_NWSE_RESIZE,
                 }}
                 onPointerDown={handleShapeHandle1Down}
                 onPointerMove={handleShapeHandle1Move}

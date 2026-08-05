@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef } from "react";
+import { CURSOR_POINTING } from "./cursors";
 
 // 그라데이션 방향 다이얼 — 도형/그라데이션 도구와 텍스트 도구 양쪽에서 같은
 // 조작으로 각도를 고른다. 다이얼 중심에서 포인터까지의 각도를 구해 그대로
@@ -56,7 +57,8 @@ export default function GradientDial({
       onPointerMove={handleMove}
       onPointerUp={handleUp}
       onPointerCancel={handleUp}
-      className="relative h-7 w-7 shrink-0 cursor-pointer touch-none rounded-full bg-gray-100 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.12)]"
+      className="relative h-7 w-7 shrink-0 touch-none rounded-full bg-gray-100 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.12)]"
+      style={{ cursor: CURSOR_POINTING }}
     >
       <div className="absolute top-1/2 left-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gray-400" />
       <div
