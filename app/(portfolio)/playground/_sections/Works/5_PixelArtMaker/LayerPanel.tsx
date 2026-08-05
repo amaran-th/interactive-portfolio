@@ -33,6 +33,7 @@ export default function LayerPanel({
   onToggleVisible,
   onToggleLocked,
   onOpacityChange,
+  onOpacityDragEnd,
   onFlatten,
 }: {
   // 아래→위 순서(가장 아래가 0번)로 저장된 레이어 배열 — 데이터 모델과
@@ -52,6 +53,11 @@ export default function LayerPanel({
   onToggleVisible: (id: string) => void;
   onToggleLocked: (id: string) => void;
   onOpacityChange: (id: string, opacity: number) => void;
+  // 슬라이더를 드래그하는 동안 onOpacityChange가 연속으로 불려도 실행취소
+  // 항목 하나로 묶이도록(Editor가 코얼레싱한다), 포인터를 떼거나 포커스가
+  // 빠져나가는 순간 "이 드래그는 끝났다"고 알려준다 — 이게 없으면 같은
+  // 레이어를 다시 드래그해도 이전 드래그의 연장으로 오인될 수 있다.
+  onOpacityDragEnd: () => void;
   onFlatten: () => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -169,6 +175,8 @@ export default function LayerPanel({
             onChange={(e) =>
               onOpacityChange(activeLayer.id, Number(e.target.value) / 100)
             }
+            onPointerUp={onOpacityDragEnd}
+            onBlur={onOpacityDragEnd}
             className="flex-1"
           />
           <span className="w-7 shrink-0 text-right">
@@ -187,8 +195,9 @@ export default function LayerPanel({
         </button>
         <button
           onClick={() => onDuplicate(activeLayerId)}
+          disabled={layers.length >= MAX_LAYERS}
           title="레이어 복제"
-          className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-100"
+          className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30"
         >
           <Copy className="h-4 w-4" />
         </button>

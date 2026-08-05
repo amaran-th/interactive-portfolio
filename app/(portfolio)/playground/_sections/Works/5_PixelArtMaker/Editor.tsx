@@ -167,7 +167,12 @@ function parsePixelArtJSON(raw: unknown): {
           ? l.opacity
           : 1,
       locked: typeof l.locked === "boolean" ? l.locked : false,
-    }));
+    }))
+    // 손으로 고쳤거나 다른 곳에서 만든 파일이 MAX_LAYERS를 넘는 레이어를
+    // 담고 있을 수 있다 — 파일 전체를 거부하지 않고 앞쪽(아래) 레이어부터
+    // MAX_LAYERS개만 남기고 조용히 잘라낸다(이 파일의 기존 관대한 보정
+    // 스타일과 동일).
+    .slice(0, MAX_LAYERS);
   return {
     name: typeof d.name === "string" && d.name.trim() ? d.name : "제목 없음",
     width: d.width,
@@ -508,6 +513,14 @@ export default function Editor({
   // 버린다.
   const moveSelectionUndoRef = useRef<(Set<number> | null | undefined)[]>([]);
   const moveSelectionRedoRef = useRef<(Set<number> | null | undefined)[]>([]);
+  // 투명도 슬라이더를 드래그하는 동안 "지금 이어지는 드래그가 어느
+  // 레이어의 것인지" 기억한다 — handleLayerOpacityChange가 같은 레이어에서
+  // 연속으로 불리면(id가 같으면) 실행취소 스택에 새로 쌓지 않고 값만
+  // 갱신하고, 다른 레이어거나 첫 틱이면 정상적으로 되돌리기 경계를 만든다.
+  // 아래 세 pushXxx 함수(오파시티가 아닌 다른 모든 편집)는 호출될 때마다
+  // 이 값을 비워, 드래그 중간에 다른 조작이 끼어들면 다음 오파시티 조작이
+  // 항상 새 경계에서 시작하게 한다.
+  const opacityDragLayerIdRef = useRef<string | null>(null);
 
   const pushHistory = useCallback(
     (
@@ -515,6 +528,12 @@ export default function Editor({
       size?: CanvasSize,
       moveOriginalMask?: Set<number> | null,
     ) => {
+      // 활성 레이어가 잠겨 있으면 그 레이어 픽셀만 바꾸는 모든 편집(그리기·
+      // 채우기·이미지/텍스트/도형 커밋 등)이 이 래퍼 하나를 거치므로, 여기
+      // 한 곳에서 막으면 모든 호출부가 함께 보호된다. 레이어 구조 변경·
+      // 캔버스 전체 변형(pushHistoryAllLayers/pushLayerOp)은 활성 레이어의
+      // 잠금과 무관하게 계속 동작해야 하므로 이 가드를 넣지 않는다.
+      if (activeLayer.locked) return;
       history.push(next, size);
       moveSelectionUndoRef.current.push(moveOriginalMask);
       if (moveSelectionUndoRef.current.length > 50) {
@@ -522,8 +541,9 @@ export default function Editor({
       }
       moveSelectionRedoRef.current = [];
       setPixelsDirty(true);
+      opacityDragLayerIdRef.current = null;
     },
-    [history],
+    [history, activeLayer],
   );
 
   // 캔버스 전체 변형(리사이즈·반전·회전)처럼 모든 레이어의 픽셀이 한꺼번에
@@ -539,12 +559,17 @@ export default function Editor({
       }
       moveSelectionRedoRef.current = [];
       setPixelsDirty(true);
+      opacityDragLayerIdRef.current = null;
     },
     [history],
   );
 
   // 레이어 구조 변경(추가·삭제·순서변경·병합·복제·보이기·투명도·잠금·이름)
   // 전용 — pushHistoryAllLayers와 동작은 같지만 호출부 의도를 이름으로 구분한다.
+  // 오파시티 드래그의 "첫 틱"도 이 함수로 정상적인 되돌리기 경계를 만든다 —
+  // handleLayerOpacityChange가 그 직후 opacityDragLayerIdRef를 다시 채워
+  // 넣으므로, 여기서 비운 값이 그대로 유지되는 건 오파시티가 아닌 다른
+  // 레이어 조작(추가·삭제·병합 등)일 때뿐이다.
   const pushLayerOp = useCallback(
     (nextLayers: PixelLayer[], nextActiveLayerId: string) => {
       history.pushLayers(nextLayers, nextActiveLayerId);
@@ -554,6 +579,7 @@ export default function Editor({
       }
       moveSelectionRedoRef.current = [];
       setPixelsDirty(true);
+      opacityDragLayerIdRef.current = null;
     },
     [history],
   );
@@ -1474,7 +1500,13 @@ export default function Editor({
   }, []);
 
   const handleSelectLayer = useCallback(
-    (id: string) => history.setActiveLayerId(id),
+    (id: string) => {
+      // 다른 레이어로 활성을 바꾸면 지금까지 진행 중이던 오파시티 드래그
+      // 코얼레싱은 더 이상 의미가 없다 — 다음 오파시티 조작은 항상 새
+      // 되돌리기 경계에서 시작해야 한다.
+      opacityDragLayerIdRef.current = null;
+      history.setActiveLayerId(id);
+    },
     [history],
   );
 
@@ -1497,6 +1529,7 @@ export default function Editor({
 
   const handleDuplicateLayer = useCallback(
     (id: string) => {
+      if (history.presentLayers.length >= MAX_LAYERS) return;
       const index = history.presentLayers.findIndex((l) => l.id === id);
       if (index < 0) return;
       const source = history.presentLayers[index];
@@ -1598,15 +1631,34 @@ export default function Editor({
     [history.presentLayers, history.activeLayerId, pushLayerOp],
   );
 
+  // range 입력은 드래그하는 동안 onChange가 계속(틱마다) 불린다 — 매번
+  // pushLayerOp를 부르면 한 번의 드래그가 실행취소 스택(50개 제한)을 혼자
+  // 다 채워 그 이전 그림 작업들을 밀어낸다. 그래서 같은 레이어에서 이어지는
+  // 틱인지(opacityDragLayerIdRef.current === id) 첫 틱인지를 구분해, 첫
+  // 틱만 되돌리기 경계를 만들고 나머지는 스택에 안 쌓이는 값만 갱신한다.
   const handleLayerOpacityChange = useCallback(
     (id: string, opacity: number) => {
       const nextLayers = history.presentLayers.map((l) =>
         l.id === id ? { ...l, opacity } : l,
       );
-      pushLayerOp(nextLayers, history.activeLayerId);
+      if (opacityDragLayerIdRef.current === id) {
+        history.replacePresentLayers(nextLayers, history.activeLayerId);
+      } else {
+        // pushLayerOp가 내부에서 opacityDragLayerIdRef를 비우므로, 이 드래그의
+        // 시작임을 기록하는 아래 줄은 반드시 pushLayerOp 호출 다음에 온다.
+        pushLayerOp(nextLayers, history.activeLayerId);
+        opacityDragLayerIdRef.current = id;
+      }
     },
-    [history.presentLayers, history.activeLayerId, pushLayerOp],
+    [history, pushLayerOp],
   );
+
+  // 슬라이더에서 포인터를 떼거나(드래그 종료) 포커스가 빠져나가면, 지금
+  // 진행 중이던 코얼레싱을 끝낸다 — 이게 없으면 같은 레이어를 놓았다가 다시
+  // 드래그해도 이전 드래그의 연장으로 취급돼 여전히 한 항목으로 묶인다.
+  const handleOpacityDragEnd = useCallback(() => {
+    opacityDragLayerIdRef.current = null;
+  }, []);
 
   const handleFlattenLayers = useCallback(() => {
     if (history.presentLayers.length <= 1) return;
@@ -1629,6 +1681,16 @@ export default function Editor({
       const rect = e.currentTarget.getBoundingClientRect();
       const rootRect = rootRef.current?.getBoundingClientRect();
       const noActiveTab = activeTabIndex < 0;
+      // 내보내기는 항상 저장(handleSave)과 같은 "지금 이 순간의" 라이브
+      // 값을 써야 한다 — doc.layers/activeLayerId는 저장할 때나 탭을 불러올
+      // 때만 갱신되고, 편집 중에는 갱신되지 않는다(자동저장은 3분 주기).
+      // 이 객체 하나를 만들어 내보내기 4종 + ExportPanel이 모두 재사용한다.
+      const exportDoc: PixelArt = {
+        ...doc,
+        pixels: compositePixels,
+        layers: history.presentLayers,
+        activeLayerId: history.activeLayerId,
+      };
       setMenuAnchor({
         x: rect.left - (rootRect?.left ?? 0),
         y: rect.bottom - (rootRect?.top ?? 0),
@@ -1653,32 +1715,36 @@ export default function Editor({
             submenu: [
               {
                 label: "PNG",
-                onClick: () =>
-                  exportAsPNG({ ...doc, pixels: compositePixels }),
+                onClick: () => exportAsPNG(exportDoc),
               },
               {
                 label: "SVG",
-                onClick: () =>
-                  exportAsSVG({ ...doc, pixels: compositePixels }),
+                onClick: () => exportAsSVG(exportDoc),
               },
               {
                 label: "JSON",
                 title:
                   "다른 기기에서도 그림을 그대로 이어 그리고 싶을 때 씁니다 — 저장된 이 파일을 그 기기의 파일 > JSON 불러오기로 열면 됩니다.",
-                onClick: () =>
-                  exportAsJSON({ ...doc, pixels: compositePixels }),
+                onClick: () => exportAsJSON(exportDoc),
               },
               {
                 label: "JPG (손실 압축)",
-                onClick: () =>
-                  exportAsJPG({ ...doc, pixels: compositePixels }),
+                onClick: () => exportAsJPG(exportDoc),
               },
             ],
           },
         ],
       });
     },
-    [doc, compositePixels, handleSave, handleSaveAs, activeTabIndex],
+    [
+      doc,
+      compositePixels,
+      history.presentLayers,
+      history.activeLayerId,
+      handleSave,
+      handleSaveAs,
+      activeTabIndex,
+    ],
   );
 
   const openEditMenu = useCallback(
@@ -2030,7 +2096,9 @@ export default function Editor({
                   pixels={history.present}
                   belowComposite={belowComposite}
                   aboveComposite={aboveComposite}
-                  activeLayerOpacity={activeLayer.opacity}
+                  activeLayerOpacity={
+                    activeLayer.visible ? activeLayer.opacity : 0
+                  }
                   activeLayerLocked={activeLayer.locked}
                   tool={tool}
                   onToolChange={setTool}
@@ -2150,8 +2218,18 @@ export default function Editor({
                   }}
                 />
               );
+              // 파일 메뉴의 내보내기와 마찬가지로 라이브 레이어 값을 실어
+              // 보낸다(Critical-1) — 그렇지 않으면 저장한 적 없는 새 캔버스나
+              // 방금 그린 내용이 JSON 내보내기에서 조용히 빠질 수 있다.
               const exportPanel = (
-                <ExportPanel doc={{ ...doc, pixels: compositePixels }} />
+                <ExportPanel
+                  doc={{
+                    ...doc,
+                    pixels: compositePixels,
+                    layers: history.presentLayers,
+                    activeLayerId: history.activeLayerId,
+                  }}
+                />
               );
 
               if (!narrow) {
@@ -2173,6 +2251,7 @@ export default function Editor({
                       onToggleVisible={handleToggleLayerVisible}
                       onToggleLocked={handleToggleLayerLocked}
                       onOpacityChange={handleLayerOpacityChange}
+                      onOpacityDragEnd={handleOpacityDragEnd}
                       onFlatten={handleFlattenLayers}
                     />
                     <Accordion title="이미지 불러오기" defaultOpen={false}>
@@ -2211,6 +2290,7 @@ export default function Editor({
                   onToggleVisible={handleToggleLayerVisible}
                   onToggleLocked={handleToggleLayerLocked}
                   onOpacityChange={handleLayerOpacityChange}
+                  onOpacityDragEnd={handleOpacityDragEnd}
                   onFlatten={handleFlattenLayers}
                 />
               );
