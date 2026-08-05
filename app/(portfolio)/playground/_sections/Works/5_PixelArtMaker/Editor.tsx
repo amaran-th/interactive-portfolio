@@ -27,9 +27,11 @@ import { AlertModal, PromptModal } from "./Dialogs";
 import DrawToolbar from "./DrawToolbar";
 import ExportPanel from "./ExportPanel";
 import {
+  exportAsGIF,
   exportAsJPG,
   exportAsJSON,
   exportAsPNG,
+  exportAsSpriteSheet,
   exportAsSVG,
 } from "./exportPixelArt";
 import FileThumbnail from "./FileThumbnail";
@@ -44,6 +46,7 @@ import {
 import { mixHex } from "./hsv";
 import ImportPanel from "./ImportPanel";
 import LayerPanel from "./LayerPanel";
+import FrameFilmstrip from "./FrameFilmstrip";
 import NewCanvasDialog from "./NewCanvasDialog";
 import ReferenceWindow from "./ReferenceWindow";
 import PixelCanvas, {
@@ -1829,6 +1832,16 @@ export default function Editor({
     pushLayerOp([flat], flat.id);
   }, [history.presentLayers, doc.width, doc.height, pushLayerOp]);
 
+  const handleFrameDurationChange = useCallback(
+    (id: string, ms: number) => {
+      const nextLayers = history.presentLayers.map((l) =>
+        l.id === id ? { ...l, frameDurationMs: ms } : l,
+      );
+      pushLayerOp(nextLayers, history.activeLayerId);
+    },
+    [history.presentLayers, history.activeLayerId, pushLayerOp],
+  );
+
   // 진짜 PC 프로그램의 창처럼 제목표시줄(이름+닫기)과 그 아래 파일/편집 메뉴 바를
   // 분리한다 — 저장·내보내기·실행취소 같은 동작은 더 이상 제목표시줄에 흩어진
   // 버튼이 아니라 메뉴 항목으로 모은다. ContextMenu를 버튼 아래쪽에 앵커해 재사용한다.
@@ -1847,6 +1860,33 @@ export default function Editor({
         layers: history.presentLayers,
         activeLayerId: history.activeLayerId,
       };
+      const exportSubmenu: ContextMenuItem[] = [
+        { label: "PNG", onClick: () => exportAsPNG(exportDoc) },
+        { label: "SVG", onClick: () => exportAsSVG(exportDoc) },
+        {
+          label: "JSON",
+          title:
+            "다른 기기에서도 그림을 그대로 이어 그리고 싶을 때 씁니다 — 저장된 이 파일을 그 기기의 파일 > JSON 불러오기로 열면 됩니다.",
+          onClick: () => exportAsJSON(exportDoc),
+        },
+        { label: "JPG (손실 압축)", onClick: () => exportAsJPG(exportDoc) },
+      ];
+      if (layerMode === "frames") {
+        exportSubmenu.push(
+          {
+            label: "GIF",
+            title: "보이는 프레임을 순서대로 재생하는 GIF로 내보냅니다.",
+            onClick: () => {
+              void exportAsGIF(exportDoc);
+            },
+          },
+          {
+            label: "스프라이트 시트",
+            title: "보이는 프레임을 가로로 이어붙인 PNG 한 장으로 내보냅니다.",
+            onClick: () => exportAsSpriteSheet(exportDoc),
+          },
+        );
+      }
       setMenuAnchor({
         x: rect.left - (rootRect?.left ?? 0),
         y: rect.bottom - (rootRect?.top ?? 0),
@@ -1868,26 +1908,7 @@ export default function Editor({
           {
             label: "내보내기",
             disabled: noActiveTab,
-            submenu: [
-              {
-                label: "PNG",
-                onClick: () => exportAsPNG(exportDoc),
-              },
-              {
-                label: "SVG",
-                onClick: () => exportAsSVG(exportDoc),
-              },
-              {
-                label: "JSON",
-                title:
-                  "다른 기기에서도 그림을 그대로 이어 그리고 싶을 때 씁니다 — 저장된 이 파일을 그 기기의 파일 > JSON 불러오기로 열면 됩니다.",
-                onClick: () => exportAsJSON(exportDoc),
-              },
-              {
-                label: "JPG (손실 압축)",
-                onClick: () => exportAsJPG(exportDoc),
-              },
-            ],
+            submenu: exportSubmenu,
           },
         ],
       });
@@ -1900,6 +1921,7 @@ export default function Editor({
       handleSave,
       handleSaveAs,
       activeTabIndex,
+      layerMode,
     ],
   );
 
@@ -2233,118 +2255,137 @@ export default function Editor({
                 onChangeCanvasBgColor={setCanvasBgColor}
               />
             </div>
-            <div className="relative flex flex-1 overflow-hidden">
-              <div
-                ref={canvasViewportRef}
-                // items-center/justify-center로 캔버스가 뷰포트보다 작을 때는
-                // 잘 가운데 놓이지만, 확대해 캔버스가 뷰포트보다 커지면 일반
-                // center 정렬은 넘치는 영역을 "시작 쪽"(왼쪽·위쪽)에서 스크롤로도
-                // 닿을 수 없게 잘라버린다(스크롤 위치는 0인데 실제로는 이미
-                // 가운데 어딘가를 보여주는 flex의 알려진 동작) — 그래서 확대
-                // 직후 캔버스 왼쪽·위쪽이 보이지 않았다. safe center는 내용이
-                // 넘칠 때만 자동으로 시작 정렬로 바뀌어 스크롤로 전체 영역에
-                // 닿을 수 있게 한다(들어갈 때는 그대로 가운데 정렬 유지).
-                className="flex flex-1 overflow-auto [align-items:safe_center] [justify-content:safe_center]"
-              >
-                <PixelCanvas
-                  width={doc.width}
-                  height={doc.height}
-                  pixels={history.present}
-                  belowComposite={belowComposite}
-                  aboveComposite={aboveComposite}
-                  activeLayerOpacity={
-                    activeLayer.visible ? activeLayer.opacity : 0
-                  }
-                  activeLayerLocked={activeLayer.locked}
-                  tool={tool}
-                  onToolChange={setTool}
-                  activeColorHex={activeColorHex}
-                  selectionMask={selection.mask}
-                  selectMode={selectMode}
-                  showGrid={showGrid}
-                  showCrosshair={showCrosshair}
-                  brushSize={brushSize}
-                  filledShapes={filledShapes}
-                  onSelectionChange={selection.setMask}
-                  onStrokeEnd={handleStrokeEnd}
-                  onPickColor={handlePickColor}
-                  onTextToolClick={handleTextToolClick}
-                  pendingText={
-                    pendingText
-                      ? { ...pendingText, colorHex: activeColorHex }
-                      : null
-                  }
-                  onPendingTextChange={handlePendingTextChange}
-                  onPendingTextMove={handlePendingTextMove}
-                  onPendingTextToggleAA={handlePendingTextToggleAA}
-                  onPendingTextToggleGradient={handlePendingTextToggleGradient}
-                  onPendingTextSetAlign={handlePendingTextSetAlign}
-                  onPendingTextRotate={handlePendingTextRotate}
-                  onPendingTextCommit={handlePendingTextCommit}
-                  onPendingTextCancel={handlePendingTextCancel}
-                  onGradientToolEnd={handleGradientToolEnd}
-                  shapeGradientFill={shapeGradientFill}
-                  gradientStartHex={activeColorHex}
-                  gradientEndHex={secondaryColorHex ?? "#00000000"}
-                  gradientSteps={gradientSteps}
-                  gradientAngleDeg={gradientAngleDeg}
-                  onGradientStepsChange={setGradientSteps}
-                  onGradientAngleChange={setGradientAngleDeg}
-                  zoom={canvasZoom}
-                  onZoomChange={setCanvasZoom}
-                  viewportRef={canvasViewportRef}
-                  wandGlobal={wandGlobal}
-                  pendingImage={pendingImage}
-                  onPendingImageMove={handlePendingImageMove}
-                  onPendingImageResize={handlePendingImageResize}
-                  onPendingImageRotate={handlePendingImageRotate}
-                  onPendingImageCommit={handlePendingImageCommit}
-                  onPendingImageCancel={handlePendingImageCancel}
-                  pendingShape={pendingShape}
-                  onShapeDragEnd={handleShapeDragEnd}
-                  onPendingShapeUpdate={handlePendingShapeUpdate}
-                  onPendingShapeCommit={handlePendingShapeCommit}
-                  onPendingShapeCancel={handlePendingShapeCancel}
-                  bottomToolbarPortalTarget={secondaryToolbarPortal}
+            <div className="relative flex flex-1 flex-col overflow-hidden">
+              <div className="relative flex flex-1 overflow-hidden">
+                <div
+                  ref={canvasViewportRef}
+                  // items-center/justify-center로 캔버스가 뷰포트보다 작을 때는
+                  // 잘 가운데 놓이지만, 확대해 캔버스가 뷰포트보다 커지면 일반
+                  // center 정렬은 넘치는 영역을 "시작 쪽"(왼쪽·위쪽)에서 스크롤로도
+                  // 닿을 수 없게 잘라버린다(스크롤 위치는 0인데 실제로는 이미
+                  // 가운데 어딘가를 보여주는 flex의 알려진 동작) — 그래서 확대
+                  // 직후 캔버스 왼쪽·위쪽이 보이지 않았다. safe center는 내용이
+                  // 넘칠 때만 자동으로 시작 정렬로 바뀌어 스크롤로 전체 영역에
+                  // 닿을 수 있게 한다(들어갈 때는 그대로 가운데 정렬 유지).
+                  className="flex flex-1 overflow-auto [align-items:safe_center] [justify-content:safe_center]"
+                >
+                  <PixelCanvas
+                    width={doc.width}
+                    height={doc.height}
+                    pixels={history.present}
+                    belowComposite={belowComposite}
+                    aboveComposite={aboveComposite}
+                    activeLayerOpacity={
+                      activeLayer.visible ? activeLayer.opacity : 0
+                    }
+                    activeLayerLocked={activeLayer.locked || isPlaying}
+                    tool={tool}
+                    onToolChange={setTool}
+                    activeColorHex={activeColorHex}
+                    selectionMask={selection.mask}
+                    selectMode={selectMode}
+                    showGrid={showGrid}
+                    showCrosshair={showCrosshair}
+                    brushSize={brushSize}
+                    filledShapes={filledShapes}
+                    onSelectionChange={selection.setMask}
+                    onStrokeEnd={handleStrokeEnd}
+                    onPickColor={handlePickColor}
+                    onTextToolClick={handleTextToolClick}
+                    pendingText={
+                      pendingText
+                        ? { ...pendingText, colorHex: activeColorHex }
+                        : null
+                    }
+                    onPendingTextChange={handlePendingTextChange}
+                    onPendingTextMove={handlePendingTextMove}
+                    onPendingTextToggleAA={handlePendingTextToggleAA}
+                    onPendingTextToggleGradient={handlePendingTextToggleGradient}
+                    onPendingTextSetAlign={handlePendingTextSetAlign}
+                    onPendingTextRotate={handlePendingTextRotate}
+                    onPendingTextCommit={handlePendingTextCommit}
+                    onPendingTextCancel={handlePendingTextCancel}
+                    onGradientToolEnd={handleGradientToolEnd}
+                    shapeGradientFill={shapeGradientFill}
+                    gradientStartHex={activeColorHex}
+                    gradientEndHex={secondaryColorHex ?? "#00000000"}
+                    gradientSteps={gradientSteps}
+                    gradientAngleDeg={gradientAngleDeg}
+                    onGradientStepsChange={setGradientSteps}
+                    onGradientAngleChange={setGradientAngleDeg}
+                    zoom={canvasZoom}
+                    onZoomChange={setCanvasZoom}
+                    viewportRef={canvasViewportRef}
+                    wandGlobal={wandGlobal}
+                    pendingImage={pendingImage}
+                    onPendingImageMove={handlePendingImageMove}
+                    onPendingImageResize={handlePendingImageResize}
+                    onPendingImageRotate={handlePendingImageRotate}
+                    onPendingImageCommit={handlePendingImageCommit}
+                    onPendingImageCancel={handlePendingImageCancel}
+                    pendingShape={pendingShape}
+                    onShapeDragEnd={handleShapeDragEnd}
+                    onPendingShapeUpdate={handlePendingShapeUpdate}
+                    onPendingShapeCommit={handlePendingShapeCommit}
+                    onPendingShapeCancel={handlePendingShapeCancel}
+                    bottomToolbarPortalTarget={secondaryToolbarPortal}
+                  />
+                </div>
+                {/* 캔버스를 스크롤하는 safe-center flex 컨테이너 밖(이 바깥 relative
+                    래퍼)에 둔다 — 그 안에 있으면 확대되어 스크롤이 생길 때
+                    align-items/justify-content:safe 조합에 따라 컨트롤 위치
+                    계산이 흔들릴 수 있다. 여기서는 뷰포트 자체에 고정돼 확대·
+                    스크롤과 무관하게 항상 같은 자리에 떠 있다. */}
+                <div className="absolute bottom-2 left-2 flex items-center gap-0.5">
+                  <button
+                    onClick={() => setCanvasZoom((z) => nextZoomStep(z, -1))}
+                    disabled={canvasZoom <= ZOOM_STEPS[0]}
+                    title="축소"
+                    className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
+                  >
+                    <Minus className="h-3 w-3" />
+                  </button>
+                  <div className="bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
+                    {canvasZoom}x
+                  </div>
+                  <button
+                    onClick={() => setCanvasZoom((z) => nextZoomStep(z, 1))}
+                    disabled={canvasZoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]}
+                    title="확대"
+                    className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
+                </div>
+                {/* DrawToolbar가 그리기/선택 도구의 하위 옵션을 포털로 그려 넣는
+                    자리 — 캔버스 하단 중앙에 둬서 좌우 사이드바를 가리지 않는다.
+                    전체 너비를 차지하는 빈 상자라 내용이 없는 양옆(배율 컨트롤
+                    쪽 포함)까지 클릭을 가로챘다 — pointer-events-none으로 이
+                    상자 자체는 클릭을 그대로 통과시키고, 실제로 그려 넣는
+                    내용(DrawToolbar·PixelCanvas 쪽)에서만 pointer-events-auto로
+                    되돌린다. */}
+                <div
+                  ref={setSecondaryToolbarPortal}
+                  className="pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center px-3"
                 />
               </div>
-              {/* 캔버스를 스크롤하는 safe-center flex 컨테이너 밖(이 바깥 relative
-                  래퍼)에 둔다 — 그 안에 있으면 확대되어 스크롤이 생길 때
-                  align-items/justify-content:safe 조합에 따라 컨트롤 위치
-                  계산이 흔들릴 수 있다. 여기서는 뷰포트 자체에 고정돼 확대·
-                  스크롤과 무관하게 항상 같은 자리에 떠 있다. */}
-              <div className="absolute bottom-2 left-2 flex items-center gap-0.5">
-                <button
-                  onClick={() => setCanvasZoom((z) => nextZoomStep(z, -1))}
-                  disabled={canvasZoom <= ZOOM_STEPS[0]}
-                  title="축소"
-                  className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
-                >
-                  <Minus className="h-3 w-3" />
-                </button>
-                <div className="bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
-                  {canvasZoom}x
-                </div>
-                <button
-                  onClick={() => setCanvasZoom((z) => nextZoomStep(z, 1))}
-                  disabled={canvasZoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]}
-                  title="확대"
-                  className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
-                >
-                  <Plus className="h-3 w-3" />
-                </button>
-              </div>
-              {/* DrawToolbar가 그리기/선택 도구의 하위 옵션을 포털로 그려 넣는
-                  자리 — 캔버스 하단 중앙에 둬서 좌우 사이드바를 가리지 않는다.
-                  전체 너비를 차지하는 빈 상자라 내용이 없는 양옆(배율 컨트롤
-                  쪽 포함)까지 클릭을 가로챘다 — pointer-events-none으로 이
-                  상자 자체는 클릭을 그대로 통과시키고, 실제로 그려 넣는
-                  내용(DrawToolbar·PixelCanvas 쪽)에서만 pointer-events-auto로
-                  되돌린다. */}
-              <div
-                ref={setSecondaryToolbarPortal}
-                className="pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center px-3"
-              />
+              {layerMode === "frames" && (
+                <FrameFilmstrip
+                  layers={history.presentLayers}
+                  activeLayerId={history.activeLayerId}
+                  width={doc.width}
+                  height={doc.height}
+                  isPlaying={isPlaying}
+                  onSelect={handleSelectLayer}
+                  onAdd={handleAddLayer}
+                  onDuplicate={handleDuplicateLayer}
+                  onDelete={handleDeleteLayer}
+                  onMoveLeft={(id) => handleMoveLayer(id, -1)}
+                  onMoveRight={(id) => handleMoveLayer(id, 1)}
+                  onToggleVisible={handleToggleLayerVisible}
+                  onDurationChange={handleFrameDurationChange}
+                />
+              )}
             </div>
             {(() => {
               // key={doc.id} — 탭마다 독립된 상태를 갖게 강제로 리마운트한다.
@@ -2409,6 +2450,14 @@ export default function Editor({
                       onOpacityChange={handleLayerOpacityChange}
                       onOpacityDragEnd={handleOpacityDragEnd}
                       onFlatten={handleFlattenLayers}
+                      layerMode={layerMode}
+                      onLayerModeChange={handleLayerModeChange}
+                      isPlaying={isPlaying}
+                      onTogglePlay={handleTogglePlay}
+                      loopPlayback={loopPlayback}
+                      onToggleLoop={handleToggleLoop}
+                      onionSkin={onionSkin}
+                      onToggleOnionSkin={handleToggleOnionSkin}
                     />
                     <Accordion title="이미지 불러오기" defaultOpen={false}>
                       {importPanel}
@@ -2448,6 +2497,14 @@ export default function Editor({
                   onOpacityChange={handleLayerOpacityChange}
                   onOpacityDragEnd={handleOpacityDragEnd}
                   onFlatten={handleFlattenLayers}
+                  layerMode={layerMode}
+                  onLayerModeChange={handleLayerModeChange}
+                  isPlaying={isPlaying}
+                  onTogglePlay={handleTogglePlay}
+                  loopPlayback={loopPlayback}
+                  onToggleLoop={handleToggleLoop}
+                  onionSkin={onionSkin}
+                  onToggleOnionSkin={handleToggleOnionSkin}
                 />
               );
               return (
