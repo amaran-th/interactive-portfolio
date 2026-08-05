@@ -543,7 +543,6 @@ export default function PixelCanvas({
           filledShapes,
         );
         const expanded = expandPoints(shapePoints, width, height, brushSize);
-        ctx.globalAlpha = 0.75;
         if (shapeGradientFill) {
           const stepColors = buildGradientSteps(
             gradientStartHex,
@@ -566,7 +565,6 @@ export default function PixelCanvas({
             ctx.fillRect(r.left, r.top, r.width, r.height);
           }
         }
-        ctx.globalAlpha = 1;
 
         const radius = Math.round(
           Math.hypot(
