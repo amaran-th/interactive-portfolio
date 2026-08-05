@@ -6,13 +6,33 @@ const LIBRARY_KEY = "playground-asset-library";
 // palette는 더 이상 픽셀이 참조하는 대상이 아니라, 빠르게 다시 쓸 수 있도록
 // 모아둔 즐겨찾기 색 목록일 뿐이다. 그래서 팔레트 스와치를 고치거나 지워도
 // 이미 칠한 픽셀은 절대 바뀌지 않는다.
+
+// 레이어 하나 — pixels는 캔버스와 같은 width×height 크기의 평면 배열이다.
+// opacity는 0~1이고, 이 레이어를 아래 레이어들 위에 합성할 때만 쓰인다
+// (레이어 안의 개별 픽셀 알파와는 별개로 곱해진다).
+export type PixelLayer = {
+  id: string;
+  name: string;
+  pixels: (string | null)[];
+  visible: boolean;
+  opacity: number;
+  locked: boolean;
+};
+
 export type PixelArt = {
   id: string;
   name: string;
   width: number;
   height: number;
   palette: string[]; // 즐겨찾기 색 목록 — 그림 데이터 자체와는 무관하다.
+  // 항상 "레이어를 모두 합성한 최종 결과"다 — 레이어 개념을 모르는 소비처
+  // (썸네일, VN 스튜디오 리소스 피커 등)는 이 필드만 읽으면 된다.
   pixels: (string | null)[];
+  // 있으면 편집기가 그대로 복원할 수 있는 레이어 스택. 없으면(V2 이하로
+  // 저장된 구파일) pixels를 감싼 단일 레이어로 취급한다 — 이 마이그레이션은
+  // 이 파일이 아니라 Editor.tsx가 문서를 열 때 담당한다(아래 참고).
+  layers?: PixelLayer[];
+  activeLayerId?: string;
   createdAt: number;
 };
 
@@ -100,6 +120,12 @@ function legacyUnpack(
   return indices.map((i) => (i < 0 ? null : (legacyPalette[i] ?? null)));
 }
 
+type StoredPixelLayerV3 = Omit<PixelLayer, "pixels"> & { pixels: PackedPixels };
+type StoredPixelArtV3 = Omit<PixelArt, "pixels" | "layers"> & {
+  pixels: PackedPixels;
+  layers?: StoredPixelLayerV3[];
+  version: 3;
+};
 type StoredPixelArtV2 = Omit<PixelArt, "pixels"> & {
   pixels: PackedPixels;
   version: 2;
@@ -107,21 +133,40 @@ type StoredPixelArtV2 = Omit<PixelArt, "pixels"> & {
 type StoredPixelArtV1 = Omit<PixelArt, "pixels"> & {
   pixels: string | number[];
 };
-type StoredPixelArt = StoredPixelArtV2 | StoredPixelArtV1;
+type StoredPixelArt = StoredPixelArtV3 | StoredPixelArtV2 | StoredPixelArtV1;
+
+function isV3(stored: StoredPixelArt): stored is StoredPixelArtV3 {
+  return (stored as StoredPixelArtV3).version === 3;
+}
 
 function isV2(stored: StoredPixelArt): stored is StoredPixelArtV2 {
   return (stored as StoredPixelArtV2).version === 2;
 }
 
 function decodeStored(stored: StoredPixelArt): PixelArt {
+  if (isV3(stored)) {
+    return {
+      ...stored,
+      pixels: unpackPixels(stored.pixels),
+      layers: stored.layers?.map((l) => ({
+        ...l,
+        pixels: unpackPixels(l.pixels),
+      })),
+    };
+  }
   if (isV2(stored)) {
     return { ...stored, pixels: unpackPixels(stored.pixels) };
   }
   return { ...stored, pixels: legacyUnpack(stored.pixels, stored.palette) };
 }
 
-export function encodeStored(art: PixelArt): StoredPixelArtV2 {
-  return { ...art, pixels: packPixels(art.pixels), version: 2 };
+export function encodeStored(art: PixelArt): StoredPixelArtV3 {
+  return {
+    ...art,
+    pixels: packPixels(art.pixels),
+    layers: art.layers?.map((l) => ({ ...l, pixels: packPixels(l.pixels) })),
+    version: 3,
+  };
 }
 
 export type BeatTrack = {
@@ -168,7 +213,7 @@ function loadLibrary(): AssetLibrary {
 function saveLibrary(lib: AssetLibrary): boolean {
   try {
     const stored: {
-      pixelArt: StoredPixelArtV2[];
+      pixelArt: StoredPixelArtV3[];
       beatPatterns: BeatPattern[];
     } = {
       pixelArt: lib.pixelArt.map(encodeStored),
@@ -233,6 +278,7 @@ export function duplicatePixelArt(id: string): PixelArt | undefined {
     id: uid(),
     name: `${item.name} 사본`,
     pixels: item.pixels.slice(),
+    layers: item.layers?.map((l) => ({ ...l, pixels: l.pixels.slice() })),
     palette: item.palette.slice(),
     createdAt: Date.now(),
   };
