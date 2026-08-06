@@ -1,6 +1,6 @@
-import { hexToRgba, rgbaToHex } from "./hsv";
+import { hexToRgba, hsvToRgb, rgbaToHex, rgbToHsv } from "./hsv";
 import type { Point } from "./types";
-import type { PixelLayer } from "../_shared/assetLibrary";
+import type { BlendMode, PixelLayer } from "../_shared/assetLibrary";
 
 // 픽셀은 트루컬러다 — hex 문자열이거나, 투명이면 null.
 export type PixelValue = string | null;
@@ -27,6 +27,117 @@ export function createGrid(width: number, height: number): PixelValue[] {
   return new Array(width * height).fill(null);
 }
 
+export type LayerAdjustments = Pick<
+  PixelLayer,
+  "brightness" | "contrast" | "saturation" | "temperature" | "tint"
+>;
+
+// 색보정 다섯 개를 정해진 순서(색온도·틴트 → 밝기 → 대비 → 채도)로 차례로
+// 적용한다 — 화이트밸런스를 먼저 잡아야 그 뒤의 밝기·대비가 최종 색 기준으로
+// 자연스럽게 걸린다. 다섯 값이 전부 0(또는 없음)이면 원본을 그대로 돌려줘
+// 불필요한 재계산을 피한다. 이 함수는 화면에 보여줄 때만 불리고, 실제
+// 저장된 픽셀 값은 절대 바꾸지 않는다.
+export function applyAdjustments(
+  value: PixelValue,
+  adjustments: LayerAdjustments,
+): PixelValue {
+  const {
+    brightness = 0,
+    contrast = 0,
+    saturation = 0,
+    temperature = 0,
+    tint = 0,
+  } = adjustments;
+  if (
+    value === null ||
+    (brightness === 0 &&
+      contrast === 0 &&
+      saturation === 0 &&
+      temperature === 0 &&
+      tint === 0)
+  ) {
+    return value;
+  }
+  const [r0, g0, b0, a] = hexToRgba(value);
+  let r = r0;
+  let g = g0;
+  let b = b0;
+
+  // 색온도(따뜻함↔차가움)·틴트(마젠타↔그린) — 정확한 CIE 기반 화이트밸런스가
+  // 아니라 사진 편집 도구들이 흔히 쓰는 채널 이동 근사치다.
+  r += (temperature / 100) * 40;
+  b -= (temperature / 100) * 40;
+  g += (tint / 100) * 40;
+  r -= (tint / 100) * 20;
+  b -= (tint / 100) * 20;
+
+  // 밝기 — 세 채널에 동일하게 더한다.
+  r += (brightness / 100) * 255;
+  g += (brightness / 100) * 255;
+  b += (brightness / 100) * 255;
+
+  // 대비 — 128을 기준으로 밀어낸다(표준 대비 공식).
+  if (contrast !== 0) {
+    const c = contrast * 2.55;
+    const factor = (259 * (c + 255)) / (255 * (259 - c));
+    r = factor * (r - 128) + 128;
+    g = factor * (g - 128) + 128;
+    b = factor * (b - 128) + 128;
+  }
+
+  r = Math.min(255, Math.max(0, r));
+  g = Math.min(255, Math.max(0, g));
+  b = Math.min(255, Math.max(0, b));
+
+  // 채도 — HSV로 바꿔 S만 조절하고 되돌린다(이미 있는 hsv.ts 변환 재사용).
+  if (saturation !== 0) {
+    const [h, s, v] = rgbToHsv(r, g, b);
+    const s2 = Math.min(1, Math.max(0, s * (1 + saturation / 100)));
+    [r, g, b] = hsvToRgb(h, s2, v);
+  }
+
+  return rgbaToHex(r, g, b, a);
+}
+
+// 0~1로 정규화된 채널 값 기준 표준 블렌드 공식(W3C 합성 스펙과 동일 계열,
+// 포토샵 블렌드 모드와 결과가 같다).
+function blendChannel(dst: number, src: number, mode: BlendMode): number {
+  switch (mode) {
+    case "multiply":
+      return dst * src;
+    case "screen":
+      return 1 - (1 - dst) * (1 - src);
+    case "overlay":
+      return dst <= 0.5 ? 2 * dst * src : 1 - 2 * (1 - dst) * (1 - src);
+    case "darken":
+      return Math.min(dst, src);
+    case "lighten":
+      return Math.max(dst, src);
+    case "color-dodge":
+      return src >= 1 ? 1 : Math.min(1, dst / (1 - src));
+    case "color-burn":
+      return src <= 0 ? 0 : 1 - Math.min(1, (1 - dst) / src);
+    case "normal":
+    default:
+      return src;
+  }
+}
+
+// dst·src 픽셀(hex)의 RGB 채널마다 blendChannel을 적용해 섞은 색을 돌려준다.
+// dst가 비어있으면(투명) 섞을 대상이 없으므로 src를 그대로 돌려준다 — 배경이
+// 없는 곳에서는 블렌드 모드가 사실상 아무 효과가 없다는 뜻이다. 알파는
+// src의 것을 그대로 들고 나가고, 실제 투명도 반영은 호출부(compositeOnto)가
+// opacity로 이어서 한다.
+function blendColor(dst: PixelValue, src: string, mode: BlendMode): string {
+  if (mode === "normal" || dst === null) return src;
+  const [dr, dg, db] = hexToRgba(dst);
+  const [sr, sg, sb, sa] = hexToRgba(src);
+  const r = blendChannel(dr / 255, sr / 255, mode) * 255;
+  const g = blendChannel(dg / 255, sg / 255, mode) * 255;
+  const b = blendChannel(db / 255, sb / 255, mode) * 255;
+  return rgbaToHex(r, g, b, sa);
+}
+
 // 레이어 투명도를 픽셀 알파에 곱해 적용한다 — opacity가 1이면 원본 그대로,
 // 0이면(완전 투명) 합성에 아무 영향이 없다.
 export function applyOpacityToPixel(
@@ -39,17 +150,27 @@ export function applyOpacityToPixel(
   return rgbaToHex(r, g, b, a * opacity);
 }
 
-// src 레이어를 자신의 투명도(srcOpacity)까지 반영해 dst 위에 겹쳐 합성한다 —
-// 레이어 하나를 그 아래 결과 위에 얹는 기본 단위 연산.
+// src 레이어를 자신의 투명도(srcOpacity)·블렌드 모드·보정까지 반영해 dst 위에
+// 겹쳐 합성한다 — 레이어 하나를 그 아래 결과 위에 얹는 기본 단위 연산.
+// srcBlendMode·srcAdjustments는 선택적이라 기존 3-인자 호출부(핵심은 그대로
+// normal 블렌드 + 보정 없음)는 코드 변경 없이 그대로 동작한다.
 export function compositeOnto(
   dst: PixelValue[],
   src: PixelValue[],
   srcOpacity: number,
+  srcBlendMode: BlendMode = "normal",
+  srcAdjustments?: LayerAdjustments,
 ): PixelValue[] {
   const out = dst.slice();
   for (let i = 0; i < src.length; i++) {
-    const s = applyOpacityToPixel(src[i], srcOpacity);
-    if (s !== null) out[i] = compositePixel(out[i], s);
+    const adjusted = srcAdjustments
+      ? applyAdjustments(src[i], srcAdjustments)
+      : src[i];
+    const s = applyOpacityToPixel(adjusted, srcOpacity);
+    if (s === null) continue;
+    const blended =
+      srcBlendMode === "normal" ? s : blendColor(out[i], s, srcBlendMode);
+    out[i] = compositePixel(out[i], blended);
   }
   return out;
 }
@@ -64,7 +185,13 @@ export function compositeLayers(
   let out = createGrid(width, height);
   for (const layer of layers) {
     if (!layer.visible) continue;
-    out = compositeOnto(out, layer.pixels, layer.opacity);
+    out = compositeOnto(
+      out,
+      layer.pixels,
+      layer.opacity,
+      layer.blendMode ?? "normal",
+      layer,
+    );
   }
   return out;
 }
