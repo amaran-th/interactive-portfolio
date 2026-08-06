@@ -1,4 +1,4 @@
-import { hexToRgba, hsvToRgb, rgbaToHex, rgbToHsv } from "./hsv";
+import { hexToRgba, rgbaToHex } from "./hsv";
 import type { Point } from "./types";
 import type { BlendMode, PixelLayer } from "../_shared/assetLibrary";
 
@@ -89,11 +89,20 @@ export function applyAdjustments(
   g = Math.min(255, Math.max(0, g));
   b = Math.min(255, Math.max(0, b));
 
-  // 채도 — HSV로 바꿔 S만 조절하고 되돌린다(이미 있는 hsv.ts 변환 재사용).
+  // 채도 — luma(밝기) 축을 기준으로 원색과의 거리를 늘리거나 줄인다. HSV의
+  // s만 조절하는 방식은 v(=max 채널)가 그대로 남아 -100에서도 무채색이
+  // 아니라 흰색이 되는 문제가 있어(순색 빨강 #ff0000 → v=1,s=0 → 흰색),
+  // 대신 CSS filter: saturate()와 같은 luma 보간을 쓴다. factor는
+  // -100→0(완전 무채색=회색), 0→1(원본), 100→2(두 배 채도)로 매핑된다.
   if (saturation !== 0) {
-    const [h, s, v] = rgbToHsv(r, g, b);
-    const s2 = Math.min(1, Math.max(0, s * (1 + saturation / 100)));
-    [r, g, b] = hsvToRgb(h, s2, v);
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    const factor = 1 + saturation / 100;
+    r = luma + (r - luma) * factor;
+    g = luma + (g - luma) * factor;
+    b = luma + (b - luma) * factor;
+    r = Math.min(255, Math.max(0, r));
+    g = Math.min(255, Math.max(0, g));
+    b = Math.min(255, Math.max(0, b));
   }
 
   return rgbaToHex(r, g, b, a);
@@ -125,17 +134,19 @@ function blendChannel(dst: number, src: number, mode: BlendMode): number {
 
 // dst·src 픽셀(hex)의 RGB 채널마다 blendChannel을 적용해 섞은 색을 돌려준다.
 // dst가 비어있으면(투명) 섞을 대상이 없으므로 src를 그대로 돌려준다 — 배경이
-// 없는 곳에서는 블렌드 모드가 사실상 아무 효과가 없다는 뜻이다. 알파는
-// src의 것을 그대로 들고 나가고, 실제 투명도 반영은 호출부(compositeOnto)가
-// opacity로 이어서 한다.
+// 없는 곳에서는 블렌드 모드가 사실상 아무 효과가 없다는 뜻이다. dst가
+// 반투명이면(알파 < 1) 표준 합성 공식대로 배경 알파만큼만 블렌드 결과를
+// 섞고 나머지는 src 그대로 둔다(Co = (1-αb)·Cs + αb·B(Cb,Cs)) — 그러지
+// 않으면 배경이 10% 알파든 100% 알파든 블렌드가 똑같이 강하게 걸린다.
+// 알파는 src의 것을 그대로 들고 나가고, 실제 투명도 반영은 호출부
+// (compositeOnto)가 opacity로 이어서 한다.
 function blendColor(dst: PixelValue, src: string, mode: BlendMode): string {
   if (mode === "normal" || dst === null) return src;
-  const [dr, dg, db] = hexToRgba(dst);
+  const [dr, dg, db, da] = hexToRgba(dst);
   const [sr, sg, sb, sa] = hexToRgba(src);
-  const r = blendChannel(dr / 255, sr / 255, mode) * 255;
-  const g = blendChannel(dg / 255, sg / 255, mode) * 255;
-  const b = blendChannel(db / 255, sb / 255, mode) * 255;
-  return rgbaToHex(r, g, b, sa);
+  const mix = (d: number, s: number) =>
+    (1 - da) * s + da * blendChannel(d / 255, s / 255, mode) * 255;
+  return rgbaToHex(mix(dr, sr), mix(dg, sg), mix(db, sb), sa);
 }
 
 // 레이어 투명도를 픽셀 알파에 곱해 적용한다 — opacity가 1이면 원본 그대로,
@@ -183,6 +194,30 @@ export function compositeLayers(
   height: number,
 ): PixelValue[] {
   let out = createGrid(width, height);
+  for (const layer of layers) {
+    if (!layer.visible) continue;
+    out = compositeOnto(
+      out,
+      layer.pixels,
+      layer.opacity,
+      layer.blendMode ?? "normal",
+      layer,
+    );
+  }
+  return out;
+}
+
+// compositeLayers와 달리 빈 캔버스가 아니라 이미 채워진 base 위에서 시작해,
+// layers를 아래→위 순서로 각자의 블렌드 모드·보정을 적용해가며 겹쳐 올린다.
+// PixelCanvas가 활성 레이어 위쪽 레이어들을 "실제로 지금 화면에 보이는
+// 배경"(활성 레이어까지 합성된 visibleBase) 위에 얹을 때 쓴다 — 빈 캔버스
+// 위에서 미리 평탄화하면 위 레이어의 블렌드 모드가 진짜 배경을 못 보고
+// 계산돼(dst===null이라 블렌드가 무효화됨) 화면에서 사라져 보인다.
+export function compositeLayersOnto(
+  base: PixelValue[],
+  layers: PixelLayer[],
+): PixelValue[] {
+  let out = base;
   for (const layer of layers) {
     if (!layer.visible) continue;
     out = compositeOnto(

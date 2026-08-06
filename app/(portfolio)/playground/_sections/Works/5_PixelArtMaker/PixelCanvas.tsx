@@ -22,6 +22,7 @@ import {
   stepColorAt,
 } from "./gradientFill";
 import {
+  compositeLayersOnto,
   compositeOnto,
   compositePixel,
   createGrid,
@@ -40,7 +41,7 @@ import {
 } from "./pixelGrid";
 import { rasterizeText, Rotation, rotateAlphaBuffer } from "./textStamp";
 import { nextZoomStep, Point, SelectMode, Tool } from "./types";
-import type { BlendMode } from "../_shared/assetLibrary";
+import type { BlendMode, PixelLayer } from "../_shared/assetLibrary";
 
 export type TextAlign = "left" | "center" | "right";
 
@@ -189,7 +190,7 @@ export default function PixelCanvas({
   onPendingShapeCancel,
   bottomToolbarPortalTarget,
   belowComposite,
-  aboveComposite,
+  aboveLayers,
   activeLayerOpacity,
   activeLayerLocked,
   activeLayerBlendMode,
@@ -284,11 +285,14 @@ export default function PixelCanvas({
   // 텍스트 편집 툴바도 그리기/선택 하위 옵션과 같은 자리(캔버스 하단 중앙)에
   // 뜨게 한다 — DrawToolbar가 쓰는 것과 같은 포털 타겟을 그대로 받는다.
   bottomToolbarPortalTarget: HTMLDivElement | null;
-  // 활성 레이어 아래/위에 있는, 보이는 다른 레이어들을 미리 합성해둔 배경·
-  // 전경 — 레이어 구조가 바뀔 때만(그리는 동안에는 그대로) Editor가 새로
-  // 계산해 내려준다. 활성 레이어가 맨 아래/맨 위면 각각 null.
+  // 활성 레이어 아래에 있는, 보이는 다른 레이어들을 미리 합성해둔 배경 —
+  // 레이어 구조가 바뀔 때만(그리는 동안에는 그대로) Editor가 새로 계산해
+  // 내려준다. 활성 레이어가 맨 아래면 null.
   belowComposite: PixelValue[] | null;
-  aboveComposite: PixelValue[] | null;
+  // 활성 레이어 위에 있는 레이어들은 미리 합성하지 않고 배열 그대로 받는다 —
+  // 각 레이어의 블렌드 모드가 "실제로 지금 화면에 보이는 배경" 위에서
+  // 계산돼야 하기 때문이다. 활성 레이어가 맨 위면 null.
+  aboveLayers: PixelLayer[] | null;
   // 활성 레이어 자체의 투명도 — 렌더링에서 belowComposite 위에 얹을 때만 쓴다.
   activeLayerOpacity: number;
   // true면 이 캔버스는 그리기 도구를 전부 무시한다(스포이트·선택류는 계속 동작).
@@ -462,7 +466,7 @@ export default function PixelCanvas({
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       // 화면에는 belowComposite → 활성 레이어(자기 투명도 적용) →
-      // aboveComposite 순서로 겹쳐 보여준다 — 실제로 편집되는 대상은
+      // aboveLayers 순서로 겹쳐 보여준다 — 실제로 편집되는 대상은
       // data(활성 레이어)뿐이고, 이 두 밴드는 시각적 맥락일 뿐이다.
       const hasAdjustments =
         !!activeLayerAdjustments.brightness ||
@@ -471,7 +475,10 @@ export default function PixelCanvas({
         !!activeLayerAdjustments.temperature ||
         !!activeLayerAdjustments.tint;
       const visibleBase =
-        belowComposite || aboveComposite || activeLayerOpacity < 1 || hasAdjustments
+        belowComposite ||
+        (aboveLayers && aboveLayers.length > 0) ||
+        activeLayerOpacity < 1 ||
+        hasAdjustments
           ? compositeOnto(
               belowComposite
                 ? belowComposite.slice()
@@ -482,9 +489,10 @@ export default function PixelCanvas({
               activeLayerAdjustments,
             )
           : data;
-      const visibleWithAbove = aboveComposite
-        ? compositeOnto(visibleBase, aboveComposite, 1)
-        : visibleBase;
+      const visibleWithAbove =
+        aboveLayers && aboveLayers.length > 0
+          ? compositeLayersOnto(visibleBase, aboveLayers)
+          : visibleBase;
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
           const color = getPixel(visibleWithAbove, width, x, y);
@@ -792,7 +800,7 @@ export default function PixelCanvas({
       gradientSteps,
       gradientAngleDeg,
       belowComposite,
-      aboveComposite,
+      aboveLayers,
       activeLayerOpacity,
       activeLayerBlendMode,
       activeLayerAdjustments,
@@ -859,7 +867,7 @@ export default function PixelCanvas({
 
   // 스포이트·마법봉·페인트통은 화면에 보이는 그대로(합성 기준)로 판정해야
   // 한다 — belowComposite + 활성 레이어(지금 workingRef 값, 자기 투명도
-  // 적용) + aboveComposite를 그 순간에만 한 번 합성한다. 매 프레임 계산하지
+  // 적용) + aboveLayers를 그 순간에만 한 번 합성한다. 매 프레임 계산하지
   // 않고 이 세 도구가 실제로 클릭될 때만 부른다.
   const getFullComposite = useCallback((): PixelValue[] => {
     const hasAdjustments =
@@ -870,7 +878,7 @@ export default function PixelCanvas({
       !!activeLayerAdjustments.tint;
     if (
       !belowComposite &&
-      !aboveComposite &&
+      (!aboveLayers || aboveLayers.length === 0) &&
       activeLayerOpacity >= 1 &&
       !hasAdjustments
     ) {
@@ -886,10 +894,12 @@ export default function PixelCanvas({
       activeLayerBlendMode,
       activeLayerAdjustments,
     );
-    return aboveComposite ? compositeOnto(withActive, aboveComposite, 1) : withActive;
+    return aboveLayers && aboveLayers.length > 0
+      ? compositeLayersOnto(withActive, aboveLayers)
+      : withActive;
   }, [
     belowComposite,
-    aboveComposite,
+    aboveLayers,
     activeLayerOpacity,
     activeLayerBlendMode,
     activeLayerAdjustments,
@@ -1117,7 +1127,7 @@ export default function PixelCanvas({
       pendingShape,
       onPendingShapeCommit,
       belowComposite,
-      aboveComposite,
+      aboveLayers,
       activeLayerOpacity,
       activeLayerLocked,
       getFullComposite,

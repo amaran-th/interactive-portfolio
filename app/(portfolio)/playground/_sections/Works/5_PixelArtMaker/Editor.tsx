@@ -57,6 +57,7 @@ import PixelCanvas, {
   textDrawX,
 } from "./PixelCanvas";
 import {
+  applyAdjustments,
   compositeLayerRange,
   compositeLayers,
   compositeOnto,
@@ -538,8 +539,23 @@ export default function Editor({
       if (!onionSkin) return null;
       const prev = prevVisibleFrame(history.presentLayers, history.activeLayerId);
       if (!prev) return null;
+      // 어니언 스킨 유령 이미지는 항상 흐린 미리보기일 뿐이다 — 이전
+      // 프레임 자신에 블렌드 모드·보정이 걸려 있어도 무시하고 일반
+      // 겹치기로만 보여준다(프레임 모드에서는 블렌드·보정을 편집 화면에
+      // 반영하지 않기로 했다).
       return compositeLayers(
-        [{ ...prev, opacity: ONION_SKIN_OPACITY }],
+        [
+          {
+            ...prev,
+            blendMode: "normal",
+            brightness: undefined,
+            contrast: undefined,
+            saturation: undefined,
+            temperature: undefined,
+            tint: undefined,
+            opacity: ONION_SKIN_OPACITY,
+          },
+        ],
         doc.width,
         doc.height,
       );
@@ -560,32 +576,43 @@ export default function Editor({
     doc.width,
     doc.height,
   ]);
-  const aboveComposite = useMemo(() => {
+  const aboveLayers = useMemo((): PixelLayer[] | null => {
     if (layerMode === "frames") {
       if (!onionSkin) return null;
       const next = nextVisibleFrame(history.presentLayers, history.activeLayerId, false);
       if (!next) return null;
-      return compositeLayers(
-        [{ ...next, opacity: ONION_SKIN_OPACITY }],
-        doc.width,
-        doc.height,
-      );
+      // 어니언 스킨 유령 이미지는 항상 흐린 미리보기일 뿐이다 — 다음
+      // 프레임 자신에 블렌드 모드·보정이 걸려 있어도 무시하고 일반
+      // 겹치기로만 보여준다(프레임 모드에서는 블렌드·보정을 편집 화면에
+      // 반영하지 않기로 했다).
+      return [
+        {
+          ...next,
+          blendMode: "normal",
+          brightness: undefined,
+          contrast: undefined,
+          saturation: undefined,
+          temperature: undefined,
+          tint: undefined,
+          opacity: ONION_SKIN_OPACITY,
+        },
+      ];
     }
-    return compositeLayerRange(
-      history.presentLayers,
+    // PixelCanvas가 각 레이어 자신의 블렌드 모드·보정을 반영하며 실제
+    // 화면(visibleBase) 위에 순서대로 얹을 수 있도록, 미리 평탄화하지 않고
+    // 레이어 배열 그대로 넘긴다 — 빈 캔버스 위에서 미리 평탄화하면 위
+    // 레이어의 블렌드 모드가 진짜 배경을 못 보고 계산돼 화면에서 사라진다.
+    const slice = history.presentLayers.slice(
       activeLayerIndex + 1,
-      history.presentLayers.length - 1,
-      doc.width,
-      doc.height,
+      history.presentLayers.length,
     );
+    return slice.length > 0 ? slice : null;
   }, [
     layerMode,
     onionSkin,
     history.presentLayers,
     history.activeLayerId,
     activeLayerIndex,
-    doc.width,
-    doc.height,
   ]);
 
   // 선택을 만들거나 다루는 도구 묶음(select·lasso·move·wand) 밖으로 나가면
@@ -1750,15 +1777,25 @@ export default function Editor({
       if (index <= 0) return;
       const layer = history.presentLayers[index];
       const below = history.presentLayers[index - 1];
+      // below 자신의 보정을 먼저 픽셀에 구워넣은 뒤에 위 레이어를 얹어야
+      // 병합 결과가 병합 전 화면과 같아진다 — 그러지 않으면 병합된 레이어가
+      // below의 보정 필드를 그대로 물려받아, 이미 위 레이어와 섞인 최종
+      // 픽셀에 below의 보정이 렌더링 시점에 다시(이중으로) 걸려버린다.
+      const belowBaked = below.pixels.map((p) => applyAdjustments(p, below));
       const merged: PixelLayer = {
         ...below,
         pixels: compositeOnto(
-          below.pixels,
+          belowBaked,
           layer.pixels,
           layer.opacity,
           layer.blendMode ?? "normal",
           layer,
         ),
+        brightness: undefined,
+        contrast: undefined,
+        saturation: undefined,
+        temperature: undefined,
+        tint: undefined,
       };
       const nextLayers = [
         ...history.presentLayers.slice(0, index - 1),
@@ -2335,13 +2372,19 @@ export default function Editor({
                     height={doc.height}
                     pixels={history.present}
                     belowComposite={belowComposite}
-                    aboveComposite={aboveComposite}
+                    aboveLayers={aboveLayers}
                     activeLayerOpacity={
                       activeLayer.visible ? activeLayer.opacity : 0
                     }
                     activeLayerLocked={activeLayer.locked || isPlaying}
-                    activeLayerBlendMode={activeLayer.blendMode ?? "normal"}
-                    activeLayerAdjustments={activeLayer}
+                    activeLayerBlendMode={
+                      layerMode === "frames"
+                        ? "normal"
+                        : (activeLayer.blendMode ?? "normal")
+                    }
+                    activeLayerAdjustments={
+                      layerMode === "frames" ? {} : activeLayer
+                    }
                     tool={tool}
                     onToolChange={setTool}
                     activeColorHex={activeColorHex}
