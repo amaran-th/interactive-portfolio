@@ -12,8 +12,8 @@
 
 `app/(portfolio)/playground/_sections/Works/5_PixelArtMaker/`
 - `pixelGrid.ts` — 정렬용 순수 함수 `unionBoundingBox`, `shiftPixels` 추가
-- `Editor.tsx` — `layerScope` 상태, scope 합성(`scopeBelowComposite`/`scopeAboveComposite`) 계산, `handleAlignLayers` 핸들러
-- `PixelCanvas.tsx` — `getFullComposite`가 scope 합성을 쓰도록 수정, 새 props 3개(`scopeBelowComposite`, `scopeAboveComposite`, `activeLayerInScope`) 추가
+- `Editor.tsx` — `layerScope` 상태, scope 합성(`scopeBelowComposite`/`scopeAboveLayers`) 계산, `handleAlignLayers` 핸들러
+- `PixelCanvas.tsx` — `getFullComposite`가 scope 합성을 쓰도록 수정, 새 props 3개(`scopeBelowComposite`, `scopeAboveLayers`, `activeLayerInScope`) 추가
 - `LayerPanel.tsx` — 레이어 행에 체크박스 추가, 헤더에 "정렬" 버튼 추가
 
 `compositeLayers`, `compositeLayerRange`, `mergeColors` 등 기존 합성/병합 함수는 변경 없음(그대로 재사용).
@@ -35,9 +35,11 @@ const [layerScope, setLayerScope] = useState<Set<string>>(
 
 ## 판정 범위 — 스포이트·마법봉·페인트통
 
+> 이 절은 2026-08-06 브레인스토밍 도중 다른 세션이 병합한 블렌드 모드·색보정 기능(커밋 `2e4d035` 등)에 맞춰 갱신되었다. 초안 시점에는 `aboveComposite: PixelValue[] | null`(미리 평탄화한 배열)이었지만, 지금은 `aboveLayers: PixelLayer[] | null`(원본 레이어 배열)이다 — 위쪽 레이어마다 자기 블렌드 모드를 실제 배경 위에서 계산해야 해서, 미리 하나로 합치면(빈 캔버스 위에서 합치는 셈이라) 블렌드 결과가 달라지기 때문이다. `below`는 자신보다 위에 있는 것과 무관하게 결과가 고정되므로 여전히 미리 평탄화한 배열로 남아 있다.
+
 ### `Editor.tsx` — scope 합성 계산
 
-기존 `belowComposite`/`aboveComposite`(화면 렌더링용, 변경 없음) 바로 옆에 병렬로 계산한다:
+기존 `belowComposite`/`aboveLayers`(화면 렌더링용, 변경 없음) 바로 옆에 병렬로 계산한다:
 
 ```ts
 const scopeBelowComposite = useMemo(() => {
@@ -48,25 +50,25 @@ const scopeBelowComposite = useMemo(() => {
   return compositeLayers(scoped, doc.width, doc.height);
 }, [layerMode, belowComposite, history.presentLayers, activeLayerIndex, layerScope, doc.width, doc.height]);
 
-const scopeAboveComposite = useMemo(() => {
-  if (layerMode === "frames") return aboveComposite;
-  const scoped = history.presentLayers
+const scopeAboveLayers = useMemo((): PixelLayer[] | null => {
+  if (layerMode === "frames") return aboveLayers; // 프레임 모드는 scope 개념 없음, 기존 그대로
+  const slice = history.presentLayers
     .slice(activeLayerIndex + 1)
     .filter((l) => layerScope.has(l.id));
-  return compositeLayers(scoped, doc.width, doc.height);
-}, [layerMode, aboveComposite, history.presentLayers, activeLayerIndex, layerScope, doc.width, doc.height]);
+  return slice.length > 0 ? slice : null;
+}, [layerMode, aboveLayers, history.presentLayers, activeLayerIndex, layerScope]);
 
 const activeLayerInScope =
   layerMode === "frames" ? true : layerScope.has(history.activeLayerId);
 ```
 
-`compositeLayers`는 빈 배열을 넘기면 완전히 투명한 그리드를 돌려준다(기존 동작, 변경 불필요) — 체크된 레이어가 하나도 없으면 `scopeBelowComposite`/`scopeAboveComposite` 둘 다 빈 그리드가 되고, `activeLayerInScope`가 `false`면 판정 결과는 "완전히 투명"이 된다. 이 경우를 위한 별도 분기는 필요 없다 — 아래 `getFullComposite`가 자연히 그렇게 동작한다.
+`compositeLayers`는 빈 배열을 넘기면 완전히 투명한 그리드를 돌려준다(기존 동작, 변경 불필요) — 체크된 레이어가 하나도 없으면 `scopeBelowComposite`는 빈 그리드, `scopeAboveLayers`는 `null`이 되고, `activeLayerInScope`가 `false`면 판정 결과는 "완전히 투명"이 된다. 이 경우를 위한 별도 분기는 필요 없다 — 아래 `getFullComposite`가 자연히 그렇게 동작한다.
 
-이 두 값과 `activeLayerInScope`를 `PixelCanvas`에 새 props로 내려준다(기존 `belowComposite`/`aboveComposite`/`activeLayerOpacity`/`activeLayerLocked` 옆에 나란히).
+이 두 값과 `activeLayerInScope`를 `PixelCanvas`에 새 props로 내려준다(기존 `belowComposite`/`aboveLayers`/`activeLayerOpacity`/`activeLayerBlendMode`/`activeLayerAdjustments`/`activeLayerLocked` 옆에 나란히).
 
 ### `PixelCanvas.tsx` — `getFullComposite` 수정
 
-현재(`PixelCanvas.tsx:842-855`)는 `belowComposite`/`aboveComposite`/`activeLayerOpacity`를 조합한다. 이를 scope 버전으로 교체한다:
+현재(`PixelCanvas.tsx:872-908`)는 `belowComposite`/`aboveLayers`/`activeLayerOpacity`/`activeLayerBlendMode`/`activeLayerAdjustments`를 조합한다(활성 레이어 자신의 블렌드 모드·보정을 반영하고, 위 레이어들은 `compositeLayersOnto`로 각자의 블렌드 모드를 실제 배경 위에서 순서대로 적용). 같은 조립 순서를 scope 값으로 교체한다:
 
 ```ts
 const getFullComposite = useCallback((): PixelValue[] => {
@@ -74,20 +76,35 @@ const getFullComposite = useCallback((): PixelValue[] => {
     ? scopeBelowComposite.slice()
     : createGrid(width, height);
   if (!activeLayerInScope) {
-    return scopeAboveComposite
-      ? compositeOnto(base, scopeAboveComposite, 1)
+    return scopeAboveLayers && scopeAboveLayers.length > 0
+      ? compositeLayersOnto(base, scopeAboveLayers)
       : base;
   }
-  const withActive = compositeOnto(base, workingRef.current, activeLayerOpacity);
-  return scopeAboveComposite
-    ? compositeOnto(withActive, scopeAboveComposite, 1)
+  const withActive = compositeOnto(
+    base,
+    workingRef.current,
+    activeLayerOpacity,
+    activeLayerBlendMode,
+    activeLayerAdjustments,
+  );
+  return scopeAboveLayers && scopeAboveLayers.length > 0
+    ? compositeLayersOnto(withActive, scopeAboveLayers)
     : withActive;
-}, [scopeBelowComposite, scopeAboveComposite, activeLayerInScope, activeLayerOpacity, width, height]);
+}, [
+  scopeBelowComposite,
+  scopeAboveLayers,
+  activeLayerInScope,
+  activeLayerOpacity,
+  activeLayerBlendMode,
+  activeLayerAdjustments,
+  width,
+  height,
+]);
 ```
 
-호출부(스포이트 `:883`, 페인트통 `:946/950/952`, 마법봉 `:972-974`)는 그대로 `getFullComposite()`를 부르기만 하면 되므로 수정 불필요 — 함수 내부 구현만 바뀐다.
+이 함수는 기존 `getFullComposite`를 **대체**한다(같은 이름, 같은 위치 — 새 함수를 추가하는 게 아니라 기존 구현을 이 내용으로 바꾸는 것). 호출부(스포이트 `:936`, 페인트통 `:999` 등, 마법봉 `:1026-1027`)는 그대로 `getFullComposite()`를 부르기만 하면 되므로 수정 불필요 — 함수 내부 구현만 바뀐다.
 
-**주의:** 페인트통이 실제로 픽셀을 쓰는 대상(`workingRef.current`, 활성 레이어)은 이 변경과 무관하게 항상 그대로다. `layerScope`는 "어디까지를 같은 영역/색으로 볼지" 판정에만 관여하고, 실제 쓰기 대상에는 관여하지 않는다.
+**주의:** 페인트통이 실제로 픽셀을 쓰는 대상(`workingRef.current`, 활성 레이어)은 이 변경과 무관하게 항상 그대로다. `layerScope`는 "어디까지를 같은 영역/색으로 볼지" 판정에만 관여하고, 실제 쓰기 대상에는 관여하지 않는다. 화면 렌더링(`belowComposite`/`aboveLayers`를 쓰는 기존 render 로직)은 이번 변경으로 전혀 달라지지 않는다.
 
 ## 정렬 — `unionBoundingBox` / `shiftPixels`
 
@@ -141,7 +158,7 @@ export function shiftPixels(
 
 ### `Editor.tsx` — `handleAlignLayers`
 
-기존 `handleFlattenLayers`(`Editor.tsx:1883-1894`)와 같은 패턴 — 대상 레이어들을 새 배열로 만들어 `pushLayerOp` 한 번으로 실행취소 스택에 올린다:
+기존 `handleFlattenLayers`(`Editor.tsx:1920-1931`)와 같은 패턴 — 대상 레이어들을 새 배열로 만들어 `pushLayerOp` 한 번으로 실행취소 스택에 올린다:
 
 ```ts
 const handleAlignLayers = useCallback(() => {
@@ -169,8 +186,8 @@ const handleAlignLayers = useCallback(() => {
 
 ## UI — `LayerPanel.tsx`
 
-- 레이어 모드 헤더 행(`LayerPanel.tsx:128-137`, 지금 "평탄화" 버튼이 있는 자리)에 같은 스타일의 "정렬" 텍스트 버튼을 추가한다. `disabled` 조건은 없음(레이어 1장이어도 정렬은 유효한 동작).
-- 각 레이어 행(`LayerPanel.tsx:142` 이하 `.map`) 맨 앞, 썸네일 왼쪽에 체크박스를 추가한다. `checked={layerScope.has(layer.id)}`, `onChange`는 새 prop `onToggleScope(id)`를 호출 — 클릭 시 행 전체의 `onClick={() => onSelect(layer.id)}`(활성 레이어 전환)가 같이 발동하지 않도록 `e.stopPropagation()`을 건다(기존 잠금/삭제 버튼들과 같은 패턴, `LayerPanel.tsx:207-209` 참고).
+- 레이어 모드 헤더 행(`LayerPanel.tsx:155-164`, 지금 "평탄화" 버튼이 있는 자리)에 같은 스타일의 "정렬" 텍스트 버튼을 추가한다. `disabled` 조건은 없음(레이어 1장이어도 정렬은 유효한 동작).
+- 각 레이어 행(`LayerPanel.tsx:169` 이하 `.map`) 맨 앞, 썸네일 왼쪽에 체크박스를 추가한다. `checked={layerScope.has(layer.id)}`, `onChange`는 새 prop `onToggleScope(id)`를 호출 — 클릭 시 행 전체의 `onClick={() => onSelect(layer.id)}`(활성 레이어 전환)가 같이 발동하지 않도록 `e.stopPropagation()`을 건다(기존 잠금 버튼 등과 같은 패턴, `LayerPanel.tsx:207-209` 참고).
 - 체크박스에 title로 "판정·정렬 범위에 포함" 정도의 짧은 설명을 단다.
 
 ## 범위 밖
