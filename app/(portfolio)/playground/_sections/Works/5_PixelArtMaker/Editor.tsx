@@ -620,7 +620,15 @@ export default function Editor({
       // 한 곳에서 막으면 모든 호출부가 함께 보호된다. 레이어 구조 변경·
       // 캔버스 전체 변형(pushHistoryAllLayers/pushLayerOp)은 활성 레이어의
       // 잠금과 무관하게 계속 동작해야 하므로 이 가드를 넣지 않는다.
-      if (activeLayer.locked) return;
+      //
+      // 재생 중(isPlaying)에도 같은 이유로 막는다 — PixelCanvas는 포인터
+      // 기반 그리기 도구를 activeLayerLocked(=locked||isPlaying)로 막지만,
+      // 선택은 재생 중에도 의도적으로 허용되므로 Alt+Backspace(채우기)·
+      // 붙여넣기·텍스트/이미지/도형 커밋처럼 선택을 거쳐 픽셀을 쓰는 Editor
+      // 레벨 핸들러들은 그 게이트를 거치지 않는다. 이 핸들러들도 전부 이
+      // 래퍼 하나로 모이므로, 여기서 한 번 더 막으면 재생 중인 프레임이
+      // 몰래 덮어써지는 일이 없다.
+      if (activeLayer.locked || isPlaying) return;
       history.push(next, size);
       moveSelectionUndoRef.current.push(moveOriginalMask);
       if (moveSelectionUndoRef.current.length > 50) {
@@ -630,7 +638,7 @@ export default function Editor({
       setPixelsDirty(true);
       opacityDragLayerIdRef.current = null;
     },
-    [history, activeLayer],
+    [history, activeLayer, isPlaying],
   );
 
   // 캔버스 전체 변형(리사이즈·반전·회전)처럼 모든 레이어의 픽셀이 한꺼번에

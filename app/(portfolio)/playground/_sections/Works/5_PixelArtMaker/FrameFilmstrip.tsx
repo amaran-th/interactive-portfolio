@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Copy, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
 import type { PixelLayer } from "../_shared/assetLibrary";
 import FileThumbnail from "./FileThumbnail";
 import {
@@ -44,6 +45,29 @@ export default function FrameFilmstrip({
 }) {
   const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
 
+  // 지속시간 입력은 키 입력마다 onDurationChange(→되돌리기 스택 커밋)를
+  // 부르지 않고, 이 로컬 버퍼에 타이핑 중인 값을 담아 두었다가 blur·Enter에서
+  // 한 번만 커밋한다 — LayerPanel의 이름 인라인 편집(editingId/editingName)과
+  // 같은 "버퍼 후 커밋" 형태다. 그러지 않으면 렌더마다 durationSec으로 값이
+  // 강제로 되돌아가 커서 위치가 튀고, 50개로 제한된 되돌리기 스택이 키 입력
+  // 하나하나로 순식간에 채워진다.
+  const [editingDurationId, setEditingDurationId] = useState<string | null>(
+    null,
+  );
+  const [editingDurationValue, setEditingDurationValue] = useState("");
+
+  const commitDuration = (id: string) => {
+    const sec = Number(editingDurationValue);
+    if (Number.isFinite(sec)) {
+      const ms = Math.min(
+        MAX_FRAME_DURATION_MS,
+        Math.max(MIN_FRAME_DURATION_MS, Math.round(sec * 1000)),
+      );
+      onDurationChange(id, ms);
+    }
+    setEditingDurationId(null);
+  };
+
   return (
     <div className="flex h-24 shrink-0 items-stretch gap-2 border-t border-gray-200 bg-white px-2 py-2">
       <div className="flex min-w-0 flex-1 items-stretch gap-1 overflow-x-auto">
@@ -84,17 +108,22 @@ export default function FrameFilmstrip({
                 min={MIN_FRAME_DURATION_MS / 1000}
                 max={MAX_FRAME_DURATION_MS / 1000}
                 step={0.01}
-                value={durationSec}
+                value={
+                  editingDurationId === layer.id
+                    ? editingDurationValue
+                    : durationSec
+                }
                 disabled={isPlaying}
                 onClick={(e) => e.stopPropagation()}
-                onChange={(e) => {
-                  const sec = Number(e.target.value);
-                  if (!Number.isFinite(sec)) return;
-                  const ms = Math.min(
-                    MAX_FRAME_DURATION_MS,
-                    Math.max(MIN_FRAME_DURATION_MS, Math.round(sec * 1000)),
-                  );
-                  onDurationChange(layer.id, ms);
+                onFocus={() => {
+                  setEditingDurationId(layer.id);
+                  setEditingDurationValue(durationSec);
+                }}
+                onChange={(e) => setEditingDurationValue(e.target.value)}
+                onBlur={() => commitDuration(layer.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                  if (e.key === "Escape") setEditingDurationId(null);
                 }}
                 className="w-full border border-gray-200 px-0.5 text-center text-[9px] text-gray-600 outline-none disabled:opacity-50"
               />
