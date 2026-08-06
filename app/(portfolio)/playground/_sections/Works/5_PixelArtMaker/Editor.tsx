@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  BlendMode,
   getPixelArt,
   listPixelArt,
   PixelArt,
@@ -105,6 +106,16 @@ import {
 // 유지하고, 비활성 탭은 이 스냅샷 형태로만 보관한다(전환 시 되돌리기 스택은
 // 초기화되지만 그림 내용은 그대로 보존된다).
 type Tab = { doc: PixelArt; hasMetaEdits: boolean; pixelsDirty: boolean };
+
+// 투명도·보정(밝기·대비·채도·색온도·틴트) 슬라이더의 드래그 코얼레싱이
+// "지금 이어지는 드래그가 어느 레이어의 어느 값인지" 구분하는 데 쓰는 필드.
+type DragCoalesceField =
+  | "opacity"
+  | "brightness"
+  | "contrast"
+  | "saturation"
+  | "temperature"
+  | "tint";
 
 // 편집을 멈추고 이 시간(ms)이 지나면 자동 저장한다.
 const AUTOSAVE_DELAY_MS = 3 * 60 * 1000;
@@ -600,14 +611,17 @@ export default function Editor({
   // 버린다.
   const moveSelectionUndoRef = useRef<(Set<number> | null | undefined)[]>([]);
   const moveSelectionRedoRef = useRef<(Set<number> | null | undefined)[]>([]);
-  // 투명도 슬라이더를 드래그하는 동안 "지금 이어지는 드래그가 어느
-  // 레이어의 것인지" 기억한다 — handleLayerOpacityChange가 같은 레이어에서
-  // 연속으로 불리면(id가 같으면) 실행취소 스택에 새로 쌓지 않고 값만
-  // 갱신하고, 다른 레이어거나 첫 틱이면 정상적으로 되돌리기 경계를 만든다.
-  // 아래 세 pushXxx 함수(오파시티가 아닌 다른 모든 편집)는 호출될 때마다
-  // 이 값을 비워, 드래그 중간에 다른 조작이 끼어들면 다음 오파시티 조작이
-  // 항상 새 경계에서 시작하게 한다.
-  const opacityDragLayerIdRef = useRef<string | null>(null);
+  // 투명도·보정 슬라이더를 드래그하는 동안 "지금 이어지는 드래그가 어느
+  // 레이어의 어느 값인지" 기억한다 — handleLayerOpacityChange·
+  // handleLayerAdjustmentChange가 같은 레이어의 같은 값에서 연속으로
+  // 불리면(레이어 id와 필드가 둘 다 같으면) 실행취소 스택에 새로 쌓지 않고
+  // 값만 갱신하고, 다른 레이어·다른 값이거나 첫 틱이면 정상적으로 되돌리기
+  // 경계를 만든다. 아래 세 pushXxx 함수는 호출될 때마다 이 값을 비워, 드래그
+  // 중간에 다른 조작이 끼어들면 다음 드래그가 항상 새 경계에서 시작하게 한다.
+  const dragCoalesceRef = useRef<{
+    layerId: string;
+    field: DragCoalesceField;
+  } | null>(null);
 
   const pushHistory = useCallback(
     (
@@ -636,7 +650,7 @@ export default function Editor({
       }
       moveSelectionRedoRef.current = [];
       setPixelsDirty(true);
-      opacityDragLayerIdRef.current = null;
+      dragCoalesceRef.current = null;
     },
     [history, activeLayer, isPlaying],
   );
@@ -654,17 +668,17 @@ export default function Editor({
       }
       moveSelectionRedoRef.current = [];
       setPixelsDirty(true);
-      opacityDragLayerIdRef.current = null;
+      dragCoalesceRef.current = null;
     },
     [history],
   );
 
   // 레이어 구조 변경(추가·삭제·순서변경·병합·복제·보이기·투명도·잠금·이름)
   // 전용 — pushHistoryAllLayers와 동작은 같지만 호출부 의도를 이름으로 구분한다.
-  // 오파시티 드래그의 "첫 틱"도 이 함수로 정상적인 되돌리기 경계를 만든다 —
-  // handleLayerOpacityChange가 그 직후 opacityDragLayerIdRef를 다시 채워
-  // 넣으므로, 여기서 비운 값이 그대로 유지되는 건 오파시티가 아닌 다른
-  // 레이어 조작(추가·삭제·병합 등)일 때뿐이다.
+  // 투명도·보정 드래그의 "첫 틱"도 이 함수로 정상적인 되돌리기 경계를 만든다 —
+  // handleLayerOpacityChange·handleLayerAdjustmentChange가 그 직후
+  // dragCoalesceRef를 다시 채워 넣으므로, 여기서 비운 값이 그대로 유지되는 건
+  // 투명도·보정이 아닌 다른 레이어 조작(추가·삭제·병합 등)일 때뿐이다.
   const pushLayerOp = useCallback(
     (nextLayers: PixelLayer[], nextActiveLayerId: string) => {
       history.pushLayers(nextLayers, nextActiveLayerId);
@@ -674,7 +688,7 @@ export default function Editor({
       }
       moveSelectionRedoRef.current = [];
       setPixelsDirty(true);
-      opacityDragLayerIdRef.current = null;
+      dragCoalesceRef.current = null;
     },
     [history],
   );
@@ -1668,10 +1682,9 @@ export default function Editor({
 
   const handleSelectLayer = useCallback(
     (id: string) => {
-      // 다른 레이어로 활성을 바꾸면 지금까지 진행 중이던 오파시티 드래그
-      // 코얼레싱은 더 이상 의미가 없다 — 다음 오파시티 조작은 항상 새
-      // 되돌리기 경계에서 시작해야 한다.
-      opacityDragLayerIdRef.current = null;
+      // 다른 레이어로 활성을 바꾸면 지금까지 진행 중이던 드래그 코얼레싱은
+      // 더 이상 의미가 없다 — 다음 드래그는 항상 새 되돌리기 경계에서 시작해야 한다.
+      dragCoalesceRef.current = null;
       history.setActiveLayerId(id);
     },
     [history],
@@ -1798,33 +1811,67 @@ export default function Editor({
     [history.presentLayers, history.activeLayerId, pushLayerOp],
   );
 
-  // range 입력은 드래그하는 동안 onChange가 계속(틱마다) 불린다 — 매번
-  // pushLayerOp를 부르면 한 번의 드래그가 실행취소 스택(50개 제한)을 혼자
-  // 다 채워 그 이전 그림 작업들을 밀어낸다. 그래서 같은 레이어에서 이어지는
-  // 틱인지(opacityDragLayerIdRef.current === id) 첫 틱인지를 구분해, 첫
-  // 틱만 되돌리기 경계를 만들고 나머지는 스택에 안 쌓이는 값만 갱신한다.
   const handleLayerOpacityChange = useCallback(
     (id: string, opacity: number) => {
       const nextLayers = history.presentLayers.map((l) =>
         l.id === id ? { ...l, opacity } : l,
       );
-      if (opacityDragLayerIdRef.current === id) {
+      if (
+        dragCoalesceRef.current?.layerId === id &&
+        dragCoalesceRef.current.field === "opacity"
+      ) {
         history.replacePresentLayers(nextLayers, history.activeLayerId);
       } else {
-        // pushLayerOp가 내부에서 opacityDragLayerIdRef를 비우므로, 이 드래그의
+        // pushLayerOp가 내부에서 dragCoalesceRef를 비우므로, 이 드래그의
         // 시작임을 기록하는 아래 줄은 반드시 pushLayerOp 호출 다음에 온다.
         pushLayerOp(nextLayers, history.activeLayerId);
-        opacityDragLayerIdRef.current = id;
+        dragCoalesceRef.current = { layerId: id, field: "opacity" };
       }
     },
     [history, pushLayerOp],
   );
 
-  // 슬라이더에서 포인터를 떼거나(드래그 종료) 포커스가 빠져나가면, 지금
-  // 진행 중이던 코얼레싱을 끝낸다 — 이게 없으면 같은 레이어를 놓았다가 다시
-  // 드래그해도 이전 드래그의 연장으로 취급돼 여전히 한 항목으로 묶인다.
   const handleOpacityDragEnd = useCallback(() => {
-    opacityDragLayerIdRef.current = null;
+    dragCoalesceRef.current = null;
+  }, []);
+
+  const handleLayerBlendModeChange = useCallback(
+    (id: string, blendMode: BlendMode) => {
+      const nextLayers = history.presentLayers.map((l) =>
+        l.id === id ? { ...l, blendMode } : l,
+      );
+      pushLayerOp(nextLayers, history.activeLayerId);
+    },
+    [history.presentLayers, history.activeLayerId, pushLayerOp],
+  );
+
+  // range 입력 다섯 개(밝기·대비·채도·색온도·틴트)가 공유하는 핸들러 —
+  // handleLayerOpacityChange와 동일한 코얼레싱 패턴이지만, 레이어 id뿐
+  // 아니라 어느 필드인지까지 같아야 "이어지는 드래그"로 취급한다.
+  const handleLayerAdjustmentChange = useCallback(
+    (
+      id: string,
+      field: "brightness" | "contrast" | "saturation" | "temperature" | "tint",
+      value: number,
+    ) => {
+      const nextLayers = history.presentLayers.map((l) =>
+        l.id === id ? { ...l, [field]: value } : l,
+      );
+      if (
+        dragCoalesceRef.current?.layerId === id &&
+        dragCoalesceRef.current.field === field
+      ) {
+        history.replacePresentLayers(nextLayers, history.activeLayerId);
+      } else {
+        pushLayerOp(nextLayers, history.activeLayerId);
+        dragCoalesceRef.current = { layerId: id, field };
+      }
+    },
+    [history, pushLayerOp],
+  );
+
+  const handleAdjustmentDragEnd = useCallback(() => {
+    dragCoalesceRef.current = null;
   }, []);
 
   const handleFlattenLayers = useCallback(() => {
