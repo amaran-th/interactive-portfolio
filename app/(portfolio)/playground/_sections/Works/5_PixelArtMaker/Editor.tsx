@@ -1752,7 +1752,13 @@ export default function Editor({
       const below = history.presentLayers[index - 1];
       const merged: PixelLayer = {
         ...below,
-        pixels: compositeOnto(below.pixels, layer.pixels, layer.opacity),
+        pixels: compositeOnto(
+          below.pixels,
+          layer.pixels,
+          layer.opacity,
+          layer.blendMode ?? "normal",
+          layer,
+        ),
       };
       const nextLayers = [
         ...history.presentLayers.slice(0, index - 1),
@@ -2334,6 +2340,8 @@ export default function Editor({
                       activeLayer.visible ? activeLayer.opacity : 0
                     }
                     activeLayerLocked={activeLayer.locked || isPlaying}
+                    activeLayerBlendMode={activeLayer.blendMode ?? "normal"}
+                    activeLayerAdjustments={activeLayer}
                     tool={tool}
                     onToolChange={setTool}
                     activeColorHex={activeColorHex}
@@ -2504,6 +2512,9 @@ export default function Editor({
                       onToggleLocked={handleToggleLayerLocked}
                       onOpacityChange={handleLayerOpacityChange}
                       onOpacityDragEnd={handleOpacityDragEnd}
+                      onBlendModeChange={handleLayerBlendModeChange}
+                      onAdjustmentChange={handleLayerAdjustmentChange}
+                      onAdjustmentDragEnd={handleAdjustmentDragEnd}
                       onFlatten={handleFlattenLayers}
                       layerMode={layerMode}
                       onLayerModeChange={handleLayerModeChange}
@@ -2551,6 +2562,9 @@ export default function Editor({
                   onToggleLocked={handleToggleLayerLocked}
                   onOpacityChange={handleLayerOpacityChange}
                   onOpacityDragEnd={handleOpacityDragEnd}
+                  onBlendModeChange={handleLayerBlendModeChange}
+                  onAdjustmentChange={handleLayerAdjustmentChange}
+                  onAdjustmentDragEnd={handleAdjustmentDragEnd}
                   onFlatten={handleFlattenLayers}
                   layerMode={layerMode}
                   onLayerModeChange={handleLayerModeChange}
