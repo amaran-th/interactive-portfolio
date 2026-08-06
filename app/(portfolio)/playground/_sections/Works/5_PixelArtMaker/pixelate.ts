@@ -141,6 +141,33 @@ export function mergeColors(
   return { palette: nextPalette, pixels: nextPixels };
 }
 
+// 여러 소스 인덱스를 한 번에 targetIndex로 접는다. mergeColors(쌍 병합)를
+// 소스 값이 큰 인덱스부터 내림차순으로 반복 호출하는 방식으로 구현한다 —
+// 큰 인덱스를 먼저 지우면, 아직 처리하지 않은 나머지 소스들은 전부 방금
+// 지운 인덱스보다 작으므로(내림차순 순회) 이번 삭제로 인한 인덱스 밀림의
+// 영향을 받지 않는다(삭제는 자신보다 큰 인덱스만 한 칸씩 당긴다). 따라서
+// 매 반복 소스는 항상 원래 값 그대로 써도 안전하고, target의 현재 위치만
+// mergeColors와 같은 공식(targetIndex = indexA > indexB ? indexA - 1 : indexA)으로
+// 갱신해 다음 반복에 넘기면 된다.
+export function mergeManyColors(
+  palette: string[],
+  pixels: number[],
+  targetIndex: number,
+  sourceIndices: number[],
+): { palette: string[]; pixels: number[] } {
+  let curPalette = palette;
+  let curPixels = pixels;
+  let curTarget = targetIndex;
+  const sortedSources = [...sourceIndices].sort((a, b) => b - a);
+  for (const source of sortedSources) {
+    const merged = mergeColors(curPalette, curPixels, curTarget, source);
+    curPalette = merged.palette;
+    curPixels = merged.pixels;
+    curTarget = curTarget > source ? curTarget - 1 : curTarget;
+  }
+  return { palette: curPalette, pixels: curPixels };
+}
+
 // 팔레트에 완전히 똑같은 hex가 여러 번 들어 있으면(스와치를 직접 다른 색과
 // 같은 값으로 고쳤을 때 등) 자동으로 하나로 합친다. j를 뒤에서부터 훑어야
 // mergeColors가 indexB(j) 위쪽 인덱스를 한 칸씩 당길 때도 아직 검사하지 않은
