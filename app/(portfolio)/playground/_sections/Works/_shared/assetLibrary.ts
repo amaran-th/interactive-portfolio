@@ -7,6 +7,18 @@ const LIBRARY_KEY = "playground-asset-library";
 // 모아둔 즐겨찾기 색 목록일 뿐이다. 그래서 팔레트 스와치를 고치거나 지워도
 // 이미 칠한 픽셀은 절대 바뀌지 않는다.
 
+// 8종만 지원한다 — Soft Light·Hard Light·Difference·Exclusion·Hue·
+// Saturation·Color·Luminosity 같은 나머지 블렌드 모드는 범위 밖이다.
+export type BlendMode =
+  | "normal"
+  | "multiply"
+  | "screen"
+  | "overlay"
+  | "darken"
+  | "lighten"
+  | "color-dodge"
+  | "color-burn";
+
 // 레이어 하나 — pixels는 캔버스와 같은 width×height 크기의 평면 배열이다.
 // opacity는 0~1이고, 이 레이어를 아래 레이어들 위에 합성할 때만 쓰인다
 // (레이어 안의 개별 픽셀 알파와는 별개로 곱해진다).
@@ -21,6 +33,15 @@ export type PixelLayer = {
   // DEFAULT_FRAME_DURATION_MS(5_PixelArtMaker/types.ts)로 취급한다 — 레이어
   // 모드에선 읽지 않는다.
   frameDurationMs?: number;
+  // 아래 레이어와 섞이는 방식 — 없으면 "normal"(그냥 얹기)로 취급한다.
+  blendMode?: BlendMode;
+  // 다섯 다 -100~100, 없으면 0(영향 없음). 화면에 보여줄 때만 계산되고
+  // 실제 저장된 픽셀 값은 절대 바뀌지 않는다(pixelGrid.ts의 applyAdjustments 참고).
+  brightness?: number;
+  contrast?: number;
+  saturation?: number;
+  temperature?: number;
+  tint?: number;
 };
 
 export type PixelArt = {
