@@ -28,6 +28,7 @@ import {
   expandPoints,
   getPixel,
   lassoMask,
+  LayerAdjustments,
   linePoints,
   PixelValue,
   resamplePixelValues,
@@ -39,6 +40,7 @@ import {
 } from "./pixelGrid";
 import { rasterizeText, Rotation, rotateAlphaBuffer } from "./textStamp";
 import { nextZoomStep, Point, SelectMode, Tool } from "./types";
+import type { BlendMode } from "../_shared/assetLibrary";
 
 export type TextAlign = "left" | "center" | "right";
 
@@ -190,6 +192,8 @@ export default function PixelCanvas({
   aboveComposite,
   activeLayerOpacity,
   activeLayerLocked,
+  activeLayerBlendMode,
+  activeLayerAdjustments,
 }: {
   width: number;
   height: number;
@@ -289,6 +293,10 @@ export default function PixelCanvas({
   activeLayerOpacity: number;
   // true면 이 캔버스는 그리기 도구를 전부 무시한다(스포이트·선택류는 계속 동작).
   activeLayerLocked: boolean;
+  // 활성 레이어 자신이 belowComposite와 섞이는 방식·보정 — render()와
+  // getFullComposite() 둘 다 이 값을 반영한다.
+  activeLayerBlendMode: BlendMode;
+  activeLayerAdjustments: LayerAdjustments;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // 트랙패드 스크롤/핀치는 짧은 시간 안에 작은 deltaY를 가진 wheel 이벤트를 수십 번
@@ -456,14 +464,22 @@ export default function PixelCanvas({
       // 화면에는 belowComposite → 활성 레이어(자기 투명도 적용) →
       // aboveComposite 순서로 겹쳐 보여준다 — 실제로 편집되는 대상은
       // data(활성 레이어)뿐이고, 이 두 밴드는 시각적 맥락일 뿐이다.
+      const hasAdjustments =
+        !!activeLayerAdjustments.brightness ||
+        !!activeLayerAdjustments.contrast ||
+        !!activeLayerAdjustments.saturation ||
+        !!activeLayerAdjustments.temperature ||
+        !!activeLayerAdjustments.tint;
       const visibleBase =
-        belowComposite || aboveComposite || activeLayerOpacity < 1
+        belowComposite || aboveComposite || activeLayerOpacity < 1 || hasAdjustments
           ? compositeOnto(
               belowComposite
                 ? belowComposite.slice()
                 : createGrid(width, height),
               data,
               activeLayerOpacity,
+              activeLayerBlendMode,
+              activeLayerAdjustments,
             )
           : data;
       const visibleWithAbove = aboveComposite
@@ -778,6 +794,8 @@ export default function PixelCanvas({
       belowComposite,
       aboveComposite,
       activeLayerOpacity,
+      activeLayerBlendMode,
+      activeLayerAdjustments,
     ],
   );
 
@@ -844,15 +862,40 @@ export default function PixelCanvas({
   // 적용) + aboveComposite를 그 순간에만 한 번 합성한다. 매 프레임 계산하지
   // 않고 이 세 도구가 실제로 클릭될 때만 부른다.
   const getFullComposite = useCallback((): PixelValue[] => {
-    if (!belowComposite && !aboveComposite && activeLayerOpacity >= 1) {
+    const hasAdjustments =
+      !!activeLayerAdjustments.brightness ||
+      !!activeLayerAdjustments.contrast ||
+      !!activeLayerAdjustments.saturation ||
+      !!activeLayerAdjustments.temperature ||
+      !!activeLayerAdjustments.tint;
+    if (
+      !belowComposite &&
+      !aboveComposite &&
+      activeLayerOpacity >= 1 &&
+      !hasAdjustments
+    ) {
       return workingRef.current;
     }
     const base = belowComposite
       ? belowComposite.slice()
       : createGrid(width, height);
-    const withActive = compositeOnto(base, workingRef.current, activeLayerOpacity);
+    const withActive = compositeOnto(
+      base,
+      workingRef.current,
+      activeLayerOpacity,
+      activeLayerBlendMode,
+      activeLayerAdjustments,
+    );
     return aboveComposite ? compositeOnto(withActive, aboveComposite, 1) : withActive;
-  }, [belowComposite, aboveComposite, activeLayerOpacity, width, height]);
+  }, [
+    belowComposite,
+    aboveComposite,
+    activeLayerOpacity,
+    activeLayerBlendMode,
+    activeLayerAdjustments,
+    width,
+    height,
+  ]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
