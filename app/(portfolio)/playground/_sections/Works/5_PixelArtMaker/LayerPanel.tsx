@@ -17,9 +17,26 @@ import {
   Unlock,
 } from "lucide-react";
 import { useState } from "react";
-import type { PixelLayer } from "../_shared/assetLibrary";
+import type { BlendMode, PixelLayer } from "../_shared/assetLibrary";
 import FileThumbnail from "./FileThumbnail";
 import { MAX_LAYERS } from "./types";
+
+type AdjustmentField =
+  | "brightness"
+  | "contrast"
+  | "saturation"
+  | "temperature"
+  | "tint";
+
+// 슬라이더 5개를 하나씩 반복해 적지 않고 이 목록을 map으로 그린다 —
+// ExportPanel.tsx의 FORMATS/SCALE_OPTIONS와 같은 패턴.
+const ADJUSTMENT_ROWS: { field: AdjustmentField; label: string }[] = [
+  { field: "brightness", label: "밝기" },
+  { field: "contrast", label: "대비" },
+  { field: "saturation", label: "채도" },
+  { field: "temperature", label: "색온도" },
+  { field: "tint", label: "틴트" },
+];
 
 export default function LayerPanel({
   layers,
@@ -40,6 +57,9 @@ export default function LayerPanel({
   onToggleLocked,
   onOpacityChange,
   onOpacityDragEnd,
+  onBlendModeChange,
+  onAdjustmentChange,
+  onAdjustmentDragEnd,
   onFlatten,
   isPlaying,
   onTogglePlay,
@@ -75,6 +95,13 @@ export default function LayerPanel({
   // 빠져나가는 순간 "이 드래그는 끝났다"고 알려준다 — 이게 없으면 같은
   // 레이어를 다시 드래그해도 이전 드래그의 연장으로 오인될 수 있다.
   onOpacityDragEnd: () => void;
+  onBlendModeChange: (id: string, mode: BlendMode) => void;
+  onAdjustmentChange: (
+    id: string,
+    field: AdjustmentField,
+    value: number,
+  ) => void;
+  onAdjustmentDragEnd: () => void;
   onFlatten: () => void;
   // 프레임 모드 전용 재생 컨트롤.
   isPlaying: boolean;
@@ -231,6 +258,50 @@ export default function LayerPanel({
                 {Math.round(activeLayer.opacity * 100)}%
               </span>
             </label>
+          </div>
+          <div className="flex shrink-0 flex-col gap-1 border-t border-gray-100 px-3 py-2">
+            <label className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
+              블렌드 모드
+              <select
+                value={activeLayer.blendMode ?? "normal"}
+                onChange={(e) =>
+                  onBlendModeChange(activeLayer.id, e.target.value as BlendMode)
+                }
+                className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600"
+              >
+                <option value="normal">Normal</option>
+                <option value="multiply">Multiply</option>
+                <option value="screen">Screen</option>
+                <option value="overlay">Overlay</option>
+                <option value="darken">Darken</option>
+                <option value="lighten">Lighten</option>
+                <option value="color-dodge">Color Dodge</option>
+                <option value="color-burn">Color Burn</option>
+              </select>
+            </label>
+            {ADJUSTMENT_ROWS.map(({ field, label }) => (
+              <label
+                key={field}
+                className="flex items-center gap-2 text-[10px] text-gray-500"
+              >
+                {label}
+                <input
+                  type="range"
+                  min={-100}
+                  max={100}
+                  value={activeLayer[field] ?? 0}
+                  onChange={(e) =>
+                    onAdjustmentChange(activeLayer.id, field, Number(e.target.value))
+                  }
+                  onPointerUp={onAdjustmentDragEnd}
+                  onBlur={onAdjustmentDragEnd}
+                  className="flex-1"
+                />
+                <span className="w-8 shrink-0 text-right">
+                  {activeLayer[field] ?? 0}
+                </span>
+              </label>
+            ))}
           </div>
           <div className="flex shrink-0 items-center gap-1 border-t border-gray-100 px-2 py-1.5">
             <button
