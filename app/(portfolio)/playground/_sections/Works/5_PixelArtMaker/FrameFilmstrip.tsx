@@ -57,6 +57,11 @@ export default function FrameFilmstrip({
   const [editingDurationValue, setEditingDurationValue] = useState("");
 
   const commitDuration = (id: string) => {
+    // Escape로 취소된 뒤에도 입력이 포커스를 잃으면 onBlur가 그대로 불려
+    // 이 함수가 다시 호출된다 — editingDurationId가 이미 비워졌다면(=이
+    // 커밋은 더 이상 살아있는 편집이 아니다) 버려둔 editingDurationValue를
+    // 읽어 취소했던 값을 도로 커밋해버리는 일이 없도록 여기서 막는다.
+    if (editingDurationId !== id) return;
     const sec = Number(editingDurationValue);
     if (Number.isFinite(sec)) {
       const ms = Math.min(
