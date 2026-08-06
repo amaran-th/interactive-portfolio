@@ -8,7 +8,7 @@ import Magnifier, { MAGNIFIER_RADIUS, MagnifierGrid } from "./Magnifier";
 import { PixelValue } from "./pixelGrid";
 import {
   dedupePalette,
-  mergeColors,
+  mergeManyColors,
   pixelateImage,
   quantizeColors,
   reducePaletteFast,
@@ -99,10 +99,13 @@ export default function ImportPanel({
   } | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const swatchContainerRef = useRef<HTMLDivElement>(null);
-  // 드래그로 스와치를 다른 스와치 위에 놓으면 병합한다 — 지금 드래그가
-  // 올라가 있는 대상만 별도로 표시해 놓을 위치를 알려준다.
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-  // 색상 병합(드래그 병합·동일색 자동 병합)만 되돌릴 수 있게 하는 로컬
+  // 병합 모드 on/off — 켜지면 스와치 클릭이 재색상 팝오버 대신 다중 선택으로
+  // 동작한다.
+  const [mergeMode, setMergeMode] = useState(false);
+  // 병합 모드에서 선택한 스와치 인덱스들 — 순서를 보존한다. 0번째가 항상
+  // "기준색"(병합 후 살아남는 색)이고, 나머지는 기준색으로 접힐 소스다.
+  const [mergeSelection, setMergeSelection] = useState<number[]>([]);
+  // 색상 병합(다중 선택 병합·동일색 자동 병합)만 되돌릴 수 있게 하는 로컬
   // 되돌리기 스택 — 슬라이더로 다시 추출하면(runPixelate) 이전 상태와는
   // 아예 다른 팔레트가 되므로 함께 비운다.
   const [previewHistory, setPreviewHistory] = useState<Preview[]>([]);
@@ -135,6 +138,7 @@ export default function ImportPanel({
       });
       setArmedColorIndex(null);
       setPreviewHistory([]);
+      setMergeSelection([]);
     },
     [],
   );
@@ -193,28 +197,45 @@ export default function ImportPanel({
     [imageEl, runPixelate],
   );
 
-  // 스와치를 다른 스와치 위로 드래그해서 놓으면 병합한다 — 놓인 자리(target)의
-  // 색이 남고, 끌어온 스와치(source)는 사라진다. 명시적인 병합 행위라 항상
-  // 되돌리기 스택에 남긴다.
-  const handleMergeDrag = useCallback(
-    (sourceIndex: number, targetIndex: number) => {
-      if (!preview || sourceIndex === targetIndex) return;
-      setPreviewHistory((h) => [...h, preview]);
-      const merged = mergeColors(
-        preview.palette,
-        preview.pixels,
-        targetIndex,
-        sourceIndex,
-      );
-      setPreview({
-        ...preview,
-        palette: merged.palette,
-        pixels: merged.pixels,
-      });
-      setArmedColorIndex(null);
-    },
-    [preview],
-  );
+  // 병합 모드 토글 — 켤 때든 끌 때든 선택 상태를 비우고, 켜는 순간 열려 있던
+  // 재색상 팝오버가 있으면 닫는다(두 모드는 상호 배타적이다).
+  const toggleMergeMode = useCallback(() => {
+    setMergeMode((v) => !v);
+    setMergeSelection([]);
+    setArmedColorIndex(null);
+  }, []);
+
+  // 병합 모드에서 스와치를 클릭했을 때의 3단계 순환:
+  // 1) 선택 안 됨 → 선택 목록 끝에 추가(목록이 비어 있었다면 이 색이 곧 기준색)
+  // 2) 선택됨(기준색 아님) → 맨 앞으로 옮겨 새 기준색으로 승격
+  // 3) 선택됨(기준색) → 선택에서 제거(남은 게 있으면 그중 가장 먼저 선택된
+  //    색이 자동으로 새 기준색이 된다 — 배열 0번째가 항상 기준색이므로 별도
+  //    처리가 필요 없다)
+  const handleMergeSelectClick = useCallback((index: number) => {
+    setMergeSelection((sel) => {
+      const pos = sel.indexOf(index);
+      if (pos === -1) return [...sel, index];
+      if (pos === 0) return sel.filter((v) => v !== index);
+      return [index, ...sel.filter((v) => v !== index)];
+    });
+  }, []);
+
+  // 선택된 색상 전체(mergeSelection[0]을 제외한 나머지)를 기준색으로 접는다.
+  // 배치 전체를 되돌리기 스택에 한 번만 남겨, 실행취소 한 번으로 이번에
+  // 합친 묶음 전체가 복원되게 한다. 병합 모드 자체는 유지한다 — 여러 그룹을
+  // 연달아 병합하는 배치 작업이 이번 개편의 핵심 동기이기 때문이다.
+  const handleMergeConfirm = useCallback(() => {
+    if (!preview || mergeSelection.length < 2) return;
+    setPreviewHistory((h) => [...h, preview]);
+    const merged = mergeManyColors(
+      preview.palette,
+      preview.pixels,
+      mergeSelection[0],
+      mergeSelection.slice(1),
+    );
+    setPreview({ ...preview, palette: merged.palette, pixels: merged.pixels });
+    setMergeSelection([]);
+  }, [preview, mergeSelection]);
 
   // 스와치 하나의 색만 바꾼다 — palette[index]만 갈아 끼우므로 그 색을 쓰던
   // 모든 픽셀이 다시 계산할 필요 없이 그대로 새 색을 반영한다(즉각 일괄 변환).
@@ -246,6 +267,7 @@ export default function ImportPanel({
     if (previewHistory.length === 0) return;
     setPreview(previewHistory[previewHistory.length - 1]);
     setPreviewHistory((h) => h.slice(0, -1));
+    setMergeSelection([]);
   }, [previewHistory]);
 
   // Ctrl/Cmd+Z를 이 패널이 먼저 가로챈다 — 되돌릴 색상 병합이 있으면 그것만
@@ -723,60 +745,81 @@ export default function ImportPanel({
           )}
 
           <div>
-            <div className="mb-1 flex items-center justify-between">
+            <div className="mb-1 flex flex-col gap-1">
               <p className="text-xs text-gray-600">
-                추출된 색상 — 클릭해 재색상, 다른 색상 위로 드래그하면 병합
+                {mergeMode
+                  ? "병합할 색상을 클릭해 선택 · 다시 클릭하면 기준색 지정"
+                  : "추출된 색상 — 클릭해 재색상"}
               </p>
-              <button
-                onClick={handleUndo}
-                disabled={previewHistory.length === 0}
-                title="색상 병합 되돌리기 (Ctrl/Cmd+Z)"
-                className="shrink-0 bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600 hover:bg-gray-200 disabled:opacity-30"
-              >
-                실행취소
-              </button>
+              <div className="flex items-center justify-end gap-1">
+                <button
+                  onClick={toggleMergeMode}
+                  title="여러 색상을 한 번에 병합"
+                  className={`px-1.5 py-0.5 text-[10px] ${
+                    mergeMode
+                      ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  병합 모드
+                </button>
+                <button
+                  onClick={handleUndo}
+                  disabled={previewHistory.length === 0}
+                  title="색상 병합 되돌리기 (Ctrl/Cmd+Z)"
+                  className="shrink-0 bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+                >
+                  실행취소
+                </button>
+              </div>
+              {mergeMode && mergeSelection.length >= 2 && (
+                <button
+                  onClick={handleMergeConfirm}
+                  className="bg-emerald-500 py-1 text-[10px] font-semibold text-white hover:bg-emerald-600"
+                >
+                  선택한 색상 {mergeSelection.length}개 병합
+                </button>
+              )}
             </div>
             <div ref={swatchContainerRef} className="flex flex-wrap gap-1.5">
-              {preview.palette.map((color, i) => (
-                <button
-                  key={i}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.effectAllowed = "move";
-                    e.dataTransfer.setData("text/plain", String(i));
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    if (dragOverIndex !== i) setDragOverIndex(i);
-                  }}
-                  onDragLeave={() =>
-                    setDragOverIndex((cur) => (cur === i ? null : cur))
-                  }
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragOverIndex(null);
-                    const sourceIndex = Number(
-                      e.dataTransfer.getData("text/plain"),
-                    );
-                    if (!Number.isNaN(sourceIndex))
-                      handleMergeDrag(sourceIndex, i);
-                  }}
-                  onClick={(e) => {
-                    setArmedColorIndex((cur) => (cur === i ? null : i));
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setPopoverPos({ left: rect.left, top: rect.bottom + 4 });
-                  }}
-                  title={`${color} — 클릭: 색상 변환 · 드래그해서 다른 색상 위에 놓으면 병합`}
-                  className={`h-5 w-5 ${
-                    dragOverIndex === i
-                      ? "ring-2 ring-violet-500"
-                      : armedColorIndex === i
-                        ? "ring-2 ring-violet-400"
-                        : "ring-1 ring-black/10"
-                  }`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
+              {preview.palette.map((color, i) => {
+                const selPos = mergeSelection.indexOf(i);
+                const isAnchor = selPos === 0;
+                const isSelected = selPos !== -1;
+                return (
+                  <button
+                    key={i}
+                    onClick={(e) => {
+                      if (mergeMode) {
+                        handleMergeSelectClick(i);
+                        return;
+                      }
+                      setArmedColorIndex((cur) => (cur === i ? null : i));
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setPopoverPos({ left: rect.left, top: rect.bottom + 4 });
+                    }}
+                    title={
+                      mergeMode
+                        ? `${color} — 클릭해 선택 · 다시 클릭하면 기준색 지정`
+                        : `${color} — 클릭: 색상 변환`
+                    }
+                    className={`relative h-5 w-5 ${
+                      isAnchor
+                        ? "ring-2 ring-emerald-500"
+                        : isSelected
+                          ? "ring-2 ring-emerald-300"
+                          : !mergeMode && armedColorIndex === i
+                            ? "ring-2 ring-violet-400"
+                            : "ring-1 ring-black/10"
+                    }`}
+                    style={{ backgroundColor: color }}
+                  >
+                    {isAnchor && (
+                      <span className="absolute -left-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
             {armedColorIndex !== null &&
               preview.palette[armedColorIndex] &&
