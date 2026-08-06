@@ -148,6 +148,7 @@ export default function ImportPanel({
       const img = new Image();
       img.onload = () => {
         setImageEl(img);
+        setMergeMode(false);
         runPixelate(img, pixelSize, antiAlias, maxColors);
       };
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
@@ -198,11 +199,12 @@ export default function ImportPanel({
   );
 
   // 병합 모드 토글 — 켤 때든 끌 때든 선택 상태를 비우고, 켜는 순간 열려 있던
-  // 재색상 팝오버가 있으면 닫는다(두 모드는 상호 배타적이다).
+  // 재색상 팝오버·스포이트가 있으면 닫는다(두 모드는 상호 배타적이다).
   const toggleMergeMode = useCallback(() => {
     setMergeMode((v) => !v);
     setMergeSelection([]);
     setArmedColorIndex(null);
+    setEyedropperActive(false);
   }, []);
 
   // 병합 모드에서 스와치를 클릭했을 때의 3단계 순환:
@@ -755,6 +757,7 @@ export default function ImportPanel({
                 <button
                   onClick={toggleMergeMode}
                   title="여러 색상을 한 번에 병합"
+                  aria-pressed={mergeMode}
                   className={`px-1.5 py-0.5 text-[10px] ${
                     mergeMode
                       ? "bg-emerald-500 text-white hover:bg-emerald-600"
