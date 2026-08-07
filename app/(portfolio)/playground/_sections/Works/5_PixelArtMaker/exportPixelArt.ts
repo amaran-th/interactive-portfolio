@@ -168,3 +168,34 @@ export async function exportAsGIF(doc: PixelArt, scale = 8): Promise<void> {
     `${doc.name}.gif`,
   );
 }
+
+// 스프라이트 시트를 파일 대신 클립보드에 이미지로 복사한다 — exportAsSpriteSheet와
+// 같은 방식으로 보이는 프레임을 가로로 이어붙인 캔버스를 조립하지만, 다운로드
+// 대신 navigator.clipboard.write로 넘긴다(copyPngToClipboard와 같은 시도/실패
+// 패턴).
+export async function copySpriteSheetToClipboard(
+  doc: PixelArt,
+  scale = 8,
+): Promise<boolean> {
+  const frames = visibleFrames(doc);
+  if (frames.length === 0) return false;
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = doc.width * scale * frames.length;
+    canvas.height = doc.height * scale;
+    const ctx = canvas.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+    frames.forEach((frame, i) => {
+      const frameCanvas = renderToCanvas({ ...doc, pixels: frame.pixels }, scale);
+      ctx.drawImage(frameCanvas, i * doc.width * scale, 0);
+    });
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/png"),
+    );
+    if (!blob) return false;
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    return true;
+  } catch {
+    return false;
+  }
+}
