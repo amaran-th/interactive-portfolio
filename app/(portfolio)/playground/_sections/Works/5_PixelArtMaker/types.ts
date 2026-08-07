@@ -85,6 +85,25 @@ export const MAX_FRAME_DURATION_MS = 5000; // 5초 하한(더 느리게는 의�
 // 프레임 모드 + 어니언 스킨에서 이전/다음 프레임을 겹쳐 보여줄 때 쓰는 고정 투명도.
 export const ONION_SKIN_OPACITY = 0.25;
 
+// 트레이싱 모드에서 캔버스 배경에 깔아두는 참고 이미지. 캔버스 네이티브
+// 픽셀 좌표계(그리드 단위)에 위치·크기·회전각을 가지므로, 캔버스를 확대·
+// 스크롤하면 PixelCanvas의 기존 scale 변환을 그대로 타고 함께 움직인다.
+// 세션 메모리에만 존재한다 — 저장(JSON/자동저장)에 포함되지 않는다.
+export type TracingImage = {
+  id: string;
+  image: HTMLImageElement;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotationDeg: number; // 자유각, 0~360
+  opacity: number; // 0~1
+};
+
+export const DEFAULT_TRACING_OPACITY = 0.5;
+// 그리드 단위 — 너무 작아지면 손잡이로 조작할 수 없게 되는 것을 막는다.
+export const MIN_TRACING_SIZE = 8;
+
 export type Point = { x: number; y: number };
 
 // 배율 1은 더 이상 "셀당 고정 16px"가 아니라 "캔버스 전체가 화면에 꽉 차게
