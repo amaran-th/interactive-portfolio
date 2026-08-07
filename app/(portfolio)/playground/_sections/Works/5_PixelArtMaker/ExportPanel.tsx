@@ -6,14 +6,17 @@ import { PixelArt } from "../_shared/assetLibrary";
 import {
   buildSvgString,
   copyPngToClipboard,
+  copySpriteSheetToClipboard,
   copyTextToClipboard,
+  exportAsGIF,
   exportAsJPG,
   exportAsJSON,
   exportAsPNG,
+  exportAsSpriteSheet,
   exportAsSVG,
 } from "./exportPixelArt";
 
-type Format = "png" | "svg" | "json" | "jpg";
+type Format = "png" | "svg" | "json" | "jpg" | "gif" | "spritesheet";
 
 // 래스터 형식(PNG·JPG)을 나란히, 그 다음 벡터/데이터 형식(SVG·JSON) 순으로 배치한다.
 const FORMATS: { id: Format; label: string }[] = [
@@ -29,6 +32,16 @@ const SCALE_OPTIONS = [1, 2, 4, 8, 16];
 
 export default function ExportPanel({ doc }: { doc: PixelArt }) {
   const [format, setFormat] = useState<Format>("png");
+  // 프레임 모드일 때만 GIF·스프라이트 시트를 목록에 더한다 — 레이어 모드에는
+  // "프레임"이라는 개념이 없어 애초에 애니메이션 내보내기가 성립하지 않는다.
+  const visibleFormats =
+    doc.layerMode === "frames"
+      ? [
+          ...FORMATS,
+          { id: "gif" as const, label: "GIF" },
+          { id: "spritesheet" as const, label: "스프라이트" },
+        ]
+      : FORMATS;
   const [scale, setScale] = useState(8);
   const [status, setStatus] = useState<string | null>(null);
   const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -39,10 +52,26 @@ export default function ExportPanel({ doc }: { doc: PixelArt }) {
     statusTimeoutRef.current = setTimeout(() => setStatus(null), 2000);
   }, []);
 
+  // 프레임 모드에서 GIF·스프라이트 시트를 골라둔 채로 레이어 모드로 돌아가면
+  // 버튼 목록에서는 사라지는데 format 상태는 그대로 남아, "파일로 저장"을
+  // 누르면 화면에 안 보이는 포맷으로 여전히 내보내지는 불일치가 생긴다 —
+  // 그런 상황이 되면 안전한 기본값(PNG)으로 되돌린다. 렌더링 중에 이전
+  // layerMode와 비교해 조정한다(useEffect 안에서 setState하면
+  // react-hooks/set-state-in-effect가 캐스케이딩 렌더를 경고한다).
+  const [prevLayerMode, setPrevLayerMode] = useState(doc.layerMode);
+  if (doc.layerMode !== prevLayerMode) {
+    setPrevLayerMode(doc.layerMode);
+    if ((format === "gif" || format === "spritesheet") && doc.layerMode !== "frames") {
+      setFormat("png");
+    }
+  }
+
   const handleSave = useCallback(() => {
     if (format === "png") exportAsPNG(doc, scale);
     else if (format === "svg") exportAsSVG(doc);
     else if (format === "json") exportAsJSON(doc);
+    else if (format === "gif") void exportAsGIF(doc, scale);
+    else if (format === "spritesheet") exportAsSpriteSheet(doc, scale);
     else exportAsJPG(doc, scale);
   }, [format, doc, scale]);
 
@@ -67,17 +96,25 @@ export default function ExportPanel({ doc }: { doc: PixelArt }) {
           ? "JSON을 복사했습니다"
           : "클립보드 복사 실패",
       );
+    } else if (format === "spritesheet") {
+      flash(
+        (await copySpriteSheetToClipboard(doc, scale))
+          ? "스프라이트 시트를 클립보드에 복사했습니다"
+          : "클립보드 복사 실패",
+      );
     }
   }, [format, doc, scale, flash]);
 
-  const hasSecondary = format !== "jpg";
+  const hasSecondary = format !== "jpg" && format !== "gif";
   const secondaryTitle =
-    format === "png" ? "클립보드에 이미지로 복사" : "코드 복사";
+    format === "png" || format === "spritesheet"
+      ? "클립보드에 이미지로 복사"
+      : "코드 복사";
 
   return (
     <>
-      <div className="grid grid-cols-4 gap-1">
-        {FORMATS.map((f) => (
+      <div className={`grid gap-1 ${doc.layerMode === "frames" ? "grid-cols-3" : "grid-cols-4"}`}>
+        {visibleFormats.map((f) => (
           <button
             key={f.id}
             onClick={() => setFormat(f.id)}
@@ -92,7 +129,10 @@ export default function ExportPanel({ doc }: { doc: PixelArt }) {
         ))}
       </div>
 
-      {(format === "png" || format === "jpg") && (
+      {(format === "png" ||
+        format === "jpg" ||
+        format === "gif" ||
+        format === "spritesheet") && (
         <div className="flex flex-col gap-1">
           <label className="flex items-center justify-between text-xs text-gray-600">
             <span>해상도</span>
