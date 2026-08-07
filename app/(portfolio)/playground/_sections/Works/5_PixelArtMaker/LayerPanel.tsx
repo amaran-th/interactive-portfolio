@@ -285,7 +285,7 @@ export default function LayerPanel({
               <SlidersHorizontal className="h-3.5 w-3.5" />
             </button>
             {showFilterPanel && (
-              <div className="absolute top-full left-0 z-30 mt-1 flex w-48 flex-col gap-1 bg-white p-2 shadow-xl">
+              <div className="absolute top-full left-0 z-30 mt-1 flex w-56 flex-col gap-1 bg-white p-2 shadow-xl">
                 <label className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
                   블렌드 모드
                   <select
@@ -310,7 +310,7 @@ export default function LayerPanel({
                     key={field}
                     className="flex items-center gap-2 text-[10px] text-gray-500"
                   >
-                    {label}
+                    <span className="w-8 shrink-0">{label}</span>
                     <input
                       type="range"
                       min={-100}
