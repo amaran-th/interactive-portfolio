@@ -521,6 +521,14 @@ export default function Editor({
   );
   const selection = useSelection();
 
+  // 스포이트·마법봉·페인트통의 판정 범위이자 "정렬" 버튼의 대상 레이어 —
+  // 활성 레이어(그리기 대상)와는 완전히 독립된 세션 전용 상태다. 저장 포맷에는
+  // 반영하지 않고, 문서를 열 때마다(loadTab이 history.reset을 부르는 시점)
+  // 그 시점의 활성 레이어 하나로 다시 초기화한다.
+  const [layerScope, setLayerScope] = useState<Set<string>>(
+    () => new Set([initialLayerState.activeLayerId]),
+  );
+
   // 저장·내보내기·탭 스냅숏 등 레이어를 모르는 모든 곳은 이 값(모든 레이어를
   // 합성한 최종 결과)만 쓴다 — PixelCanvas에 넘기는 history.present(활성
   // 레이어)와는 다른 값이다.
@@ -614,6 +622,36 @@ export default function Editor({
     history.activeLayerId,
     activeLayerIndex,
   ]);
+
+  // 스포이트·마법봉·페인트통 판정 전용 합성 — 화면 렌더링용 belowComposite/
+  // aboveLayers와 별개로, layerScope로 한 번 더 필터링한다. 프레임 모드는
+  // scope 개념이 없어 기존 값을 그대로 통과시킨다.
+  const scopeBelowComposite = useMemo(() => {
+    if (layerMode === "frames") return belowComposite;
+    const scoped = history.presentLayers
+      .slice(0, activeLayerIndex)
+      .filter((l) => layerScope.has(l.id));
+    return compositeLayers(scoped, doc.width, doc.height);
+  }, [
+    layerMode,
+    belowComposite,
+    history.presentLayers,
+    activeLayerIndex,
+    layerScope,
+    doc.width,
+    doc.height,
+  ]);
+
+  const scopeAboveLayers = useMemo((): PixelLayer[] | null => {
+    if (layerMode === "frames") return aboveLayers;
+    const slice = history.presentLayers
+      .slice(activeLayerIndex + 1)
+      .filter((l) => layerScope.has(l.id));
+    return slice.length > 0 ? slice : null;
+  }, [layerMode, aboveLayers, history.presentLayers, activeLayerIndex, layerScope]);
+
+  const activeLayerInScope =
+    layerMode === "frames" ? true : layerScope.has(history.activeLayerId);
 
   // 선택을 만들거나 다루는 도구 묶음(select·lasso·move·wand) 밖으로 나가면
   // 더 이상 쓸모가 없어진 선택 영역을 자동으로 지운다 — 그 묶음 안에서
@@ -896,6 +934,7 @@ export default function Editor({
         width: tab.doc.width,
         height: tab.doc.height,
       });
+      setLayerScope(new Set([activeLayerId]));
       setActiveColorHex(DEFAULT_ACTIVE_COLOR);
       setSecondaryColorHex(null);
       setHasMetaEdits(tab.hasMetaEdits);
@@ -2404,6 +2443,9 @@ export default function Editor({
                     activeLayerAdjustments={
                       layerMode === "frames" ? {} : activeLayer
                     }
+                    scopeBelowComposite={scopeBelowComposite}
+                    scopeAboveLayers={scopeAboveLayers}
+                    activeLayerInScope={activeLayerInScope}
                     tool={tool}
                     onToolChange={setTool}
                     activeColorHex={activeColorHex}

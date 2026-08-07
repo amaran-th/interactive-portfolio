@@ -195,6 +195,9 @@ export default function PixelCanvas({
   activeLayerLocked,
   activeLayerBlendMode,
   activeLayerAdjustments,
+  scopeBelowComposite,
+  scopeAboveLayers,
+  activeLayerInScope,
 }: {
   width: number;
   height: number;
@@ -301,6 +304,12 @@ export default function PixelCanvas({
   // getFullComposite() 둘 다 이 값을 반영한다.
   activeLayerBlendMode: BlendMode;
   activeLayerAdjustments: LayerAdjustments;
+  // 스포이트·마법봉·페인트통 판정 전용 — belowComposite/aboveLayers(화면
+  // 렌더링용)와 별개로 layerScope로 필터링된 값을 받는다. activeLayerInScope가
+  // false면 활성 레이어(workingRef.current) 자체가 판정에서 제외된다.
+  scopeBelowComposite: PixelValue[] | null;
+  scopeAboveLayers: PixelLayer[] | null;
+  activeLayerInScope: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // 트랙패드 스크롤/핀치는 짧은 시간 안에 작은 deltaY를 가진 wheel 이벤트를 수십 번
@@ -870,23 +879,14 @@ export default function PixelCanvas({
   // 적용) + aboveLayers를 그 순간에만 한 번 합성한다. 매 프레임 계산하지
   // 않고 이 세 도구가 실제로 클릭될 때만 부른다.
   const getFullComposite = useCallback((): PixelValue[] => {
-    const hasAdjustments =
-      !!activeLayerAdjustments.brightness ||
-      !!activeLayerAdjustments.contrast ||
-      !!activeLayerAdjustments.saturation ||
-      !!activeLayerAdjustments.temperature ||
-      !!activeLayerAdjustments.tint;
-    if (
-      !belowComposite &&
-      (!aboveLayers || aboveLayers.length === 0) &&
-      activeLayerOpacity >= 1 &&
-      !hasAdjustments
-    ) {
-      return workingRef.current;
-    }
-    const base = belowComposite
-      ? belowComposite.slice()
+    const base = scopeBelowComposite
+      ? scopeBelowComposite.slice()
       : createGrid(width, height);
+    if (!activeLayerInScope) {
+      return scopeAboveLayers && scopeAboveLayers.length > 0
+        ? compositeLayersOnto(base, scopeAboveLayers)
+        : base;
+    }
     const withActive = compositeOnto(
       base,
       workingRef.current,
@@ -894,12 +894,13 @@ export default function PixelCanvas({
       activeLayerBlendMode,
       activeLayerAdjustments,
     );
-    return aboveLayers && aboveLayers.length > 0
-      ? compositeLayersOnto(withActive, aboveLayers)
+    return scopeAboveLayers && scopeAboveLayers.length > 0
+      ? compositeLayersOnto(withActive, scopeAboveLayers)
       : withActive;
   }, [
-    belowComposite,
-    aboveLayers,
+    scopeBelowComposite,
+    scopeAboveLayers,
+    activeLayerInScope,
     activeLayerOpacity,
     activeLayerBlendMode,
     activeLayerAdjustments,
