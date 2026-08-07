@@ -12,6 +12,7 @@ import {
   Play,
   Plus,
   Repeat,
+  SlidersHorizontal,
   Sparkles,
   Trash2,
   Unlock,
@@ -60,6 +61,7 @@ export default function LayerPanel({
   onBlendModeChange,
   onAdjustmentChange,
   onAdjustmentDragEnd,
+  onResetAdjustments,
   onFlatten,
   isPlaying,
   onTogglePlay,
@@ -102,6 +104,7 @@ export default function LayerPanel({
     value: number,
   ) => void;
   onAdjustmentDragEnd: () => void;
+  onResetAdjustments: (id: string) => void;
   onFlatten: () => void;
   // 프레임 모드 전용 재생 컨트롤.
   isPlaying: boolean;
@@ -113,9 +116,19 @@ export default function LayerPanel({
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
 
   const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
   const activeLayer = layers[activeIndex] ?? layers[layers.length - 1];
+  // 트리거 버튼을 보라색으로 강조할지 판정 — 블렌드 모드가 Normal이 아니거나
+  // 보정 5개 중 하나라도 0이 아니면 "지금 필터가 걸려 있다"는 뜻이다.
+  const hasActiveFilter =
+    (activeLayer.blendMode ?? "normal") !== "normal" ||
+    !!activeLayer.brightness ||
+    !!activeLayer.contrast ||
+    !!activeLayer.saturation ||
+    !!activeLayer.temperature ||
+    !!activeLayer.tint;
   // 화면에는 위에서부터(최상단 먼저) 보여준다 — 배열 자체는 아래→위 순서.
   const topToBottom = [...layers].reverse();
 
@@ -259,49 +272,77 @@ export default function LayerPanel({
               </span>
             </label>
           </div>
-          <div className="flex shrink-0 flex-col gap-1 border-t border-gray-100 px-3 py-2">
-            <label className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
-              블렌드 모드
-              <select
-                value={activeLayer.blendMode ?? "normal"}
-                onChange={(e) =>
-                  onBlendModeChange(activeLayer.id, e.target.value as BlendMode)
-                }
-                className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600"
-              >
-                <option value="normal">Normal</option>
-                <option value="multiply">Multiply</option>
-                <option value="screen">Screen</option>
-                <option value="overlay">Overlay</option>
-                <option value="darken">Darken</option>
-                <option value="lighten">Lighten</option>
-                <option value="color-dodge">Color Dodge</option>
-                <option value="color-burn">Color Burn</option>
-              </select>
-            </label>
-            {ADJUSTMENT_ROWS.map(({ field, label }) => (
-              <label
-                key={field}
-                className="flex items-center gap-2 text-[10px] text-gray-500"
-              >
-                {label}
-                <input
-                  type="range"
-                  min={-100}
-                  max={100}
-                  value={activeLayer[field] ?? 0}
-                  onChange={(e) =>
-                    onAdjustmentChange(activeLayer.id, field, Number(e.target.value))
+          <div className="relative shrink-0 border-t border-gray-100 px-3 py-2">
+            <button
+              onClick={() => setShowFilterPanel((v) => !v)}
+              title="블렌드 모드·색보정"
+              className={`flex h-6 w-6 items-center justify-center ${
+                hasActiveFilter
+                  ? "bg-violet-500 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+            </button>
+            {showFilterPanel && (
+              <div className="absolute top-full left-0 z-30 mt-1 flex w-48 flex-col gap-1 bg-white p-2 shadow-xl">
+                <label className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
+                  블렌드 모드
+                  <select
+                    value={activeLayer.blendMode ?? "normal"}
+                    onChange={(e) =>
+                      onBlendModeChange(activeLayer.id, e.target.value as BlendMode)
+                    }
+                    className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600"
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="multiply">Multiply</option>
+                    <option value="screen">Screen</option>
+                    <option value="overlay">Overlay</option>
+                    <option value="darken">Darken</option>
+                    <option value="lighten">Lighten</option>
+                    <option value="color-dodge">Color Dodge</option>
+                    <option value="color-burn">Color Burn</option>
+                  </select>
+                </label>
+                {ADJUSTMENT_ROWS.map(({ field, label }) => (
+                  <label
+                    key={field}
+                    className="flex items-center gap-2 text-[10px] text-gray-500"
+                  >
+                    {label}
+                    <input
+                      type="range"
+                      min={-100}
+                      max={100}
+                      value={activeLayer[field] ?? 0}
+                      onChange={(e) =>
+                        onAdjustmentChange(activeLayer.id, field, Number(e.target.value))
+                      }
+                      onPointerUp={onAdjustmentDragEnd}
+                      onBlur={onAdjustmentDragEnd}
+                      className="flex-1 accent-violet-500"
+                    />
+                    <span className="w-8 shrink-0 text-right">
+                      {activeLayer[field] ?? 0}
+                    </span>
+                  </label>
+                ))}
+                <button
+                  onClick={() => onResetAdjustments(activeLayer.id)}
+                  disabled={
+                    !activeLayer.brightness &&
+                    !activeLayer.contrast &&
+                    !activeLayer.saturation &&
+                    !activeLayer.temperature &&
+                    !activeLayer.tint
                   }
-                  onPointerUp={onAdjustmentDragEnd}
-                  onBlur={onAdjustmentDragEnd}
-                  className="flex-1"
-                />
-                <span className="w-8 shrink-0 text-right">
-                  {activeLayer[field] ?? 0}
-                </span>
-              </label>
-            ))}
+                  className="self-end text-[10px] text-violet-500 hover:text-violet-700 disabled:opacity-30"
+                >
+                  초기화
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-1 border-t border-gray-100 px-2 py-1.5">
             <button
