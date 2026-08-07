@@ -2,6 +2,7 @@
 
 import { Minus, Plus, X } from "lucide-react";
 import { RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { useImageFileLoader } from "./useImageFileLoader";
 import {
   CURSOR_CROSSHAIR,
   CURSOR_GRAB,
@@ -92,7 +93,11 @@ export default function ReferenceWindow({
   const [minimized, setMinimized] = useState(false);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [isDragOver, setIsDragOver] = useState(false);
+  const { loadFile, handleDrop, handlePasteFromClipboard, isDragOver, setIsDragOver } =
+    useImageFileLoader((img) => {
+      setImage(img);
+      setZoom(1);
+    });
   // 캔버스 자체 배율(zoom)과는 별개로, "100%"가 실제 픽셀 1:1이 아니라
   // "지금 창 안에 이미지 전체가 보이는 크기"를 뜻하게 한다 — 메인 캔버스의
   // 배율 1 = 화면 맞춤 관례와 통일한다. 실제 표시 크기 = 원본 크기 ×
@@ -108,7 +113,6 @@ export default function ReferenceWindow({
   } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const objectUrlRef = useRef<string | null>(null);
 
   const windowDragRef = useRef<{ offsetX: number; offsetY: number } | null>(
     null,
@@ -128,49 +132,6 @@ export default function ReferenceWindow({
     scrollTop: number;
     moved: boolean;
   } | null>(null);
-
-  const loadFile = useCallback((file: File) => {
-    const img = new Image();
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    const url = URL.createObjectURL(file);
-    objectUrlRef.current = url;
-    img.onload = () => {
-      setImage(img);
-      setZoom(1);
-    };
-    img.src = url;
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    };
-  }, []);
-
-  const handlePasteFromClipboard = useCallback(async () => {
-    try {
-      const items = await navigator.clipboard.read();
-      for (const item of items) {
-        const imageType = item.types.find((t) => t.startsWith("image/"));
-        if (!imageType) continue;
-        const blob = await item.getType(imageType);
-        loadFile(new File([blob], "clipboard-image", { type: imageType }));
-        return;
-      }
-    } catch {
-      // 클립보드 접근 실패 — 무시(파일 선택으로 대신 진행할 수 있음)
-    }
-  }, [loadFile]);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      setIsDragOver(false);
-      const file = e.dataTransfer.files?.[0];
-      if (file && file.type.startsWith("image/")) loadFile(file);
-    },
-    [loadFile],
-  );
 
   useEffect(() => {
     const canvas = canvasRef.current;
