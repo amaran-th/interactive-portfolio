@@ -40,7 +40,7 @@ import {
   wandMaskGlobal,
 } from "./pixelGrid";
 import { rasterizeText, Rotation, rotateAlphaBuffer } from "./textStamp";
-import { nextZoomStep, Point, SelectMode, Tool } from "./types";
+import { nextZoomStep, Point, SelectMode, Tool, TracingImage } from "./types";
 import type { BlendMode, PixelLayer } from "../_shared/assetLibrary";
 
 export type TextAlign = "left" | "center" | "right";
@@ -193,6 +193,7 @@ export default function PixelCanvas({
   aboveLayers,
   activeLayerOpacity,
   activeLayerLocked,
+  tracingImages,
   activeLayerBlendMode,
   activeLayerAdjustments,
   scopeBelowComposite,
@@ -300,6 +301,9 @@ export default function PixelCanvas({
   activeLayerOpacity: number;
   // true면 이 캔버스는 그리기 도구를 전부 무시한다(스포이트·선택류는 계속 동작).
   activeLayerLocked: boolean;
+  // 트레이싱 모드에서 캔버스 배경에 깔아두는 참고 이미지들 — 항상 픽셀
+  // 데이터보다 먼저(맨 뒤에) 그린다. 실제 픽셀에는 절대 섞이지 않는다.
+  tracingImages: TracingImage[];
   // 활성 레이어 자신이 belowComposite와 섞이는 방식·보정 — render()와
   // getFullComposite() 둘 다 이 값을 반영한다.
   activeLayerBlendMode: BlendMode;
@@ -474,6 +478,27 @@ export default function PixelCanvas({
       if (!ctx) return;
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // belowComposite/활성 레이어/aboveComposite/그리드보다 먼저 그려서
+      // 항상 맨 뒤에 깔리게 한다 — 실제 픽셀 데이터가 아니라 눈으로 보는
+      // 보조선이므로 exportPixelArt.ts는 이 캔버스를 아예 참조하지 않는다.
+      // imageSmoothingEnabled는 이미 위에서 false로 설정했다(픽셀아트답게
+      // 확대해도 흐려지지 않는다).
+      for (const t of tracingImages) {
+        ctx.save();
+        ctx.globalAlpha = t.opacity;
+        const cx = (t.x + t.width / 2) * scale;
+        const cy = (t.y + t.height / 2) * scale;
+        ctx.translate(cx, cy);
+        ctx.rotate((t.rotationDeg * Math.PI) / 180);
+        ctx.drawImage(
+          t.image,
+          (-t.width / 2) * scale,
+          (-t.height / 2) * scale,
+          t.width * scale,
+          t.height * scale,
+        );
+        ctx.restore();
+      }
       // 화면에는 belowComposite → 활성 레이어(자기 투명도 적용) →
       // aboveLayers 순서로 겹쳐 보여준다 — 실제로 편집되는 대상은
       // data(활성 레이어)뿐이고, 이 두 밴드는 시각적 맥락일 뿐이다.
@@ -811,6 +836,7 @@ export default function PixelCanvas({
       belowComposite,
       aboveLayers,
       activeLayerOpacity,
+      tracingImages,
       activeLayerBlendMode,
       activeLayerAdjustments,
     ],
