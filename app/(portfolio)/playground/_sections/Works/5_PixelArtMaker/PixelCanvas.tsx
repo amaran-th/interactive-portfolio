@@ -40,7 +40,14 @@ import {
   wandMaskGlobal,
 } from "./pixelGrid";
 import { rasterizeText, Rotation, rotateAlphaBuffer } from "./textStamp";
-import { nextZoomStep, Point, SelectMode, Tool, TracingImage } from "./types";
+import {
+  MIN_TRACING_SIZE,
+  nextZoomStep,
+  Point,
+  SelectMode,
+  Tool,
+  TracingImage,
+} from "./types";
 import type { BlendMode, PixelLayer } from "../_shared/assetLibrary";
 
 export type TextAlign = "left" | "center" | "right";
@@ -194,6 +201,9 @@ export default function PixelCanvas({
   activeLayerOpacity,
   activeLayerLocked,
   tracingImages,
+  activeTracingImage,
+  onActiveTracingChange,
+  onActiveTracingDeselect,
   activeLayerBlendMode,
   activeLayerAdjustments,
   scopeBelowComposite,
@@ -304,6 +314,13 @@ export default function PixelCanvas({
   // 트레이싱 모드에서 캔버스 배경에 깔아두는 참고 이미지들 — 항상 픽셀
   // 데이터보다 먼저(맨 뒤에) 그린다. 실제 픽셀에는 절대 섞이지 않는다.
   tracingImages: TracingImage[];
+  // 지금 캔버스 위에서 이동·크기·회전 손잡이가 떠 있는 대상(한 번에 하나만).
+  activeTracingImage: TracingImage | null;
+  onActiveTracingChange: (
+    patch: Partial<Pick<TracingImage, "x" | "y" | "width" | "height" | "rotationDeg">>,
+  ) => void;
+  // 오버레이 바깥 캔버스를 클릭했을 때(선택 해제).
+  onActiveTracingDeselect: () => void;
   // 활성 레이어 자신이 belowComposite와 섞이는 방식·보정 — render()와
   // getFullComposite() 둘 다 이 값을 반영한다.
   activeLayerBlendMode: BlendMode;
@@ -938,6 +955,11 @@ export default function PixelCanvas({
     (e: React.PointerEvent<HTMLCanvasElement>) => {
       if (e.button !== 0) return;
 
+      if (activeTracingImage) {
+        onActiveTracingDeselect();
+        return;
+      }
+
       if (isSpaceHeld) {
         const container = viewportRef.current;
         if (container) {
@@ -1158,6 +1180,8 @@ export default function PixelCanvas({
       activeLayerOpacity,
       activeLayerLocked,
       getFullComposite,
+      activeTracingImage,
+      onActiveTracingDeselect,
     ],
   );
 
@@ -1506,6 +1530,137 @@ export default function PixelCanvas({
       onPendingImageResize(nextWidth, nextHeight);
     },
     [scale, onPendingImageResize],
+  );
+
+  // 트레이싱 이미지 조정(이동·크기·회전) — pendingImage와 같은 독립 오버레이
+  // 패턴이지만 커밋/취소 개념이 없다(픽셀에 구워지는 대상이 아니라 이미
+  // 항상 라이브 상태이므로, 손을 떼면 그 값 그대로 유지된다).
+  const tracingDragRef = useRef<{ offsetX: number; offsetY: number } | null>(
+    null,
+  );
+  const tracingResizeRef = useRef<{
+    startX: number;
+    startY: number;
+    startWidth: number;
+    startHeight: number;
+  } | null>(null);
+  const tracingRotateRef = useRef<{
+    centerX: number;
+    centerY: number;
+    startAngle: number;
+    startRotationDeg: number;
+  } | null>(null);
+
+  const handleTracingInteractionEnd = useCallback(() => {
+    tracingDragRef.current = null;
+    tracingResizeRef.current = null;
+    tracingRotateRef.current = null;
+  }, []);
+
+  const handleTracingBodyDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!activeTracingImage) return;
+      const point = toRawGridPoint(e);
+      if (!point) return;
+      tracingDragRef.current = {
+        offsetX: point.x - activeTracingImage.x,
+        offsetY: point.y - activeTracingImage.y,
+      };
+      e.currentTarget.setPointerCapture(e.pointerId);
+    },
+    [activeTracingImage, toRawGridPoint],
+  );
+  const handleTracingBodyMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!tracingDragRef.current) return;
+      const point = toRawGridPoint(e);
+      if (!point) return;
+      onActiveTracingChange({
+        x: point.x - tracingDragRef.current.offsetX,
+        y: point.y - tracingDragRef.current.offsetY,
+      });
+    },
+    [toRawGridPoint, onActiveTracingChange],
+  );
+
+  const handleTracingResizeDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      if (!activeTracingImage) return;
+      tracingResizeRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        startWidth: activeTracingImage.width,
+        startHeight: activeTracingImage.height,
+      };
+      e.currentTarget.setPointerCapture(e.pointerId);
+    },
+    [activeTracingImage],
+  );
+  const handleTracingResizeMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!tracingResizeRef.current || !activeTracingImage) return;
+      const rawDx = (e.clientX - tracingResizeRef.current.startX) / scale;
+      const rawDy = (e.clientY - tracingResizeRef.current.startY) / scale;
+      // 회전된 상자의 로컬(회전 전) 좌표계로 화면 드래그량을 되돌려
+      // 계산한다 — 그래야 돌아간 상태에서도 모서리를 당기면 그 방향으로
+      // 자연스럽게 커진다. (참고: 중심 기준 회전이라 크기가 바뀌면 중심도
+      // 함께 이동해, 회전된 상태에서 리사이즈하면 상자가 살짝 미끄러지듯
+      // 보일 수 있다 — 알려진 단순화이며, 회전 전에 크기부터 맞추면 없다.)
+      const rad = (-activeTracingImage.rotationDeg * Math.PI) / 180;
+      const dx = rawDx * Math.cos(rad) - rawDy * Math.sin(rad);
+      const dy = rawDx * Math.sin(rad) + rawDy * Math.cos(rad);
+      onActiveTracingChange({
+        width: Math.max(
+          MIN_TRACING_SIZE,
+          Math.round(tracingResizeRef.current.startWidth + dx),
+        ),
+        height: Math.max(
+          MIN_TRACING_SIZE,
+          Math.round(tracingResizeRef.current.startHeight + dy),
+        ),
+      });
+    },
+    [scale, activeTracingImage, onActiveTracingChange],
+  );
+
+  const handleTracingRotateDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      if (!activeTracingImage) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const centerX =
+        rect.left +
+        (activeTracingImage.x + activeTracingImage.width / 2) * scale;
+      const centerY =
+        rect.top +
+        (activeTracingImage.y + activeTracingImage.height / 2) * scale;
+      tracingRotateRef.current = {
+        centerX,
+        centerY,
+        startAngle: Math.atan2(e.clientY - centerY, e.clientX - centerX),
+        startRotationDeg: activeTracingImage.rotationDeg,
+      };
+      e.currentTarget.setPointerCapture(e.pointerId);
+    },
+    [activeTracingImage, scale],
+  );
+  const handleTracingRotateMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const start = tracingRotateRef.current;
+      if (!start) return;
+      const angle = Math.atan2(
+        e.clientY - start.centerY,
+        e.clientX - start.centerX,
+      );
+      const deltaDeg = ((angle - start.startAngle) * 180) / Math.PI;
+      onActiveTracingChange({
+        rotationDeg: (start.startRotationDeg + deltaDeg + 360) % 360,
+      });
+    },
+    [onActiveTracingChange],
   );
 
   // pendingShape 오버레이도 pendingImage와 같은 방식(독립된 DOM 요소 + 자체
@@ -1907,6 +2062,44 @@ export default function PixelCanvas({
             </button>
           </div>
         </>
+      )}
+      {activeTracingImage && (
+        <div
+          className="absolute z-10 touch-none border-2 border-dashed border-violet-500"
+          style={{
+            left: activeTracingImage.x * scale,
+            top: activeTracingImage.y * scale,
+            width: activeTracingImage.width * scale,
+            height: activeTracingImage.height * scale,
+            transform: `rotate(${activeTracingImage.rotationDeg}deg)`,
+            transformOrigin: "center",
+            cursor: CURSOR_DRAGGING,
+          }}
+          onPointerDown={handleTracingBodyDown}
+          onPointerMove={handleTracingBodyMove}
+          onPointerUp={handleTracingInteractionEnd}
+          onPointerCancel={handleTracingInteractionEnd}
+        >
+          {/* 크기 조절 — 우하단 모서리, 상자와 함께 회전한다(부모 transform 상속). */}
+          <div
+            className="absolute -right-1.5 -bottom-1.5 h-4 w-4 touch-none rounded-full bg-violet-500 shadow-[0_0_0_2px_#ffffff]"
+            style={{ cursor: CURSOR_NWSE_RESIZE }}
+            onPointerDown={handleTracingResizeDown}
+            onPointerMove={handleTracingResizeMove}
+            onPointerUp={handleTracingInteractionEnd}
+            onPointerCancel={handleTracingInteractionEnd}
+          />
+          {/* 회전 — 상단 중앙에서 위로 띄운 손잡이. 중심 기준 각도 변화를
+              그대로 rotationDeg에 더한다(자유각). */}
+          <div
+            className="absolute -top-6 left-1/2 h-3 w-3 -translate-x-1/2 touch-none rounded-full bg-violet-500 shadow-[0_0_0_2px_#ffffff]"
+            style={{ cursor: CURSOR_GRAB }}
+            onPointerDown={handleTracingRotateDown}
+            onPointerMove={handleTracingRotateMove}
+            onPointerUp={handleTracingInteractionEnd}
+            onPointerCancel={handleTracingInteractionEnd}
+          />
+        </div>
       )}
       {pendingShape &&
         (() => {
