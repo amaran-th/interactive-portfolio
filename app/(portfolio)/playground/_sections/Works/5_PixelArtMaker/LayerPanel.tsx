@@ -63,6 +63,9 @@ export default function LayerPanel({
   onAdjustmentDragEnd,
   onResetAdjustments,
   onFlatten,
+  layerScope,
+  onToggleScope,
+  onAlign,
   isPlaying,
   onTogglePlay,
   loopPlayback,
@@ -106,6 +109,11 @@ export default function LayerPanel({
   onAdjustmentDragEnd: () => void;
   onResetAdjustments: (id: string) => void;
   onFlatten: () => void;
+  // 체크된 레이어 집합 — 스포이트·마법봉·페인트통 판정 범위이자 "정렬" 대상.
+  // 활성 레이어(activeLayerId)와는 독립적이다.
+  layerScope: Set<string>;
+  onToggleScope: (id: string) => void;
+  onAlign: () => void;
   // 프레임 모드 전용 재생 컨트롤.
   isPlaying: boolean;
   onTogglePlay: () => void;
@@ -166,14 +174,23 @@ export default function LayerPanel({
           </button>
         </div>
         {layerMode === "layers" && (
-          <button
-            onClick={onFlatten}
-            disabled={layers.length <= 1}
-            title="모든 레이어를 하나로 평탄화"
-            className="text-[10px] font-normal text-gray-400 hover:text-gray-600 disabled:opacity-30"
-          >
-            평탄화
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onAlign}
+              title="체크된 레이어의 그림을 캔버스 중앙으로 옮긴다"
+              className="text-[10px] font-normal text-gray-400 hover:text-gray-600"
+            >
+              정렬
+            </button>
+            <button
+              onClick={onFlatten}
+              disabled={layers.length <= 1}
+              title="모든 레이어를 하나로 평탄화"
+              className="text-[10px] font-normal text-gray-400 hover:text-gray-600 disabled:opacity-30"
+            >
+              평탄화
+            </button>
+          </div>
         )}
       </div>
       {layerMode === "layers" ? (
@@ -189,6 +206,14 @@ export default function LayerPanel({
                     isActive ? "bg-violet-50" : "hover:bg-gray-50"
                   }`}
                 >
+                  <input
+                    type="checkbox"
+                    checked={layerScope.has(layer.id)}
+                    onChange={() => onToggleScope(layer.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    title="판정·정렬 범위에 포함"
+                    className="h-3.5 w-3.5 shrink-0"
+                  />
                   <FileThumbnail width={width} height={height} pixels={layer.pixels} />
                   {editingId === layer.id ? (
                     <input

@@ -74,6 +74,8 @@ import {
   rotatePixelValuesBy,
   setPixel,
   shapeToolPoints,
+  shiftPixels,
+  unionBoundingBox,
 } from "./pixelGrid";
 import { isMacPlatform } from "./platform";
 import ResizeCanvasDialog from "./ResizeCanvasDialog";
@@ -1988,6 +1990,46 @@ export default function Editor({
     pushLayerOp([flat], flat.id);
   }, [history.presentLayers, doc.width, doc.height, pushLayerOp]);
 
+  // 체크된 레이어(layerScope)를 켜고 끈다 — 활성 레이어(그리기 대상)와는
+  // 무관한 독립 상태라 pushLayerOp(실행취소)를 거치지 않는다.
+  const handleToggleLayerScope = useCallback((id: string) => {
+    setLayerScope((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  // 체크된 레이어들의 불투명 영역을 하나로 묶어 그 경계 상자가 캔버스
+  // 중앙에 오도록, 체크된 레이어들만 같은 만큼(서로 상대 위치 유지) 이동시킨다.
+  // 체크 안 된 레이어는 건드리지 않는다. handleFlattenLayers와 같은 패턴으로
+  // pushLayerOp 한 번에 실행취소 스택에 올라간다.
+  const handleAlignLayers = useCallback(() => {
+    const targets = history.presentLayers.filter((l) => layerScope.has(l.id));
+    if (targets.length === 0) return;
+    const box = unionBoundingBox(
+      targets.map((l) => l.pixels),
+      doc.width,
+      doc.height,
+    );
+    if (!box) return;
+    const contentW = box.maxX - box.minX + 1;
+    const contentH = box.maxY - box.minY + 1;
+    const dx = Math.floor((doc.width - contentW) / 2) - box.minX;
+    const dy = Math.floor((doc.height - contentH) / 2) - box.minY;
+    if (dx === 0 && dy === 0) return;
+    const nextLayers = history.presentLayers.map((l) =>
+      layerScope.has(l.id)
+        ? { ...l, pixels: shiftPixels(l.pixels, doc.width, doc.height, dx, dy) }
+        : l,
+    );
+    pushLayerOp(nextLayers, history.activeLayerId);
+  }, [history.presentLayers, history.activeLayerId, layerScope, doc.width, doc.height, pushLayerOp]);
+
   const handleFrameDurationChange = useCallback(
     (id: string, ms: number) => {
       const nextLayers = history.presentLayers.map((l) =>
@@ -2621,6 +2663,9 @@ export default function Editor({
                       onAdjustmentDragEnd={handleAdjustmentDragEnd}
                       onResetAdjustments={handleResetAdjustments}
                       onFlatten={handleFlattenLayers}
+                      layerScope={layerScope}
+                      onToggleScope={handleToggleLayerScope}
+                      onAlign={handleAlignLayers}
                       layerMode={layerMode}
                       onLayerModeChange={handleLayerModeChange}
                       isPlaying={isPlaying}
@@ -2672,6 +2717,9 @@ export default function Editor({
                   onAdjustmentDragEnd={handleAdjustmentDragEnd}
                   onResetAdjustments={handleResetAdjustments}
                   onFlatten={handleFlattenLayers}
+                  layerScope={layerScope}
+                  onToggleScope={handleToggleLayerScope}
+                  onAlign={handleAlignLayers}
                   layerMode={layerMode}
                   onLayerModeChange={handleLayerModeChange}
                   isPlaying={isPlaying}
