@@ -30,6 +30,11 @@ const FORMATS: { id: Format; label: string }[] = [
 // 벡터/데이터라 해상도 개념이 없어 이 옵션 자체를 보여주지 않는다.
 const SCALE_OPTIONS = [1, 2, 4, 8, 16];
 
+// GIF·스프라이트 시트는 배율에 보이는 프레임 수까지 곱해져 캔버스가
+// 커지므로, 16×까지 열어두면 브라우저 캔버스 크기 한도(대략 65,535px)를
+// 넘기거나 GIF 인코딩 중 메모리가 급증할 수 있어 8×까지로 상한을 낮춘다.
+const FRAME_SCALE_OPTIONS = [1, 2, 4, 8];
+
 export default function ExportPanel({ doc }: { doc: PixelArt }) {
   const [format, setFormat] = useState<Format>("png");
   // 프레임 모드일 때만 GIF·스프라이트 시트를 목록에 더한다 — 레이어 모드에는
@@ -42,6 +47,9 @@ export default function ExportPanel({ doc }: { doc: PixelArt }) {
           { id: "spritesheet" as const, label: "스프라이트" },
         ]
       : FORMATS;
+  // 스프라이트 시트는 보이는 프레임 수만큼 가로로 이어붙이므로, 해상도
+  // 표시·배율 상한 계산 둘 다 이 값이 필요하다.
+  const visibleFrameCount = (doc.layers ?? []).filter((l) => l.visible).length;
   const [scale, setScale] = useState(8);
   const [status, setStatus] = useState<string | null>(null);
   const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -64,6 +72,14 @@ export default function ExportPanel({ doc }: { doc: PixelArt }) {
     if ((format === "gif" || format === "spritesheet") && doc.layerMode !== "frames") {
       setFormat("png");
     }
+  }
+
+  // scale이 16으로 골라진 상태에서 포맷을 GIF·스프라이트 시트로 바꾸면,
+  // 화면에는 8× 이하 버튼만 보이는데(FRAME_SCALE_OPTIONS) 내부 scale 값은
+  // 여전히 16으로 남아 "파일로 저장"을 누르면 화면에 없는 배율로 여전히
+  // 내보내지는 불일치가 생긴다 — 그 상태가 되면 8로 낮춘다.
+  if ((format === "gif" || format === "spritesheet") && scale > 8) {
+    setScale(8);
   }
 
   const handleSave = useCallback(() => {
@@ -137,11 +153,17 @@ export default function ExportPanel({ doc }: { doc: PixelArt }) {
           <label className="flex items-center justify-between text-xs text-gray-600">
             <span>해상도</span>
             <span className="text-[10px] tabular-nums text-gray-400">
-              {doc.width * scale} × {doc.height * scale}px
+              {doc.width *
+                scale *
+                (format === "spritesheet" ? Math.max(1, visibleFrameCount) : 1)}{" "}
+              × {doc.height * scale}px
             </span>
           </label>
           <div className="flex gap-1">
-            {SCALE_OPTIONS.map((s) => (
+            {(format === "gif" || format === "spritesheet"
+              ? FRAME_SCALE_OPTIONS
+              : SCALE_OPTIONS
+            ).map((s) => (
               <button
                 key={s}
                 onClick={() => setScale(s)}
