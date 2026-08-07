@@ -384,6 +384,53 @@ export function resizeGrid(
   return next;
 }
 
+// 여러 레이어의 불투명 픽셀을 하나의 집합으로 보고 그 경계 상자를 구한다.
+// 전부 완전히 투명하면(정렬할 내용이 없으면) null을 돌려준다.
+export function unionBoundingBox(
+  pixelLists: PixelValue[][],
+  width: number,
+  height: number,
+): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const pixels of pixelLists) {
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (pixels[y * width + x] === null) continue;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (minX === Infinity) return null;
+  return { minX, minY, maxX, maxY };
+}
+
+// pixels를 (dx, dy)만큼 평행이동한 같은 크기의 새 그리드를 돌려준다.
+// 캔버스 밖으로 나가는 픽셀은 잘리고, 새로 드러나는 자리는 투명(null)으로 채운다.
+export function shiftPixels(
+  pixels: PixelValue[],
+  width: number,
+  height: number,
+  dx: number,
+  dy: number,
+): PixelValue[] {
+  const out = new Array<PixelValue>(width * height).fill(null);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const srcX = x - dx;
+      const srcY = y - dy;
+      if (srcX < 0 || srcY < 0 || srcX >= width || srcY >= height) continue;
+      out[y * width + x] = pixels[srcY * width + srcX];
+    }
+  }
+  return out;
+}
+
 export function idx(width: number, x: number, y: number): number {
   return y * width + x;
 }
