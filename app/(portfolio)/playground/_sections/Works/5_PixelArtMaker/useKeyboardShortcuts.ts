@@ -57,6 +57,8 @@ export function useKeyboardShortcuts({
   hasPendingShape,
   onCommitPendingShape,
   onCancelPendingShape,
+  hasActiveTracing,
+  onCancelActiveTracing,
 }: {
   onToolChange: (tool: Tool) => void;
   onUndo: () => void;
@@ -87,6 +89,11 @@ export function useKeyboardShortcuts({
   hasPendingShape?: boolean;
   onCommitPendingShape?: () => void;
   onCancelPendingShape?: () => void;
+  // 트레이싱 이미지 조정 손잡이가 떠 있으면, Enter/Esc 우선순위 중
+  // pendingImage/pendingShape 다음·선택 해제보다는 앞선 순서로 Escape가
+  // 조정 상태부터 해제한다.
+  hasActiveTracing?: boolean;
+  onCancelActiveTracing?: () => void;
 }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -181,6 +188,7 @@ export function useKeyboardShortcuts({
       if (e.key === "Escape") {
         if (hasPendingImage) onCancelPendingImage?.();
         else if (hasPendingShape) onCancelPendingShape?.();
+        else if (hasActiveTracing) onCancelActiveTracing?.();
         else onClearSelection?.();
         return;
       }
@@ -213,5 +221,7 @@ export function useKeyboardShortcuts({
     hasPendingShape,
     onCommitPendingShape,
     onCancelPendingShape,
+    hasActiveTracing,
+    onCancelActiveTracing,
   ]);
 }
