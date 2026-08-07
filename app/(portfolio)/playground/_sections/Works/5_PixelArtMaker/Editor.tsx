@@ -1773,6 +1773,10 @@ export default function Editor({
       ...history.presentLayers.slice(insertAt),
     ];
     pushLayerOp(nextLayers, newLayer.id);
+    // 방금 생긴 레이어는 사용자가 체크/해제할 기회가 없었으므로, 기본으로
+    // 판정 대상(layerScope)에 넣는다 — 그러지 않으면 새 레이어에 그려도
+    // 스포이트·마법봉·페인트통이 그 레이어를 못 보는 상태로 시작한다.
+    setLayerScope((prev) => new Set(prev).add(newLayer.id));
   }, [history.presentLayers, activeLayerIndex, doc.width, doc.height, pushLayerOp]);
 
   const handleDuplicateLayer = useCallback(
@@ -1793,6 +1797,9 @@ export default function Editor({
         ...history.presentLayers.slice(index + 1),
       ];
       pushLayerOp(nextLayers, copy.id);
+      // handleAddLayer와 같은 이유로, 방금 생긴 복제본도 기본으로 판정
+      // 대상에 넣는다.
+      setLayerScope((prev) => new Set(prev).add(copy.id));
     },
     [history.presentLayers, pushLayerOp],
   );
@@ -1988,6 +1995,10 @@ export default function Editor({
       locked: false,
     };
     pushLayerOp([flat], flat.id);
+    // 평탄화는 기존 레이어를 전부 새 레이어 하나로 합치므로, 이전 layerScope가
+    // 가리키던 id는 전부 사라진다 — 추가가 아니라 이 레이어 하나로 완전히
+    // 교체한다.
+    setLayerScope(new Set([flat.id]));
   }, [history.presentLayers, doc.width, doc.height, pushLayerOp]);
 
   // 체크된 레이어(layerScope)를 켜고 끈다 — 활성 레이어(그리기 대상)와는
