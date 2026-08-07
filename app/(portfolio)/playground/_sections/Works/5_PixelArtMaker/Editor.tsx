@@ -1917,6 +1917,25 @@ export default function Editor({
     dragCoalesceRef.current = null;
   }, []);
 
+  const handleResetAdjustments = useCallback(
+    (id: string) => {
+      const nextLayers = history.presentLayers.map((l) =>
+        l.id === id
+          ? {
+              ...l,
+              brightness: undefined,
+              contrast: undefined,
+              saturation: undefined,
+              temperature: undefined,
+              tint: undefined,
+            }
+          : l,
+      );
+      pushLayerOp(nextLayers, history.activeLayerId);
+    },
+    [history.presentLayers, history.activeLayerId, pushLayerOp],
+  );
+
   const handleFlattenLayers = useCallback(() => {
     if (history.presentLayers.length <= 1) return;
     const flat: PixelLayer = {
@@ -2558,6 +2577,7 @@ export default function Editor({
                       onBlendModeChange={handleLayerBlendModeChange}
                       onAdjustmentChange={handleLayerAdjustmentChange}
                       onAdjustmentDragEnd={handleAdjustmentDragEnd}
+                      onResetAdjustments={handleResetAdjustments}
                       onFlatten={handleFlattenLayers}
                       layerMode={layerMode}
                       onLayerModeChange={handleLayerModeChange}
@@ -2608,6 +2628,7 @@ export default function Editor({
                   onBlendModeChange={handleLayerBlendModeChange}
                   onAdjustmentChange={handleLayerAdjustmentChange}
                   onAdjustmentDragEnd={handleAdjustmentDragEnd}
+                  onResetAdjustments={handleResetAdjustments}
                   onFlatten={handleFlattenLayers}
                   layerMode={layerMode}
                   onLayerModeChange={handleLayerModeChange}
