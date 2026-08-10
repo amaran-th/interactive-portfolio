@@ -104,6 +104,23 @@ export const DEFAULT_TRACING_OPACITY = 0.5;
 // 그리드 단위 — 너무 작아지면 손잡이로 조작할 수 없게 되는 것을 막는다.
 export const MIN_TRACING_SIZE = 8;
 
+export type ReferenceMode = "lookup" | "tracing"; // 참고 모드 / 트레이싱 모드
+
+// 레퍼런스 창 하나가 다루는 통합 데이터 — 참고 모드로 보다가 트레이싱 모드로
+// 전환해도 같은 이미지·id를 유지한다. 세션 메모리 전용, 저장 안 됨(TracingImage와
+// 동일한 정책).
+export type ReferenceItem = {
+  id: string;
+  image: HTMLImageElement | null; // 아직 안 불러왔으면 null
+  mode: ReferenceMode;
+  // 트레이싱 모드에 처음 들어갈 때 한 번만 채워지고, 이후 참고 모드로 돌아가도
+  // 유지된다(모드를 오가도 캔버스 위 위치·크기·회전·투명도를 기억하기 위함).
+  // TracingImage와 필드가 같지만 id/image가 빠진 부분집합이라 별도 타입으로 뺀다.
+  tracingGeometry: Omit<TracingImage, "id" | "image"> | null;
+};
+
+export const DEFAULT_REFERENCE_MODE: ReferenceMode = "lookup";
+
 export type Point = { x: number; y: number };
 
 // 배율 1은 더 이상 "셀당 고정 16px"가 아니라 "캔버스 전체가 화면에 꽉 차게
