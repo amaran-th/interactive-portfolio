@@ -173,6 +173,10 @@ export default function ReferenceWindow({
     moved: boolean;
   } | null>(null);
 
+  // minimized도 의존성에 넣는다 — 최소화하면 {!minimized && (...)} 블록
+  // 전체가 언마운트되어 canvas DOM 노드가 사라지고, 다시 펼치면 완전히
+  // 새(빈) canvas 노드가 생긴다. image/mode는 그대로라 이 효과가 다시
+  // 실행되지 않으면 새 canvas에 이미지를 그릴 기회가 없다.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !image || mode !== "lookup") return;
@@ -182,12 +186,14 @@ export default function ReferenceWindow({
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(image, 0, 0);
-  }, [image, mode]);
+  }, [image, mode, minimized]);
 
   // 이미지를 새로 불러올 때마다 창 안에 전체가 들어오는 배율을 다시 잰다 —
   // 메인 캔버스의 "배율 1 = 화면 맞춤" 관례와 통일해, zoom=1(100%)이 실제
   // 픽셀 1:1이 아니라 "지금 창 안에 전체가 보이는 크기"를 뜻하게 한다.
-  // (참고 모드 전용 — 트레이싱 모드는 뷰포트 자체가 없다.)
+  // (참고 모드 전용 — 트레이싱 모드는 뷰포트 자체가 없다.) 위와 같은 이유로
+  // minimized도 의존성에 필요하다 — viewportRef의 DOM 노드도 최소화·복원을
+  // 거치며 새로 생긴다.
   useEffect(() => {
     const container = viewportRef.current;
     if (!container || !image || mode !== "lookup") return;
@@ -203,7 +209,7 @@ export default function ReferenceWindow({
     const ro = new ResizeObserver(update);
     ro.observe(container);
     return () => ro.disconnect();
-  }, [image, mode]);
+  }, [image, mode, minimized]);
 
   // 편집기 창(rootRef)에 transition-transform(scale)이 걸려 있어, 그 자식인
   // 이 창(position: fixed)의 containing block이 뷰포트가 아니라 rootRef
@@ -416,7 +422,10 @@ export default function ReferenceWindow({
       style={{
         left: pos.x,
         top: pos.y,
-        width: size.width,
+        // 최소화하면 너비도 제목표시줄 내용(이름 + 버튼)만큼만 남긴다 —
+        // position: fixed 요소는 width를 명시하지 않으면 내용 크기로
+        // 줄어드는(shrink-to-fit) 특성을 그대로 이용한다.
+        width: minimized ? undefined : size.width,
         height: minimized ? undefined : size.height,
         zIndex,
       }}
@@ -427,7 +436,7 @@ export default function ReferenceWindow({
         onPointerMove={handleTitleMove}
         onPointerUp={handleTitleUp}
         onPointerCancel={handleTitleUp}
-        className="flex touch-none items-center justify-between bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700"
+        className="flex touch-none items-center justify-between gap-3 bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700"
         style={{ cursor: CURSOR_MOVE }}
       >
         <span>레퍼런스{windowNumber}</span>
