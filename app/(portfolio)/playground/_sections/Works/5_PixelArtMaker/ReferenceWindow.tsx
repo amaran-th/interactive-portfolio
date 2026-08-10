@@ -611,19 +611,20 @@ export default function ReferenceWindow({
             </>
           ) : (
             // (신규) 트레이싱 모드 본문 — TracingControlWindow.tsx에서 흡수.
-            // 참고 모드와 창 크기를 공유하게 되면서 남는 세로 공간이 생길 수
-            // 있다 — 내용 전체를 세로 가운데 정렬해 위쪽에 쏠려 보이지
-            // 않게 한다(썸네일 자체는 max-h로 상한만 두고 원래 크기에
-            // 가깝게 유지 — flex-1로 무제한 늘리면 중첩 flex 열에서
-            // min-h-0을 빠짐없이 챙기지 않는 한 의도한 것보다 훨씬 커지기
-            // 쉽다).
-            <div className="flex flex-1 flex-col justify-center gap-2 p-2">
+            // 창 크기는 참고 모드와 공유하므로, 이 안에서 썸네일이 남는
+            // 세로 공간을 전부 채운다(투명도·조정 버튼은 원래 크기 그대로
+            // 아래 고정). flex-1만으로는 안 된다 — 중첩된 flex 열에서
+            // min-h-0을 부모(gap 컨테이너)와 자식(이미지) 양쪽에 다 줘야
+            // 콘텐츠의 원래 크기가 아니라 실제로 남은 공간 기준으로
+            // 줄어든다(하나라도 빠지면 이미지가 자기 원본 해상도만큼
+            // 커지려고 해서 창을 밀어낸다).
+            <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
               <img
                 src={image.src}
                 alt=""
-                className="max-h-40 w-full bg-gray-50 object-contain"
+                className="w-full min-h-0 flex-1 bg-gray-50 object-contain"
               />
-              <label className="flex items-center gap-2 text-[10px] text-gray-500">
+              <label className="flex shrink-0 items-center gap-2 text-[10px] text-gray-500">
                 투명도
                 <input
                   type="range"
@@ -641,7 +642,7 @@ export default function ReferenceWindow({
               </label>
               <button
                 onClick={onToggleAdjust}
-                className={`flex items-center justify-center gap-1 px-2 py-1 text-[10px] ${
+                className={`flex shrink-0 items-center justify-center gap-1 px-2 py-1 text-[10px] ${
                   isAdjusting
                     ? "bg-violet-500 text-white"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
