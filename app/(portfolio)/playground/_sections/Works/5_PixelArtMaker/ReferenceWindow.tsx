@@ -333,6 +333,25 @@ export default function ReferenceWindow({
     resizeRef.current = null;
   }, []);
 
+  // 안전망 — 제목표시줄/리사이즈 손잡이 자체의 onPointerUp/onPointerCancel이
+  // 놓치는 경우(포인터가 브라우저 창 밖에서 떼지거나, setPointerCapture가
+  // 실패하는 등)를 대비해 window 레벨에서도 같은 정리를 한 번 더 한다.
+  // 이게 없으면 드래그가 안 끝난 것처럼 ref가 남아, 나중에 그 손잡이 위로
+  // 마우스만 지나가도(클릭 없이) 남아있던 시작점 기준으로 크기·위치가
+  // 계속 바뀌는 것처럼 보인다.
+  useEffect(() => {
+    const clearDragState = () => {
+      windowDragRef.current = null;
+      resizeRef.current = null;
+    };
+    window.addEventListener("pointerup", clearDragState);
+    window.addEventListener("pointercancel", clearDragState);
+    return () => {
+      window.removeEventListener("pointerup", clearDragState);
+      window.removeEventListener("pointercancel", clearDragState);
+    };
+  }, []);
+
   // Ctrl/Cmd+휠로 확대·축소 — 메인 캔버스와 같은 관례. (참고 모드 전용.)
   useEffect(() => {
     const el = viewportRef.current;
