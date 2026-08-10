@@ -49,7 +49,6 @@ import { mixHex } from "./hsv";
 import ImportPanel from "./ImportPanel";
 import LayerPanel from "./LayerPanel";
 import FrameFilmstrip from "./FrameFilmstrip";
-import TracingControlWindow from "./TracingControlWindow";
 import TracingListPanel from "./TracingListPanel";
 import NewCanvasDialog from "./NewCanvasDialog";
 import ReferenceWindow from "./ReferenceWindow";
@@ -377,125 +376,12 @@ export default function Editor({
       { id: uid(), zIndex: referenceZRef.current, spawnIndex },
     ]);
   }, []);
-  const closeReferenceWindow = useCallback((id: string) => {
-    setReferenceWindows((ws) => ws.filter((w) => w.id !== id));
-  }, []);
   const bringReferenceWindowToFront = useCallback((id: string) => {
     referenceZRef.current += 1;
     const z = referenceZRef.current;
     setReferenceWindows((ws) =>
       ws.map((w) => (w.id === id ? { ...w, zIndex: z } : w)),
     );
-  }, []);
-  // 트레이싱 모드 — 캔버스 배경에 참고 이미지를 깔아두고 따라 그리는 기능.
-  // 레퍼런스 창과 완전히 독립된 기능이라 동시에 켤 수 있다. tracingMode는
-  // 오직 렌더링 표시 여부만 결정하고, 꺼도 tracingImages/tracingWindows는
-  // 그대로 남는다(다시 켜면 복원). 탭(문서)별이 아니라 레퍼런스 창과 같은
-  // 스코프(편집기 세션 전체)에서 공유한다.
-  const [tracingMode, setTracingMode] = useState(false);
-  const [tracingImages, setTracingImages] = useState<TracingImage[]>([]);
-  // 지금 캔버스 위에서 이동·크기·회전 손잡이가 떠 있는 대상 — 한 번에
-  // 하나만 조정할 수 있다.
-  const [activeTracingId, setActiveTracingId] = useState<string | null>(null);
-  // 미니 컨트롤 창(wide 전용) 자체의 위치·최소화 상태 — tracingImages와
-  // id로 짝을 이루는 병렬 배열이다. narrow(TracingListPanel)는 쓰지 않는다.
-  const [tracingWindows, setTracingWindows] = useState<
-    { id: string; zIndex: number; spawnIndex: number; minimized: boolean }[]
-  >([]);
-  const tracingZRef = useRef(60);
-  const tracingSpawnRef = useRef(0);
-  const openTracingWindow = useCallback(() => {
-    tracingZRef.current += 1;
-    const spawnIndex = tracingSpawnRef.current;
-    tracingSpawnRef.current += 1;
-    setTracingWindows((ws) => [
-      ...ws,
-      { id: uid(), zIndex: tracingZRef.current, spawnIndex, minimized: false },
-    ]);
-  }, []);
-  const bringTracingWindowToFront = useCallback((id: string) => {
-    tracingZRef.current += 1;
-    const z = tracingZRef.current;
-    setTracingWindows((ws) =>
-      ws.map((w) => (w.id === id ? { ...w, zIndex: z } : w)),
-    );
-  }, []);
-  const toggleTracingWindowMinimized = useCallback((id: string) => {
-    setTracingWindows((ws) =>
-      ws.map((w) => (w.id === id ? { ...w, minimized: !w.minimized } : w)),
-    );
-  }, []);
-  // 이미지를 처음 불러왔을 때 — 캔버스 안에 전체가 들어오도록 맞추고
-  // 가운데 정렬한다(ReferenceWindow의 fitScale과 같은 관례: 배율 1 =
-  // 화면 맞춤). id는 wide에서는 미리 만들어 둔 tracingWindows 항목의 id를
-  // 그대로 받고, narrow(handleTracingListAdd)에서는 새로 만든다.
-  const handleTracingImageLoaded = useCallback(
-    (id: string, image: HTMLImageElement) => {
-      const fitScale = Math.min(
-        doc.width / image.naturalWidth,
-        doc.height / image.naturalHeight,
-      );
-      const w = image.naturalWidth * fitScale;
-      const h = image.naturalHeight * fitScale;
-      setTracingImages((imgs) => [
-        ...imgs,
-        {
-          id,
-          image,
-          x: (doc.width - w) / 2,
-          y: (doc.height - h) / 2,
-          width: w,
-          height: h,
-          rotationDeg: 0,
-          opacity: DEFAULT_TRACING_OPACITY,
-        },
-      ]);
-    },
-    [doc.width, doc.height],
-  );
-  // narrow의 TracingListPanel은 wide의 tracingWindows 같은 "미리 만들어 둔
-  // 빈 창"이 없다 — 이미지를 고르는 즉시 새 id로 바로 추가한다.
-  const handleTracingListAdd = useCallback(
-    (image: HTMLImageElement) => {
-      handleTracingImageLoaded(uid(), image);
-    },
-    [handleTracingImageLoaded],
-  );
-  const handleTracingOpacityChange = useCallback(
-    (id: string, opacity: number) => {
-      setTracingImages((imgs) =>
-        imgs.map((t) => (t.id === id ? { ...t, opacity } : t)),
-      );
-    },
-    [],
-  );
-  // 미니 창의 닫기(X)와 리스트 패널의 삭제 버튼이 공유하는 단일 삭제
-  // 핸들러 — 창 항목과 이미지 데이터를 함께 지우고, 지금 그 이미지를
-  // 조정 중이었다면 조정 상태도 함께 해제한다.
-  const handleTracingDelete = useCallback((id: string) => {
-    setTracingWindows((ws) => ws.filter((w) => w.id !== id));
-    setTracingImages((imgs) => imgs.filter((t) => t.id !== id));
-    setActiveTracingId((cur) => (cur === id ? null : cur));
-  }, []);
-  const handleToggleTracingAdjust = useCallback((id: string) => {
-    setActiveTracingId((cur) => (cur === id ? null : id));
-  }, []);
-  const activeTracingImage =
-    tracingImages.find((t) => t.id === activeTracingId) ?? null;
-  const handleActiveTracingChange = useCallback(
-    (
-      patch: Partial<
-        Pick<TracingImage, "x" | "y" | "width" | "height" | "rotationDeg">
-      >,
-    ) => {
-      setTracingImages((imgs) =>
-        imgs.map((t) => (t.id === activeTracingId ? { ...t, ...patch } : t)),
-      );
-    },
-    [activeTracingId],
-  );
-  const handleTracingDeselect = useCallback(() => {
-    setActiveTracingId(null);
   }, []);
   // (신규) 레퍼런스/트레이싱 통합 — 레퍼런스 항목 하나가 참고 모드와
   // 트레이싱 모드를 오갈 수 있다. referenceItems가 그 데이터(이미지·모드·
@@ -1995,8 +1881,8 @@ export default function Editor({
     hasPendingShape: !!pendingShape,
     onCommitPendingShape: handlePendingShapeCommit,
     onCancelPendingShape: handlePendingShapeCancel,
-    hasActiveTracing: !!activeTracingId,
-    onCancelActiveTracing: handleTracingDeselect,
+    hasActiveTracing: !!activeReferenceId,
+    onCancelActiveTracing: handleReferenceDeselect,
   });
 
   // "+" 버튼으로 지금 활성 색상을 즐겨찾기에 명시적으로 추가한다.
@@ -2616,7 +2502,7 @@ export default function Editor({
         {!narrow && (
           <button
             onClick={openReferenceWindow}
-            title="참고 이미지 창을 새로 엽니다. 여러 개를 동시에 띄울 수 있습니다(저장되지 않음)"
+            title="참고 이미지 창을 새로 엽니다. 참고 모드(뷰포트로 보기)와 트레이싱 모드(캔버스 배경에 깔아 따라 그리기)를 창 안에서 오갈 수 있습니다. 여러 개를 동시에 띄울 수 있습니다(저장되지 않음)"
             className={`px-2 py-1 text-xs ${
               referenceWindows.length > 0
                 ? "bg-violet-50 text-violet-700"
@@ -2624,26 +2510,6 @@ export default function Editor({
             }`}
           >
             레퍼런스
-          </button>
-        )}
-        <button
-          onClick={() => setTracingMode((v) => !v)}
-          title="캔버스 배경에 참고 이미지를 깔아두고 따라 그립니다(저장되지 않음)"
-          className={`px-2 py-1 text-xs ${
-            tracingMode
-              ? "bg-violet-50 text-violet-700"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          트레이싱
-        </button>
-        {tracingMode && !narrow && (
-          <button
-            onClick={openTracingWindow}
-            title="트레이싱 이미지를 추가합니다"
-            className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
-          >
-            + 이미지
           </button>
         )}
       </div>
@@ -2860,10 +2726,10 @@ export default function Editor({
                     onPendingShapeCommit={handlePendingShapeCommit}
                     onPendingShapeCancel={handlePendingShapeCancel}
                     bottomToolbarPortalTarget={secondaryToolbarPortal}
-                    tracingImages={tracingMode ? tracingImages : []}
-                    activeTracingImage={tracingMode ? activeTracingImage : null}
-                    onActiveTracingChange={handleActiveTracingChange}
-                    onActiveTracingDeselect={handleTracingDeselect}
+                    tracingImages={tracingCanvasImages}
+                    activeTracingImage={activeTracingCanvasImage}
+                    onActiveTracingChange={handleActiveReferenceGeometryChange}
+                    onActiveTracingDeselect={handleReferenceDeselect}
                   />
                 </div>
                 {/* 캔버스를 스크롤하는 safe-center flex 컨테이너 밖(이 바깥 relative
@@ -3021,7 +2887,7 @@ export default function Editor({
                     ? "이미지 불러오기"
                     : openFloatingPanel === "export"
                       ? "내보내기"
-                      : "트레이싱";
+                      : "레퍼런스";
               const layerPanel = (
                 <LayerPanel
                   layers={history.presentLayers}
@@ -3105,23 +2971,21 @@ export default function Editor({
                   >
                     <Download className="h-4 w-4" />
                   </button>
-                  {tracingMode && (
-                    <button
-                      onClick={() =>
-                        setOpenFloatingPanel((p) =>
-                          p === "tracing" ? null : "tracing",
-                        )
-                      }
-                      title="트레이싱"
-                      className={`flex h-8 w-8 items-center justify-center transition-colors ${
-                        openFloatingPanel === "tracing"
-                          ? "bg-violet-500 text-white"
-                          : "bg-white text-gray-500 shadow-md hover:bg-gray-50"
-                      }`}
-                    >
-                      <ImageIcon className="h-4 w-4" />
-                    </button>
-                  )}
+                  <button
+                    onClick={() =>
+                      setOpenFloatingPanel((p) =>
+                        p === "tracing" ? null : "tracing",
+                      )
+                    }
+                    title="레퍼런스"
+                    className={`flex h-8 w-8 items-center justify-center transition-colors ${
+                      openFloatingPanel === "tracing"
+                        ? "bg-violet-500 text-white"
+                        : "bg-white text-gray-500 shadow-md hover:bg-gray-50"
+                    }`}
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                  </button>
                   {openFloatingPanel && (
                     <div className="absolute top-0 right-full z-40 mr-2 flex max-h-full w-72 flex-col bg-white shadow-xl">
                       <div className="flex shrink-0 items-center justify-between px-3 py-2 text-xs font-semibold text-gray-500">
@@ -3143,15 +3007,15 @@ export default function Editor({
                           exportPanel
                         ) : (
                           <TracingListPanel
-                            tracingImages={tracingImages}
-                            activeTracingId={activeTracingId}
-                            onAdd={handleTracingListAdd}
-                            onOpacityChange={handleTracingOpacityChange}
+                            tracingImages={tracingCanvasImages}
+                            activeTracingId={activeReferenceId}
+                            onAdd={handleReferenceListAdd}
+                            onOpacityChange={handleReferenceOpacityChange}
                             onToggleAdjust={(id) => {
-                              handleToggleTracingAdjust(id);
+                              handleToggleReferenceAdjust(id);
                               setOpenFloatingPanel(null);
                             }}
-                            onDelete={handleTracingDelete}
+                            onDelete={handleReferenceDelete}
                           />
                         )}
                       </div>
@@ -3470,39 +3334,31 @@ export default function Editor({
         onCancel={() => setSaveAsPromptOpen(false)}
       />
 
-      {referenceWindows.map((w) => (
-        <ReferenceWindow
-          key={w.id}
-          boundsRef={rootRef}
-          eyedropperActive={tool === "eyedropper"}
-          onPickColor={handlePickColor}
-          onClose={() => closeReferenceWindow(w.id)}
-          zIndex={w.zIndex}
-          spawnIndex={w.spawnIndex}
-          onFocus={() => bringReferenceWindowToFront(w.id)}
-        />
-      ))}
-
-      {tracingMode &&
-        tracingWindows.map((w) => (
-          <TracingControlWindow
+      {referenceWindows.map((w) => {
+        const item = referenceItems.find((r) => r.id === w.id) ?? null;
+        return (
+          <ReferenceWindow
             key={w.id}
-            tracing={tracingImages.find((t) => t.id === w.id) ?? null}
-            isActive={activeTracingId === w.id}
             boundsRef={rootRef}
+            eyedropperActive={tool === "eyedropper"}
+            onPickColor={handlePickColor}
+            onClose={() => handleReferenceDelete(w.id)}
             zIndex={w.zIndex}
             spawnIndex={w.spawnIndex}
-            minimized={w.minimized}
-            onFocus={() => bringTracingWindowToFront(w.id)}
-            onToggleMinimize={() => toggleTracingWindowMinimized(w.id)}
-            onClose={() => handleTracingDelete(w.id)}
-            onImageLoaded={(image) => handleTracingImageLoaded(w.id, image)}
+            onFocus={() => bringReferenceWindowToFront(w.id)}
+            mode={item?.mode ?? DEFAULT_REFERENCE_MODE}
+            onModeChange={(mode) => handleReferenceModeChange(w.id, mode)}
+            image={item?.image ?? null}
+            onImageLoaded={(image) => handleReferenceImageLoaded(w.id, image)}
+            tracingGeometry={item?.tracingGeometry ?? null}
+            isAdjusting={activeReferenceId === w.id}
+            onToggleAdjust={() => handleToggleReferenceAdjust(w.id)}
             onOpacityChange={(opacity) =>
-              handleTracingOpacityChange(w.id, opacity)
+              handleReferenceOpacityChange(w.id, opacity)
             }
-            onToggleAdjust={() => handleToggleTracingAdjust(w.id)}
           />
-        ))}
+        );
+      })}
     </div>
   );
 }
