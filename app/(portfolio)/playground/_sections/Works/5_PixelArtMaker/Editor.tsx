@@ -2,6 +2,7 @@
 
 import {
   Download,
+  Image as ImageIcon,
   ImagePlus,
   Layers as LayersIcon,
   Minus,
@@ -48,6 +49,8 @@ import { mixHex } from "./hsv";
 import ImportPanel from "./ImportPanel";
 import LayerPanel from "./LayerPanel";
 import FrameFilmstrip from "./FrameFilmstrip";
+import TracingControlWindow from "./TracingControlWindow";
+import TracingListPanel from "./TracingListPanel";
 import NewCanvasDialog from "./NewCanvasDialog";
 import ReferenceWindow from "./ReferenceWindow";
 import PixelCanvas, {
@@ -564,7 +567,7 @@ export default function Editor({
   // narrow일 때 이미지 불러오기/내보내기 사이드바가 아이콘 두 개로 줄어들고,
   // 그 중 하나를 누르면 이 상태에 맞는 패널이 플로팅 팝업으로 뜬다.
   const [openFloatingPanel, setOpenFloatingPanel] = useState<
-    "layers" | "import" | "export" | null
+    "layers" | "import" | "export" | "tracing" | null
   >(null);
   // 확대 상태에서 스페이스+드래그로 스크롤할 대상 — PixelCanvas에 그대로 내려준다.
   const canvasViewportRef = useRef<HTMLDivElement>(null);
@@ -2838,7 +2841,9 @@ export default function Editor({
                   ? "레이어"
                   : openFloatingPanel === "import"
                     ? "이미지 불러오기"
-                    : "내보내기";
+                    : openFloatingPanel === "export"
+                      ? "내보내기"
+                      : "트레이싱";
               const layerPanel = (
                 <LayerPanel
                   layers={history.presentLayers}
@@ -2922,6 +2927,23 @@ export default function Editor({
                   >
                     <Download className="h-4 w-4" />
                   </button>
+                  {tracingMode && (
+                    <button
+                      onClick={() =>
+                        setOpenFloatingPanel((p) =>
+                          p === "tracing" ? null : "tracing",
+                        )
+                      }
+                      title="트레이싱"
+                      className={`flex h-8 w-8 items-center justify-center transition-colors ${
+                        openFloatingPanel === "tracing"
+                          ? "bg-violet-500 text-white"
+                          : "bg-white text-gray-500 shadow-md hover:bg-gray-50"
+                      }`}
+                    >
+                      <ImageIcon className="h-4 w-4" />
+                    </button>
+                  )}
                   {openFloatingPanel && (
                     <div className="absolute top-0 right-full z-40 mr-2 flex max-h-full w-72 flex-col bg-white shadow-xl">
                       <div className="flex shrink-0 items-center justify-between px-3 py-2 text-xs font-semibold text-gray-500">
@@ -2935,11 +2957,25 @@ export default function Editor({
                         </button>
                       </div>
                       <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-3 pt-0">
-                        {openFloatingPanel === "layers"
-                          ? layerPanel
-                          : openFloatingPanel === "import"
-                            ? importPanel
-                            : exportPanel}
+                        {openFloatingPanel === "layers" ? (
+                          layerPanel
+                        ) : openFloatingPanel === "import" ? (
+                          importPanel
+                        ) : openFloatingPanel === "export" ? (
+                          exportPanel
+                        ) : (
+                          <TracingListPanel
+                            tracingImages={tracingImages}
+                            activeTracingId={activeTracingId}
+                            onAdd={handleTracingListAdd}
+                            onOpacityChange={handleTracingOpacityChange}
+                            onToggleAdjust={(id) => {
+                              handleToggleTracingAdjust(id);
+                              setOpenFloatingPanel(null);
+                            }}
+                            onDelete={handleTracingDelete}
+                          />
+                        )}
                       </div>
                     </div>
                   )}
@@ -3268,6 +3304,27 @@ export default function Editor({
           onFocus={() => bringReferenceWindowToFront(w.id)}
         />
       ))}
+
+      {tracingMode &&
+        tracingWindows.map((w) => (
+          <TracingControlWindow
+            key={w.id}
+            tracing={tracingImages.find((t) => t.id === w.id) ?? null}
+            isActive={activeTracingId === w.id}
+            boundsRef={rootRef}
+            zIndex={w.zIndex}
+            spawnIndex={w.spawnIndex}
+            minimized={w.minimized}
+            onFocus={() => bringTracingWindowToFront(w.id)}
+            onToggleMinimize={() => toggleTracingWindowMinimized(w.id)}
+            onClose={() => handleTracingDelete(w.id)}
+            onImageLoaded={(image) => handleTracingImageLoaded(w.id, image)}
+            onOpacityChange={(opacity) =>
+              handleTracingOpacityChange(w.id, opacity)
+            }
+            onToggleAdjust={() => handleToggleTracingAdjust(w.id)}
+          />
+        ))}
     </div>
   );
 }
