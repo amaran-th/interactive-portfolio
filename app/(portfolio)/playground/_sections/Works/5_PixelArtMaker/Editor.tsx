@@ -3372,7 +3372,7 @@ export default function Editor({
       />
 
       {!narrow &&
-        referenceWindows.map((w) => {
+        referenceWindows.map((w, i) => {
           const item = referenceItems.find((r) => r.id === w.id) ?? null;
           return (
             <ReferenceWindow
@@ -3383,6 +3383,7 @@ export default function Editor({
               onClose={() => handleReferenceDelete(w.id)}
               zIndex={w.zIndex}
               spawnIndex={w.spawnIndex}
+              windowNumber={i + 1}
               onFocus={() => bringReferenceWindowToFront(w.id)}
               mode={item?.mode ?? DEFAULT_REFERENCE_MODE}
               onModeChange={(mode) => handleReferenceModeChange(w.id, mode)}

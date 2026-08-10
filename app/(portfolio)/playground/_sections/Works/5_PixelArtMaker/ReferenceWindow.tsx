@@ -17,10 +17,6 @@ const DEFAULT_WIDTH = 420;
 const DEFAULT_HEIGHT = 360;
 const MIN_WIDTH = 240;
 const MIN_HEIGHT = 200;
-// 트레이싱 모드일 때는 참고 모드처럼 뷰포트를 자유 리사이즈할 이유가 없다
-// (TracingControlWindow가 쓰던 고정 폭을 그대로 가져온다) — 창 높이는 내용에
-// 맞춰 자동으로 정해진다.
-const TRACING_WINDOW_WIDTH = 220;
 const TITLE_BAR_HEIGHT = 32;
 const ZOOM_STEPS = [0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8];
 // 편집기 창(rootRef) 자체가 overflow-hidden이라, 이 창이 그 경계 밖으로 나가는
@@ -73,6 +69,7 @@ export default function ReferenceWindow({
   eyedropperActive,
   zIndex,
   spawnIndex,
+  windowNumber,
   onFocus,
   mode,
   onModeChange,
@@ -98,6 +95,11 @@ export default function ReferenceWindow({
   // 창이 열릴 때 한 번만 정해지는 순번 — 기본 위치를 계단식으로 어긋나게
   // 배치하는 데만 쓰고, 포커스가 바뀌어도 값 자체는 변하지 않는다.
   spawnIndex: number;
+  // (신규) 지금 열려 있는 레퍼런스 창 중 이 창의 순서(1부터) — 제목표시줄에
+  // "레퍼런스1", "레퍼런스2"처럼 표시해 여러 창을 구분한다. spawnIndex와
+  // 달리 창이 닫히면 나머지 창들의 번호가 다시 앞으로 당겨진다(항상 지금
+  // 열려 있는 창 개수만큼 1..N으로 채워짐).
+  windowNumber: number;
   // 창의 아무 곳이나 누르면 Editor에 알려 이 창을 맨 앞으로 올리게 한다.
   onFocus: () => void;
   // (신규) 지금 이 창이 참고 모드인지 트레이싱 모드인지 — Editor의
@@ -171,10 +173,6 @@ export default function ReferenceWindow({
     moved: boolean;
   } | null>(null);
 
-  // (신규) 창의 실제 폭 — 참고 모드는 자유 리사이즈된 size.width, 트레이싱
-  // 모드는 고정폭. clampPos·outer div 스타일이 모두 이 값을 쓴다.
-  const windowWidth = mode === "tracing" ? TRACING_WINDOW_WIDTH : size.width;
-
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !image || mode !== "lookup") return;
@@ -234,7 +232,7 @@ export default function ReferenceWindow({
     (nextPos: { x: number; y: number }) => {
       const bounds = getBounds();
       if (!bounds) return nextPos;
-      const minX = bounds.left + MIN_VISIBLE_PX - windowWidth;
+      const minX = bounds.left + MIN_VISIBLE_PX - size.width;
       const maxX = bounds.right - MIN_VISIBLE_PX;
       const minY = bounds.top + MIN_VISIBLE_PX - TITLE_BAR_HEIGHT;
       const maxY = bounds.bottom - MIN_VISIBLE_PX;
@@ -243,7 +241,7 @@ export default function ReferenceWindow({
         y: Math.min(Math.max(nextPos.y, minY), maxY),
       };
     },
-    [getBounds, windowWidth],
+    [getBounds, size.width],
   );
 
   // 창이 뜬 직후, 그리고 브라우저 창 크기가 바뀌어 배경화면 상자 자체가
@@ -260,13 +258,6 @@ export default function ReferenceWindow({
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);
   }, [clampPos]);
-  // 참고 모드(자유 리사이즈 size.width)에서 트레이싱 모드(고정폭
-  // TRACING_WINDOW_WIDTH)로 바뀌면 windowWidth 자체가 좁아져 clampPos의
-  // 유효 범위도 함께 바뀐다 — 왼쪽 가장자리 근처에 있던 창이 더 이상
-  // 화면 안에 있지 않게 될 수 있으므로 폭이 바뀔 때마다 다시 당겨 넣는다.
-  useEffect(() => {
-    setPos((p) => clampPos(p));
-  }, [windowWidth, clampPos]);
 
   // 제목표시줄을 드래그해 창을 옮긴다 — pos는 rootRef 기준 로컬 좌표이므로
   // 마우스의 뷰포트 좌표(clientX/Y)도 먼저 로컬로 바꿔야 어긋나지 않는다.
@@ -425,8 +416,8 @@ export default function ReferenceWindow({
       style={{
         left: pos.x,
         top: pos.y,
-        width: windowWidth,
-        height: minimized || mode === "tracing" ? undefined : size.height,
+        width: size.width,
+        height: minimized ? undefined : size.height,
         zIndex,
       }}
       onPointerDownCapture={onFocus}
@@ -439,7 +430,7 @@ export default function ReferenceWindow({
         className="flex touch-none items-center justify-between bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700"
         style={{ cursor: CURSOR_MOVE }}
       >
-        <span>레퍼런스</span>
+        <span>레퍼런스{windowNumber}</span>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setMinimized((m) => !m)}
@@ -655,23 +646,23 @@ export default function ReferenceWindow({
               </button>
             </div>
           )}
-          {/* 크기 조절 손잡이 — 참고 모드에서만, 우하단 모서리를 드래그하면
-              늘고 준다(트레이싱 모드는 고정폭·자동높이라 리사이즈가 없다). */}
-          {mode === "lookup" && (
-            <div
-              onPointerDown={handleResizeDown}
-              onPointerMove={handleResizeMove}
-              onPointerUp={handleResizeUp}
-              onPointerCancel={handleResizeUp}
-              title="드래그해서 창 크기 조절"
-              className="absolute right-0 bottom-0 h-4 w-4 touch-none"
-              style={{
-                cursor: CURSOR_NWSE_RESIZE,
-                background:
-                  "linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.2) 50%)",
-              }}
-            />
-          )}
+          {/* 크기 조절 손잡이 — 우하단 모서리를 드래그하면 늘고 준다. 두
+              모드가 같은 size 상태를 공유하므로(모드마다 다른 고정폭을
+              쓰던 예전과 달리) 모드를 전환해도 창 크기가 그대로 유지된다 —
+              리사이즈도 모드와 무관하게 항상 가능하다. */}
+          <div
+            onPointerDown={handleResizeDown}
+            onPointerMove={handleResizeMove}
+            onPointerUp={handleResizeUp}
+            onPointerCancel={handleResizeUp}
+            title="드래그해서 창 크기 조절"
+            className="absolute right-0 bottom-0 h-4 w-4 touch-none"
+            style={{
+              cursor: CURSOR_NWSE_RESIZE,
+              background:
+                "linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.2) 50%)",
+            }}
+          />
         </div>
       )}
     </div>
