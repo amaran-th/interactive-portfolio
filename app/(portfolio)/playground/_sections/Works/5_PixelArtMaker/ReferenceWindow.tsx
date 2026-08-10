@@ -1,6 +1,6 @@
 "use client";
 
-import { Minus, Plus, X } from "lucide-react";
+import { Minus, Pencil, Plus, X } from "lucide-react";
 import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { useImageFileLoader } from "./useImageFileLoader";
 import {
@@ -11,11 +11,16 @@ import {
   CURSOR_POINTING,
 } from "./cursors";
 import Magnifier, { MAGNIFIER_RADIUS, MagnifierGrid } from "./Magnifier";
+import { ReferenceMode, TracingImage } from "./types";
 
 const DEFAULT_WIDTH = 420;
 const DEFAULT_HEIGHT = 360;
 const MIN_WIDTH = 240;
 const MIN_HEIGHT = 200;
+// 트레이싱 모드일 때는 참고 모드처럼 뷰포트를 자유 리사이즈할 이유가 없다
+// (TracingControlWindow가 쓰던 고정 폭을 그대로 가져온다) — 창 높이는 내용에
+// 맞춰 자동으로 정해진다.
+const TRACING_WINDOW_WIDTH = 220;
 const TITLE_BAR_HEIGHT = 32;
 const ZOOM_STEPS = [0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8];
 // 편집기 창(rootRef) 자체가 overflow-hidden이라, 이 창이 그 경계 밖으로 나가는
@@ -54,10 +59,13 @@ function sampleHex(
   return `#${[d[0], d[1], d[2]].map((n) => n.toString(16).padStart(2, "0")).join("")}`;
 }
 
-// 편집기 세션 안에서 일회성으로 여는 참고 이미지 창 — 붙여넣거나 불러온
-// 이미지를 localStorage 등 어디에도 저장하지 않는다(닫으면 그냥 사라진다).
-// 오직 두 가지만 한다: 참고 이미지를 확대·이동해가며 보는 것, 그리고 편집기의
-// 스포이트 도구가 활성화된 상태에서 그 위를 클릭해 뽑은 색을 넘기는 것.
+// 편집기 세션 안에서 열고 닫는 일회성 레퍼런스 창 — 붙여넣거나 불러온 이미지를
+// localStorage 등 어디에도 저장하지 않는다(닫으면 그냥 사라진다). 같은 이미지를
+// 두 가지 방식으로 쓸 수 있다: 참고 모드(뷰포트로 확대·이동해 보면서 스포이트로
+// 색을 뽑는다)와 트레이싱 모드(캔버스 배경에 깔아두고 이동·크기·회전을 조정하며
+// 따라 그린다, 조정 자체는 캔버스 위에서 이루어지고 이 창은 트리거·투명도만
+// 담당한다). 모드를 오가도 이미지와 트레이싱 지오메트리(위치·크기·회전)는
+// 유지된다 — Editor가 이 두 가지를 이 창의 생애주기보다 오래 들고 있는다.
 export default function ReferenceWindow({
   onClose,
   onPickColor,
@@ -66,6 +74,14 @@ export default function ReferenceWindow({
   zIndex,
   spawnIndex,
   onFocus,
+  mode,
+  onModeChange,
+  image,
+  onImageLoaded,
+  tracingGeometry,
+  isAdjusting,
+  onToggleAdjust,
+  onOpacityChange,
 }: {
   onClose: () => void;
   onPickColor: (hex: string) => void;
@@ -73,7 +89,8 @@ export default function ReferenceWindow({
   // 나갈 수 없게 한다 — rootRef는 이미 편집기 창과 정확히 같은 크기·위치라
   // 별도의 가운데 정렬 계산 없이 그 경계를 그대로 쓰면 된다.
   boundsRef: RefObject<HTMLDivElement | null>;
-  // 편집기에서 스포이트 도구를 선택한 상태일 때만 클릭이 색 추출로 이어진다.
+  // 편집기에서 스포이트 도구를 선택한 상태일 때만(그리고 참고 모드일 때만
+  // 실제로 뷰포트가 떠서 클릭할 수 있다) 클릭이 색 추출로 이어진다.
   eyedropperActive: boolean;
   // 여러 창을 동시에 띄울 수 있어, 마지막으로 만진 창이 항상 맨 앞에 오도록
   // Editor가 관리하는 z-index를 그대로 받아 쓴다.
@@ -83,6 +100,23 @@ export default function ReferenceWindow({
   spawnIndex: number;
   // 창의 아무 곳이나 누르면 Editor에 알려 이 창을 맨 앞으로 올리게 한다.
   onFocus: () => void;
+  // (신규) 지금 이 창이 참고 모드인지 트레이싱 모드인지 — Editor의
+  // ReferenceItem.mode를 그대로 받는다.
+  mode: ReferenceMode;
+  onModeChange: (mode: ReferenceMode) => void;
+  // (신규) 이미지 자체는 이제 이 창의 로컬 상태가 아니라 Editor가 들고 있다 —
+  // 모드를 오가도 같은 이미지를 써야 하므로 창 하나에 가둘 수 없다.
+  image: HTMLImageElement | null;
+  onImageLoaded: (image: HTMLImageElement) => void;
+  // (신규) 트레이싱 모드 전용 지오메트리 — mode === "tracing"일 때만 읽는다.
+  // 아직 한 번도 트레이싱 모드에 들어간 적 없으면 null(Editor가 처음 진입 시
+  // 채워 준다).
+  tracingGeometry: Omit<TracingImage, "id" | "image"> | null;
+  // (신규) 지금 캔버스 위에서 이 항목의 이동·크기·회전 손잡이가 떠 있는지.
+  isAdjusting: boolean;
+  onToggleAdjust: () => void;
+  // (신규) 트레이싱 지오메트리의 투명도만 바꾼다.
+  onOpacityChange: (opacity: number) => void;
 }) {
   const cascade = (spawnIndex % SPAWN_CASCADE_WRAP) * SPAWN_CASCADE_STEP;
   const [pos, setPos] = useState({ x: 160 + cascade, y: 110 + cascade });
@@ -91,17 +125,21 @@ export default function ReferenceWindow({
     height: DEFAULT_HEIGHT,
   });
   const [minimized, setMinimized] = useState(false);
-  const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(1);
-  const { loadFile, handleDrop, handlePasteFromClipboard, isDragOver, setIsDragOver } =
-    useImageFileLoader((img) => {
-      setImage(img);
-      setZoom(1);
-    });
+  const {
+    loadFile,
+    handleDrop,
+    handlePasteFromClipboard,
+    isDragOver,
+    setIsDragOver,
+  } = useImageFileLoader((img) => {
+    onImageLoaded(img);
+    setZoom(1);
+  });
   // 캔버스 자체 배율(zoom)과는 별개로, "100%"가 실제 픽셀 1:1이 아니라
   // "지금 창 안에 이미지 전체가 보이는 크기"를 뜻하게 한다 — 메인 캔버스의
   // 배율 1 = 화면 맞춤 관례와 통일한다. 실제 표시 크기 = 원본 크기 ×
-  // fitScale × zoom.
+  // fitScale × zoom. (참고 모드 전용 — 트레이싱 모드는 안 쓴다.)
   const [fitScale, setFitScale] = useState(1);
   // 스포이트 도구가 활성화된 동안 커서를 따라다니는 확대경 위치 — 그리드
   // 좌표(캔버스 네이티브 픽셀)와 화면 좌표(확대경을 띄울 위치)를 함께 든다.
@@ -133,23 +171,28 @@ export default function ReferenceWindow({
     moved: boolean;
   } | null>(null);
 
+  // (신규) 창의 실제 폭 — 참고 모드는 자유 리사이즈된 size.width, 트레이싱
+  // 모드는 고정폭. clampPos·outer div 스타일이 모두 이 값을 쓴다.
+  const windowWidth = mode === "tracing" ? TRACING_WINDOW_WIDTH : size.width;
+
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !image) return;
+    if (!canvas || !image || mode !== "lookup") return;
     canvas.width = image.naturalWidth;
     canvas.height = image.naturalHeight;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(image, 0, 0);
-  }, [image]);
+  }, [image, mode]);
 
   // 이미지를 새로 불러올 때마다 창 안에 전체가 들어오는 배율을 다시 잰다 —
   // 메인 캔버스의 "배율 1 = 화면 맞춤" 관례와 통일해, zoom=1(100%)이 실제
   // 픽셀 1:1이 아니라 "지금 창 안에 전체가 보이는 크기"를 뜻하게 한다.
+  // (참고 모드 전용 — 트레이싱 모드는 뷰포트 자체가 없다.)
   useEffect(() => {
     const container = viewportRef.current;
-    if (!container || !image) return;
+    if (!container || !image || mode !== "lookup") return;
     const update = () => {
       const availW = container.clientWidth;
       const availH = container.clientHeight;
@@ -162,7 +205,7 @@ export default function ReferenceWindow({
     const ro = new ResizeObserver(update);
     ro.observe(container);
     return () => ro.disconnect();
-  }, [image]);
+  }, [image, mode]);
 
   // 편집기 창(rootRef)에 transition-transform(scale)이 걸려 있어, 그 자식인
   // 이 창(position: fixed)의 containing block이 뷰포트가 아니라 rootRef
@@ -191,7 +234,7 @@ export default function ReferenceWindow({
     (nextPos: { x: number; y: number }) => {
       const bounds = getBounds();
       if (!bounds) return nextPos;
-      const minX = bounds.left + MIN_VISIBLE_PX - size.width;
+      const minX = bounds.left + MIN_VISIBLE_PX - windowWidth;
       const maxX = bounds.right - MIN_VISIBLE_PX;
       const minY = bounds.top + MIN_VISIBLE_PX - TITLE_BAR_HEIGHT;
       const maxY = bounds.bottom - MIN_VISIBLE_PX;
@@ -200,7 +243,7 @@ export default function ReferenceWindow({
         y: Math.min(Math.max(nextPos.y, minY), maxY),
       };
     },
-    [getBounds, size.width],
+    [getBounds, windowWidth],
   );
 
   // 창이 뜬 직후, 그리고 브라우저 창 크기가 바뀌어 배경화면 상자 자체가
@@ -286,7 +329,7 @@ export default function ReferenceWindow({
     resizeRef.current = null;
   }, []);
 
-  // Ctrl/Cmd+휠로 확대·축소 — 메인 캔버스와 같은 관례.
+  // Ctrl/Cmd+휠로 확대·축소 — 메인 캔버스와 같은 관례. (참고 모드 전용.)
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
@@ -375,8 +418,8 @@ export default function ReferenceWindow({
       style={{
         left: pos.x,
         top: pos.y,
-        width: size.width,
-        height: minimized ? undefined : size.height,
+        width: windowWidth,
+        height: minimized || mode === "tracing" ? undefined : size.height,
         zIndex,
       }}
       onPointerDownCapture={onFocus}
@@ -412,6 +455,31 @@ export default function ReferenceWindow({
 
       {!minimized && (
         <div className="relative flex flex-1 flex-col overflow-hidden">
+          {/* (신규) 모드 토글 — 참고 모드는 같은 이미지를 뷰포트로 보고,
+              트레이싱 모드는 캔버스 배경에 깔아 따라 그린다. */}
+          <div className="flex shrink-0 border-b border-gray-100 text-[10px]">
+            <button
+              onClick={() => onModeChange("lookup")}
+              className={`flex-1 py-1 ${
+                mode === "lookup"
+                  ? "bg-violet-50 font-semibold text-violet-700"
+                  : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              참고
+            </button>
+            <button
+              onClick={() => onModeChange("tracing")}
+              className={`flex-1 py-1 ${
+                mode === "tracing"
+                  ? "bg-violet-50 font-semibold text-violet-700"
+                  : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              트레이싱
+            </button>
+          </div>
+
           {!image ? (
             <div
               onDragOver={(e) => {
@@ -443,7 +511,7 @@ export default function ReferenceWindow({
                 클립보드에서 붙여넣기
               </button>
             </div>
-          ) : (
+          ) : mode === "lookup" ? (
             <>
               <div
                 ref={viewportRef}
@@ -524,21 +592,60 @@ export default function ReferenceWindow({
                 </div>
               </div>
             </>
+          ) : (
+            // (신규) 트레이싱 모드 본문 — TracingControlWindow.tsx에서 흡수.
+            <div className="flex flex-col gap-2 p-2">
+              <img
+                src={image.src}
+                alt=""
+                className="h-16 w-full bg-gray-50 object-contain"
+              />
+              <label className="flex items-center gap-2 text-[10px] text-gray-500">
+                투명도
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Math.round((tracingGeometry?.opacity ?? 1) * 100)}
+                  onChange={(e) =>
+                    onOpacityChange(Number(e.target.value) / 100)
+                  }
+                  className="flex-1"
+                />
+                <span className="w-7 shrink-0 text-right">
+                  {Math.round((tracingGeometry?.opacity ?? 1) * 100)}%
+                </span>
+              </label>
+              <button
+                onClick={onToggleAdjust}
+                className={`flex items-center justify-center gap-1 px-2 py-1 text-[10px] ${
+                  isAdjusting
+                    ? "bg-violet-500 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                <Pencil className="h-3 w-3" />
+                {isAdjusting ? "조정 중" : "조정"}
+              </button>
+            </div>
           )}
-          {/* 크기 조절 손잡이 — 우하단 모서리를 드래그하면 늘고 준다. */}
-          <div
-            onPointerDown={handleResizeDown}
-            onPointerMove={handleResizeMove}
-            onPointerUp={handleResizeUp}
-            onPointerCancel={handleResizeUp}
-            title="드래그해서 창 크기 조절"
-            className="absolute right-0 bottom-0 h-4 w-4 touch-none"
-            style={{
-              cursor: CURSOR_NWSE_RESIZE,
-              background:
-                "linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.2) 50%)",
-            }}
-          />
+          {/* 크기 조절 손잡이 — 참고 모드에서만, 우하단 모서리를 드래그하면
+              늘고 준다(트레이싱 모드는 고정폭·자동높이라 리사이즈가 없다). */}
+          {mode === "lookup" && (
+            <div
+              onPointerDown={handleResizeDown}
+              onPointerMove={handleResizeMove}
+              onPointerUp={handleResizeUp}
+              onPointerCancel={handleResizeUp}
+              title="드래그해서 창 크기 조절"
+              className="absolute right-0 bottom-0 h-4 w-4 touch-none"
+              style={{
+                cursor: CURSOR_NWSE_RESIZE,
+                background:
+                  "linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.2) 50%)",
+              }}
+            />
+          )}
         </div>
       )}
     </div>
