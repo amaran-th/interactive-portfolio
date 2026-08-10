@@ -456,25 +456,44 @@ export default function ReferenceWindow({
       {!minimized && (
         <div className="relative flex flex-1 flex-col overflow-hidden">
           {/* (신규) 모드 토글 — 참고 모드는 같은 이미지를 뷰포트로 보고,
-              트레이싱 모드는 캔버스 배경에 깔아 따라 그린다. */}
-          <div className="flex shrink-0 border-b border-gray-100 text-[10px]">
+              트레이싱 모드는 캔버스 배경에 깔아 따라 그린다. 스위치 형태라
+              지금 상태가 한눈에 보인다 — 좌우 라벨을 눌러 그 모드로 바로
+              가거나, 스위치 자체를 눌러 토글할 수 있다. */}
+          <div className="flex shrink-0 items-center justify-center gap-2 border-b border-gray-100 px-3 py-1.5 text-[10px]">
             <button
               onClick={() => onModeChange("lookup")}
-              className={`flex-1 py-1 ${
+              className={
                 mode === "lookup"
-                  ? "bg-violet-50 font-semibold text-violet-700"
-                  : "text-gray-500 hover:bg-gray-50"
-              }`}
+                  ? "font-semibold text-violet-700"
+                  : "text-gray-400 hover:text-gray-600"
+              }
             >
               참고
             </button>
             <button
-              onClick={() => onModeChange("tracing")}
-              className={`flex-1 py-1 ${
-                mode === "tracing"
-                  ? "bg-violet-50 font-semibold text-violet-700"
-                  : "text-gray-500 hover:bg-gray-50"
+              onClick={() => onModeChange(mode === "lookup" ? "tracing" : "lookup")}
+              role="switch"
+              aria-checked={mode === "tracing"}
+              title="참고/트레이싱 모드 전환"
+              className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                mode === "tracing" ? "bg-violet-400" : "bg-gray-200"
               }`}
+            >
+              <span
+                className="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform"
+                style={{
+                  transform:
+                    mode === "tracing" ? "translateX(16px)" : "translateX(0)",
+                }}
+              />
+            </button>
+            <button
+              onClick={() => onModeChange("tracing")}
+              className={
+                mode === "tracing"
+                  ? "font-semibold text-violet-700"
+                  : "text-gray-400 hover:text-gray-600"
+              }
             >
               트레이싱
             </button>
