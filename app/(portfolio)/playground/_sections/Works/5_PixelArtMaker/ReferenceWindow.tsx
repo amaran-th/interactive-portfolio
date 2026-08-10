@@ -611,11 +611,15 @@ export default function ReferenceWindow({
             </>
           ) : (
             // (신규) 트레이싱 모드 본문 — TracingControlWindow.tsx에서 흡수.
-            <div className="flex flex-col gap-2 p-2">
+            // 참고 모드와 창 크기를 공유하게 되면서 남는 세로 공간이 생길 수
+            // 있다 — 썸네일을 flex-1로 늘려 그 공간을 채운다(슬라이더·버튼은
+            // 원래 크기 그대로, min-h-0은 flex 자식이 내용 크기 밑으로
+            // 줄어들지 못하는 기본 동작을 풀어 실제로 늘어나게 한다).
+            <div className="flex flex-1 flex-col gap-2 p-2">
               <img
                 src={image.src}
                 alt=""
-                className="h-16 w-full bg-gray-50 object-contain"
+                className="w-full min-h-0 flex-1 bg-gray-50 object-contain"
               />
               <label className="flex items-center gap-2 text-[10px] text-gray-500">
                 투명도
