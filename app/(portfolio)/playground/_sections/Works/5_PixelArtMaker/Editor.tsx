@@ -87,12 +87,15 @@ import {
   CANVAS_PRESETS,
   DEFAULT_CANVAS_BG_COLOR,
   DEFAULT_FRAME_DURATION_MS,
+  DEFAULT_REFERENCE_MODE,
   DEFAULT_TRACING_OPACITY,
   MAX_CANVAS_SIZE,
   MAX_LAYERS,
   NARROW_BREAKPOINT,
   nextZoomStep,
   ONION_SKIN_OPACITY,
+  ReferenceItem,
+  ReferenceMode,
   SELECT_TOOL_CATEGORY,
   SelectMode,
   Tool,
@@ -494,6 +497,175 @@ export default function Editor({
   const handleTracingDeselect = useCallback(() => {
     setActiveTracingId(null);
   }, []);
+  // (신규) 레퍼런스/트레이싱 통합 — 레퍼런스 항목 하나가 참고 모드와
+  // 트레이싱 모드를 오갈 수 있다. referenceItems가 그 데이터(이미지·모드·
+  // 트레이싱 지오메트리)를 들고, referenceWindows(기존)가 창 UI 상태(위치·
+  // z-index)를 든다 — 이 둘은 id로 짝을 이루는 병렬 배열이다.
+  const [referenceItems, setReferenceItems] = useState<ReferenceItem[]>([]);
+  // 지금 캔버스 위에서 이동·크기·회전 손잡이가 떠 있는 대상 — 트레이싱
+  // 모드인 항목에만 의미가 있다(참고 모드에서는 "조정" 버튼 자체가 없다).
+  const [activeReferenceId, setActiveReferenceId] = useState<string | null>(
+    null,
+  );
+  // 이미지를 처음 불러왔을 때 데이터 항목을 만든다 — 기본 모드는 참고 모드.
+  // id는 wide에서는 미리 만들어 둔 referenceWindows 항목의 id를 그대로
+  // 받고, narrow(handleReferenceListAdd)에서는 새로 만든다.
+  const handleReferenceImageLoaded = useCallback(
+    (id: string, image: HTMLImageElement) => {
+      setReferenceItems((items) => [
+        ...items,
+        {
+          id,
+          image,
+          mode: DEFAULT_REFERENCE_MODE,
+          tracingGeometry: null,
+        },
+      ]);
+    },
+    [],
+  );
+  // narrow의 TracingListPanel은 wide처럼 미리 만들어 둔 "빈 창"이 없다 —
+  // 이미지를 고르는 즉시 새 id로 바로 추가하되, narrow는 참고 모드 뷰가
+  // 없으므로 트레이싱 모드로 강제하고 지오메트리도 바로 계산해 채운다
+  // (캔버스에 맞춰 가운데 정렬한 fit 크기 — ReferenceWindow의 fitScale과
+  // 같은 관례: 배율 1 = 화면 맞춤).
+  const handleReferenceListAdd = useCallback(
+    (image: HTMLImageElement) => {
+      const id = uid();
+      const fitScale = Math.min(
+        doc.width / image.naturalWidth,
+        doc.height / image.naturalHeight,
+      );
+      const w = image.naturalWidth * fitScale;
+      const h = image.naturalHeight * fitScale;
+      setReferenceItems((items) => [
+        ...items,
+        {
+          id,
+          image,
+          mode: "tracing",
+          tracingGeometry: {
+            x: (doc.width - w) / 2,
+            y: (doc.height - h) / 2,
+            width: w,
+            height: h,
+            rotationDeg: 0,
+            opacity: DEFAULT_TRACING_OPACITY,
+          },
+        },
+      ]);
+    },
+    [doc.width, doc.height],
+  );
+  // 모드를 바꾼다. "tracing"으로 처음 들어가는 순간(tracingGeometry가 아직
+  // null)이면 캔버스에 맞춰 가운데 정렬한 fit 크기로 한 번만 채운다 — 이미
+  // 값이 있으면(참고 모드를 거쳐 다시 트레이싱으로 돌아온 경우) 그대로
+  // 둔다(모드를 오가도 위치를 기억). 반대로 "tracing"에서 다른 모드로
+  // 바뀌는데 그 항목이 조정 중이었다면 조정 상태도 함께 해제한다 — 안
+  // 그러면 손잡이가 안 보이는 모드를 거쳤다가 나중에 다시 트레이싱으로
+  // 돌아왔을 때 손잡이가 뜬금없이 다시 나타난다.
+  const handleReferenceModeChange = useCallback(
+    (id: string, mode: ReferenceMode) => {
+      setReferenceItems((items) =>
+        items.map((r) => {
+          if (r.id !== id) return r;
+          if (mode !== "tracing" || r.tracingGeometry || !r.image) {
+            return { ...r, mode };
+          }
+          const fitScale = Math.min(
+            doc.width / r.image.naturalWidth,
+            doc.height / r.image.naturalHeight,
+          );
+          const w = r.image.naturalWidth * fitScale;
+          const h = r.image.naturalHeight * fitScale;
+          return {
+            ...r,
+            mode,
+            tracingGeometry: {
+              x: (doc.width - w) / 2,
+              y: (doc.height - h) / 2,
+              width: w,
+              height: h,
+              rotationDeg: 0,
+              opacity: DEFAULT_TRACING_OPACITY,
+            },
+          };
+        }),
+      );
+      if (mode !== "tracing") {
+        setActiveReferenceId((cur) => (cur === id ? null : cur));
+      }
+    },
+    [doc.width, doc.height],
+  );
+  const handleReferenceOpacityChange = useCallback(
+    (id: string, opacity: number) => {
+      setReferenceItems((items) =>
+        items.map((r) =>
+          r.id === id && r.tracingGeometry
+            ? { ...r, tracingGeometry: { ...r.tracingGeometry, opacity } }
+            : r,
+        ),
+      );
+    },
+    [],
+  );
+  // 창의 닫기(X)와 narrow 리스트 패널의 삭제 버튼이 공유하는 단일 삭제
+  // 핸들러 — 창 항목과 데이터 항목을 함께 지우고, 지금 그 항목을 조정
+  // 중이었다면 조정 상태도 함께 해제한다.
+  const handleReferenceDelete = useCallback((id: string) => {
+    setReferenceWindows((ws) => ws.filter((w) => w.id !== id));
+    setReferenceItems((items) => items.filter((r) => r.id !== id));
+    setActiveReferenceId((cur) => (cur === id ? null : cur));
+  }, []);
+  const handleToggleReferenceAdjust = useCallback((id: string) => {
+    setActiveReferenceId((cur) => (cur === id ? null : id));
+  }, []);
+  const activeReferenceItem =
+    referenceItems.find((r) => r.id === activeReferenceId) ?? null;
+  const handleActiveReferenceGeometryChange = useCallback(
+    (
+      patch: Partial<
+        Pick<TracingImage, "x" | "y" | "width" | "height" | "rotationDeg">
+      >,
+    ) => {
+      setReferenceItems((items) =>
+        items.map((r) =>
+          r.id === activeReferenceId && r.tracingGeometry
+            ? { ...r, tracingGeometry: { ...r.tracingGeometry, ...patch } }
+            : r,
+        ),
+      );
+    },
+    [activeReferenceId],
+  );
+  const handleReferenceDeselect = useCallback(() => {
+    setActiveReferenceId(null);
+  }, []);
+  // PixelCanvas·narrow 리스트 패널(둘 다 TracingImage[]를 받는다)에 넘길
+  // 배열 — 이미지가 있고 트레이싱 모드인 항목만 걸러 TracingImage 모양으로
+  // 편다. 이 파생 하나를 두 소비처가 함께 쓴다.
+  const tracingCanvasImages: TracingImage[] = referenceItems
+    .filter(
+      (
+        r,
+      ): r is ReferenceItem & {
+        image: HTMLImageElement;
+        tracingGeometry: NonNullable<ReferenceItem["tracingGeometry"]>;
+      } =>
+        r.mode === "tracing" && r.image !== null && r.tracingGeometry !== null,
+    )
+    .map((r) => ({ id: r.id, image: r.image, ...r.tracingGeometry }));
+  const activeTracingCanvasImage: TracingImage | null =
+    activeReferenceItem?.mode === "tracing" &&
+    activeReferenceItem.image &&
+    activeReferenceItem.tracingGeometry
+      ? {
+          id: activeReferenceItem.id,
+          image: activeReferenceItem.image,
+          ...activeReferenceItem.tracingGeometry,
+        }
+      : null;
   const [showGrid, setShowGrid] = useState(true);
   const [showCrosshair, setShowCrosshair] = useState(false);
   const [brushSize, setBrushSize] = useState(1);
