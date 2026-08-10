@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
+  Droplet,
   Eye,
   EyeOff,
   Layers as LayersIcon,
@@ -12,7 +13,6 @@ import {
   Play,
   Plus,
   Repeat,
-  SlidersHorizontal,
   Sparkles,
   Trash2,
   Unlock,
@@ -204,7 +204,7 @@ export default function LayerPanel({
                   onClick={() => onSelect(layer.id)}
                   className={`flex cursor-pointer items-center gap-2 px-2 py-1.5 ${
                     isActive ? "bg-violet-50" : "hover:bg-gray-50"
-                  }`}
+                  } ${layer.visible ? "" : "opacity-40"}`}
                 >
                   <input
                     type="checkbox"
@@ -277,7 +277,7 @@ export default function LayerPanel({
               );
             })}
           </div>
-          <div className="shrink-0 border-t border-gray-100 px-3 py-2">
+          <div className="relative shrink-0 border-t border-gray-100 px-3 py-2">
             <label className="flex items-center gap-2 text-[10px] text-gray-500">
               투명도
               <input
@@ -295,22 +295,20 @@ export default function LayerPanel({
               <span className="w-7 shrink-0 text-right">
                 {Math.round(activeLayer.opacity * 100)}%
               </span>
+              <button
+                onClick={() => setShowFilterPanel((v) => !v)}
+                title="블렌드 모드·색보정"
+                className={`flex h-6 w-6 shrink-0 items-center justify-center ${
+                  hasActiveFilter
+                    ? "bg-violet-500 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                <Droplet className="h-3.5 w-3.5" />
+              </button>
             </label>
-          </div>
-          <div className="relative shrink-0 border-t border-gray-100 px-3 py-2">
-            <button
-              onClick={() => setShowFilterPanel((v) => !v)}
-              title="블렌드 모드·색보정"
-              className={`flex h-6 w-6 items-center justify-center ${
-                hasActiveFilter
-                  ? "bg-violet-500 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-            </button>
             {showFilterPanel && (
-              <div className="absolute top-full left-0 z-30 mt-1 flex w-56 flex-col gap-1 bg-white p-2 shadow-xl">
+              <div className="absolute top-full right-0 z-30 mt-1 flex w-56 flex-col gap-1 bg-white p-2 shadow-xl">
                 <label className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
                   블렌드 모드
                   <select
