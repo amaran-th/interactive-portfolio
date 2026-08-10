@@ -1823,6 +1823,8 @@ export default function Editor({
     hasPendingShape: !!pendingShape,
     onCommitPendingShape: handlePendingShapeCommit,
     onCancelPendingShape: handlePendingShapeCancel,
+    hasActiveTracing: !!activeTracingId,
+    onCancelActiveTracing: handleTracingDeselect,
   });
 
   // "+" 버튼으로 지금 활성 색상을 즐겨찾기에 명시적으로 추가한다.
@@ -2686,6 +2688,10 @@ export default function Editor({
                     onPendingShapeCommit={handlePendingShapeCommit}
                     onPendingShapeCancel={handlePendingShapeCancel}
                     bottomToolbarPortalTarget={secondaryToolbarPortal}
+                    tracingImages={tracingMode ? tracingImages : []}
+                    activeTracingImage={tracingMode ? activeTracingImage : null}
+                    onActiveTracingChange={handleActiveTracingChange}
+                    onActiveTracingDeselect={handleTracingDeselect}
                   />
                 </div>
                 {/* 캔버스를 스크롤하는 safe-center flex 컨테이너 밖(이 바깥 relative
