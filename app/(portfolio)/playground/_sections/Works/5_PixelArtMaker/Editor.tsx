@@ -310,6 +310,32 @@ function prevVisibleFrame(
   return null;
 }
 
+// 트레이싱 모드에 처음 들어갈 때 캔버스에 맞춰 가운데 정렬한 fit 크기의
+// 초기 지오메트리를 계산한다 — 이미지를 불러오는 세 진입점(narrow의
+// handleReferenceListAdd, 모드 전환의 handleReferenceModeChange, 트레이싱
+// 모드로 미리 전환해 둔 뒤 이미지가 뒤늦게 로드되는 handleReferenceImageLoaded)
+// 이 같은 계산을 중복 없이 공유한다.
+function computeFitTracingGeometry(
+  docWidth: number,
+  docHeight: number,
+  image: HTMLImageElement,
+): Omit<TracingImage, "id" | "image"> {
+  const fitScale = Math.min(
+    docWidth / image.naturalWidth,
+    docHeight / image.naturalHeight,
+  );
+  const w = image.naturalWidth * fitScale;
+  const h = image.naturalHeight * fitScale;
+  return {
+    x: (docWidth - w) / 2,
+    y: (docHeight - h) / 2,
+    width: w,
+    height: h,
+    rotationDeg: 0,
+    opacity: DEFAULT_TRACING_OPACITY,
+  };
+}
+
 export default function Editor({
   docId,
   startMode = "empty",
@@ -371,9 +397,14 @@ export default function Editor({
     referenceZRef.current += 1;
     const spawnIndex = referenceSpawnRef.current;
     referenceSpawnRef.current += 1;
+    const id = uid();
     setReferenceWindows((ws) => [
       ...ws,
-      { id: uid(), zIndex: referenceZRef.current, spawnIndex },
+      { id, zIndex: referenceZRef.current, spawnIndex },
+    ]);
+    setReferenceItems((items) => [
+      ...items,
+      { id, image: null, mode: DEFAULT_REFERENCE_MODE, tracingGeometry: null },
     ]);
   }, []);
   const bringReferenceWindowToFront = useCallback((id: string) => {
@@ -398,17 +429,28 @@ export default function Editor({
   // 받고, narrow(handleReferenceListAdd)에서는 새로 만든다.
   const handleReferenceImageLoaded = useCallback(
     (id: string, image: HTMLImageElement) => {
-      setReferenceItems((items) => [
-        ...items,
-        {
-          id,
-          image,
-          mode: DEFAULT_REFERENCE_MODE,
-          tracingGeometry: null,
-        },
-      ]);
+      setReferenceItems((items) =>
+        items.map((r) => {
+          if (r.id !== id) return r;
+          // 이미지가 로드되기 전에 이미 트레이싱 모드로 전환해 둔 경우
+          // (openReferenceWindow가 빈 아이템을 만들어 두므로 이제 가능하다)
+          // — 그때 미뤄둔 fit 지오메트리 계산을 여기서 채운다.
+          if (r.mode === "tracing" && !r.tracingGeometry) {
+            return {
+              ...r,
+              image,
+              tracingGeometry: computeFitTracingGeometry(
+                doc.width,
+                doc.height,
+                image,
+              ),
+            };
+          }
+          return { ...r, image };
+        }),
+      );
     },
-    [],
+    [doc.width, doc.height],
   );
   // narrow의 TracingListPanel은 wide처럼 미리 만들어 둔 "빈 창"이 없다 —
   // 이미지를 고르는 즉시 새 id로 바로 추가하되, narrow는 참고 모드 뷰가
@@ -418,27 +460,28 @@ export default function Editor({
   const handleReferenceListAdd = useCallback(
     (image: HTMLImageElement) => {
       const id = uid();
-      const fitScale = Math.min(
-        doc.width / image.naturalWidth,
-        doc.height / image.naturalHeight,
-      );
-      const w = image.naturalWidth * fitScale;
-      const h = image.naturalHeight * fitScale;
       setReferenceItems((items) => [
         ...items,
         {
           id,
           image,
           mode: "tracing",
-          tracingGeometry: {
-            x: (doc.width - w) / 2,
-            y: (doc.height - h) / 2,
-            width: w,
-            height: h,
-            rotationDeg: 0,
-            opacity: DEFAULT_TRACING_OPACITY,
-          },
+          tracingGeometry: computeFitTracingGeometry(
+            doc.width,
+            doc.height,
+            image,
+          ),
         },
+      ]);
+      // narrow에서 만든 항목도 wide처럼 창 항목을 함께 만들어 둔다 — 그래야
+      // 나중에 편집기가 넓어졌을 때 이 항목을 다룰 플로팅 창이 있다
+      // (openReferenceWindow와 같은 cascade/z-index 규칙을 그대로 따른다).
+      referenceZRef.current += 1;
+      const spawnIndex = referenceSpawnRef.current;
+      referenceSpawnRef.current += 1;
+      setReferenceWindows((ws) => [
+        ...ws,
+        { id, zIndex: referenceZRef.current, spawnIndex },
       ]);
     },
     [doc.width, doc.height],
@@ -458,23 +501,14 @@ export default function Editor({
           if (mode !== "tracing" || r.tracingGeometry || !r.image) {
             return { ...r, mode };
           }
-          const fitScale = Math.min(
-            doc.width / r.image.naturalWidth,
-            doc.height / r.image.naturalHeight,
-          );
-          const w = r.image.naturalWidth * fitScale;
-          const h = r.image.naturalHeight * fitScale;
           return {
             ...r,
             mode,
-            tracingGeometry: {
-              x: (doc.width - w) / 2,
-              y: (doc.height - h) / 2,
-              width: w,
-              height: h,
-              rotationDeg: 0,
-              opacity: DEFAULT_TRACING_OPACITY,
-            },
+            tracingGeometry: computeFitTracingGeometry(
+              doc.width,
+              doc.height,
+              r.image,
+            ),
           };
         }),
       );
@@ -507,8 +541,6 @@ export default function Editor({
   const handleToggleReferenceAdjust = useCallback((id: string) => {
     setActiveReferenceId((cur) => (cur === id ? null : id));
   }, []);
-  const activeReferenceItem =
-    referenceItems.find((r) => r.id === activeReferenceId) ?? null;
   const handleActiveReferenceGeometryChange = useCallback(
     (
       patch: Partial<
@@ -530,28 +562,33 @@ export default function Editor({
   }, []);
   // PixelCanvas·narrow 리스트 패널(둘 다 TracingImage[]를 받는다)에 넘길
   // 배열 — 이미지가 있고 트레이싱 모드인 항목만 걸러 TracingImage 모양으로
-  // 편다. 이 파생 하나를 두 소비처가 함께 쓴다.
-  const tracingCanvasImages: TracingImage[] = referenceItems
-    .filter(
-      (
-        r,
-      ): r is ReferenceItem & {
-        image: HTMLImageElement;
-        tracingGeometry: NonNullable<ReferenceItem["tracingGeometry"]>;
-      } =>
-        r.mode === "tracing" && r.image !== null && r.tracingGeometry !== null,
-    )
-    .map((r) => ({ id: r.id, image: r.image, ...r.tracingGeometry }));
-  const activeTracingCanvasImage: TracingImage | null =
-    activeReferenceItem?.mode === "tracing" &&
-    activeReferenceItem.image &&
-    activeReferenceItem.tracingGeometry
-      ? {
-          id: activeReferenceItem.id,
-          image: activeReferenceItem.image,
-          ...activeReferenceItem.tracingGeometry,
-        }
+  // 편다. 이 파생 하나를 두 소비처가 함께 쓴다. PixelCanvas의 render
+  // useCallback 의존성 배열에 그대로 들어가므로, useMemo 없이 매 렌더 새
+  // 배열/객체를 만들면 무관한 Editor 리렌더마다 캔버스가 다시 그려진다.
+  const tracingCanvasImages: TracingImage[] = useMemo(
+    () =>
+      referenceItems
+        .filter(
+          (
+            r,
+          ): r is ReferenceItem & {
+            image: HTMLImageElement;
+            tracingGeometry: NonNullable<ReferenceItem["tracingGeometry"]>;
+          } =>
+            r.mode === "tracing" &&
+            r.image !== null &&
+            r.tracingGeometry !== null,
+        )
+        .map((r) => ({ id: r.id, image: r.image, ...r.tracingGeometry })),
+    [referenceItems],
+  );
+  const activeTracingCanvasImage: TracingImage | null = useMemo(() => {
+    const item =
+      referenceItems.find((r) => r.id === activeReferenceId) ?? null;
+    return item?.mode === "tracing" && item.image && item.tracingGeometry
+      ? { id: item.id, image: item.image, ...item.tracingGeometry }
       : null;
+  }, [referenceItems, activeReferenceId]);
   const [showGrid, setShowGrid] = useState(true);
   const [showCrosshair, setShowCrosshair] = useState(false);
   const [brushSize, setBrushSize] = useState(1);
@@ -625,7 +662,7 @@ export default function Editor({
   // narrow일 때 이미지 불러오기/내보내기 사이드바가 아이콘 두 개로 줄어들고,
   // 그 중 하나를 누르면 이 상태에 맞는 패널이 플로팅 팝업으로 뜬다.
   const [openFloatingPanel, setOpenFloatingPanel] = useState<
-    "layers" | "import" | "export" | "tracing" | null
+    "layers" | "import" | "export" | "reference" | null
   >(null);
   // 확대 상태에서 스페이스+드래그로 스크롤할 대상 — PixelCanvas에 그대로 내려준다.
   const canvasViewportRef = useRef<HTMLDivElement>(null);
@@ -1881,7 +1918,7 @@ export default function Editor({
     hasPendingShape: !!pendingShape,
     onCommitPendingShape: handlePendingShapeCommit,
     onCancelPendingShape: handlePendingShapeCancel,
-    hasActiveTracing: !!activeReferenceId,
+    hasActiveTracing: !!activeTracingCanvasImage,
     onCancelActiveTracing: handleReferenceDeselect,
   });
 
@@ -2974,12 +3011,12 @@ export default function Editor({
                   <button
                     onClick={() =>
                       setOpenFloatingPanel((p) =>
-                        p === "tracing" ? null : "tracing",
+                        p === "reference" ? null : "reference",
                       )
                     }
                     title="레퍼런스"
                     className={`flex h-8 w-8 items-center justify-center transition-colors ${
-                      openFloatingPanel === "tracing"
+                      openFloatingPanel === "reference"
                         ? "bg-violet-500 text-white"
                         : "bg-white text-gray-500 shadow-md hover:bg-gray-50"
                     }`}
@@ -3334,31 +3371,34 @@ export default function Editor({
         onCancel={() => setSaveAsPromptOpen(false)}
       />
 
-      {referenceWindows.map((w) => {
-        const item = referenceItems.find((r) => r.id === w.id) ?? null;
-        return (
-          <ReferenceWindow
-            key={w.id}
-            boundsRef={rootRef}
-            eyedropperActive={tool === "eyedropper"}
-            onPickColor={handlePickColor}
-            onClose={() => handleReferenceDelete(w.id)}
-            zIndex={w.zIndex}
-            spawnIndex={w.spawnIndex}
-            onFocus={() => bringReferenceWindowToFront(w.id)}
-            mode={item?.mode ?? DEFAULT_REFERENCE_MODE}
-            onModeChange={(mode) => handleReferenceModeChange(w.id, mode)}
-            image={item?.image ?? null}
-            onImageLoaded={(image) => handleReferenceImageLoaded(w.id, image)}
-            tracingGeometry={item?.tracingGeometry ?? null}
-            isAdjusting={activeReferenceId === w.id}
-            onToggleAdjust={() => handleToggleReferenceAdjust(w.id)}
-            onOpacityChange={(opacity) =>
-              handleReferenceOpacityChange(w.id, opacity)
-            }
-          />
-        );
-      })}
+      {!narrow &&
+        referenceWindows.map((w) => {
+          const item = referenceItems.find((r) => r.id === w.id) ?? null;
+          return (
+            <ReferenceWindow
+              key={w.id}
+              boundsRef={rootRef}
+              eyedropperActive={tool === "eyedropper"}
+              onPickColor={handlePickColor}
+              onClose={() => handleReferenceDelete(w.id)}
+              zIndex={w.zIndex}
+              spawnIndex={w.spawnIndex}
+              onFocus={() => bringReferenceWindowToFront(w.id)}
+              mode={item?.mode ?? DEFAULT_REFERENCE_MODE}
+              onModeChange={(mode) => handleReferenceModeChange(w.id, mode)}
+              image={item?.image ?? null}
+              onImageLoaded={(image) =>
+                handleReferenceImageLoaded(w.id, image)
+              }
+              tracingGeometry={item?.tracingGeometry ?? null}
+              isAdjusting={activeReferenceId === w.id}
+              onToggleAdjust={() => handleToggleReferenceAdjust(w.id)}
+              onOpacityChange={(opacity) =>
+                handleReferenceOpacityChange(w.id, opacity)
+              }
+            />
+          );
+        })}
     </div>
   );
 }

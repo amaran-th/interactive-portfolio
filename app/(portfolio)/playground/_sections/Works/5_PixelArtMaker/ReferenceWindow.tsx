@@ -260,6 +260,13 @@ export default function ReferenceWindow({
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);
   }, [clampPos]);
+  // 참고 모드(자유 리사이즈 size.width)에서 트레이싱 모드(고정폭
+  // TRACING_WINDOW_WIDTH)로 바뀌면 windowWidth 자체가 좁아져 clampPos의
+  // 유효 범위도 함께 바뀐다 — 왼쪽 가장자리 근처에 있던 창이 더 이상
+  // 화면 안에 있지 않게 될 수 있으므로 폭이 바뀔 때마다 다시 당겨 넣는다.
+  useEffect(() => {
+    setPos((p) => clampPos(p));
+  }, [windowWidth, clampPos]);
 
   // 제목표시줄을 드래그해 창을 옮긴다 — pos는 rootRef 기준 로컬 좌표이므로
   // 마우스의 뷰포트 좌표(clientX/Y)도 먼저 로컬로 바꿔야 어긋나지 않는다.

@@ -6,10 +6,10 @@ import { TracingImage } from "./types";
 import { useImageFileLoader } from "./useImageFileLoader";
 
 // narrow 레이아웃에서 트레이싱 이미지 목록을 보여주는 패널 — LayerPanel과
-// 같은 세로 목록 스타일이다. Editor.tsx가 openFloatingPanel === "tracing"일
-// 때 기존 아이콘→플로팅 팝업 패턴 안에 그대로 끼워 넣는다. wide 전용인
-// TracingControlWindow(자유 드래그 미니 창)와 달리 창 위치·zIndex 상태가
-// 없다 — tracingImages 배열만 그대로 순회해서 그린다.
+// 같은 세로 목록 스타일이다. Editor.tsx가 openFloatingPanel === "reference"일
+// 때 기존 아이콘→플로팅 팝업 패턴 안에 그대로 끼워 넣는다. wide 전용으로 뜨는
+// 플로팅 ReferenceWindow와 달리 이 패널 자체는 창 위치·zIndex 같은 창 상태를
+// 들지 않는다 — tracingImages 배열만 그대로 순회해서 그린다.
 export default function TracingListPanel({
   tracingImages,
   activeTracingId,
