@@ -85,27 +85,40 @@ export default function FrameFilmstrip({
             <div
               key={layer.id}
               onClick={() => !isPlaying && onSelect(layer.id)}
-              className={`flex w-16 shrink-0 flex-col items-center gap-0.5 px-1 py-1 ${
+              className={`flex w-16 shrink-0 flex-col items-center gap-0.5 px-1 py-0.5 ${
                 isActive ? "bg-violet-50" : "hover:bg-gray-50"
               } ${isPlaying ? "cursor-default" : "cursor-pointer"}`}
             >
               <div className="flex w-full items-center justify-between text-[9px] text-gray-400">
                 <span>{index + 1}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!isPlaying) onToggleVisible(layer.id);
-                  }}
-                  disabled={isPlaying}
-                  title={layer.visible ? "숨기기" : "보이기"}
-                  className="text-gray-400 hover:text-gray-700 disabled:opacity-30"
-                >
-                  {layer.visible ? (
-                    <Eye className="h-3 w-3" />
-                  ) : (
-                    <EyeOff className="h-3 w-3" />
-                  )}
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isPlaying) onToggleVisible(layer.id);
+                    }}
+                    disabled={isPlaying}
+                    title={layer.visible ? "숨기기" : "보이기"}
+                    className="text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                  >
+                    {layer.visible ? (
+                      <Eye className="h-3 w-3" />
+                    ) : (
+                      <EyeOff className="h-3 w-3" />
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isPlaying) onDelete(layer.id);
+                    }}
+                    disabled={isPlaying || layers.length <= 1}
+                    title="프레임 삭제"
+                    className="text-gray-300 hover:text-red-500 disabled:opacity-30"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
               </div>
               <FileThumbnail width={width} height={height} pixels={layer.pixels} />
               <input
@@ -132,17 +145,6 @@ export default function FrameFilmstrip({
                 }}
                 className="w-full border border-gray-200 px-0.5 text-center text-[9px] text-gray-600 outline-none disabled:opacity-50"
               />
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!isPlaying) onDelete(layer.id);
-                }}
-                disabled={isPlaying || layers.length <= 1}
-                title="프레임 삭제"
-                className="text-gray-300 hover:text-red-500 disabled:opacity-30"
-              >
-                <Trash2 className="h-3 w-3" />
-              </button>
             </div>
           );
         })}
