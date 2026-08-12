@@ -72,6 +72,10 @@ export default function LayerPanel({
   onToggleLoop,
   onionSkin,
   onToggleOnionSkin,
+  onionSkinOpacity,
+  onOnionSkinOpacityChange,
+  onionSkinRange,
+  onOnionSkinRangeChange,
 }: {
   // 아래→위 순서(가장 아래가 0번)로 저장된 레이어 배열 — 데이터 모델과
   // Editor의 useCanvasHistory가 쓰는 순서를 그대로 따른다.
@@ -121,6 +125,10 @@ export default function LayerPanel({
   onToggleLoop: () => void;
   onionSkin: boolean;
   onToggleOnionSkin: () => void;
+  onionSkinOpacity: number;
+  onOnionSkinOpacityChange: (opacity: number) => void;
+  onionSkinRange: number;
+  onOnionSkinRangeChange: (range: number) => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
@@ -458,6 +466,43 @@ export default function LayerPanel({
             <Sparkles className="h-3.5 w-3.5" />
             어니언 스킨
           </button>
+          {onionSkin && (
+            <div className="flex flex-col gap-1 border-t border-gray-100 pt-2">
+              <label className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
+                투명도
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Math.round(onionSkinOpacity * 100)}
+                  onChange={(e) =>
+                    onOnionSkinOpacityChange(Number(e.target.value) / 100)
+                  }
+                  className="flex-1 accent-violet-500"
+                />
+                <span className="w-8 shrink-0 text-right">
+                  {Math.round(onionSkinOpacity * 100)}%
+                </span>
+              </label>
+              <label className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
+                범위
+                <input
+                  type="range"
+                  min={1}
+                  max={5}
+                  step={1}
+                  value={onionSkinRange}
+                  onChange={(e) =>
+                    onOnionSkinRangeChange(Number(e.target.value))
+                  }
+                  className="flex-1 accent-violet-500"
+                />
+                <span className="w-8 shrink-0 text-right">
+                  {onionSkinRange}장
+                </span>
+              </label>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -2940,6 +2940,10 @@ export default function Editor({
                       onToggleLoop={handleToggleLoop}
                       onionSkin={onionSkin}
                       onToggleOnionSkin={handleToggleOnionSkin}
+                      onionSkinOpacity={onionSkinOpacity}
+                      onOnionSkinOpacityChange={handleOnionSkinOpacityChange}
+                      onionSkinRange={onionSkinRange}
+                      onOnionSkinRangeChange={handleOnionSkinRangeChange}
                     />
                     <Accordion title="이미지 불러오기" defaultOpen={false}>
                       {importPanel}
@@ -2996,6 +3000,10 @@ export default function Editor({
                   onToggleLoop={handleToggleLoop}
                   onionSkin={onionSkin}
                   onToggleOnionSkin={handleToggleOnionSkin}
+                  onionSkinOpacity={onionSkinOpacity}
+                  onOnionSkinOpacityChange={handleOnionSkinOpacityChange}
+                  onionSkinRange={onionSkinRange}
+                  onOnionSkinRangeChange={handleOnionSkinRangeChange}
                 />
               );
               return (
