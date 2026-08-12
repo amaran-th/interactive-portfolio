@@ -82,7 +82,9 @@ export const DEFAULT_FRAME_DURATION_MS = 100;
 export const MIN_FRAME_DURATION_MS = 20; // 50fps 상한
 export const MAX_FRAME_DURATION_MS = 5000; // 5초 하한(더 느리게는 의미 없음)
 
-// 프레임 모드 + 어니언 스킨에서 이전/다음 프레임을 겹쳐 보여줄 때 쓰는 고정 투명도.
+// 프레임 모드 + 어니언 스킨에서 이전/다음 프레임을 겹쳐 보여줄 때 쓰는 기본
+// 투명도 — 사용자가 프레임 패널 슬라이더로 조절하며, 이 값은 그 초기값이자
+// 초기화 대상이다.
 export const ONION_SKIN_OPACITY = 0.25;
 
 // 트레이싱 모드에서 캔버스 배경에 깔아두는 참고 이미지. 캔버스 네이티브

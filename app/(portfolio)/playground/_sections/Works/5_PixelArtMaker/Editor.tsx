@@ -279,8 +279,8 @@ function layersFromDoc(doc: PixelArt): {
 
 // layers는 아래→위(=필름스트립 왼쪽→오른쪽) 순서. currentId 다음으로
 // "보이는" 레이어를 찾는다 — 끝에 닿았을 때 loop면 처음(보이는 첫 레이어)
-// 으로, 아니면 null(재생 정지 신호)을 돌려준다. 어니언 스킨의 "다음 보이는
-// 프레임"에도 loop=false로 재사용한다.
+// 으로, 아니면 null(재생 정지 신호)을 돌려준다. 재생 진행 전용이다 —
+// 어니언 스킨은 아래 prevVisibleFrames/nextVisibleFrames를 쓴다.
 function nextVisibleFrame(
   layers: PixelLayer[],
   currentId: string,
@@ -866,16 +866,17 @@ export default function Editor({
 
   // 스포이트·마법봉·페인트통 판정 전용 합성 — 화면 렌더링용 belowComposite/
   // aboveLayers와 별개로, layerScope로 한 번 더 필터링한다. 프레임 모드는
-  // scope 개념이 없어 기존 값을 그대로 통과시킨다.
+  // scope 개념이 없고, 어니언 스킨 유령은 내보내기에도 안 들어가는 참고용
+  // 오버레이라 "보이는 그대로 판정"(레이어 모드에서만 유효한 원칙) 대상이
+  // 아니다 — 도구는 항상 지금 편집 중인 프레임 자신만 본다.
   const scopeBelowComposite = useMemo(() => {
-    if (layerMode === "frames") return belowComposite;
+    if (layerMode === "frames") return null;
     const scoped = history.presentLayers
       .slice(0, activeLayerIndex)
       .filter((l) => layerScope.has(l.id));
     return compositeLayers(scoped, doc.width, doc.height);
   }, [
     layerMode,
-    belowComposite,
     history.presentLayers,
     activeLayerIndex,
     layerScope,
@@ -884,12 +885,12 @@ export default function Editor({
   ]);
 
   const scopeAboveLayers = useMemo((): PixelLayer[] | null => {
-    if (layerMode === "frames") return aboveLayers;
+    if (layerMode === "frames") return null;
     const slice = history.presentLayers
       .slice(activeLayerIndex + 1)
       .filter((l) => layerScope.has(l.id));
     return slice.length > 0 ? slice : null;
-  }, [layerMode, aboveLayers, history.presentLayers, activeLayerIndex, layerScope]);
+  }, [layerMode, history.presentLayers, activeLayerIndex, layerScope]);
 
   const activeLayerInScope =
     layerMode === "frames" ? true : layerScope.has(history.activeLayerId);

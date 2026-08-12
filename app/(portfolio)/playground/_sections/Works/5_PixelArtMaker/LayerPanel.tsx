@@ -485,7 +485,7 @@ export default function LayerPanel({
                 </span>
               </label>
               <label className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
-                범위
+                범위(앞뒤)
                 <input
                   type="range"
                   min={1}
