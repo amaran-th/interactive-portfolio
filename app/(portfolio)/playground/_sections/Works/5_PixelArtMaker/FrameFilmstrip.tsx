@@ -114,7 +114,7 @@ export default function FrameFilmstrip({
                     }}
                     disabled={isPlaying || layers.length <= 1}
                     title="프레임 삭제"
-                    className="text-gray-300 hover:text-red-500 disabled:opacity-30"
+                    className="text-gray-400 hover:text-red-500 disabled:opacity-30"
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>
