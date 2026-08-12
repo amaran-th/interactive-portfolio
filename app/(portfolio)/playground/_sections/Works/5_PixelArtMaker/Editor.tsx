@@ -297,17 +297,34 @@ function nextVisibleFrame(
   return null;
 }
 
-// 어니언 스킨의 "이전 보이는 프레임" — 재생과 달리 순환하지 않는다(이전
-// 프레임이 없으면 그냥 안 보여준다).
-function prevVisibleFrame(
+// 어니언 스킨 전용 — 현재 프레임에서 이전/다음 방향으로 최대 count장까지
+// "보이는" 프레임을 가까운 순서대로 모은다. 재생(nextVisibleFrame)과 달리
+// 순환하지 않는다 — 어니언 스킨은 스택 끝에서 반대편으로 넘어가 보여주면
+// 오히려 혼란스럽다.
+function prevVisibleFrames(
   layers: PixelLayer[],
   currentId: string,
-): PixelLayer | null {
+  count: number,
+): PixelLayer[] {
   const currentIndex = layers.findIndex((l) => l.id === currentId);
-  for (let i = currentIndex - 1; i >= 0; i--) {
-    if (layers[i].visible) return layers[i];
+  const result: PixelLayer[] = [];
+  for (let i = currentIndex - 1; i >= 0 && result.length < count; i--) {
+    if (layers[i].visible) result.push(layers[i]);
   }
-  return null;
+  return result;
+}
+
+function nextVisibleFrames(
+  layers: PixelLayer[],
+  currentId: string,
+  count: number,
+): PixelLayer[] {
+  const currentIndex = layers.findIndex((l) => l.id === currentId);
+  const result: PixelLayer[] = [];
+  for (let i = currentIndex + 1; i < layers.length && result.length < count; i++) {
+    if (layers[i].visible) result.push(layers[i]);
+  }
+  return result;
 }
 
 // 트레이싱 모드에 처음 들어갈 때 캔버스에 맞춰 가운데 정렬한 fit 크기의
@@ -724,6 +741,8 @@ export default function Editor({
   const [isPlaying, setIsPlaying] = useState(false);
   const [loopPlayback, setLoopPlayback] = useState(true);
   const [onionSkin, setOnionSkin] = useState(true);
+  const [onionSkinOpacity, setOnionSkinOpacity] = useState(ONION_SKIN_OPACITY);
+  const [onionSkinRange, setOnionSkinRange] = useState(1);
 
   const initialLayerState = layersFromDoc(initial.doc);
   const history = useCanvasHistory(
@@ -757,25 +776,28 @@ export default function Editor({
   const belowComposite = useMemo(() => {
     if (layerMode === "frames") {
       if (!onionSkin) return null;
-      const prev = prevVisibleFrame(history.presentLayers, history.activeLayerId);
-      if (!prev) return null;
-      // 어니언 스킨 유령 이미지는 항상 흐린 미리보기일 뿐이다 — 이전
-      // 프레임 자신에 블렌드 모드·보정이 걸려 있어도 무시하고 일반
-      // 겹치기로만 보여준다(프레임 모드에서는 블렌드·보정을 편집 화면에
-      // 반영하지 않기로 했다).
+      const prevFrames = prevVisibleFrames(
+        history.presentLayers,
+        history.activeLayerId,
+        onionSkinRange,
+      );
+      if (prevFrames.length === 0) return null;
+      // 어니언 스킨 유령 이미지는 항상 흐린 미리보기일 뿐이다 — 각 프레임
+      // 자신에 블렌드 모드·보정이 걸려 있어도 무시하고 일반 겹치기로만
+      // 보여준다(프레임 모드에서는 블렌드·보정을 편집 화면에 반영하지
+      // 않기로 했다). 가까운 프레임이 먼 프레임보다 위에 오도록(더 잘
+      // 보이도록) 배열을 뒤집어(먼 프레임 → 가까운 프레임 순으로) 합성한다.
       return compositeLayers(
-        [
-          {
-            ...prev,
-            blendMode: "normal",
-            brightness: undefined,
-            contrast: undefined,
-            saturation: undefined,
-            temperature: undefined,
-            tint: undefined,
-            opacity: ONION_SKIN_OPACITY,
-          },
-        ],
+        [...prevFrames].reverse().map((frame) => ({
+          ...frame,
+          blendMode: "normal" as const,
+          brightness: undefined,
+          contrast: undefined,
+          saturation: undefined,
+          temperature: undefined,
+          tint: undefined,
+          opacity: onionSkinOpacity,
+        })),
         doc.width,
         doc.height,
       );
@@ -790,6 +812,8 @@ export default function Editor({
   }, [
     layerMode,
     onionSkin,
+    onionSkinOpacity,
+    onionSkinRange,
     history.presentLayers,
     history.activeLayerId,
     activeLayerIndex,
@@ -799,24 +823,27 @@ export default function Editor({
   const aboveLayers = useMemo((): PixelLayer[] | null => {
     if (layerMode === "frames") {
       if (!onionSkin) return null;
-      const next = nextVisibleFrame(history.presentLayers, history.activeLayerId, false);
-      if (!next) return null;
-      // 어니언 스킨 유령 이미지는 항상 흐린 미리보기일 뿐이다 — 다음
-      // 프레임 자신에 블렌드 모드·보정이 걸려 있어도 무시하고 일반
-      // 겹치기로만 보여준다(프레임 모드에서는 블렌드·보정을 편집 화면에
-      // 반영하지 않기로 했다).
-      return [
-        {
-          ...next,
-          blendMode: "normal",
-          brightness: undefined,
-          contrast: undefined,
-          saturation: undefined,
-          temperature: undefined,
-          tint: undefined,
-          opacity: ONION_SKIN_OPACITY,
-        },
-      ];
+      const nextFrames = nextVisibleFrames(
+        history.presentLayers,
+        history.activeLayerId,
+        onionSkinRange,
+      );
+      if (nextFrames.length === 0) return null;
+      // 어니언 스킨 유령 이미지는 항상 흐린 미리보기일 뿐이다 — 각 프레임
+      // 자신에 블렌드 모드·보정이 걸려 있어도 무시하고 일반 겹치기로만
+      // 보여준다(프레임 모드에서는 블렌드·보정을 편집 화면에 반영하지
+      // 않기로 했다). 가까운 프레임이 먼 프레임보다 위에 오도록(더 잘
+      // 보이도록) 배열을 뒤집어(먼 프레임 → 가까운 프레임 순으로) 넘긴다.
+      return [...nextFrames].reverse().map((frame) => ({
+        ...frame,
+        blendMode: "normal" as const,
+        brightness: undefined,
+        contrast: undefined,
+        saturation: undefined,
+        temperature: undefined,
+        tint: undefined,
+        opacity: onionSkinOpacity,
+      }));
     }
     // PixelCanvas가 각 레이어 자신의 블렌드 모드·보정을 반영하며 실제
     // 화면(visibleBase) 위에 순서대로 얹을 수 있도록, 미리 평탄화하지 않고
@@ -830,6 +857,8 @@ export default function Editor({
   }, [
     layerMode,
     onionSkin,
+    onionSkinOpacity,
+    onionSkinRange,
     history.presentLayers,
     history.activeLayerId,
     activeLayerIndex,
@@ -981,6 +1010,14 @@ export default function Editor({
   const handleTogglePlay = useCallback(() => setIsPlaying((p) => !p), []);
   const handleToggleLoop = useCallback(() => setLoopPlayback((l) => !l), []);
   const handleToggleOnionSkin = useCallback(() => setOnionSkin((o) => !o), []);
+  const handleOnionSkinOpacityChange = useCallback(
+    (opacity: number) => setOnionSkinOpacity(opacity),
+    [],
+  );
+  const handleOnionSkinRangeChange = useCallback(
+    (range: number) => setOnionSkinRange(range),
+    [],
+  );
 
   // 재생 루프(requestAnimationFrame) 안에서 항상 최신 값을 읽기 위한 ref들 —
   // history.presentLayers/activeLayerId는 재생 중 프레임이 바뀔 때마다
