@@ -75,7 +75,7 @@ export default function FrameFilmstrip({
 
   return (
     <div className="flex h-24 shrink-0 items-stretch gap-2 border-t border-gray-200 bg-white px-2 py-2">
-      <div className="flex min-w-0 flex-1 items-stretch gap-1 overflow-x-auto">
+      <div className="flex min-w-0 flex-1 items-stretch gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {layers.map((layer, index) => {
           const isActive = layer.id === activeLayerId;
           const durationSec = (
