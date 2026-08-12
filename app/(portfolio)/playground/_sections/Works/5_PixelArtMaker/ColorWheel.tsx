@@ -160,7 +160,7 @@ export default function ColorWheel({
 
       const style: CSSProperties = { position: "fixed" };
       if (openUpward) {
-        style.bottom = boundsRect.bottom - triggerRect.top - GAP;
+        style.bottom = boundsRect.bottom - triggerRect.top + GAP;
         style.maxHeight = spaceAbove;
       } else {
         style.top = triggerRect.bottom - boundsRect.top + GAP;
