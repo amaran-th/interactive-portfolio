@@ -281,7 +281,7 @@ export default function ColorWheel({
         </button>
       </div>
 
-      <div className="grid grid-cols-6 gap-1.5">
+      <div className="grid w-full grid-cols-6 gap-1.5">
         {favorites.map((color, index) => (
           <div key={index} className="group relative h-6 w-6">
             <button
