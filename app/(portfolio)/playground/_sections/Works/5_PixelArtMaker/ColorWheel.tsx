@@ -128,7 +128,17 @@ export default function ColorWheel({
   // 브라우저가 그리기 전에 최종 위치가 반영돼 화면에는 깜빡임 없이 바로 최종
   // 위치로 보인다.
   useLayoutEffect(() => {
-    if (!showPaletteManager) return;
+    // 패널이 닫힐 때 이전 계산값(특히 maxHeight)을 지워둔다 — 그대로 남아
+    // 있으면 다음에 열 때 panelRect.height 측정이 지난번 clamp 값에 갇혀
+    // 자연 높이를 정확히 잴 수 없다. resetStyle도 recompute와 같은 이유로
+    // 지역 함수로 감싸 호출한다(바로 setState를 호출하면
+    // react-hooks/set-state-in-effect 린트에 걸린다).
+    const resetStyle = () => setPaletteManagerPanelStyle({});
+
+    if (!showPaletteManager) {
+      resetStyle();
+      return;
+    }
     const bounds = boundsRef.current;
     if (!bounds) return;
 
@@ -138,6 +148,7 @@ export default function ColorWheel({
       if (!trigger || !panel) return;
 
       const MARGIN = 8;
+      const GAP = 4;
       const triggerRect = trigger.getBoundingClientRect();
       const boundsRect = bounds.getBoundingClientRect();
       const panelRect = panel.getBoundingClientRect();
@@ -149,10 +160,10 @@ export default function ColorWheel({
 
       const style: CSSProperties = { position: "fixed" };
       if (openUpward) {
-        style.bottom = boundsRect.bottom - triggerRect.top;
+        style.bottom = boundsRect.bottom - triggerRect.top - GAP;
         style.maxHeight = spaceAbove;
       } else {
-        style.top = triggerRect.bottom - boundsRect.top;
+        style.top = triggerRect.bottom - boundsRect.top + GAP;
         style.maxHeight = spaceBelow;
       }
 
@@ -167,7 +178,7 @@ export default function ColorWheel({
     const ro = new ResizeObserver(recompute);
     ro.observe(bounds);
     return () => ro.disconnect();
-  }, [showPaletteManager, boundsRef]);
+  }, [showPaletteManager, boundsRef, paletteSets]);
 
   // 항상 새 세트를 만든다(기존 세트를 고르고 있어도 덮어쓰지 않는다) — 세트를
   // 덮어쓰는 행동은 이름이 명확한 handleOverwriteSet으로 따로 뺐다.
@@ -337,7 +348,7 @@ export default function ColorWheel({
         </div>
       </div>
 
-      <div className="relative flex w-full items-center justify-between">
+      <div className="flex w-full items-center justify-between">
         <p className="text-xs font-semibold text-gray-500">즐겨찾기</p>
         <button
           ref={paletteManagerTriggerRef}
@@ -358,7 +369,7 @@ export default function ColorWheel({
           <div
             ref={paletteManagerPanelRef}
             style={paletteManagerPanelStyle}
-            className="fixed z-30 flex w-56 flex-col gap-1 overflow-hidden bg-white p-2 shadow-xl"
+            className="fixed z-30 flex w-52 flex-col gap-1 overflow-hidden bg-white p-2 shadow-xl"
           >
             <p className="text-xs font-semibold text-gray-500">즐겨찾기 관리</p>
             {paletteSets.length === 0 ? (
