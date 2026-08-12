@@ -1,7 +1,14 @@
 "use client";
 
 import { Download, Save, Settings, Trash2, X } from "lucide-react";
-import { useCallback, useState } from "react";
+import {
+  CSSProperties,
+  RefObject,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import ColorPicker, { CHECKER_STYLE } from "./ColorPicker";
 import { PromptModal } from "./Dialogs";
 import {
@@ -35,6 +42,7 @@ export default function ColorWheel({
   onToolChange,
   canvasBgColor,
   onChangeCanvasBgColor,
+  boundsRef,
 }: {
   favorites: string[];
   activeColorHex: string;
@@ -56,6 +64,10 @@ export default function ColorWheel({
   // 그 바깥을 칠한다. 항상 불투명 단색이라 같은 색상환의 알파만 무시하고 쓴다.
   canvasBgColor: string;
   onChangeCanvasBgColor: (hex: string) => void;
+  // 드롭다운 패널이 벗어나면 안 되는 경계 — 편집창 루트(Editor.tsx의
+  // rootRef). 편집창 루트에 transform(scale)이 걸려 있어, 패널을 fixed로
+  // 띄울 때 뷰포트가 아니라 이 루트 기준으로 위치를 계산해야 한다.
+  boundsRef: RefObject<HTMLDivElement | null>;
 }) {
   const [armedTarget, setArmedTarget] = useState<ArmedTarget>("primary");
 
@@ -95,6 +107,67 @@ export default function ColorWheel({
   // 세트 불러오기/저장/삭제는 즐겨찾기 색을 고르는 것만큼 자주 쓰지 않는다 —
   // 기본은 닫아 두고, "즐겨찾기" 라벨 옆 톱니바퀴를 눌러야 뜨는 드롭다운 패널로 보여준다.
   const [showPaletteManager, setShowPaletteManager] = useState(false);
+
+  // 드롭다운 트리거(톱니바퀴)와 패널 DOM 노드 — 열 때마다 실제 남은 공간을
+  // 재서 패널을 편집창 밖으로 나가지 않게 fixed로 띄운다.
+  const paletteManagerTriggerRef = useRef<HTMLButtonElement>(null);
+  const paletteManagerPanelRef = useRef<HTMLDivElement>(null);
+  const [paletteManagerPanelStyle, setPaletteManagerPanelStyle] =
+    useState<CSSProperties>({});
+
+  // 편집창 루트(boundsRef) 기준 좌표로 패널 위치를 계산한다 —
+  // ContextMenu(Editor.tsx의 openFileMenu/openEditMenu)와 같은 관례: 편집창
+  // 루트에 transform(scale)이 걸려 있어, fixed 좌표는 뷰포트가 아니라 이
+  // 루트 기준 상대좌표로 계산해야 정확히 자리 잡는다. 패널이 열려 있는 동안
+  // 편집창 크기가 바뀌면(narrow 감지에 쓰는 것과 같은 ResizeObserver 패턴)
+  // 위치를 다시 계산해, 창을 줄여도 경계를 벗어나지 않게 한다.
+  // recompute를 이 effect 안에 지역 함수로 두는 이유: 밖으로 빼 useCallback
+  // 으로 만들면 effect 안에서 그 참조를 곧바로 호출하는 모양이 되어(이후
+  // ResizeObserver 콜백으로도 재사용) "effect 안에서 setState를 동기 호출"로
+  // 오인돼 react-hooks/set-state-in-effect 린트 규칙에 걸린다. useLayoutEffect라
+  // 브라우저가 그리기 전에 최종 위치가 반영돼 화면에는 깜빡임 없이 바로 최종
+  // 위치로 보인다.
+  useLayoutEffect(() => {
+    if (!showPaletteManager) return;
+    const bounds = boundsRef.current;
+    if (!bounds) return;
+
+    const recompute = () => {
+      const trigger = paletteManagerTriggerRef.current;
+      const panel = paletteManagerPanelRef.current;
+      if (!trigger || !panel) return;
+
+      const MARGIN = 8;
+      const triggerRect = trigger.getBoundingClientRect();
+      const boundsRect = bounds.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+
+      const spaceBelow = boundsRect.bottom - triggerRect.bottom - MARGIN;
+      const spaceAbove = triggerRect.top - boundsRect.top - MARGIN;
+      const openUpward =
+        panelRect.height > spaceBelow && spaceAbove > spaceBelow;
+
+      const style: CSSProperties = { position: "fixed" };
+      if (openUpward) {
+        style.bottom = boundsRect.bottom - triggerRect.top;
+        style.maxHeight = spaceAbove;
+      } else {
+        style.top = triggerRect.bottom - boundsRect.top;
+        style.maxHeight = spaceBelow;
+      }
+
+      let left = triggerRect.right - boundsRect.left - panelRect.width;
+      if (left < MARGIN) left = MARGIN;
+      style.left = left;
+
+      setPaletteManagerPanelStyle(style);
+    };
+
+    recompute();
+    const ro = new ResizeObserver(recompute);
+    ro.observe(bounds);
+    return () => ro.disconnect();
+  }, [showPaletteManager, boundsRef]);
 
   // 항상 새 세트를 만든다(기존 세트를 고르고 있어도 덮어쓰지 않는다) — 세트를
   // 덮어쓰는 행동은 이름이 명확한 handleOverwriteSet으로 따로 뺐다.
@@ -267,6 +340,7 @@ export default function ColorWheel({
       <div className="relative flex w-full items-center justify-between">
         <p className="text-xs font-semibold text-gray-500">즐겨찾기</p>
         <button
+          ref={paletteManagerTriggerRef}
           onClick={() => setShowPaletteManager((v) => !v)}
           title="즐겨찾기 관리(팔레트 세트 불러오기·저장·삭제)"
           className={`flex h-5 w-5 items-center justify-center ${
@@ -281,12 +355,16 @@ export default function ColorWheel({
             열어도 남아 있다. 위 즐겨찾기와는 분리된 저장소로, 즐겨찾기를
             이름 붙여 저장해뒀다가 나중에 통째로 불러와 쓴다. */}
         {showPaletteManager && (
-          <div className="absolute top-full right-0 z-30 mt-1 flex w-full flex-col gap-1 bg-white p-2 shadow-xl">
+          <div
+            ref={paletteManagerPanelRef}
+            style={paletteManagerPanelStyle}
+            className="fixed z-30 flex w-56 flex-col gap-1 overflow-hidden bg-white p-2 shadow-xl"
+          >
             <p className="text-xs font-semibold text-gray-500">즐겨찾기 관리</p>
             {paletteSets.length === 0 ? (
               <p className="text-[10px] text-gray-400">저장된 세트가 없습니다</p>
             ) : (
-              <div className="flex flex-col">
+              <div className="flex min-h-0 flex-col overflow-y-auto">
                 {paletteSets.map((set) => (
                   <div key={set.id} className="group flex items-center gap-1 py-1">
                     <div className="flex shrink-0 gap-px">

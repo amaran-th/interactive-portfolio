@@ -2714,6 +2714,7 @@ export default function Editor({
                 onToolChange={setTool}
                 canvasBgColor={canvasBgColor}
                 onChangeCanvasBgColor={setCanvasBgColor}
+                boundsRef={rootRef}
               />
             </div>
             <div className="relative flex flex-1 flex-col overflow-hidden">
