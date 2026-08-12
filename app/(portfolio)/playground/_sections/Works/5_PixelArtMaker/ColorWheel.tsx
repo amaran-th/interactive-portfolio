@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Save, Settings, Trash2, X } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Settings, Trash2, X } from "lucide-react";
 import {
   CSSProperties,
   RefObject,
@@ -403,14 +403,14 @@ export default function ColorWheel({
                       title="즐겨찾기 전체를 이 세트 색으로 교체"
                       className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                     >
-                      <Download className="h-3 w-3" />
+                      <ArrowDownToLine className="h-3 w-3" />
                     </button>
                     <button
                       onClick={() => handleOverwriteSet(set)}
                       title="이 세트를 지금 즐겨찾기 내용으로 덮어쓰기"
                       className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                     >
-                      <Save className="h-3 w-3" />
+                      <ArrowUpFromLine className="h-3 w-3" />
                     </button>
                     <button
                       onClick={() => handleDeleteSet(set)}
