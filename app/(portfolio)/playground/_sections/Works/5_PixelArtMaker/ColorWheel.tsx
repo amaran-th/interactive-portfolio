@@ -1,6 +1,6 @@
 "use client";
 
-import { Settings, X } from "lucide-react";
+import { Download, Save, Settings, Trash2, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import ColorPicker, { CHECKER_STYLE } from "./ColorPicker";
 import { PromptModal } from "./Dialogs";
@@ -91,7 +91,6 @@ export default function ColorWheel({
   const [paletteSets, setPaletteSets] = useState<PaletteSet[]>(() =>
     listPaletteSets(),
   );
-  const [selectedSetId, setSelectedSetId] = useState("");
   const [saveSetPromptOpen, setSaveSetPromptOpen] = useState(false);
   // 세트 불러오기/저장/삭제는 즐겨찾기 색을 고르는 것만큼 자주 쓰지 않는다 —
   // 기본은 접어 두고, "즐겨찾기" 라벨 옆 톱니바퀴를 눌러야 펼쳐지게 한다.
@@ -107,34 +106,33 @@ export default function ColorWheel({
   const handleConfirmSaveAsNewSet = useCallback(
     (name: string) => {
       setSaveSetPromptOpen(false);
-      const created = createPaletteSet(name, favorites);
+      createPaletteSet(name, favorites);
       setPaletteSets(listPaletteSets());
-      setSelectedSetId(created.id);
     },
     [favorites],
   );
 
-  // 고른 세트가 있을 때만 그 세트의 저장값을 지금 즐겨찾기로 덮어쓴다.
-  const handleOverwriteSet = useCallback(() => {
-    if (!selectedSetId) return;
-    updatePaletteSetColors(selectedSetId, favorites);
-    setPaletteSets(listPaletteSets());
-  }, [selectedSetId, favorites]);
+  // 세트 목록의 "덮어쓰기" 아이콘이 바로 호출한다 — select로 먼저 "고르는"
+  // 절차가 없어져, 대상 세트를 인자로 직접 받는다.
+  const handleOverwriteSet = useCallback(
+    (set: PaletteSet) => {
+      updatePaletteSetColors(set.id, favorites);
+      setPaletteSets(listPaletteSets());
+    },
+    [favorites],
+  );
 
   // 불러오기는 지금 즐겨찾기에 세트 색을 더하는 게 아니라, 즐겨찾기 전체를
   // 세트 색으로 통째로 바꾼다 — "이 세트를 쓴다"는 뜻이 분명해지도록.
-  const handleLoadSet = useCallback(() => {
-    const set = paletteSets.find((s) => s.id === selectedSetId);
-    if (!set) return;
-    onReplaceFavorites(set.colors);
-  }, [paletteSets, selectedSetId, onReplaceFavorites]);
+  const handleLoadSet = useCallback(
+    (set: PaletteSet) => onReplaceFavorites(set.colors),
+    [onReplaceFavorites],
+  );
 
-  const handleDeleteSet = useCallback(() => {
-    if (!selectedSetId) return;
-    deletePaletteSet(selectedSetId);
+  const handleDeleteSet = useCallback((set: PaletteSet) => {
+    deletePaletteSet(set.id);
     setPaletteSets(listPaletteSets());
-    setSelectedSetId("");
-  }, [selectedSetId]);
+  }, []);
 
   const targetHex =
     armedTarget === "primary"
@@ -268,17 +266,86 @@ export default function ColorWheel({
 
       <div className="flex w-full items-center justify-between">
         <p className="text-xs font-semibold text-gray-500">즐겨찾기</p>
-        <button
-          onClick={() => setShowPaletteManager((v) => !v)}
-          title="즐겨찾기 관리(팔레트 세트 불러오기·저장·삭제)"
-          className={`flex h-5 w-5 items-center justify-center ${
-            showPaletteManager
-              ? "bg-violet-500 text-white"
-              : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-          }`}
-        >
-          <Settings className="h-3 w-3" />
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowPaletteManager((v) => !v)}
+            title="즐겨찾기 관리(팔레트 세트 불러오기·저장·삭제)"
+            className={`flex h-5 w-5 items-center justify-center ${
+              showPaletteManager
+                ? "bg-violet-500 text-white"
+                : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            }`}
+          >
+            <Settings className="h-3 w-3" />
+          </button>
+          {/* 팔레트 세트 — 파일이 아니라 편집기 자체에 저장돼 다른 작품을
+              열어도 남아 있다. 위 즐겨찾기와는 분리된 저장소로, 즐겨찾기를
+              이름 붙여 저장해뒀다가 나중에 통째로 불러와 쓴다. */}
+          {showPaletteManager && (
+            <div className="absolute top-full right-0 z-30 mt-1 flex w-56 flex-col gap-1 bg-white p-2 shadow-xl">
+              <p className="text-xs font-semibold text-gray-500">즐겨찾기 관리</p>
+              {paletteSets.length === 0 ? (
+                <p className="text-[10px] text-gray-400">저장된 세트가 없습니다</p>
+              ) : (
+                <div className="flex flex-col">
+                  {paletteSets.map((set) => (
+                    <div key={set.id} className="group flex items-center gap-1 py-1">
+                      <div className="flex shrink-0 gap-px">
+                        {set.colors.slice(0, 5).map((c, i) => (
+                          <span
+                            key={i}
+                            className="h-2.5 w-2.5"
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </div>
+                      {set.colors.length > 5 && (
+                        <span className="shrink-0 text-[8px] text-gray-400">
+                          +{set.colors.length - 5}
+                        </span>
+                      )}
+                      <span
+                        className="min-w-0 flex-1 truncate text-[10px] text-gray-700"
+                        title={set.name}
+                      >
+                        {set.name}
+                      </span>
+                      <button
+                        onClick={() => handleLoadSet(set)}
+                        title="즐겨찾기 전체를 이 세트 색으로 교체"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                      >
+                        <Download className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => handleOverwriteSet(set)}
+                        title="이 세트를 지금 즐겨찾기 내용으로 덮어쓰기"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                      >
+                        <Save className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSet(set)}
+                        title="이 세트 삭제"
+                        className="hidden h-5 w-5 shrink-0 items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 group-hover:flex"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={handleSaveAsNewSet}
+                disabled={favorites.length === 0}
+                title="지금 즐겨찾기를 새 이름의 팔레트 세트로 저장"
+                className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+              >
+                새로 저장
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid w-full grid-cols-6 gap-1.5">
@@ -332,63 +399,6 @@ export default function ColorWheel({
           +
         </button>
       </div>
-
-      {/* 팔레트 세트 — 파일이 아니라 편집기 자체에 저장돼 다른 작품을 열어도
-          남아 있다. 위 즐겨찾기와는 분리된 저장소로, 즐겨찾기를 이름 붙여
-          저장해뒀다가 나중에 통째로 불러와 쓴다. 자주 쓰는 기능이 아니라
-          "즐겨찾기" 라벨 옆 톱니바퀴를 눌러야만 보인다. */}
-      {showPaletteManager && (
-        <div className="flex w-full flex-col gap-1 border-t border-gray-100 pt-2">
-          <p className="text-xs font-semibold text-gray-500">즐겨찾기 관리</p>
-          <select
-            value={selectedSetId}
-            onChange={(e) => setSelectedSetId(e.target.value)}
-            title="편집기에 저장된 팔레트 세트(파일과 무관) — 즐겨찾기를 이름 붙여 저장해둔 것"
-            className="w-full bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600"
-          >
-            <option value="">(선택 없음)</option>
-            {paletteSets.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} ({s.colors.length})
-              </option>
-            ))}
-          </select>
-          <div className="flex flex-wrap gap-1">
-            <button
-              onClick={handleLoadSet}
-              disabled={!selectedSetId}
-              title="즐겨찾기 전체를 선택한 세트 색으로 교체"
-              className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600 hover:bg-gray-200 disabled:opacity-30"
-            >
-              불러오기(교체)
-            </button>
-            <button
-              onClick={handleOverwriteSet}
-              disabled={!selectedSetId}
-              title="선택한 세트를 지금 즐겨찾기 내용으로 덮어쓰기"
-              className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600 hover:bg-gray-200 disabled:opacity-30"
-            >
-              덮어쓰기
-            </button>
-            <button
-              onClick={handleSaveAsNewSet}
-              disabled={favorites.length === 0}
-              title="지금 즐겨찾기를 새 이름의 팔레트 세트로 저장"
-              className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600 hover:bg-gray-200 disabled:opacity-30"
-            >
-              새로 저장
-            </button>
-            <button
-              onClick={handleDeleteSet}
-              disabled={!selectedSetId}
-              title="선택한 세트 삭제"
-              className="bg-gray-100 px-1.5 py-1 text-[10px] text-red-500 hover:bg-red-50 disabled:opacity-30"
-            >
-              삭제
-            </button>
-          </div>
-        </div>
-      )}
 
       <PromptModal
         open={saveSetPromptOpen}
