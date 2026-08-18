@@ -8,10 +8,13 @@ import {
   NewAssetClassInput,
   NewFixedExpenseInput,
   NewIrregularCashflowInput,
+  NewTransferRuleInput,
+  TransferRule,
 } from "./types";
 import GroupAssetSection from "./input-sections/GroupAssetSection";
 import IncomeSection from "./input-sections/IncomeSection";
 import ExpenseSection from "./input-sections/ExpenseSection";
+import TransferRuleSection from "./input-sections/TransferRuleSection";
 
 type InputPanelProps = {
   groups: Group[];
@@ -32,6 +35,9 @@ type InputPanelProps = {
   irregularExpenses: IrregularCashflow[];
   onAddIrregularExpense: (input: NewIrregularCashflowInput) => void;
   onRemoveIrregularExpense: (id: string) => void;
+  transferRules: TransferRule[];
+  onAddTransferRule: (input: NewTransferRuleInput) => void;
+  onRemoveTransferRule: (id: string) => void;
   today: Date;
 };
 
@@ -63,6 +69,12 @@ export default function InputPanel(props: InputPanelProps) {
         onAddIrregularExpense={props.onAddIrregularExpense}
         onRemoveIrregularExpense={props.onRemoveIrregularExpense}
         today={props.today}
+      />
+      <TransferRuleSection
+        assetClasses={props.assetClasses}
+        transferRules={props.transferRules}
+        onAddTransferRule={props.onAddTransferRule}
+        onRemoveTransferRule={props.onRemoveTransferRule}
       />
     </div>
   );

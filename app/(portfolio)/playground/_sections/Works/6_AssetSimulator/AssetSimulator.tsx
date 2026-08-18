@@ -10,7 +10,9 @@ import {
   NewAssetClassInput,
   NewFixedExpenseInput,
   NewIrregularCashflowInput,
+  NewTransferRuleInput,
   SimulationInput,
+  TransferRule,
   newId,
   nextGroupColor,
 } from "./types";
@@ -29,6 +31,7 @@ export default function AssetSimulator() {
   const [irregularExpenses, setIrregularExpenses] = useState<
     IrregularCashflow[]
   >([]);
+  const [transferRules, setTransferRules] = useState<TransferRule[]>([]);
   const today = useMemo(() => new Date(), []);
 
   const handleAddGroup = (name: string) => {
@@ -70,6 +73,12 @@ export default function AssetSimulator() {
   const handleRemoveIrregularExpense = (id: string) => {
     setIrregularExpenses((prev) => prev.filter((e) => e.id !== id));
   };
+  const handleAddTransferRule = (input: NewTransferRuleInput) => {
+    setTransferRules((prev) => [...prev, { id: newId(), ...input }]);
+  };
+  const handleRemoveTransferRule = (id: string) => {
+    setTransferRules((prev) => prev.filter((r) => r.id !== id));
+  };
 
   const simulationInput = useMemo<SimulationInput>(
     () => ({
@@ -79,7 +88,7 @@ export default function AssetSimulator() {
       fixedExpenses,
       irregularIncomes,
       irregularExpenses,
-      transferRules: [],
+      transferRules,
     }),
     [
       groups,
@@ -88,6 +97,7 @@ export default function AssetSimulator() {
       fixedExpenses,
       irregularIncomes,
       irregularExpenses,
+      transferRules,
     ],
   );
 
@@ -116,6 +126,9 @@ export default function AssetSimulator() {
           irregularExpenses={irregularExpenses}
           onAddIrregularExpense={handleAddIrregularExpense}
           onRemoveIrregularExpense={handleRemoveIrregularExpense}
+          transferRules={transferRules}
+          onAddTransferRule={handleAddTransferRule}
+          onRemoveTransferRule={handleRemoveTransferRule}
           today={today}
         />
         <div className="flex flex-col gap-4">
