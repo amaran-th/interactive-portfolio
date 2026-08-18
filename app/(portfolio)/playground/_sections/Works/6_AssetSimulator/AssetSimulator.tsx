@@ -5,7 +5,6 @@ import {
   AssetClass,
   FixedExpense,
   Group,
-  HORIZON_MONTHS,
   IrregularCashflow,
   NewAssetClassInput,
   NewFixedExpenseInput,
@@ -18,6 +17,7 @@ import {
 } from "./types";
 import { useSimulation } from "./useSimulation";
 import InputPanel from "./InputPanel";
+import TimelineSlider from "./TimelineSlider";
 
 export default function AssetSimulator() {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -132,17 +132,11 @@ export default function AssetSimulator() {
           today={today}
         />
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-gray-500">
-            선택 시점: {selectedMonth}개월 후 · 총자산{" "}
-            {selectedSnapshot.totalBalance.toLocaleString()}원
-          </p>
-          <input
-            type="range"
-            min={0}
-            max={HORIZON_MONTHS}
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(Number(e.target.value))}
-            className="w-full accent-indigo-500"
+          <TimelineSlider
+            selectedMonth={selectedMonth}
+            onChange={setSelectedMonth}
+            totalBalance={selectedSnapshot.totalBalance}
+            today={today}
           />
         </div>
       </div>
