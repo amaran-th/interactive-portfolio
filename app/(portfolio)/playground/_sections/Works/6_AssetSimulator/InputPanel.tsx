@@ -1,7 +1,14 @@
 "use client";
 
-import { AssetClass, Group, NewAssetClassInput } from "./types";
+import {
+  AssetClass,
+  Group,
+  IrregularCashflow,
+  NewAssetClassInput,
+  NewIrregularCashflowInput,
+} from "./types";
 import GroupAssetSection from "./input-sections/GroupAssetSection";
+import IncomeSection from "./input-sections/IncomeSection";
 
 type InputPanelProps = {
   groups: Group[];
@@ -11,6 +18,12 @@ type InputPanelProps = {
   onAddAssetClass: (input: NewAssetClassInput) => void;
   onRemoveAssetClass: (id: string) => void;
   onSetPrimaryAsset: (id: string) => void;
+  monthlyIncome: number;
+  onChangeMonthlyIncome: (value: number) => void;
+  irregularIncomes: IrregularCashflow[];
+  onAddIrregularIncome: (input: NewIrregularCashflowInput) => void;
+  onRemoveIrregularIncome: (id: string) => void;
+  today: Date;
 };
 
 export default function InputPanel(props: InputPanelProps) {
@@ -24,6 +37,14 @@ export default function InputPanel(props: InputPanelProps) {
         onAddAssetClass={props.onAddAssetClass}
         onRemoveAssetClass={props.onRemoveAssetClass}
         onSetPrimaryAsset={props.onSetPrimaryAsset}
+      />
+      <IncomeSection
+        monthlyIncome={props.monthlyIncome}
+        onChangeMonthlyIncome={props.onChangeMonthlyIncome}
+        irregularIncomes={props.irregularIncomes}
+        onAddIrregularIncome={props.onAddIrregularIncome}
+        onRemoveIrregularIncome={props.onRemoveIrregularIncome}
+        today={props.today}
       />
     </div>
   );

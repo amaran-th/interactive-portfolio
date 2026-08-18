@@ -5,7 +5,9 @@ import {
   AssetClass,
   Group,
   HORIZON_MONTHS,
+  IrregularCashflow,
   NewAssetClassInput,
+  NewIrregularCashflowInput,
   SimulationInput,
   newId,
   nextGroupColor,
@@ -17,6 +19,11 @@ export default function AssetSimulator() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [assetClasses, setAssetClasses] = useState<AssetClass[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(0);
+  const [monthlyIncome, setMonthlyIncome] = useState(0);
+  const [irregularIncomes, setIrregularIncomes] = useState<
+    IrregularCashflow[]
+  >([]);
+  const today = useMemo(() => new Date(), []);
 
   const handleAddGroup = (name: string) => {
     setGroups((prev) => [
@@ -39,18 +46,24 @@ export default function AssetSimulator() {
       prev.map((a) => ({ ...a, isPrimary: a.id === id })),
     );
   };
+  const handleAddIrregularIncome = (input: NewIrregularCashflowInput) => {
+    setIrregularIncomes((prev) => [...prev, { id: newId(), ...input }]);
+  };
+  const handleRemoveIrregularIncome = (id: string) => {
+    setIrregularIncomes((prev) => prev.filter((e) => e.id !== id));
+  };
 
   const simulationInput = useMemo<SimulationInput>(
     () => ({
       groups,
       assetClasses,
-      monthlyIncome: 0,
+      monthlyIncome,
       fixedExpenses: [],
-      irregularIncomes: [],
+      irregularIncomes,
       irregularExpenses: [],
       transferRules: [],
     }),
-    [groups, assetClasses],
+    [groups, assetClasses, monthlyIncome, irregularIncomes],
   );
 
   const snapshots = useSimulation(simulationInput);
@@ -67,6 +80,12 @@ export default function AssetSimulator() {
           onAddAssetClass={handleAddAssetClass}
           onRemoveAssetClass={handleRemoveAssetClass}
           onSetPrimaryAsset={handleSetPrimaryAsset}
+          monthlyIncome={monthlyIncome}
+          onChangeMonthlyIncome={setMonthlyIncome}
+          irregularIncomes={irregularIncomes}
+          onAddIrregularIncome={handleAddIrregularIncome}
+          onRemoveIrregularIncome={handleRemoveIrregularIncome}
+          today={today}
         />
         <div className="flex flex-col gap-4">
           <p className="text-sm text-gray-500">
