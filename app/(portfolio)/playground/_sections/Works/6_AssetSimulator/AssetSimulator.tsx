@@ -18,6 +18,7 @@ import {
 import { useSimulation } from "./useSimulation";
 import InputPanel from "./InputPanel";
 import TimelineSlider from "./TimelineSlider";
+import AssetAreaChart from "./AssetAreaChart";
 
 export default function AssetSimulator() {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -137,6 +138,11 @@ export default function AssetSimulator() {
             onChange={setSelectedMonth}
             totalBalance={selectedSnapshot.totalBalance}
             today={today}
+          />
+          <AssetAreaChart
+            snapshots={snapshots}
+            groups={groups}
+            selectedMonth={selectedMonth}
           />
         </div>
       </div>
