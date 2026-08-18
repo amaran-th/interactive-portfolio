@@ -123,5 +123,6 @@ export const works: WorkItem[] = [
     platforms: [{ type: "pc" }, { type: "mobile" }],
     content: <AssetSimulator />,
     path: "/asset-simulator",
+    theme: "light",
   },
 ];
