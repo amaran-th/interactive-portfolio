@@ -20,6 +20,7 @@ import InputPanel from "./InputPanel";
 import TimelineSlider from "./TimelineSlider";
 import AssetAreaChart from "./AssetAreaChart";
 import GroupDonutChart from "./GroupDonutChart";
+import FlowDiagram from "./FlowDiagram";
 
 export default function AssetSimulator() {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -105,6 +106,7 @@ export default function AssetSimulator() {
 
   const snapshots = useSimulation(simulationInput);
   const selectedSnapshot = snapshots[selectedMonth];
+  const primaryAsset = assetClasses.find((a) => a.isPrimary);
 
   return (
     <div className="h-full w-full overflow-y-auto bg-gradient-to-br from-indigo-100 via-blue-50 to-purple-100 p-4 text-gray-800">
@@ -150,6 +152,11 @@ export default function AssetSimulator() {
               groups={groups}
               assetClasses={assetClasses}
               snapshot={selectedSnapshot}
+            />
+            <FlowDiagram
+              snapshot={selectedSnapshot}
+              primaryAsset={primaryAsset}
+              assetClasses={assetClasses}
             />
           </div>
         </div>
