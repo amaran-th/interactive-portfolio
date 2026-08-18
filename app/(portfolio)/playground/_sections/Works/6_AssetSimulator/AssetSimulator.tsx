@@ -3,10 +3,12 @@
 import { useMemo, useState } from "react";
 import {
   AssetClass,
+  FixedExpense,
   Group,
   HORIZON_MONTHS,
   IrregularCashflow,
   NewAssetClassInput,
+  NewFixedExpenseInput,
   NewIrregularCashflowInput,
   SimulationInput,
   newId,
@@ -21,6 +23,10 @@ export default function AssetSimulator() {
   const [selectedMonth, setSelectedMonth] = useState(0);
   const [monthlyIncome, setMonthlyIncome] = useState(0);
   const [irregularIncomes, setIrregularIncomes] = useState<
+    IrregularCashflow[]
+  >([]);
+  const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
+  const [irregularExpenses, setIrregularExpenses] = useState<
     IrregularCashflow[]
   >([]);
   const today = useMemo(() => new Date(), []);
@@ -52,18 +58,37 @@ export default function AssetSimulator() {
   const handleRemoveIrregularIncome = (id: string) => {
     setIrregularIncomes((prev) => prev.filter((e) => e.id !== id));
   };
+  const handleAddFixedExpense = (input: NewFixedExpenseInput) => {
+    setFixedExpenses((prev) => [...prev, { id: newId(), ...input }]);
+  };
+  const handleRemoveFixedExpense = (id: string) => {
+    setFixedExpenses((prev) => prev.filter((e) => e.id !== id));
+  };
+  const handleAddIrregularExpense = (input: NewIrregularCashflowInput) => {
+    setIrregularExpenses((prev) => [...prev, { id: newId(), ...input }]);
+  };
+  const handleRemoveIrregularExpense = (id: string) => {
+    setIrregularExpenses((prev) => prev.filter((e) => e.id !== id));
+  };
 
   const simulationInput = useMemo<SimulationInput>(
     () => ({
       groups,
       assetClasses,
       monthlyIncome,
-      fixedExpenses: [],
+      fixedExpenses,
       irregularIncomes,
-      irregularExpenses: [],
+      irregularExpenses,
       transferRules: [],
     }),
-    [groups, assetClasses, monthlyIncome, irregularIncomes],
+    [
+      groups,
+      assetClasses,
+      monthlyIncome,
+      fixedExpenses,
+      irregularIncomes,
+      irregularExpenses,
+    ],
   );
 
   const snapshots = useSimulation(simulationInput);
@@ -85,6 +110,12 @@ export default function AssetSimulator() {
           irregularIncomes={irregularIncomes}
           onAddIrregularIncome={handleAddIrregularIncome}
           onRemoveIrregularIncome={handleRemoveIrregularIncome}
+          fixedExpenses={fixedExpenses}
+          onAddFixedExpense={handleAddFixedExpense}
+          onRemoveFixedExpense={handleRemoveFixedExpense}
+          irregularExpenses={irregularExpenses}
+          onAddIrregularExpense={handleAddIrregularExpense}
+          onRemoveIrregularExpense={handleRemoveIrregularExpense}
           today={today}
         />
         <div className="flex flex-col gap-4">
