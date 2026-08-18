@@ -13,7 +13,6 @@ export interface WorkItem {
   thumbnail?: string;
   content: React.ReactNode;
   path?: string;
-  theme?: "light";
 }
 
 interface WorkProps {
