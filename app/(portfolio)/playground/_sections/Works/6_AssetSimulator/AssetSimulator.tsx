@@ -19,6 +19,7 @@ import { useSimulation } from "./useSimulation";
 import InputPanel from "./InputPanel";
 import TimelineSlider from "./TimelineSlider";
 import AssetAreaChart from "./AssetAreaChart";
+import GroupDonutChart from "./GroupDonutChart";
 
 export default function AssetSimulator() {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -144,6 +145,13 @@ export default function AssetSimulator() {
             groups={groups}
             selectedMonth={selectedMonth}
           />
+          <div className="grid gap-4 md:grid-cols-2">
+            <GroupDonutChart
+              groups={groups}
+              assetClasses={assetClasses}
+              snapshot={selectedSnapshot}
+            />
+          </div>
         </div>
       </div>
     </div>
