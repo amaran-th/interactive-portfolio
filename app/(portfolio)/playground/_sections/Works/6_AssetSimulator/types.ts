@@ -1,3 +1,5 @@
+export type Currency = "KRW" | "USD";
+
 export type Group = {
   id: string;
   name: string;
@@ -7,7 +9,8 @@ export type Group = {
 export type AssetClass = {
   id: string;
   name: string;
-  groupId: string;
+  groupId?: string;
+  currency: Currency;
   initialBalance: number;
   annualReturnRate: number;
   isPrimary: boolean;
@@ -17,6 +20,13 @@ export type FixedExpense = {
   id: string;
   name: string;
   amount: number;
+};
+
+export type FixedIncome = {
+  id: string;
+  name: string;
+  amount: number;
+  groupId?: string;
 };
 
 export type IrregularCashflow = {
@@ -41,11 +51,12 @@ export type TransferRule = {
 export type SimulationInput = {
   groups: Group[];
   assetClasses: AssetClass[];
-  monthlyIncome: number;
+  fixedIncomes: FixedIncome[];
   fixedExpenses: FixedExpense[];
   irregularIncomes: IrregularCashflow[];
   irregularExpenses: IrregularCashflow[];
   transferRules: TransferRule[];
+  exchangeRate: number;
 };
 
 export type MonthFlow = {
@@ -62,20 +73,29 @@ export type MonthFlow = {
 export type MonthSnapshot = {
   monthIndex: number;
   assetBalances: Record<string, number>;
+  assetBalancesKRW: Record<string, number>;
   groupTotals: Record<string, number>;
+  ungroupedTotalKRW: number;
   totalBalance: number;
   flow: MonthFlow;
 };
 
 export type NewAssetClassInput = {
   name: string;
-  groupId: string;
+  groupId?: string;
+  currency: Currency;
   initialBalance: number;
   annualReturnRate: number;
   isPrimary: boolean;
 };
 
 export type NewFixedExpenseInput = { name: string; amount: number };
+
+export type NewFixedIncomeInput = {
+  name: string;
+  amount: number;
+  groupId?: string;
+};
 
 export type NewIrregularCashflowInput = {
   name: string;
@@ -104,10 +124,34 @@ export const GROUP_PALETTE = [
   "#fca5a5",
 ];
 
+export const UNGROUPED_LABEL = "미분류";
+export const UNGROUPED_COLOR = "#9ca3af";
+
 export function nextGroupColor(existingCount: number): string {
   return GROUP_PALETTE[existingCount % GROUP_PALETTE.length];
 }
 
 export function newId(): string {
   return crypto.randomUUID();
+}
+
+export function formatKRW(amount: number): string {
+  const abs = Math.abs(amount);
+  const sign = amount < 0 ? "-" : "";
+  if (abs >= 100_000_000) {
+    return `${sign}${(abs / 100_000_000).toFixed(1)}억원`;
+  }
+  if (abs >= 10_000) {
+    return `${sign}${Math.round(abs / 10_000).toLocaleString()}만원`;
+  }
+  return `${sign}${Math.round(abs).toLocaleString()}원`;
+}
+
+export function formatMonthsFromNow(months: number): string {
+  if (months < 12) {
+    return `${months}개월 후`;
+  }
+  const years = Math.floor(months / 12);
+  const remainder = months % 12;
+  return remainder === 0 ? `${years}년 후` : `${years}년 ${remainder}개월 후`;
 }

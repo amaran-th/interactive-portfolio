@@ -16,30 +16,68 @@ export function monthIndexFromTargetDate(
   return (year - todayYear) * 12 + (month - todayMonth);
 }
 
+function toKRW(asset: AssetClass, nativeBalance: number, exchangeRate: number): number {
+  return asset.currency === "USD" ? nativeBalance * exchangeRate : nativeBalance;
+}
+
 function computeGroupTotals(
+  balancesKRW: Record<string, number>,
+  assetClasses: AssetClass[],
+  groups: Group[],
+): { groupTotals: Record<string, number>; ungroupedTotalKRW: number } {
+  const groupTotals: Record<string, number> = {};
+  for (const group of groups) {
+    groupTotals[group.id] = 0;
+  }
+  let ungroupedTotalKRW = 0;
+  for (const asset of assetClasses) {
+    const value = balancesKRW[asset.id] ?? 0;
+    if (asset.groupId && groupTotals[asset.groupId] !== undefined) {
+      groupTotals[asset.groupId] += value;
+    } else {
+      ungroupedTotalKRW += value;
+    }
+  }
+  return { groupTotals, ungroupedTotalKRW };
+}
+
+function sumBalances(balancesKRW: Record<string, number>): number {
+  return Object.values(balancesKRW).reduce((sum, value) => sum + value, 0);
+}
+
+function buildSnapshot(
+  monthIndex: number,
   balances: Record<string, number>,
   assetClasses: AssetClass[],
   groups: Group[],
-): Record<string, number> {
-  const totals: Record<string, number> = {};
-  for (const group of groups) {
-    totals[group.id] = 0;
-  }
+  exchangeRate: number,
+  flow: MonthSnapshot["flow"],
+): MonthSnapshot {
+  const assetBalancesKRW: Record<string, number> = {};
   for (const asset of assetClasses) {
-    totals[asset.groupId] = (totals[asset.groupId] ?? 0) + balances[asset.id];
+    assetBalancesKRW[asset.id] = toKRW(asset, balances[asset.id] ?? 0, exchangeRate);
   }
-  return totals;
-}
-
-function sumBalances(balances: Record<string, number>): number {
-  return Object.values(balances).reduce((sum, value) => sum + value, 0);
+  const { groupTotals, ungroupedTotalKRW } = computeGroupTotals(
+    assetBalancesKRW,
+    assetClasses,
+    groups,
+  );
+  return {
+    monthIndex,
+    assetBalances: { ...balances },
+    assetBalancesKRW,
+    groupTotals,
+    ungroupedTotalKRW,
+    totalBalance: sumBalances(assetBalancesKRW),
+    flow,
+  };
 }
 
 export function runSimulation(
   input: SimulationInput,
   today: Date = new Date(),
 ): MonthSnapshot[] {
-  const { groups, assetClasses, transferRules } = input;
+  const { groups, assetClasses, transferRules, exchangeRate } = input;
   const primary = assetClasses.find((asset) => asset.isPrimary);
 
   const balances: Record<string, number> = {};
@@ -48,13 +86,11 @@ export function runSimulation(
   }
 
   const snapshots: MonthSnapshot[] = [
-    {
-      monthIndex: 0,
-      assetBalances: { ...balances },
-      groupTotals: computeGroupTotals(balances, assetClasses, groups),
-      totalBalance: sumBalances(balances),
-      flow: { incomeIn: 0, expenseOut: 0, transfers: [] },
-    },
+    buildSnapshot(0, balances, assetClasses, groups, exchangeRate, {
+      incomeIn: 0,
+      expenseOut: 0,
+      transfers: [],
+    }),
   ];
 
   for (let month = 1; month <= HORIZON_MONTHS; month++) {
@@ -65,12 +101,16 @@ export function runSimulation(
     };
 
     if (primary) {
+      const fixedIncomeTotal = input.fixedIncomes.reduce(
+        (sum, item) => sum + item.amount,
+        0,
+      );
       const irregularIncomeThisMonth = input.irregularIncomes
         .filter(
           (item) => monthIndexFromTargetDate(item.targetDate, today) === month,
         )
         .reduce((sum, item) => sum + item.amount, 0);
-      const incomeIn = input.monthlyIncome + irregularIncomeThisMonth;
+      const incomeIn = fixedIncomeTotal + irregularIncomeThisMonth;
       balances[primary.id] += incomeIn;
       flow.incomeIn = incomeIn;
 
@@ -116,13 +156,9 @@ export function runSimulation(
       balances[asset.id] *= 1 + monthlyRate;
     }
 
-    snapshots.push({
-      monthIndex: month,
-      assetBalances: { ...balances },
-      groupTotals: computeGroupTotals(balances, assetClasses, groups),
-      totalBalance: sumBalances(balances),
-      flow,
-    });
+    snapshots.push(
+      buildSnapshot(month, balances, assetClasses, groups, exchangeRate, flow),
+    );
   }
 
   return snapshots;
