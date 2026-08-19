@@ -236,6 +236,7 @@ export default function AssetSimulator() {
           <AssetAreaChart
             snapshots={snapshots}
             groups={groups}
+            assetClasses={assetClasses}
             selectedMonth={selectedMonth}
           />
           <div className="grid gap-4 md:grid-cols-2">
