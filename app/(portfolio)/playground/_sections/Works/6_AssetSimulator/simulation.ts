@@ -1,7 +1,8 @@
 import {
   AssetClass,
+  Goal,
+  GOAL_SEARCH_CAP_MONTHS,
   Group,
-  HORIZON_MONTHS,
   MonthSnapshot,
   RepeatSchedule,
   SimulationInput,
@@ -40,17 +41,18 @@ export function fires(
 export function validateSchedule(
   schedule: RepeatSchedule,
   today: Date,
+  horizonMonths: number,
 ): string | null {
-  const rangeMessage = `1개월 후부터 ${formatMonthsFromNow(HORIZON_MONTHS)} 사이의 날짜만 선택할 수 있습니다.`;
+  const rangeMessage = `1개월 후부터 ${formatMonthsFromNow(horizonMonths)} 사이의 날짜만 선택할 수 있습니다.`;
 
   if (schedule.mode === "once") {
     const m = monthIndexFromTargetDate(schedule.date, today);
-    if (!Number.isFinite(m) || m < 1 || m > HORIZON_MONTHS) return rangeMessage;
+    if (!Number.isFinite(m) || m < 1 || m > horizonMonths) return rangeMessage;
     return null;
   }
 
   const start = monthIndexFromTargetDate(schedule.startDate, today);
-  if (!Number.isFinite(start) || start < 1 || start > HORIZON_MONTHS) {
+  if (!Number.isFinite(start) || start < 1 || start > horizonMonths) {
     return rangeMessage;
   }
 
@@ -133,7 +135,8 @@ function buildSnapshot(
 
 export function runSimulation(
   input: SimulationInput,
-  today: Date = new Date(),
+  today: Date,
+  horizonMonths: number,
 ): MonthSnapshot[] {
   const { groups, assetClasses, transferRules, exchangeRate } = input;
   const primary = assetClasses.find((asset) => asset.isPrimary);
@@ -151,7 +154,7 @@ export function runSimulation(
     }),
   ];
 
-  for (let month = 1; month <= HORIZON_MONTHS; month++) {
+  for (let month = 1; month <= horizonMonths; month++) {
     const flow: MonthSnapshot["flow"] = {
       incomeIn: 0,
       expenseOut: 0,
@@ -203,4 +206,25 @@ export function runSimulation(
   }
 
   return snapshots;
+}
+
+function goalMetricValue(goal: Goal, snapshot: MonthSnapshot): number {
+  if (goal.metric.type === "total") return snapshot.totalBalance;
+  if (goal.metric.type === "asset") {
+    return snapshot.assetBalancesKRW[goal.metric.assetId] ?? 0;
+  }
+  return snapshot.groupTotals[goal.metric.groupId] ?? 0;
+}
+
+export function findGoalAchievementMonth(
+  input: SimulationInput,
+  goal: Goal,
+  today: Date,
+  searchCapMonths: number = GOAL_SEARCH_CAP_MONTHS,
+): number | null {
+  const snapshots = runSimulation(input, today, searchCapMonths);
+  const found = snapshots.find(
+    (s) => goalMetricValue(goal, s) >= goal.targetAmount,
+  );
+  return found ? found.monthIndex : null;
 }

@@ -14,6 +14,7 @@ export type AssetClass = {
   initialBalance: number;
   annualReturnRate: number;
   isPrimary: boolean;
+  color: string;
 };
 
 export type RepeatUntil =
@@ -55,6 +56,16 @@ export type TransferRule = {
   mode: TransferMode;
   amount: number;
   schedule: RepeatSchedule;
+};
+
+export type GoalMetric =
+  | { type: "total" }
+  | { type: "asset"; assetId: string }
+  | { type: "group"; groupId: string };
+
+export type Goal = {
+  metric: GoalMetric;
+  targetAmount: number;
 };
 
 export type SimulationInput = {
@@ -118,7 +129,9 @@ export type NewTransferRuleInput = {
   schedule: RepeatSchedule;
 };
 
-export const HORIZON_MONTHS = 120;
+export const HORIZON_PRESET_YEARS = [5, 10, 20, 30] as const;
+export const DEFAULT_HORIZON_YEARS = 10;
+export const GOAL_SEARCH_CAP_MONTHS = 6000;
 
 export const GROUP_PALETTE = [
   "#818cf8",
@@ -135,6 +148,10 @@ export const UNGROUPED_LABEL = "미분류";
 export const UNGROUPED_COLOR = "#9ca3af";
 
 export function nextGroupColor(existingCount: number): string {
+  return GROUP_PALETTE[existingCount % GROUP_PALETTE.length];
+}
+
+export function nextAssetColor(existingCount: number): string {
   return GROUP_PALETTE[existingCount % GROUP_PALETTE.length];
 }
 
