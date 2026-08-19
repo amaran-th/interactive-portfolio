@@ -25,6 +25,15 @@ import GroupDonutChart from "./GroupDonutChart";
 import FlowDiagram from "./FlowDiagram";
 import ComparisonBarChart from "./ComparisonBarChart";
 
+function withGuaranteedPrimary(assets: AssetClass[]): AssetClass[] {
+  if (assets.some((a) => a.isPrimary && a.currency === "KRW")) {
+    return assets;
+  }
+  const candidate = assets.find((a) => a.currency === "KRW");
+  if (!candidate) return assets;
+  return assets.map((a) => ({ ...a, isPrimary: a.id === candidate.id }));
+}
+
 export default function AssetSimulator() {
   const today = useMemo(() => new Date(), []);
 
@@ -52,21 +61,35 @@ export default function AssetSimulator() {
   };
 
   const handleAddAssetClass = (input: NewAssetClassInput) => {
-    setAssetClasses((prev) => [
-      ...(input.isPrimary
-        ? prev.map((a) => ({ ...a, isPrimary: false }))
-        : prev),
-      { id: newId(), ...input },
-    ]);
+    setAssetClasses((prev) => {
+      const withNew = [
+        ...(input.isPrimary
+          ? prev.map((a) => ({ ...a, isPrimary: false }))
+          : prev),
+        { id: newId(), ...input },
+      ];
+      return withGuaranteedPrimary(withNew);
+    });
   };
   const handleUpdateAssetClass = (id: string, input: NewAssetClassInput) => {
-    setAssetClasses((prev) =>
-      prev.map((a) => {
+    setAssetClasses((prev) => {
+      const updated = prev.map((a) => {
         if (a.id === id) return { ...a, ...input };
         if (input.isPrimary) return { ...a, isPrimary: false };
         return a;
-      }),
-    );
+      });
+      return withGuaranteedPrimary(updated);
+    });
+    setTransferRules((prev) => {
+      const nextAssets = assetClasses.map((a) =>
+        a.id === id ? { ...a, ...input } : a,
+      );
+      return prev.filter((r) => {
+        const from = nextAssets.find((a) => a.id === r.fromAssetId);
+        const to = nextAssets.find((a) => a.id === r.toAssetId);
+        return from && to && from.currency === to.currency;
+      });
+    });
   };
   const handleRemoveAssetClass = (id: string) => {
     setAssetClasses((prev) => {
@@ -193,6 +216,9 @@ export default function AssetSimulator() {
   const snapshots = useSimulation(simulationInput, today);
   const selectedSnapshot = snapshots[selectedMonth];
   const primaryAsset = assetClasses.find((a) => a.isPrimary);
+  const assetGroups = groups.filter((g) =>
+    assetClasses.some((a) => a.groupId === g.id),
+  );
 
   return (
     <div className="h-full w-full overflow-y-auto bg-gradient-to-br from-indigo-100 via-blue-50 to-purple-100 p-4 text-gray-800">
@@ -203,8 +229,11 @@ export default function AssetSimulator() {
             환율(1달러 = 원)
             <input
               type="number"
+              min={1}
               value={exchangeRate}
-              onChange={(e) => setExchangeRate(Number(e.target.value) || 0)}
+              onChange={(e) =>
+                setExchangeRate(Math.max(1, Number(e.target.value) || 1))
+              }
               className="w-24 rounded-full border border-white/60 bg-white/80 px-2 py-1 text-sm"
             />
           </label>
@@ -249,18 +278,18 @@ export default function AssetSimulator() {
             <div className="grid gap-4 md:grid-cols-2">
               <AssetAreaChart
                 snapshots={snapshots}
-                groups={groups}
+                groups={assetGroups}
                 assetClasses={assetClasses}
                 selectedMonth={selectedMonth}
               />
               <ComparisonBarChart
                 snapshots={snapshots}
-                groups={groups}
+                groups={assetGroups}
                 assetClasses={assetClasses}
                 selectedMonth={selectedMonth}
               />
               <GroupDonutChart
-                groups={groups}
+                groups={assetGroups}
                 assetClasses={assetClasses}
                 snapshot={selectedSnapshot}
               />
@@ -268,6 +297,7 @@ export default function AssetSimulator() {
                 snapshot={selectedSnapshot}
                 primaryAsset={primaryAsset}
                 assetClasses={assetClasses}
+                exchangeRate={exchangeRate}
               />
             </div>
           </div>

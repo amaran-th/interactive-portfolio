@@ -66,8 +66,7 @@ export default function GroupAssetSection({
       currency,
       initialBalance: Number(balance) || 0,
       annualReturnRate: Number(returnRate) || 0,
-      isPrimary:
-        currency === "KRW" && (makePrimary || assetClasses.length === 0),
+      isPrimary: currency === "KRW" && makePrimary,
     };
     if (editingId) {
       onUpdateAssetClass(editingId, input);

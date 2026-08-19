@@ -5,7 +5,6 @@ import {
   Group,
   MonthSnapshot,
   UNGROUPED_COLOR,
-  UNGROUPED_LABEL,
   formatKRW,
 } from "./types";
 

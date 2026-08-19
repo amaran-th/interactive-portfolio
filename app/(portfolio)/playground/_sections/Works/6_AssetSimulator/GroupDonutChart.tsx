@@ -60,7 +60,7 @@ export default function GroupDonutChart({
   if (!activeTabId) {
     return (
       <div className="flex h-[220px] items-center justify-center rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
-        그룹을 추가하면 비율을 확인합니다
+        자산군을 추가하면 비율이 나타납니다
       </div>
     );
   }
