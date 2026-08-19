@@ -16,6 +16,8 @@ import ScheduleEditor from "./ScheduleEditor";
 type IncomeSectionProps = {
   groups: Group[];
   onAddGroup: (name: string) => string;
+  onUpdateGroup: (id: string, input: { name: string; color: string }) => void;
+  onRemoveGroup: (id: string) => void;
   incomes: IncomeItem[];
   onAddIncome: (input: NewIncomeItemInput) => void;
   onUpdateIncome: (id: string, input: NewIncomeItemInput) => void;
@@ -45,6 +47,8 @@ function scheduleSummary(schedule: RepeatSchedule): string {
 export default function IncomeSection({
   groups,
   onAddGroup,
+  onUpdateGroup,
+  onRemoveGroup,
   incomes,
   onAddIncome,
   onUpdateIncome,
@@ -167,6 +171,8 @@ export default function IncomeSection({
             value={groupId}
             onChange={setGroupId}
             onCreateGroup={onAddGroup}
+            onUpdateGroup={onUpdateGroup}
+            onRemoveGroup={onRemoveGroup}
           />
         </div>
         <input

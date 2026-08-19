@@ -16,6 +16,8 @@ import ScheduleEditor from "./ScheduleEditor";
 type ExpenseSectionProps = {
   groups: Group[];
   onAddGroup: (name: string) => string;
+  onUpdateGroup: (id: string, input: { name: string; color: string }) => void;
+  onRemoveGroup: (id: string) => void;
   expenses: ExpenseItem[];
   onAddExpense: (input: NewExpenseItemInput) => void;
   onUpdateExpense: (id: string, input: NewExpenseItemInput) => void;
@@ -45,6 +47,8 @@ function scheduleSummary(schedule: RepeatSchedule): string {
 export default function ExpenseSection({
   groups,
   onAddGroup,
+  onUpdateGroup,
+  onRemoveGroup,
   expenses,
   onAddExpense,
   onUpdateExpense,
@@ -167,6 +171,8 @@ export default function ExpenseSection({
             value={groupId}
             onChange={setGroupId}
             onCreateGroup={onAddGroup}
+            onUpdateGroup={onUpdateGroup}
+            onRemoveGroup={onRemoveGroup}
           />
         </div>
         <input

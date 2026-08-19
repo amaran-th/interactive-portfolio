@@ -1,27 +1,39 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { AssetClass, Currency, Group, NewAssetClassInput } from "../types";
+import {
+  AssetClass,
+  Currency,
+  GROUP_PALETTE,
+  Group,
+  NewAssetClassInput,
+} from "../types";
 import GroupPicker from "./GroupPicker";
 
 type GroupAssetSectionProps = {
   groups: Group[];
   onAddGroup: (name: string) => string;
+  onUpdateGroup: (id: string, input: { name: string; color: string }) => void;
+  onRemoveGroup: (id: string) => void;
   assetClasses: AssetClass[];
   onAddAssetClass: (input: NewAssetClassInput) => void;
   onUpdateAssetClass: (id: string, input: NewAssetClassInput) => void;
   onRemoveAssetClass: (id: string) => void;
   onSetPrimaryAsset: (id: string) => void;
+  onChangeAssetColor: (id: string, color: string) => void;
 };
 
 export default function GroupAssetSection({
   groups,
   onAddGroup,
+  onUpdateGroup,
+  onRemoveGroup,
   assetClasses,
   onAddAssetClass,
   onUpdateAssetClass,
   onRemoveAssetClass,
   onSetPrimaryAsset,
+  onChangeAssetColor,
 }: GroupAssetSectionProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -31,6 +43,7 @@ export default function GroupAssetSection({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [returnRate, setReturnRate] = useState("0");
   const [makePrimary, setMakePrimary] = useState(false);
+  const [colorPickerId, setColorPickerId] = useState<string | null>(null);
 
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -92,46 +105,80 @@ export default function GroupAssetSection({
           return (
             <li
               key={asset.id}
-              onClick={() => startEdit(asset)}
-              className="flex cursor-pointer items-center justify-between rounded-xl border border-indigo-100 bg-white/80 px-3 py-2 text-sm hover:border-indigo-300"
+              className="flex flex-col gap-1.5 rounded-xl border border-indigo-100 bg-white/80 px-3 py-2 text-sm hover:border-indigo-300"
             >
-              <span className="flex flex-1 items-center gap-2">
-                <input
-                  type="radio"
-                  name="primary-asset"
-                  checked={asset.isPrimary}
-                  disabled={asset.currency === "USD"}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={() => onSetPrimaryAsset(asset.id)}
-                />
-                {group && (
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: group.color }}
-                  />
-                )}
-                <span>{asset.name}</span>
-                <span className="text-gray-400">
-                  {asset.currency === "USD"
-                    ? `$${asset.initialBalance.toLocaleString()}`
-                    : `${asset.initialBalance.toLocaleString()}원`}
-                </span>
-                {asset.isPrimary && (
-                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-600">
-                    기본 계좌
-                  </span>
-                )}
-              </span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemoveAssetClass(asset.id);
-                }}
-                className="text-gray-400 hover:text-gray-700"
+              <div
+                onClick={() => startEdit(asset)}
+                className="flex cursor-pointer items-center justify-between"
               >
-                ✕
-              </button>
+                <span className="flex flex-1 items-center gap-2">
+                  <input
+                    type="radio"
+                    name="primary-asset"
+                    checked={asset.isPrimary}
+                    disabled={asset.currency === "USD"}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => onSetPrimaryAsset(asset.id)}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setColorPickerId((prev) =>
+                        prev === asset.id ? null : asset.id,
+                      );
+                    }}
+                    className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10"
+                    style={{ backgroundColor: asset.color }}
+                    aria-label="자산 색상 변경"
+                  />
+                  {group && (
+                    <span
+                      className="h-2.5 w-2.5 rounded-full ring-2 ring-white"
+                      style={{ backgroundColor: group.color }}
+                    />
+                  )}
+                  <span>{asset.name}</span>
+                  <span className="text-gray-400">
+                    {asset.currency === "USD"
+                      ? `$${asset.initialBalance.toLocaleString()}`
+                      : `${asset.initialBalance.toLocaleString()}원`}
+                  </span>
+                  {asset.isPrimary && (
+                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-600">
+                      기본 계좌
+                    </span>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveAssetClass(asset.id);
+                  }}
+                  className="text-gray-400 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+              {colorPickerId === asset.id && (
+                <div className="flex flex-wrap gap-1.5 pl-6">
+                  {GROUP_PALETTE.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onChangeAssetColor(asset.id, color);
+                        setColorPickerId(null);
+                      }}
+                      className="h-5 w-5 rounded-full ring-1 ring-black/10"
+                      style={{ backgroundColor: color }}
+                      aria-label={`색상 ${color}로 변경`}
+                    />
+                  ))}
+                </div>
+              )}
             </li>
           );
         })}
@@ -151,6 +198,8 @@ export default function GroupAssetSection({
             value={groupId}
             onChange={setGroupId}
             onCreateGroup={onAddGroup}
+            onUpdateGroup={onUpdateGroup}
+            onRemoveGroup={onRemoveGroup}
           />
         </div>
         <div className="flex gap-2">
