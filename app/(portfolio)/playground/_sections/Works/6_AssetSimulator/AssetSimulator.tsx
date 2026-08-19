@@ -3,8 +3,11 @@
 import { useMemo, useState } from "react";
 import {
   AssetClass,
+  DEFAULT_HORIZON_YEARS,
   ExpenseItem,
+  Goal,
   Group,
+  HORIZON_PRESET_YEARS,
   IncomeItem,
   NewAssetClassInput,
   NewExpenseItemInput,
@@ -13,6 +16,7 @@ import {
   SimulationInput,
   TransferRule,
   newId,
+  nextAssetColor,
   nextGroupColor,
 } from "./types";
 import { useSimulation } from "./useSimulation";
@@ -22,6 +26,7 @@ import AssetAreaChart from "./AssetAreaChart";
 import GroupDonutChart from "./GroupDonutChart";
 import FlowDiagram from "./FlowDiagram";
 import ComparisonBarChart from "./ComparisonBarChart";
+import GoalCard from "./GoalCard";
 
 function withGuaranteedPrimary(assets: AssetClass[]): AssetClass[] {
   if (assets.some((a) => a.isPrimary && a.currency === "KRW")) {
@@ -30,6 +35,18 @@ function withGuaranteedPrimary(assets: AssetClass[]): AssetClass[] {
   const candidate = assets.find((a) => a.currency === "KRW");
   if (!candidate) return assets;
   return assets.map((a) => ({ ...a, isPrimary: a.id === candidate.id }));
+}
+
+function goalReferences(
+  goal: Goal | null,
+  kind: "asset" | "group",
+  id: string,
+): boolean {
+  if (!goal) return false;
+  if (kind === "asset") {
+    return goal.metric.type === "asset" && goal.metric.assetId === id;
+  }
+  return goal.metric.type === "group" && goal.metric.groupId === id;
 }
 
 export default function AssetSimulator() {
@@ -42,6 +59,15 @@ export default function AssetSimulator() {
   const [transferRules, setTransferRules] = useState<TransferRule[]>([]);
   const [exchangeRate, setExchangeRate] = useState(1350);
   const [selectedMonth, setSelectedMonth] = useState(0);
+  const [horizonYears, setHorizonYears] = useState(DEFAULT_HORIZON_YEARS);
+  const [goal, setGoal] = useState<Goal | null>(null);
+
+  const horizonMonths = horizonYears * 12;
+
+  const handleChangeHorizon = (years: number) => {
+    setHorizonYears(years);
+    setSelectedMonth((prev) => Math.min(prev, years * 12));
+  };
 
   const handleAddGroup = (name: string): string => {
     const id = newId();
@@ -51,6 +77,27 @@ export default function AssetSimulator() {
     ]);
     return id;
   };
+  const handleUpdateGroup = (
+    id: string,
+    input: { name: string; color: string },
+  ) => {
+    setGroups((prev) =>
+      prev.map((g) => (g.id === id ? { ...g, ...input } : g)),
+    );
+  };
+  const handleRemoveGroup = (id: string) => {
+    setGroups((prev) => prev.filter((g) => g.id !== id));
+    setAssetClasses((prev) =>
+      prev.map((a) => (a.groupId === id ? { ...a, groupId: undefined } : a)),
+    );
+    setIncomes((prev) =>
+      prev.map((i) => (i.groupId === id ? { ...i, groupId: undefined } : i)),
+    );
+    setExpenses((prev) =>
+      prev.map((e) => (e.groupId === id ? { ...e, groupId: undefined } : e)),
+    );
+    setGoal((prev) => (goalReferences(prev, "group", id) ? null : prev));
+  };
 
   const handleAddAssetClass = (input: NewAssetClassInput) => {
     setAssetClasses((prev) => {
@@ -58,7 +105,7 @@ export default function AssetSimulator() {
         ...(input.isPrimary
           ? prev.map((a) => ({ ...a, isPrimary: false }))
           : prev),
-        { id: newId(), ...input },
+        { id: newId(), ...input, color: nextAssetColor(prev.length) },
       ];
       return withGuaranteedPrimary(withNew);
     });
@@ -83,6 +130,11 @@ export default function AssetSimulator() {
       });
     });
   };
+  const handleChangeAssetColor = (id: string, color: string) => {
+    setAssetClasses((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, color } : a)),
+    );
+  };
   const handleRemoveAssetClass = (id: string) => {
     setAssetClasses((prev) => {
       const removed = prev.find((a) => a.id === id);
@@ -100,6 +152,7 @@ export default function AssetSimulator() {
     setTransferRules((prev) =>
       prev.filter((r) => r.fromAssetId !== id && r.toAssetId !== id),
     );
+    setGoal((prev) => (goalReferences(prev, "asset", id) ? null : prev));
   };
   const handleSetPrimaryAsset = (id: string) => {
     setAssetClasses((prev) =>
@@ -158,7 +211,7 @@ export default function AssetSimulator() {
     [groups, assetClasses, incomes, expenses, transferRules, exchangeRate],
   );
 
-  const snapshots = useSimulation(simulationInput, today);
+  const snapshots = useSimulation(simulationInput, today, horizonMonths);
   const selectedSnapshot = snapshots[selectedMonth];
   const primaryAsset = assetClasses.find((a) => a.isPrimary);
   const assetGroups = groups.filter((g) =>
@@ -170,28 +223,49 @@ export default function AssetSimulator() {
       <div className="mx-auto max-w-[1600px]">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold text-gray-800">자산 시뮬레이터</h2>
-          <label className="flex items-center gap-2 text-xs text-gray-600">
-            환율(1달러 = 원)
-            <input
-              type="number"
-              min={1}
-              value={exchangeRate}
-              onChange={(e) =>
-                setExchangeRate(Math.max(1, Number(e.target.value) || 1))
-              }
-              className="w-24 rounded-full border border-white/60 bg-white/80 px-2 py-1 text-sm"
-            />
-          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1">
+              {HORIZON_PRESET_YEARS.map((years) => (
+                <button
+                  key={years}
+                  type="button"
+                  onClick={() => handleChangeHorizon(years)}
+                  className={`rounded-full px-3 py-1 text-xs ${
+                    horizonYears === years
+                      ? "bg-indigo-500 text-white"
+                      : "bg-white/80 text-gray-600"
+                  }`}
+                >
+                  {years}년
+                </button>
+              ))}
+            </div>
+            <label className="flex items-center gap-2 text-xs text-gray-600">
+              환율(1달러 = 원)
+              <input
+                type="number"
+                min={1}
+                value={exchangeRate}
+                onChange={(e) =>
+                  setExchangeRate(Math.max(1, Number(e.target.value) || 1))
+                }
+                className="w-24 rounded-full border border-white/60 bg-white/80 px-2 py-1 text-sm"
+              />
+            </label>
+          </div>
         </div>
         <div className="grid gap-4 md:grid-cols-[360px_1fr]">
           <InputPanel
             groups={groups}
             onAddGroup={handleAddGroup}
+            onUpdateGroup={handleUpdateGroup}
+            onRemoveGroup={handleRemoveGroup}
             assetClasses={assetClasses}
             onAddAssetClass={handleAddAssetClass}
             onUpdateAssetClass={handleUpdateAssetClass}
             onRemoveAssetClass={handleRemoveAssetClass}
             onSetPrimaryAsset={handleSetPrimaryAsset}
+            onChangeAssetColor={handleChangeAssetColor}
             incomes={incomes}
             onAddIncome={handleAddIncome}
             onUpdateIncome={handleUpdateIncome}
@@ -205,12 +279,14 @@ export default function AssetSimulator() {
             onUpdateTransferRule={handleUpdateTransferRule}
             onRemoveTransferRule={handleRemoveTransferRule}
             today={today}
+            horizonMonths={horizonMonths}
           />
           <div className="flex flex-col gap-4">
             <TimelineSlider
               selectedMonth={selectedMonth}
               onChange={setSelectedMonth}
               today={today}
+              horizonMonths={horizonMonths}
             />
             <div className="grid gap-4 md:grid-cols-2">
               <AssetAreaChart
@@ -235,6 +311,15 @@ export default function AssetSimulator() {
                 primaryAsset={primaryAsset}
                 assetClasses={assetClasses}
                 exchangeRate={exchangeRate}
+              />
+              <GoalCard
+                goal={goal}
+                onSetGoal={setGoal}
+                assetClasses={assetClasses}
+                groups={assetGroups}
+                simulationInput={simulationInput}
+                today={today}
+                selectedSnapshot={selectedSnapshot}
               />
             </div>
           </div>

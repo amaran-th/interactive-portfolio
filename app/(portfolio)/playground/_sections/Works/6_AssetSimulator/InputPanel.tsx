@@ -19,11 +19,14 @@ import TransferRuleSection from "./input-sections/TransferRuleSection";
 type InputPanelProps = {
   groups: Group[];
   onAddGroup: (name: string) => string;
+  onUpdateGroup: (id: string, input: { name: string; color: string }) => void;
+  onRemoveGroup: (id: string) => void;
   assetClasses: AssetClass[];
   onAddAssetClass: (input: NewAssetClassInput) => void;
   onUpdateAssetClass: (id: string, input: NewAssetClassInput) => void;
   onRemoveAssetClass: (id: string) => void;
   onSetPrimaryAsset: (id: string) => void;
+  onChangeAssetColor: (id: string, color: string) => void;
   incomes: IncomeItem[];
   onAddIncome: (input: NewIncomeItemInput) => void;
   onUpdateIncome: (id: string, input: NewIncomeItemInput) => void;
@@ -37,6 +40,7 @@ type InputPanelProps = {
   onUpdateTransferRule: (id: string, input: NewTransferRuleInput) => void;
   onRemoveTransferRule: (id: string) => void;
   today: Date;
+  horizonMonths: number;
 };
 
 export default function InputPanel(props: InputPanelProps) {
@@ -45,29 +49,38 @@ export default function InputPanel(props: InputPanelProps) {
       <GroupAssetSection
         groups={props.groups}
         onAddGroup={props.onAddGroup}
+        onUpdateGroup={props.onUpdateGroup}
+        onRemoveGroup={props.onRemoveGroup}
         assetClasses={props.assetClasses}
         onAddAssetClass={props.onAddAssetClass}
         onUpdateAssetClass={props.onUpdateAssetClass}
         onRemoveAssetClass={props.onRemoveAssetClass}
         onSetPrimaryAsset={props.onSetPrimaryAsset}
+        onChangeAssetColor={props.onChangeAssetColor}
       />
       <IncomeSection
         groups={props.groups}
         onAddGroup={props.onAddGroup}
+        onUpdateGroup={props.onUpdateGroup}
+        onRemoveGroup={props.onRemoveGroup}
         incomes={props.incomes}
         onAddIncome={props.onAddIncome}
         onUpdateIncome={props.onUpdateIncome}
         onRemoveIncome={props.onRemoveIncome}
         today={props.today}
+        horizonMonths={props.horizonMonths}
       />
       <ExpenseSection
         groups={props.groups}
         onAddGroup={props.onAddGroup}
+        onUpdateGroup={props.onUpdateGroup}
+        onRemoveGroup={props.onRemoveGroup}
         expenses={props.expenses}
         onAddExpense={props.onAddExpense}
         onUpdateExpense={props.onUpdateExpense}
         onRemoveExpense={props.onRemoveExpense}
         today={props.today}
+        horizonMonths={props.horizonMonths}
       />
       <TransferRuleSection
         assetClasses={props.assetClasses}
@@ -76,6 +89,7 @@ export default function InputPanel(props: InputPanelProps) {
         onUpdateTransferRule={props.onUpdateTransferRule}
         onRemoveTransferRule={props.onRemoveTransferRule}
         today={props.today}
+        horizonMonths={props.horizonMonths}
       />
     </div>
   );

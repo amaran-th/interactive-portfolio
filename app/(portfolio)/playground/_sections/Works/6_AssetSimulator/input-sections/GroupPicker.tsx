@@ -32,6 +32,14 @@ export default function GroupPicker({
 
   const selectedGroup = groups.find((g) => g.id === value);
 
+  const closePanel = () => {
+    setOpen(false);
+    setCreating(false);
+    setDraftName("");
+    setRenamingId(null);
+    setColorPickerId(null);
+  };
+
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (e: MouseEvent) => {
@@ -42,14 +50,6 @@ export default function GroupPicker({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
-
-  const closePanel = () => {
-    setOpen(false);
-    setCreating(false);
-    setDraftName("");
-    setRenamingId(null);
-    setColorPickerId(null);
-  };
 
   const commitNewGroup = () => {
     const name = draftName.trim();
