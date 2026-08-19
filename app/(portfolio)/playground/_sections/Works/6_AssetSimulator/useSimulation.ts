@@ -5,6 +5,10 @@ import { runSimulation } from "./simulation";
 export function useSimulation(
   input: SimulationInput,
   today: Date,
+  horizonMonths: number,
 ): MonthSnapshot[] {
-  return useMemo(() => runSimulation(input, today), [input, today]);
+  return useMemo(
+    () => runSimulation(input, today, horizonMonths),
+    [input, today, horizonMonths],
+  );
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import { HORIZON_MONTHS, formatMonthsFromNow } from "./types";
+import { formatMonthsFromNow } from "./types";
 
 type TimelineSliderProps = {
   selectedMonth: number;
   onChange: (month: number) => void;
   today: Date;
+  horizonMonths: number;
 };
 
 function formatMonthLabel(monthIndex: number, today: Date): string {
@@ -21,6 +22,7 @@ export default function TimelineSlider({
   selectedMonth,
   onChange,
   today,
+  horizonMonths,
 }: TimelineSliderProps) {
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
@@ -32,7 +34,7 @@ export default function TimelineSlider({
       <input
         type="range"
         min={0}
-        max={HORIZON_MONTHS}
+        max={horizonMonths}
         value={selectedMonth}
         onChange={(e) => onChange(Number(e.target.value))}
         className="mt-3 w-full accent-indigo-500"
