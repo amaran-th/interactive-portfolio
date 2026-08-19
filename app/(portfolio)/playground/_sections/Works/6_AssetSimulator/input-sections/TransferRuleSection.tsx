@@ -4,10 +4,14 @@ import { useRef, useState } from "react";
 import {
   AssetClass,
   NewTransferRuleInput,
-  TransferFrequency,
+  RepeatSchedule,
   TransferMode,
   TransferRule,
+  addMonths,
+  toMonthInputValue,
 } from "../types";
+import { validateSchedule } from "../simulation";
+import ScheduleEditor from "./ScheduleEditor";
 
 type TransferRuleSectionProps = {
   assetClasses: AssetClass[];
@@ -15,7 +19,26 @@ type TransferRuleSectionProps = {
   onAddTransferRule: (input: NewTransferRuleInput) => void;
   onUpdateTransferRule: (id: string, input: NewTransferRuleInput) => void;
   onRemoveTransferRule: (id: string) => void;
+  today: Date;
 };
+
+function defaultSchedule(today: Date): RepeatSchedule {
+  return {
+    mode: "recurring",
+    startDate: toMonthInputValue(addMonths(today, 1)),
+    frequency: "monthly",
+    until: { type: "indefinite" },
+  };
+}
+
+function scheduleSummary(schedule: RepeatSchedule): string {
+  if (schedule.mode === "once") return `${schedule.date} · 1회성`;
+  const freq = schedule.frequency === "monthly" ? "매월" : "매년";
+  if (schedule.until.type === "indefinite") return `${freq} · 무기한`;
+  if (schedule.until.type === "count")
+    return `${freq} · ${schedule.until.count}회`;
+  return `${freq} · ${schedule.until.date}까지`;
+}
 
 export default function TransferRuleSection({
   assetClasses,
@@ -23,13 +46,16 @@ export default function TransferRuleSection({
   onAddTransferRule,
   onUpdateTransferRule,
   onRemoveTransferRule,
+  today,
 }: TransferRuleSectionProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [fromAssetId, setFromAssetId] = useState("");
   const [toAssetId, setToAssetId] = useState("");
   const [mode, setMode] = useState<TransferMode>("fixed");
   const [amount, setAmount] = useState("");
-  const [frequency, setFrequency] = useState<TransferFrequency>("monthly");
+  const [schedule, setSchedule] = useState<RepeatSchedule>(
+    defaultSchedule(today),
+  );
   const [error, setError] = useState<string | null>(null);
   const amountRef = useRef<HTMLInputElement>(null);
 
@@ -52,7 +78,7 @@ export default function TransferRuleSection({
     setToAssetId("");
     setMode("fixed");
     setAmount("");
-    setFrequency("monthly");
+    setSchedule(defaultSchedule(today));
     setError(null);
   };
 
@@ -62,7 +88,8 @@ export default function TransferRuleSection({
     setToAssetId(rule.toAssetId);
     setMode(rule.mode);
     setAmount(String(rule.amount));
-    setFrequency(rule.frequency);
+    setSchedule(rule.schedule);
+    setError(null);
   };
 
   const handleSubmit = () => {
@@ -70,17 +97,22 @@ export default function TransferRuleSection({
       setError("이체할 수 있는 같은 통화의 자산군이 2개 이상 필요합니다.");
       return;
     }
-    setError(null);
     if (!amount || Number(amount) === 0) {
       amountRef.current?.focus();
       return;
     }
+    const scheduleError = validateSchedule(schedule, today);
+    if (scheduleError) {
+      setError(scheduleError);
+      return;
+    }
+    setError(null);
     const input: NewTransferRuleInput = {
       fromAssetId: effectiveFrom,
       toAssetId: effectiveTo,
       mode,
       amount: Number(amount),
-      frequency,
+      schedule,
     };
     if (editingId) {
       onUpdateTransferRule(editingId, input);
@@ -112,7 +144,7 @@ export default function TransferRuleSection({
               {rule.mode === "fixed"
                 ? `${rule.amount.toLocaleString()}원`
                 : `${rule.amount}%`}{" "}
-              · {rule.frequency === "monthly" ? "매월" : "매년"}
+              · {scheduleSummary(rule.schedule)}
             </span>
             <button
               type="button"
@@ -178,15 +210,8 @@ export default function TransferRuleSection({
             placeholder={mode === "fixed" ? "금액" : "%"}
             className="w-24 rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-amber-400"
           />
-          <select
-            value={frequency}
-            onChange={(e) => setFrequency(e.target.value as TransferFrequency)}
-            className="rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-sm"
-          >
-            <option value="monthly">매월</option>
-            <option value="yearly">매년</option>
-          </select>
         </div>
+        <ScheduleEditor value={schedule} onChange={setSchedule} today={today} />
         {error && <p className="text-xs text-rose-500">{error}</p>}
         <div className="flex gap-2">
           <button
