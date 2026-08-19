@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   AssetClass,
   NewTransferRuleInput,
@@ -13,6 +13,7 @@ type TransferRuleSectionProps = {
   assetClasses: AssetClass[];
   transferRules: TransferRule[];
   onAddTransferRule: (input: NewTransferRuleInput) => void;
+  onUpdateTransferRule: (id: string, input: NewTransferRuleInput) => void;
   onRemoveTransferRule: (id: string) => void;
 };
 
@@ -20,39 +21,85 @@ export default function TransferRuleSection({
   assetClasses,
   transferRules,
   onAddTransferRule,
+  onUpdateTransferRule,
   onRemoveTransferRule,
 }: TransferRuleSectionProps) {
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [fromAssetId, setFromAssetId] = useState("");
   const [toAssetId, setToAssetId] = useState("");
   const [mode, setMode] = useState<TransferMode>("fixed");
   const [amount, setAmount] = useState("");
   const [frequency, setFrequency] = useState<TransferFrequency>("monthly");
+  const amountRef = useRef<HTMLInputElement>(null);
 
   const nameOf = (id: string) =>
     assetClasses.find((a) => a.id === id)?.name ?? "?";
 
-  const handleAdd = () => {
-    const from = fromAssetId || assetClasses[0]?.id;
-    const to = toAssetId || assetClasses[1]?.id;
-    if (!from || !to || from === to || !amount) return;
-    onAddTransferRule({
-      fromAssetId: from,
-      toAssetId: to,
+  const effectiveFrom = fromAssetId || assetClasses[0]?.id || "";
+  const fromAsset = assetClasses.find((a) => a.id === effectiveFrom);
+  const sameCurrencyAssets = assetClasses.filter(
+    (a) => a.id !== effectiveFrom && a.currency === fromAsset?.currency,
+  );
+  const effectiveTo =
+    toAssetId && sameCurrencyAssets.some((a) => a.id === toAssetId)
+      ? toAssetId
+      : sameCurrencyAssets[0]?.id || "";
+
+  const resetForm = () => {
+    setEditingId(null);
+    setFromAssetId("");
+    setToAssetId("");
+    setMode("fixed");
+    setAmount("");
+    setFrequency("monthly");
+  };
+
+  const startEdit = (rule: TransferRule) => {
+    setEditingId(rule.id);
+    setFromAssetId(rule.fromAssetId);
+    setToAssetId(rule.toAssetId);
+    setMode(rule.mode);
+    setAmount(String(rule.amount));
+    setFrequency(rule.frequency);
+  };
+
+  const handleSubmit = () => {
+    if (!effectiveFrom || !effectiveTo || effectiveFrom === effectiveTo) return;
+    if (!amount || Number(amount) === 0) {
+      amountRef.current?.focus();
+      return;
+    }
+    const input: NewTransferRuleInput = {
+      fromAssetId: effectiveFrom,
+      toAssetId: effectiveTo,
       mode,
       amount: Number(amount),
       frequency,
-    });
-    setAmount("");
+    };
+    if (editingId) {
+      onUpdateTransferRule(editingId, input);
+    } else {
+      onAddTransferRule(input);
+    }
+    resetForm();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSubmit();
+    }
   };
 
   return (
-    <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-      <h3 className="text-sm font-semibold text-gray-800">이체 규칙</h3>
+    <div className="rounded-2xl border border-amber-200 bg-white/70 p-4 backdrop-blur">
+      <h3 className="text-sm font-semibold text-amber-700">이체 규칙</h3>
       <ul className="mt-2 flex flex-col gap-2">
         {transferRules.map((rule) => (
           <li
             key={rule.id}
-            className="flex items-center justify-between rounded-xl border border-white/60 bg-white/80 px-3 py-2 text-sm"
+            onClick={() => startEdit(rule)}
+            className="flex cursor-pointer items-center justify-between rounded-xl border border-amber-100 bg-white/80 px-3 py-2 text-sm hover:border-amber-300"
           >
             <span>
               {nameOf(rule.fromAssetId)} → {nameOf(rule.toAssetId)} ·{" "}
@@ -63,7 +110,10 @@ export default function TransferRuleSection({
             </span>
             <button
               type="button"
-              onClick={() => onRemoveTransferRule(rule.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemoveTransferRule(rule.id);
+              }}
               className="text-gray-400 hover:text-gray-700"
             >
               ✕
@@ -72,28 +122,35 @@ export default function TransferRuleSection({
         ))}
       </ul>
 
-      <div className="mt-3 flex flex-col gap-2">
+      <div className="mt-3 flex flex-col gap-2" onKeyDown={handleKeyDown}>
         <div className="flex items-center gap-2">
           <select
-            value={fromAssetId || assetClasses[0]?.id || ""}
-            onChange={(e) => setFromAssetId(e.target.value)}
-            className="flex-1 rounded-full border border-white/60 bg-white/80 px-3 py-1.5 text-sm"
+            value={effectiveFrom}
+            onChange={(e) => {
+              setFromAssetId(e.target.value);
+              setToAssetId("");
+            }}
+            className="flex-1 rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-sm"
           >
             {assetClasses.map((asset) => (
               <option key={asset.id} value={asset.id}>
-                {asset.name}
+                {asset.name}({asset.currency})
               </option>
             ))}
           </select>
           <span className="text-gray-400">→</span>
           <select
-            value={toAssetId || assetClasses[1]?.id || ""}
+            value={effectiveTo}
             onChange={(e) => setToAssetId(e.target.value)}
-            className="flex-1 rounded-full border border-white/60 bg-white/80 px-3 py-1.5 text-sm"
+            className="flex-1 rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-sm"
+            disabled={sameCurrencyAssets.length === 0}
           >
-            {assetClasses.map((asset) => (
+            {sameCurrencyAssets.length === 0 && (
+              <option value="">같은 통화 자산군이 없습니다</option>
+            )}
+            {sameCurrencyAssets.map((asset) => (
               <option key={asset.id} value={asset.id}>
-                {asset.name}
+                {asset.name}({asset.currency})
               </option>
             ))}
           </select>
@@ -102,35 +159,47 @@ export default function TransferRuleSection({
           <select
             value={mode}
             onChange={(e) => setMode(e.target.value as TransferMode)}
-            className="rounded-full border border-white/60 bg-white/80 px-3 py-1.5 text-sm"
+            className="rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-sm"
           >
             <option value="fixed">고정 금액</option>
             <option value="percentOfSource">출발 잔액 비율(%)</option>
           </select>
           <input
+            ref={amountRef}
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             type="number"
             placeholder={mode === "fixed" ? "금액" : "%"}
-            className="w-24 rounded-full border border-white/60 bg-white/80 px-3 py-1.5 text-sm"
+            className="w-24 rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-amber-400"
           />
           <select
             value={frequency}
             onChange={(e) => setFrequency(e.target.value as TransferFrequency)}
-            className="rounded-full border border-white/60 bg-white/80 px-3 py-1.5 text-sm"
+            className="rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-sm"
           >
             <option value="monthly">매월</option>
             <option value="yearly">매년</option>
           </select>
         </div>
-        <button
-          type="button"
-          onClick={handleAdd}
-          disabled={assetClasses.length < 2}
-          className="self-start rounded-full bg-indigo-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          이체 규칙 추가
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={sameCurrencyAssets.length === 0}
+            className="self-start rounded-full bg-amber-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {editingId ? "저장" : "이체 규칙 추가"}
+          </button>
+          {editingId && (
+            <button
+              type="button"
+              onClick={resetForm}
+              className="self-start rounded-full px-4 py-1.5 text-sm text-gray-500 hover:text-gray-700"
+            >
+              취소
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
