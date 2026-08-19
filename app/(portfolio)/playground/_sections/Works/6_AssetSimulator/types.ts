@@ -16,28 +16,37 @@ export type AssetClass = {
   isPrimary: boolean;
 };
 
-export type FixedExpense = {
-  id: string;
-  name: string;
-  amount: number;
-};
+export type RepeatUntil =
+  | { type: "indefinite" }
+  | { type: "date"; date: string }
+  | { type: "count"; count: number };
 
-export type FixedIncome = {
+export type RepeatSchedule =
+  | { mode: "once"; date: string }
+  | {
+      mode: "recurring";
+      startDate: string;
+      frequency: "monthly" | "yearly";
+      until: RepeatUntil;
+    };
+
+export type IncomeItem = {
   id: string;
   name: string;
   amount: number;
   groupId?: string;
+  schedule: RepeatSchedule;
 };
 
-export type IrregularCashflow = {
+export type ExpenseItem = {
   id: string;
   name: string;
   amount: number;
-  targetDate: string; // "YYYY-MM"
+  groupId?: string;
+  schedule: RepeatSchedule;
 };
 
 export type TransferMode = "fixed" | "percentOfSource";
-export type TransferFrequency = "monthly" | "yearly";
 
 export type TransferRule = {
   id: string;
@@ -45,16 +54,14 @@ export type TransferRule = {
   toAssetId: string;
   mode: TransferMode;
   amount: number;
-  frequency: TransferFrequency;
+  schedule: RepeatSchedule;
 };
 
 export type SimulationInput = {
   groups: Group[];
   assetClasses: AssetClass[];
-  fixedIncomes: FixedIncome[];
-  fixedExpenses: FixedExpense[];
-  irregularIncomes: IrregularCashflow[];
-  irregularExpenses: IrregularCashflow[];
+  incomes: IncomeItem[];
+  expenses: ExpenseItem[];
   transferRules: TransferRule[];
   exchangeRate: number;
 };
@@ -89,18 +96,18 @@ export type NewAssetClassInput = {
   isPrimary: boolean;
 };
 
-export type NewFixedExpenseInput = { name: string; amount: number };
-
-export type NewFixedIncomeInput = {
+export type NewIncomeItemInput = {
   name: string;
   amount: number;
   groupId?: string;
+  schedule: RepeatSchedule;
 };
 
-export type NewIrregularCashflowInput = {
+export type NewExpenseItemInput = {
   name: string;
   amount: number;
-  targetDate: string;
+  groupId?: string;
+  schedule: RepeatSchedule;
 };
 
 export type NewTransferRuleInput = {
@@ -108,7 +115,7 @@ export type NewTransferRuleInput = {
   toAssetId: string;
   mode: TransferMode;
   amount: number;
-  frequency: TransferFrequency;
+  schedule: RepeatSchedule;
 };
 
 export const HORIZON_MONTHS = 120;

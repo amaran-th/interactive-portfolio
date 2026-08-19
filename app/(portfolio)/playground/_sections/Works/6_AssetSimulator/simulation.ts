@@ -3,7 +3,9 @@ import {
   Group,
   HORIZON_MONTHS,
   MonthSnapshot,
+  RepeatSchedule,
   SimulationInput,
+  formatMonthsFromNow,
 } from "./types";
 
 export function monthIndexFromTargetDate(
@@ -16,7 +18,59 @@ export function monthIndexFromTargetDate(
   return (year - todayYear) * 12 + (month - todayMonth);
 }
 
-function toKRW(asset: AssetClass, nativeBalance: number, exchangeRate: number): number {
+export function fires(
+  schedule: RepeatSchedule,
+  month: number,
+  today: Date,
+): boolean {
+  if (schedule.mode === "once") {
+    return monthIndexFromTargetDate(schedule.date, today) === month;
+  }
+  const start = monthIndexFromTargetDate(schedule.startDate, today);
+  const period = schedule.frequency === "monthly" ? 1 : 12;
+  if (month < start || (month - start) % period !== 0) return false;
+  const occurrence = (month - start) / period + 1;
+  if (schedule.until.type === "count") return occurrence <= schedule.until.count;
+  if (schedule.until.type === "date") {
+    return month <= monthIndexFromTargetDate(schedule.until.date, today);
+  }
+  return true;
+}
+
+export function validateSchedule(
+  schedule: RepeatSchedule,
+  today: Date,
+): string | null {
+  const rangeMessage = `1개월 후부터 ${formatMonthsFromNow(HORIZON_MONTHS)} 사이의 날짜만 선택할 수 있습니다.`;
+
+  if (schedule.mode === "once") {
+    const m = monthIndexFromTargetDate(schedule.date, today);
+    if (!Number.isFinite(m) || m < 1 || m > HORIZON_MONTHS) return rangeMessage;
+    return null;
+  }
+
+  const start = monthIndexFromTargetDate(schedule.startDate, today);
+  if (!Number.isFinite(start) || start < 1 || start > HORIZON_MONTHS) {
+    return rangeMessage;
+  }
+
+  if (schedule.until.type === "date") {
+    const until = monthIndexFromTargetDate(schedule.until.date, today);
+    if (!Number.isFinite(until) || until < start) {
+      return "종료 날짜는 시작 날짜보다 이후여야 합니다.";
+    }
+  }
+  if (schedule.until.type === "count" && schedule.until.count < 1) {
+    return "반복 횟수는 1 이상이어야 합니다.";
+  }
+  return null;
+}
+
+function toKRW(
+  asset: AssetClass,
+  nativeBalance: number,
+  exchangeRate: number,
+): number {
   return asset.currency === "USD" ? nativeBalance * exchangeRate : nativeBalance;
 }
 
@@ -55,7 +109,11 @@ function buildSnapshot(
 ): MonthSnapshot {
   const assetBalancesKRW: Record<string, number> = {};
   for (const asset of assetClasses) {
-    assetBalancesKRW[asset.id] = toKRW(asset, balances[asset.id] ?? 0, exchangeRate);
+    assetBalancesKRW[asset.id] = toKRW(
+      asset,
+      balances[asset.id] ?? 0,
+      exchangeRate,
+    );
   }
   const { groupTotals, ungroupedTotalKRW } = computeGroupTotals(
     assetBalancesKRW,
@@ -101,38 +159,21 @@ export function runSimulation(
     };
 
     if (primary) {
-      const fixedIncomeTotal = input.fixedIncomes.reduce(
-        (sum, item) => sum + item.amount,
-        0,
-      );
-      const irregularIncomeThisMonth = input.irregularIncomes
-        .filter(
-          (item) => monthIndexFromTargetDate(item.targetDate, today) === month,
-        )
+      const incomeIn = input.incomes
+        .filter((item) => fires(item.schedule, month, today))
         .reduce((sum, item) => sum + item.amount, 0);
-      const incomeIn = fixedIncomeTotal + irregularIncomeThisMonth;
       balances[primary.id] += incomeIn;
       flow.incomeIn = incomeIn;
 
-      const fixedExpenseTotal = input.fixedExpenses.reduce(
-        (sum, item) => sum + item.amount,
-        0,
-      );
-      const irregularExpenseThisMonth = input.irregularExpenses
-        .filter(
-          (item) => monthIndexFromTargetDate(item.targetDate, today) === month,
-        )
+      const expenseOut = input.expenses
+        .filter((item) => fires(item.schedule, month, today))
         .reduce((sum, item) => sum + item.amount, 0);
-      const expenseOut = fixedExpenseTotal + irregularExpenseThisMonth;
       balances[primary.id] -= expenseOut;
       flow.expenseOut = expenseOut;
     }
 
     for (const rule of transferRules) {
-      const shouldRun =
-        rule.frequency === "monthly" ||
-        (rule.frequency === "yearly" && month % 12 === 0);
-      if (!shouldRun) continue;
+      if (!fires(rule.schedule, month, today)) continue;
 
       const sourceBalance = balances[rule.fromAssetId] ?? 0;
       const requested =
