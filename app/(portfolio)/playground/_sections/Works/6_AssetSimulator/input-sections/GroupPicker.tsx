@@ -42,7 +42,14 @@ export default function GroupPicker({
 
   if (creating) {
     return (
-      <div className="flex items-center gap-1">
+      <div
+        className="flex items-center gap-1"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === "Escape") {
+            e.stopPropagation();
+          }
+        }}
+      >
         <input
           autoFocus
           value={draftName}
