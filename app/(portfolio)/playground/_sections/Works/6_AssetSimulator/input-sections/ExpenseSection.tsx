@@ -21,6 +21,7 @@ type ExpenseSectionProps = {
   onUpdateExpense: (id: string, input: NewExpenseItemInput) => void;
   onRemoveExpense: (id: string) => void;
   today: Date;
+  horizonMonths: number;
 };
 
 function defaultSchedule(today: Date): RepeatSchedule {
@@ -49,6 +50,7 @@ export default function ExpenseSection({
   onUpdateExpense,
   onRemoveExpense,
   today,
+  horizonMonths,
 }: ExpenseSectionProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -88,7 +90,7 @@ export default function ExpenseSection({
       amountRef.current?.focus();
       return;
     }
-    const scheduleError = validateSchedule(schedule, today);
+    const scheduleError = validateSchedule(schedule, today, horizonMonths);
     if (scheduleError) {
       setError(scheduleError);
       return;
