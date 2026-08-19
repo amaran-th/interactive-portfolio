@@ -2,14 +2,12 @@
 
 import {
   AssetClass,
-  FixedExpense,
-  FixedIncome,
+  ExpenseItem,
   Group,
-  IrregularCashflow,
+  IncomeItem,
   NewAssetClassInput,
-  NewFixedExpenseInput,
-  NewFixedIncomeInput,
-  NewIrregularCashflowInput,
+  NewExpenseItemInput,
+  NewIncomeItemInput,
   NewTransferRuleInput,
   TransferRule,
 } from "./types";
@@ -26,22 +24,14 @@ type InputPanelProps = {
   onUpdateAssetClass: (id: string, input: NewAssetClassInput) => void;
   onRemoveAssetClass: (id: string) => void;
   onSetPrimaryAsset: (id: string) => void;
-  fixedIncomes: FixedIncome[];
-  onAddFixedIncome: (input: NewFixedIncomeInput) => void;
-  onUpdateFixedIncome: (id: string, input: NewFixedIncomeInput) => void;
-  onRemoveFixedIncome: (id: string) => void;
-  irregularIncomes: IrregularCashflow[];
-  onAddIrregularIncome: (input: NewIrregularCashflowInput) => void;
-  onUpdateIrregularIncome: (id: string, input: NewIrregularCashflowInput) => void;
-  onRemoveIrregularIncome: (id: string) => void;
-  fixedExpenses: FixedExpense[];
-  onAddFixedExpense: (input: NewFixedExpenseInput) => void;
-  onUpdateFixedExpense: (id: string, input: NewFixedExpenseInput) => void;
-  onRemoveFixedExpense: (id: string) => void;
-  irregularExpenses: IrregularCashflow[];
-  onAddIrregularExpense: (input: NewIrregularCashflowInput) => void;
-  onUpdateIrregularExpense: (id: string, input: NewIrregularCashflowInput) => void;
-  onRemoveIrregularExpense: (id: string) => void;
+  incomes: IncomeItem[];
+  onAddIncome: (input: NewIncomeItemInput) => void;
+  onUpdateIncome: (id: string, input: NewIncomeItemInput) => void;
+  onRemoveIncome: (id: string) => void;
+  expenses: ExpenseItem[];
+  onAddExpense: (input: NewExpenseItemInput) => void;
+  onUpdateExpense: (id: string, input: NewExpenseItemInput) => void;
+  onRemoveExpense: (id: string) => void;
   transferRules: TransferRule[];
   onAddTransferRule: (input: NewTransferRuleInput) => void;
   onUpdateTransferRule: (id: string, input: NewTransferRuleInput) => void;
@@ -64,25 +54,19 @@ export default function InputPanel(props: InputPanelProps) {
       <IncomeSection
         groups={props.groups}
         onAddGroup={props.onAddGroup}
-        fixedIncomes={props.fixedIncomes}
-        onAddFixedIncome={props.onAddFixedIncome}
-        onUpdateFixedIncome={props.onUpdateFixedIncome}
-        onRemoveFixedIncome={props.onRemoveFixedIncome}
-        irregularIncomes={props.irregularIncomes}
-        onAddIrregularIncome={props.onAddIrregularIncome}
-        onUpdateIrregularIncome={props.onUpdateIrregularIncome}
-        onRemoveIrregularIncome={props.onRemoveIrregularIncome}
+        incomes={props.incomes}
+        onAddIncome={props.onAddIncome}
+        onUpdateIncome={props.onUpdateIncome}
+        onRemoveIncome={props.onRemoveIncome}
         today={props.today}
       />
       <ExpenseSection
-        fixedExpenses={props.fixedExpenses}
-        onAddFixedExpense={props.onAddFixedExpense}
-        onUpdateFixedExpense={props.onUpdateFixedExpense}
-        onRemoveFixedExpense={props.onRemoveFixedExpense}
-        irregularExpenses={props.irregularExpenses}
-        onAddIrregularExpense={props.onAddIrregularExpense}
-        onUpdateIrregularExpense={props.onUpdateIrregularExpense}
-        onRemoveIrregularExpense={props.onRemoveIrregularExpense}
+        groups={props.groups}
+        onAddGroup={props.onAddGroup}
+        expenses={props.expenses}
+        onAddExpense={props.onAddExpense}
+        onUpdateExpense={props.onUpdateExpense}
+        onRemoveExpense={props.onRemoveExpense}
         today={props.today}
       />
       <TransferRuleSection
@@ -91,6 +75,7 @@ export default function InputPanel(props: InputPanelProps) {
         onAddTransferRule={props.onAddTransferRule}
         onUpdateTransferRule={props.onUpdateTransferRule}
         onRemoveTransferRule={props.onRemoveTransferRule}
+        today={props.today}
       />
     </div>
   );
