@@ -4,10 +4,12 @@ import { useMemo, useState } from "react";
 import {
   AssetClass,
   FixedExpense,
+  FixedIncome,
   Group,
   IrregularCashflow,
   NewAssetClassInput,
   NewFixedExpenseInput,
+  NewFixedIncomeInput,
   NewIrregularCashflowInput,
   NewTransferRuleInput,
   SimulationInput,
@@ -23,61 +25,142 @@ import GroupDonutChart from "./GroupDonutChart";
 import FlowDiagram from "./FlowDiagram";
 
 export default function AssetSimulator() {
+  const today = useMemo(() => new Date(), []);
+
   const [groups, setGroups] = useState<Group[]>([]);
   const [assetClasses, setAssetClasses] = useState<AssetClass[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState(0);
-  const [monthlyIncome, setMonthlyIncome] = useState(0);
+  const [fixedIncomes, setFixedIncomes] = useState<FixedIncome[]>([]);
+  const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
   const [irregularIncomes, setIrregularIncomes] = useState<
     IrregularCashflow[]
   >([]);
-  const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
   const [irregularExpenses, setIrregularExpenses] = useState<
     IrregularCashflow[]
   >([]);
   const [transferRules, setTransferRules] = useState<TransferRule[]>([]);
-  const today = useMemo(() => new Date(), []);
+  const [exchangeRate, setExchangeRate] = useState(1350);
+  const [selectedMonth, setSelectedMonth] = useState(0);
 
-  const handleAddGroup = (name: string) => {
+  const handleAddGroup = (name: string): string => {
+    const id = newId();
     setGroups((prev) => [
       ...prev,
-      { id: newId(), name, color: nextGroupColor(prev.length) },
+      { id, name, color: nextGroupColor(prev.length) },
+    ]);
+    return id;
+  };
+
+  const handleAddAssetClass = (input: NewAssetClassInput) => {
+    setAssetClasses((prev) => [
+      ...(input.isPrimary
+        ? prev.map((a) => ({ ...a, isPrimary: false }))
+        : prev),
+      { id: newId(), ...input },
     ]);
   };
-  const handleRemoveGroup = (id: string) => {
-    setGroups((prev) => prev.filter((g) => g.id !== id));
-    setAssetClasses((prev) => prev.filter((a) => a.groupId !== id));
-  };
-  const handleAddAssetClass = (input: NewAssetClassInput) => {
-    setAssetClasses((prev) => [...prev, { id: newId(), ...input }]);
+  const handleUpdateAssetClass = (id: string, input: NewAssetClassInput) => {
+    setAssetClasses((prev) =>
+      prev.map((a) => {
+        if (a.id === id) return { ...a, ...input };
+        if (input.isPrimary) return { ...a, isPrimary: false };
+        return a;
+      }),
+    );
   };
   const handleRemoveAssetClass = (id: string) => {
-    setAssetClasses((prev) => prev.filter((a) => a.id !== id));
+    setAssetClasses((prev) => {
+      const removed = prev.find((a) => a.id === id);
+      const rest = prev.filter((a) => a.id !== id);
+      if (removed?.isPrimary) {
+        const nextPrimary = rest.find((a) => a.currency === "KRW");
+        if (nextPrimary) {
+          return rest.map((a) =>
+            a.id === nextPrimary.id ? { ...a, isPrimary: true } : a,
+          );
+        }
+      }
+      return rest;
+    });
+    setTransferRules((prev) =>
+      prev.filter((r) => r.fromAssetId !== id && r.toAssetId !== id),
+    );
   };
   const handleSetPrimaryAsset = (id: string) => {
     setAssetClasses((prev) =>
       prev.map((a) => ({ ...a, isPrimary: a.id === id })),
     );
   };
+
+  const handleAddFixedIncome = (input: NewFixedIncomeInput) => {
+    setFixedIncomes((prev) => [...prev, { id: newId(), ...input }]);
+  };
+  const handleUpdateFixedIncome = (
+    id: string,
+    input: NewFixedIncomeInput,
+  ) => {
+    setFixedIncomes((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, ...input } : i)),
+    );
+  };
+  const handleRemoveFixedIncome = (id: string) => {
+    setFixedIncomes((prev) => prev.filter((i) => i.id !== id));
+  };
+
   const handleAddIrregularIncome = (input: NewIrregularCashflowInput) => {
     setIrregularIncomes((prev) => [...prev, { id: newId(), ...input }]);
   };
-  const handleRemoveIrregularIncome = (id: string) => {
-    setIrregularIncomes((prev) => prev.filter((e) => e.id !== id));
+  const handleUpdateIrregularIncome = (
+    id: string,
+    input: NewIrregularCashflowInput,
+  ) => {
+    setIrregularIncomes((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, ...input } : i)),
+    );
   };
+  const handleRemoveIrregularIncome = (id: string) => {
+    setIrregularIncomes((prev) => prev.filter((i) => i.id !== id));
+  };
+
   const handleAddFixedExpense = (input: NewFixedExpenseInput) => {
     setFixedExpenses((prev) => [...prev, { id: newId(), ...input }]);
+  };
+  const handleUpdateFixedExpense = (
+    id: string,
+    input: NewFixedExpenseInput,
+  ) => {
+    setFixedExpenses((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, ...input } : e)),
+    );
   };
   const handleRemoveFixedExpense = (id: string) => {
     setFixedExpenses((prev) => prev.filter((e) => e.id !== id));
   };
+
   const handleAddIrregularExpense = (input: NewIrregularCashflowInput) => {
     setIrregularExpenses((prev) => [...prev, { id: newId(), ...input }]);
+  };
+  const handleUpdateIrregularExpense = (
+    id: string,
+    input: NewIrregularCashflowInput,
+  ) => {
+    setIrregularExpenses((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, ...input } : e)),
+    );
   };
   const handleRemoveIrregularExpense = (id: string) => {
     setIrregularExpenses((prev) => prev.filter((e) => e.id !== id));
   };
+
   const handleAddTransferRule = (input: NewTransferRuleInput) => {
     setTransferRules((prev) => [...prev, { id: newId(), ...input }]);
+  };
+  const handleUpdateTransferRule = (
+    id: string,
+    input: NewTransferRuleInput,
+  ) => {
+    setTransferRules((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, ...input } : r)),
+    );
   };
   const handleRemoveTransferRule = (id: string) => {
     setTransferRules((prev) => prev.filter((r) => r.id !== id));
@@ -87,24 +170,26 @@ export default function AssetSimulator() {
     () => ({
       groups,
       assetClasses,
-      monthlyIncome,
+      fixedIncomes,
       fixedExpenses,
       irregularIncomes,
       irregularExpenses,
       transferRules,
+      exchangeRate,
     }),
     [
       groups,
       assetClasses,
-      monthlyIncome,
+      fixedIncomes,
       fixedExpenses,
       irregularIncomes,
       irregularExpenses,
       transferRules,
+      exchangeRate,
     ],
   );
 
-  const snapshots = useSimulation(simulationInput);
+  const snapshots = useSimulation(simulationInput, today);
   const selectedSnapshot = snapshots[selectedMonth];
   const primaryAsset = assetClasses.find((a) => a.isPrimary);
 
@@ -114,24 +199,30 @@ export default function AssetSimulator() {
         <InputPanel
           groups={groups}
           onAddGroup={handleAddGroup}
-          onRemoveGroup={handleRemoveGroup}
           assetClasses={assetClasses}
           onAddAssetClass={handleAddAssetClass}
+          onUpdateAssetClass={handleUpdateAssetClass}
           onRemoveAssetClass={handleRemoveAssetClass}
           onSetPrimaryAsset={handleSetPrimaryAsset}
-          monthlyIncome={monthlyIncome}
-          onChangeMonthlyIncome={setMonthlyIncome}
+          fixedIncomes={fixedIncomes}
+          onAddFixedIncome={handleAddFixedIncome}
+          onUpdateFixedIncome={handleUpdateFixedIncome}
+          onRemoveFixedIncome={handleRemoveFixedIncome}
           irregularIncomes={irregularIncomes}
           onAddIrregularIncome={handleAddIrregularIncome}
+          onUpdateIrregularIncome={handleUpdateIrregularIncome}
           onRemoveIrregularIncome={handleRemoveIrregularIncome}
           fixedExpenses={fixedExpenses}
           onAddFixedExpense={handleAddFixedExpense}
+          onUpdateFixedExpense={handleUpdateFixedExpense}
           onRemoveFixedExpense={handleRemoveFixedExpense}
           irregularExpenses={irregularExpenses}
           onAddIrregularExpense={handleAddIrregularExpense}
+          onUpdateIrregularExpense={handleUpdateIrregularExpense}
           onRemoveIrregularExpense={handleRemoveIrregularExpense}
           transferRules={transferRules}
           onAddTransferRule={handleAddTransferRule}
+          onUpdateTransferRule={handleUpdateTransferRule}
           onRemoveTransferRule={handleRemoveTransferRule}
           today={today}
         />
