@@ -6,6 +6,7 @@ type FlowDiagramProps = {
   snapshot: MonthSnapshot;
   primaryAsset: AssetClass | undefined;
   assetClasses: AssetClass[];
+  exchangeRate: number;
 };
 
 const WIDTH = 600;
@@ -46,6 +47,7 @@ export default function FlowDiagram({
   snapshot,
   primaryAsset,
   assetClasses,
+  exchangeRate,
 }: FlowDiagramProps) {
   if (!primaryAsset) {
     return (
@@ -57,9 +59,14 @@ export default function FlowDiagram({
 
   const destinationTotals = new Map<string, number>();
   for (const transfer of snapshot.flow.transfers) {
+    const fromAsset = assetClasses.find((a) => a.id === transfer.fromAssetId);
+    const amountKRW =
+      fromAsset?.currency === "USD"
+        ? transfer.amount * exchangeRate
+        : transfer.amount;
     destinationTotals.set(
       transfer.toAssetId,
-      (destinationTotals.get(transfer.toAssetId) ?? 0) + transfer.amount,
+      (destinationTotals.get(transfer.toAssetId) ?? 0) + amountKRW,
     );
   }
 
