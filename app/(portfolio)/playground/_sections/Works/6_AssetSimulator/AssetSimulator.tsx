@@ -23,6 +23,7 @@ import TimelineSlider from "./TimelineSlider";
 import AssetAreaChart from "./AssetAreaChart";
 import GroupDonutChart from "./GroupDonutChart";
 import FlowDiagram from "./FlowDiagram";
+import ComparisonBarChart from "./ComparisonBarChart";
 
 export default function AssetSimulator() {
   const today = useMemo(() => new Date(), []);
@@ -195,60 +196,80 @@ export default function AssetSimulator() {
 
   return (
     <div className="h-full w-full overflow-y-auto bg-gradient-to-br from-indigo-100 via-blue-50 to-purple-100 p-4 text-gray-800">
-      <div className="grid gap-4 md:grid-cols-[320px_1fr]">
-        <InputPanel
-          groups={groups}
-          onAddGroup={handleAddGroup}
-          assetClasses={assetClasses}
-          onAddAssetClass={handleAddAssetClass}
-          onUpdateAssetClass={handleUpdateAssetClass}
-          onRemoveAssetClass={handleRemoveAssetClass}
-          onSetPrimaryAsset={handleSetPrimaryAsset}
-          fixedIncomes={fixedIncomes}
-          onAddFixedIncome={handleAddFixedIncome}
-          onUpdateFixedIncome={handleUpdateFixedIncome}
-          onRemoveFixedIncome={handleRemoveFixedIncome}
-          irregularIncomes={irregularIncomes}
-          onAddIrregularIncome={handleAddIrregularIncome}
-          onUpdateIrregularIncome={handleUpdateIrregularIncome}
-          onRemoveIrregularIncome={handleRemoveIrregularIncome}
-          fixedExpenses={fixedExpenses}
-          onAddFixedExpense={handleAddFixedExpense}
-          onUpdateFixedExpense={handleUpdateFixedExpense}
-          onRemoveFixedExpense={handleRemoveFixedExpense}
-          irregularExpenses={irregularExpenses}
-          onAddIrregularExpense={handleAddIrregularExpense}
-          onUpdateIrregularExpense={handleUpdateIrregularExpense}
-          onRemoveIrregularExpense={handleRemoveIrregularExpense}
-          transferRules={transferRules}
-          onAddTransferRule={handleAddTransferRule}
-          onUpdateTransferRule={handleUpdateTransferRule}
-          onRemoveTransferRule={handleRemoveTransferRule}
-          today={today}
-        />
-        <div className="flex flex-col gap-4">
-          <TimelineSlider
-            selectedMonth={selectedMonth}
-            onChange={setSelectedMonth}
+      <div className="mx-auto max-w-[1600px]">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-bold text-gray-800">자산 시뮬레이터</h2>
+          <label className="flex items-center gap-2 text-xs text-gray-600">
+            환율(1달러 = 원)
+            <input
+              type="number"
+              value={exchangeRate}
+              onChange={(e) => setExchangeRate(Number(e.target.value) || 0)}
+              className="w-24 rounded-full border border-white/60 bg-white/80 px-2 py-1 text-sm"
+            />
+          </label>
+        </div>
+        <div className="grid gap-4 md:grid-cols-[360px_1fr]">
+          <InputPanel
+            groups={groups}
+            onAddGroup={handleAddGroup}
+            assetClasses={assetClasses}
+            onAddAssetClass={handleAddAssetClass}
+            onUpdateAssetClass={handleUpdateAssetClass}
+            onRemoveAssetClass={handleRemoveAssetClass}
+            onSetPrimaryAsset={handleSetPrimaryAsset}
+            fixedIncomes={fixedIncomes}
+            onAddFixedIncome={handleAddFixedIncome}
+            onUpdateFixedIncome={handleUpdateFixedIncome}
+            onRemoveFixedIncome={handleRemoveFixedIncome}
+            irregularIncomes={irregularIncomes}
+            onAddIrregularIncome={handleAddIrregularIncome}
+            onUpdateIrregularIncome={handleUpdateIrregularIncome}
+            onRemoveIrregularIncome={handleRemoveIrregularIncome}
+            fixedExpenses={fixedExpenses}
+            onAddFixedExpense={handleAddFixedExpense}
+            onUpdateFixedExpense={handleUpdateFixedExpense}
+            onRemoveFixedExpense={handleRemoveFixedExpense}
+            irregularExpenses={irregularExpenses}
+            onAddIrregularExpense={handleAddIrregularExpense}
+            onUpdateIrregularExpense={handleUpdateIrregularExpense}
+            onRemoveIrregularExpense={handleRemoveIrregularExpense}
+            transferRules={transferRules}
+            onAddTransferRule={handleAddTransferRule}
+            onUpdateTransferRule={handleUpdateTransferRule}
+            onRemoveTransferRule={handleRemoveTransferRule}
             today={today}
           />
-          <AssetAreaChart
-            snapshots={snapshots}
-            groups={groups}
-            assetClasses={assetClasses}
-            selectedMonth={selectedMonth}
-          />
-          <div className="grid gap-4 md:grid-cols-2">
-            <GroupDonutChart
-              groups={groups}
-              assetClasses={assetClasses}
-              snapshot={selectedSnapshot}
+          <div className="flex flex-col gap-4">
+            <TimelineSlider
+              selectedMonth={selectedMonth}
+              onChange={setSelectedMonth}
+              today={today}
             />
-            <FlowDiagram
-              snapshot={selectedSnapshot}
-              primaryAsset={primaryAsset}
-              assetClasses={assetClasses}
-            />
+            <div className="grid gap-4 md:grid-cols-2">
+              <AssetAreaChart
+                snapshots={snapshots}
+                groups={groups}
+                assetClasses={assetClasses}
+                selectedMonth={selectedMonth}
+              />
+              <ComparisonBarChart
+                snapshots={snapshots}
+                groups={groups}
+                assetClasses={assetClasses}
+                selectedMonth={selectedMonth}
+              />
+              <GroupDonutChart
+                groups={groups}
+                assetClasses={assetClasses}
+                snapshot={selectedSnapshot}
+              />
+              <FlowDiagram
+                snapshot={selectedSnapshot}
+                primaryAsset={primaryAsset}
+                assetClasses={assetClasses}
+              />
+            </div>
           </div>
         </div>
       </div>

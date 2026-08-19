@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 export default function AssetSimulatorPage() {
   return (
     <main className="flex h-dvh justify-center overflow-hidden text-gray-800">
-      <div className="h-full w-full max-w-5xl">
+      <div className="h-full w-full max-w-[1600px]">
         <AssetSimulator />
       </div>
     </main>
