@@ -3,14 +3,12 @@
 import { useMemo, useState } from "react";
 import {
   AssetClass,
-  FixedExpense,
-  FixedIncome,
+  ExpenseItem,
   Group,
-  IrregularCashflow,
+  IncomeItem,
   NewAssetClassInput,
-  NewFixedExpenseInput,
-  NewFixedIncomeInput,
-  NewIrregularCashflowInput,
+  NewExpenseItemInput,
+  NewIncomeItemInput,
   NewTransferRuleInput,
   SimulationInput,
   TransferRule,
@@ -39,14 +37,8 @@ export default function AssetSimulator() {
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [assetClasses, setAssetClasses] = useState<AssetClass[]>([]);
-  const [fixedIncomes, setFixedIncomes] = useState<FixedIncome[]>([]);
-  const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
-  const [irregularIncomes, setIrregularIncomes] = useState<
-    IrregularCashflow[]
-  >([]);
-  const [irregularExpenses, setIrregularExpenses] = useState<
-    IrregularCashflow[]
-  >([]);
+  const [incomes, setIncomes] = useState<IncomeItem[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [transferRules, setTransferRules] = useState<TransferRule[]>([]);
   const [exchangeRate, setExchangeRate] = useState(1350);
   const [selectedMonth, setSelectedMonth] = useState(0);
@@ -115,64 +107,28 @@ export default function AssetSimulator() {
     );
   };
 
-  const handleAddFixedIncome = (input: NewFixedIncomeInput) => {
-    setFixedIncomes((prev) => [...prev, { id: newId(), ...input }]);
+  const handleAddIncome = (input: NewIncomeItemInput) => {
+    setIncomes((prev) => [...prev, { id: newId(), ...input }]);
   };
-  const handleUpdateFixedIncome = (
-    id: string,
-    input: NewFixedIncomeInput,
-  ) => {
-    setFixedIncomes((prev) =>
+  const handleUpdateIncome = (id: string, input: NewIncomeItemInput) => {
+    setIncomes((prev) =>
       prev.map((i) => (i.id === id ? { ...i, ...input } : i)),
     );
   };
-  const handleRemoveFixedIncome = (id: string) => {
-    setFixedIncomes((prev) => prev.filter((i) => i.id !== id));
+  const handleRemoveIncome = (id: string) => {
+    setIncomes((prev) => prev.filter((i) => i.id !== id));
   };
 
-  const handleAddIrregularIncome = (input: NewIrregularCashflowInput) => {
-    setIrregularIncomes((prev) => [...prev, { id: newId(), ...input }]);
+  const handleAddExpense = (input: NewExpenseItemInput) => {
+    setExpenses((prev) => [...prev, { id: newId(), ...input }]);
   };
-  const handleUpdateIrregularIncome = (
-    id: string,
-    input: NewIrregularCashflowInput,
-  ) => {
-    setIrregularIncomes((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, ...input } : i)),
-    );
-  };
-  const handleRemoveIrregularIncome = (id: string) => {
-    setIrregularIncomes((prev) => prev.filter((i) => i.id !== id));
-  };
-
-  const handleAddFixedExpense = (input: NewFixedExpenseInput) => {
-    setFixedExpenses((prev) => [...prev, { id: newId(), ...input }]);
-  };
-  const handleUpdateFixedExpense = (
-    id: string,
-    input: NewFixedExpenseInput,
-  ) => {
-    setFixedExpenses((prev) =>
+  const handleUpdateExpense = (id: string, input: NewExpenseItemInput) => {
+    setExpenses((prev) =>
       prev.map((e) => (e.id === id ? { ...e, ...input } : e)),
     );
   };
-  const handleRemoveFixedExpense = (id: string) => {
-    setFixedExpenses((prev) => prev.filter((e) => e.id !== id));
-  };
-
-  const handleAddIrregularExpense = (input: NewIrregularCashflowInput) => {
-    setIrregularExpenses((prev) => [...prev, { id: newId(), ...input }]);
-  };
-  const handleUpdateIrregularExpense = (
-    id: string,
-    input: NewIrregularCashflowInput,
-  ) => {
-    setIrregularExpenses((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, ...input } : e)),
-    );
-  };
-  const handleRemoveIrregularExpense = (id: string) => {
-    setIrregularExpenses((prev) => prev.filter((e) => e.id !== id));
+  const handleRemoveExpense = (id: string) => {
+    setExpenses((prev) => prev.filter((e) => e.id !== id));
   };
 
   const handleAddTransferRule = (input: NewTransferRuleInput) => {
@@ -194,23 +150,12 @@ export default function AssetSimulator() {
     () => ({
       groups,
       assetClasses,
-      fixedIncomes,
-      fixedExpenses,
-      irregularIncomes,
-      irregularExpenses,
+      incomes,
+      expenses,
       transferRules,
       exchangeRate,
     }),
-    [
-      groups,
-      assetClasses,
-      fixedIncomes,
-      fixedExpenses,
-      irregularIncomes,
-      irregularExpenses,
-      transferRules,
-      exchangeRate,
-    ],
+    [groups, assetClasses, incomes, expenses, transferRules, exchangeRate],
   );
 
   const snapshots = useSimulation(simulationInput, today);
@@ -247,22 +192,14 @@ export default function AssetSimulator() {
             onUpdateAssetClass={handleUpdateAssetClass}
             onRemoveAssetClass={handleRemoveAssetClass}
             onSetPrimaryAsset={handleSetPrimaryAsset}
-            fixedIncomes={fixedIncomes}
-            onAddFixedIncome={handleAddFixedIncome}
-            onUpdateFixedIncome={handleUpdateFixedIncome}
-            onRemoveFixedIncome={handleRemoveFixedIncome}
-            irregularIncomes={irregularIncomes}
-            onAddIrregularIncome={handleAddIrregularIncome}
-            onUpdateIrregularIncome={handleUpdateIrregularIncome}
-            onRemoveIrregularIncome={handleRemoveIrregularIncome}
-            fixedExpenses={fixedExpenses}
-            onAddFixedExpense={handleAddFixedExpense}
-            onUpdateFixedExpense={handleUpdateFixedExpense}
-            onRemoveFixedExpense={handleRemoveFixedExpense}
-            irregularExpenses={irregularExpenses}
-            onAddIrregularExpense={handleAddIrregularExpense}
-            onUpdateIrregularExpense={handleUpdateIrregularExpense}
-            onRemoveIrregularExpense={handleRemoveIrregularExpense}
+            incomes={incomes}
+            onAddIncome={handleAddIncome}
+            onUpdateIncome={handleUpdateIncome}
+            onRemoveIncome={handleRemoveIncome}
+            expenses={expenses}
+            onAddExpense={handleAddExpense}
+            onUpdateExpense={handleUpdateExpense}
+            onRemoveExpense={handleRemoveExpense}
             transferRules={transferRules}
             onAddTransferRule={handleAddTransferRule}
             onUpdateTransferRule={handleUpdateTransferRule}
