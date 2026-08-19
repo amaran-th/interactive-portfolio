@@ -1,60 +1,253 @@
 "use client";
 
-import { useState } from "react";
-import { IrregularCashflow, NewIrregularCashflowInput } from "../types";
+import { useRef, useState } from "react";
+import {
+  FixedIncome,
+  Group,
+  HORIZON_MONTHS,
+  IrregularCashflow,
+  NewFixedIncomeInput,
+  NewIrregularCashflowInput,
+  formatMonthsFromNow,
+} from "../types";
 import { monthIndexFromTargetDate } from "../simulation";
+import GroupPicker from "./GroupPicker";
 
 type IncomeSectionProps = {
-  monthlyIncome: number;
-  onChangeMonthlyIncome: (value: number) => void;
+  groups: Group[];
+  onAddGroup: (name: string) => string;
+  fixedIncomes: FixedIncome[];
+  onAddFixedIncome: (input: NewFixedIncomeInput) => void;
+  onUpdateFixedIncome: (id: string, input: NewFixedIncomeInput) => void;
+  onRemoveFixedIncome: (id: string) => void;
   irregularIncomes: IrregularCashflow[];
   onAddIrregularIncome: (input: NewIrregularCashflowInput) => void;
+  onUpdateIrregularIncome: (id: string, input: NewIrregularCashflowInput) => void;
   onRemoveIrregularIncome: (id: string) => void;
   today: Date;
 };
+
+function addMonths(date: Date, months: number): Date {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1);
+}
 
 function toMonthInputValue(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
 export default function IncomeSection({
-  monthlyIncome,
-  onChangeMonthlyIncome,
+  groups,
+  onAddGroup,
+  fixedIncomes,
+  onAddFixedIncome,
+  onUpdateFixedIncome,
+  onRemoveFixedIncome,
   irregularIncomes,
   onAddIrregularIncome,
+  onUpdateIrregularIncome,
   onRemoveIrregularIncome,
   today,
 }: IncomeSectionProps) {
-  const [name, setName] = useState("");
-  const [amount, setAmount] = useState("");
-  const [targetDate, setTargetDate] = useState(toMonthInputValue(today));
+  const nextMonthValue = toMonthInputValue(addMonths(today, 1));
 
-  const handleAdd = () => {
-    if (!name.trim() || !amount) return;
-    onAddIrregularIncome({
-      name: name.trim(),
-      amount: Number(amount),
-      targetDate,
-    });
-    setName("");
-    setAmount("");
+  const [fixedEditingId, setFixedEditingId] = useState<string | null>(null);
+  const [fixedName, setFixedName] = useState("");
+  const [fixedAmount, setFixedAmount] = useState("");
+  const [fixedGroupId, setFixedGroupId] = useState("");
+  const fixedNameRef = useRef<HTMLInputElement>(null);
+  const fixedAmountRef = useRef<HTMLInputElement>(null);
+
+  const [irregularEditingId, setIrregularEditingId] = useState<string | null>(
+    null,
+  );
+  const [irregularName, setIrregularName] = useState("");
+  const [irregularAmount, setIrregularAmount] = useState("");
+  const [irregularDate, setIrregularDate] = useState(nextMonthValue);
+  const [irregularError, setIrregularError] = useState<string | null>(null);
+  const irregularNameRef = useRef<HTMLInputElement>(null);
+  const irregularAmountRef = useRef<HTMLInputElement>(null);
+  const irregularDateRef = useRef<HTMLInputElement>(null);
+
+  const resetFixedForm = () => {
+    setFixedEditingId(null);
+    setFixedName("");
+    setFixedAmount("");
+    setFixedGroupId("");
+  };
+
+  const startEditFixed = (item: FixedIncome) => {
+    setFixedEditingId(item.id);
+    setFixedName(item.name);
+    setFixedAmount(String(item.amount));
+    setFixedGroupId(item.groupId ?? "");
+  };
+
+  const handleSubmitFixed = () => {
+    if (!fixedName.trim()) {
+      fixedNameRef.current?.focus();
+      return;
+    }
+    if (!fixedAmount || Number(fixedAmount) === 0) {
+      fixedAmountRef.current?.focus();
+      return;
+    }
+    const input: NewFixedIncomeInput = {
+      name: fixedName.trim(),
+      amount: Number(fixedAmount),
+      groupId: fixedGroupId || undefined,
+    };
+    if (fixedEditingId) {
+      onUpdateFixedIncome(fixedEditingId, input);
+    } else {
+      onAddFixedIncome(input);
+    }
+    resetFixedForm();
+  };
+
+  const resetIrregularForm = () => {
+    setIrregularEditingId(null);
+    setIrregularName("");
+    setIrregularAmount("");
+    setIrregularDate(nextMonthValue);
+    setIrregularError(null);
+  };
+
+  const startEditIrregular = (item: IrregularCashflow) => {
+    setIrregularEditingId(item.id);
+    setIrregularName(item.name);
+    setIrregularAmount(String(item.amount));
+    setIrregularDate(item.targetDate);
+    setIrregularError(null);
+  };
+
+  const handleSubmitIrregular = () => {
+    if (!irregularName.trim()) {
+      irregularNameRef.current?.focus();
+      return;
+    }
+    if (!irregularAmount || Number(irregularAmount) === 0) {
+      irregularAmountRef.current?.focus();
+      return;
+    }
+    const monthsFromNow = monthIndexFromTargetDate(irregularDate, today);
+    if (monthsFromNow < 1 || monthsFromNow > HORIZON_MONTHS) {
+      setIrregularError(
+        `1개월 후부터 ${HORIZON_MONTHS}개월 후 사이의 날짜만 선택할 수 있습니다.`,
+      );
+      irregularDateRef.current?.focus();
+      return;
+    }
+    setIrregularError(null);
+    const input: NewIrregularCashflowInput = {
+      name: irregularName.trim(),
+      amount: Number(irregularAmount),
+      targetDate: irregularDate,
+    };
+    if (irregularEditingId) {
+      onUpdateIrregularIncome(irregularEditingId, input);
+    } else {
+      onAddIrregularIncome(input);
+    }
+    resetIrregularForm();
+  };
+
+  const handleFixedKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSubmitFixed();
+    }
+  };
+
+  const handleIrregularKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSubmitIrregular();
+    }
   };
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-        <h3 className="text-sm font-semibold text-gray-800">월 고정수입</h3>
-        <input
-          value={monthlyIncome || ""}
-          onChange={(e) => onChangeMonthlyIncome(Number(e.target.value) || 0)}
-          type="number"
-          placeholder="월급 등"
-          className="mt-2 w-full rounded-full border border-white/60 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-indigo-300"
-        />
+      <div className="rounded-2xl border border-emerald-200 bg-white/70 p-4 backdrop-blur">
+        <h3 className="text-sm font-semibold text-emerald-700">고정수입</h3>
+        <ul className="mt-2 flex flex-col gap-2">
+          {fixedIncomes.map((item) => {
+            const group = groups.find((g) => g.id === item.groupId);
+            return (
+              <li
+                key={item.id}
+                onClick={() => startEditFixed(item)}
+                className="flex cursor-pointer items-center justify-between rounded-xl border border-emerald-100 bg-white/80 px-3 py-2 text-sm hover:border-emerald-300"
+              >
+                <span className="flex items-center gap-2">
+                  {group && (
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: group.color }}
+                    />
+                  )}
+                  {item.name} · {item.amount.toLocaleString()}원/월
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveFixedIncome(item.id);
+                  }}
+                  className="text-gray-400 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="mt-3 flex flex-col gap-2" onKeyDown={handleFixedKeyDown}>
+          <div className="flex gap-2">
+            <input
+              ref={fixedNameRef}
+              value={fixedName}
+              onChange={(e) => setFixedName(e.target.value)}
+              placeholder="예: 월급, 부수입"
+              className="flex-1 rounded-full border border-emerald-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-emerald-400"
+            />
+            <GroupPicker
+              groups={groups}
+              value={fixedGroupId}
+              onChange={setFixedGroupId}
+              onCreateGroup={onAddGroup}
+            />
+          </div>
+          <input
+            ref={fixedAmountRef}
+            value={fixedAmount}
+            onChange={(e) => setFixedAmount(e.target.value)}
+            type="number"
+            placeholder="금액"
+            className="rounded-full border border-emerald-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-emerald-400"
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleSubmitFixed}
+              className="self-start rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-600"
+            >
+              {fixedEditingId ? "저장" : "추가"}
+            </button>
+            {fixedEditingId && (
+              <button
+                type="button"
+                onClick={resetFixedForm}
+                className="self-start rounded-full px-4 py-1.5 text-sm text-gray-500 hover:text-gray-700"
+              >
+                취소
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-        <h3 className="text-sm font-semibold text-gray-800">비정기 수입</h3>
+      <div className="rounded-2xl border border-emerald-200 bg-white/70 p-4 backdrop-blur">
+        <h3 className="text-sm font-semibold text-emerald-700">비정기 수입</h3>
         <ul className="mt-2 flex flex-col gap-2">
           {irregularIncomes.map((item) => {
             const monthsFromNow = monthIndexFromTargetDate(
@@ -64,15 +257,19 @@ export default function IncomeSection({
             return (
               <li
                 key={item.id}
-                className="flex items-center justify-between rounded-xl border border-white/60 bg-white/80 px-3 py-2 text-sm"
+                onClick={() => startEditIrregular(item)}
+                className="flex cursor-pointer items-center justify-between rounded-xl border border-emerald-100 bg-white/80 px-3 py-2 text-sm hover:border-emerald-300"
               >
                 <span>
                   {item.name} · {item.amount.toLocaleString()}원 ·{" "}
-                  {monthsFromNow}개월 후
+                  {formatMonthsFromNow(monthsFromNow)}
                 </span>
                 <button
                   type="button"
-                  onClick={() => onRemoveIrregularIncome(item.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveIrregularIncome(item.id);
+                  }}
                   className="text-gray-400 hover:text-gray-700"
                 >
                   ✕
@@ -81,39 +278,61 @@ export default function IncomeSection({
             );
           })}
         </ul>
-        <div className="mt-3 flex flex-col gap-2">
+        <div
+          className="mt-3 flex flex-col gap-2"
+          onKeyDown={handleIrregularKeyDown}
+        >
           <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            ref={irregularNameRef}
+            value={irregularName}
+            onChange={(e) => setIrregularName(e.target.value)}
             placeholder="예: 프리랜서 계약금"
-            className="rounded-full border border-white/60 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-indigo-300"
+            className="rounded-full border border-emerald-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-emerald-400"
           />
           <input
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            ref={irregularAmountRef}
+            value={irregularAmount}
+            onChange={(e) => setIrregularAmount(e.target.value)}
             type="number"
             placeholder="금액"
-            className="rounded-full border border-white/60 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-indigo-300"
+            className="rounded-full border border-emerald-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-emerald-400"
           />
           <div className="flex items-center gap-2">
             <input
-              value={targetDate}
-              onChange={(e) => setTargetDate(e.target.value)}
+              ref={irregularDateRef}
+              value={irregularDate}
+              onChange={(e) => setIrregularDate(e.target.value)}
               type="month"
-              min={toMonthInputValue(today)}
-              className="rounded-full border border-white/60 bg-white/80 px-3 py-1.5 text-sm"
+              min={nextMonthValue}
+              className="rounded-full border border-emerald-200 bg-white/80 px-3 py-1.5 text-sm"
             />
             <span className="text-xs text-gray-500">
-              {monthIndexFromTargetDate(targetDate, today)}개월 후
+              {formatMonthsFromNow(
+                monthIndexFromTargetDate(irregularDate, today),
+              )}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={handleAdd}
-            className="self-start rounded-full bg-indigo-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-600"
-          >
-            추가
-          </button>
+          {irregularError && (
+            <p className="text-xs text-rose-500">{irregularError}</p>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleSubmitIrregular}
+              className="self-start rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-600"
+            >
+              {irregularEditingId ? "저장" : "추가"}
+            </button>
+            {irregularEditingId && (
+              <button
+                type="button"
+                onClick={resetIrregularForm}
+                className="self-start rounded-full px-4 py-1.5 text-sm text-gray-500 hover:text-gray-700"
+              >
+                취소
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
