@@ -30,15 +30,6 @@ const STROKE = 24;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-const SLICE_COLORS = [
-  "#6366f1",
-  "#a855f7",
-  "#14b8a6",
-  "#ec4899",
-  "#3b82f6",
-  "#f59e0b",
-];
-
 const UNGROUPED_TAB_ID = "__ungrouped__";
 
 export default function GroupDonutChart({
@@ -78,7 +69,7 @@ export default function GroupDonutChart({
     offset: number;
     items: Slice[];
   }>(
-    (acc, asset, i) => {
+    (acc, asset) => {
       const amount = snapshot.assetBalancesKRW[asset.id] ?? 0;
       const ratio = tabTotal > 0 ? amount / tabTotal : 0;
       const dash = ratio * CIRCUMFERENCE;
@@ -87,7 +78,7 @@ export default function GroupDonutChart({
         name: asset.name,
         amount,
         ratio,
-        color: SLICE_COLORS[i % SLICE_COLORS.length],
+        color: asset.color,
         dashArray: `${dash} ${CIRCUMFERENCE - dash}`,
         dashOffset: -acc.offset,
       };

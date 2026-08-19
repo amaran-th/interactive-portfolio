@@ -4,7 +4,6 @@ import {
   AssetClass,
   Group,
   MonthSnapshot,
-  UNGROUPED_COLOR,
   formatKRW,
   formatMonthsFromNow,
 } from "./types";
@@ -22,7 +21,24 @@ const BAR_WIDTH = 64;
 const BASE_Y = HEIGHT - 30;
 const MAX_BAR_HEIGHT = 160;
 
-type Segment = { id: string; color: string; y: number; height: number };
+type Segment = {
+  id: string;
+  fill: string;
+  stroke: string | undefined;
+  y: number;
+  height: number;
+};
+
+function orderedAssets(
+  assetClasses: AssetClass[],
+  groups: Group[],
+): AssetClass[] {
+  const grouped = groups.flatMap((g) =>
+    assetClasses.filter((a) => a.groupId === g.id),
+  );
+  const ungrouped = assetClasses.filter((a) => !a.groupId);
+  return [...grouped, ...ungrouped];
+}
 
 export default function ComparisonBarChart({
   snapshots,
@@ -40,11 +56,7 @@ export default function ComparisonBarChart({
 
   const nowSnapshot = snapshots[0];
   const futureSnapshot = snapshots[selectedMonth];
-  const hasUngrouped = assetClasses.some((a) => !a.groupId);
-  const segmentDefs = [
-    ...groups.map((g) => ({ id: g.id, color: g.color })),
-    ...(hasUngrouped ? [{ id: "__ungrouped__", color: UNGROUPED_COLOR }] : []),
-  ];
+  const assets = orderedAssets(assetClasses, groups);
 
   const maxTotal = Math.max(
     1,
@@ -53,22 +65,26 @@ export default function ComparisonBarChart({
   );
 
   const buildSegments = (snapshot: MonthSnapshot): Segment[] => {
-    const { segments } = segmentDefs.reduce<{
+    const { segments } = assets.reduce<{
       cursor: number;
       segments: Segment[];
     }>(
-      (acc, def) => {
-        const value =
-          def.id === "__ungrouped__"
-            ? snapshot.ungroupedTotalKRW
-            : (snapshot.groupTotals[def.id] ?? 0);
+      (acc, asset) => {
+        const value = snapshot.assetBalancesKRW[asset.id] ?? 0;
         const height = (value / maxTotal) * MAX_BAR_HEIGHT;
         const y = BASE_Y - acc.cursor - height;
+        const group = groups.find((g) => g.id === asset.groupId);
         return {
           cursor: acc.cursor + height,
           segments: [
             ...acc.segments,
-            { id: def.id, color: def.color, y, height },
+            {
+              id: asset.id,
+              fill: asset.color,
+              stroke: group?.color,
+              y,
+              height,
+            },
           ],
         };
       },
@@ -108,8 +124,10 @@ export default function ComparisonBarChart({
             y={seg.y}
             width={BAR_WIDTH}
             height={Math.max(0, seg.height)}
-            fill={seg.color}
+            fill={seg.fill}
             fillOpacity={0.75}
+            stroke={seg.stroke}
+            strokeWidth={seg.stroke ? 2 : 0}
           />
         ))}
         {futureSegments.map((seg) => (
@@ -119,8 +137,10 @@ export default function ComparisonBarChart({
             y={seg.y}
             width={BAR_WIDTH}
             height={Math.max(0, seg.height)}
-            fill={seg.color}
+            fill={seg.fill}
             fillOpacity={0.75}
+            stroke={seg.stroke}
+            strokeWidth={seg.stroke ? 2 : 0}
           />
         ))}
         <text

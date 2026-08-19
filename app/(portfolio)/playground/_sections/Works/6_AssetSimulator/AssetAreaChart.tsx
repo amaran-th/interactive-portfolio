@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  AssetClass,
-  Group,
-  MonthSnapshot,
-  UNGROUPED_COLOR,
-  formatKRW,
-} from "./types";
+import { AssetClass, Group, MonthSnapshot, formatKRW } from "./types";
 
 type AssetAreaChartProps = {
   snapshots: MonthSnapshot[];
@@ -18,6 +12,17 @@ type AssetAreaChartProps = {
 const WIDTH = 600;
 const HEIGHT = 220;
 const PADDING = 12;
+
+function orderedAssets(
+  assetClasses: AssetClass[],
+  groups: Group[],
+): AssetClass[] {
+  const grouped = groups.flatMap((g) =>
+    assetClasses.filter((a) => a.groupId === g.id),
+  );
+  const ungrouped = assetClasses.filter((a) => !a.groupId);
+  return [...grouped, ...ungrouped];
+}
 
 export default function AssetAreaChart({
   snapshots,
@@ -33,32 +38,27 @@ export default function AssetAreaChart({
     );
   }
 
-  const hasUngrouped = assetClasses.some((a) => !a.groupId);
-  const bandDefs = [
-    ...groups.map((g) => ({ id: g.id, color: g.color })),
-    ...(hasUngrouped
-      ? [{ id: "__ungrouped__", color: UNGROUPED_COLOR }]
-      : []),
-  ];
-
+  const assets = orderedAssets(assetClasses, groups);
   const maxTotal = Math.max(1, ...snapshots.map((s) => s.totalBalance));
   const stepX = (WIDTH - PADDING * 2) / (snapshots.length - 1);
   const scaleY = (value: number) =>
     HEIGHT - PADDING - (value / maxTotal) * (HEIGHT - PADDING * 2);
 
-  const { bands } = bandDefs.reduce<{
+  const { bands } = assets.reduce<{
     prevTop: number[];
-    bands: { id: string; color: string; points: string }[];
+    bands: {
+      id: string;
+      fill: string;
+      stroke: string | undefined;
+      points: string;
+    }[];
   }>(
-    (acc, band) => {
+    (acc, asset) => {
       const bottom = acc.prevTop;
-      const top = snapshots.map((snapshot, i) => {
-        const value =
-          band.id === "__ungrouped__"
-            ? snapshot.ungroupedTotalKRW
-            : (snapshot.groupTotals[band.id] ?? 0);
-        return bottom[i] + value;
-      });
+      const top = snapshots.map(
+        (snapshot, i) =>
+          bottom[i] + (snapshot.assetBalancesKRW[asset.id] ?? 0),
+      );
 
       const topPoints = top.map(
         (value, i) => `${PADDING + i * stepX},${scaleY(value)}`,
@@ -67,13 +67,16 @@ export default function AssetAreaChart({
         .map((value, i) => `${PADDING + i * stepX},${scaleY(value)}`)
         .reverse();
 
+      const group = groups.find((g) => g.id === asset.groupId);
+
       return {
         prevTop: top,
         bands: [
           ...acc.bands,
           {
-            id: band.id,
-            color: band.color,
+            id: asset.id,
+            fill: asset.color,
+            stroke: group?.color,
             points: [...topPoints, ...bottomPoints].join(" "),
           },
         ],
@@ -98,8 +101,10 @@ export default function AssetAreaChart({
           <polygon
             key={band.id}
             points={band.points}
-            fill={band.color}
+            fill={band.fill}
             fillOpacity={0.55}
+            stroke={band.stroke}
+            strokeWidth={band.stroke ? 2 : 0}
           />
         ))}
         <line
