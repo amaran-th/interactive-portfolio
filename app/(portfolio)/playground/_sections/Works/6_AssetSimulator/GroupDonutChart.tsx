@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { AssetClass, Group, MonthSnapshot } from "./types";
+import {
+  AssetClass,
+  Group,
+  MonthSnapshot,
+  UNGROUPED_LABEL,
+  formatKRW,
+} from "./types";
 
 type GroupDonutChartProps = {
   groups: Group[];
@@ -12,6 +18,7 @@ type GroupDonutChartProps = {
 type Slice = {
   id: string;
   name: string;
+  amount: number;
   ratio: number;
   color: string;
   dashArray: string;
@@ -32,40 +39,53 @@ const SLICE_COLORS = [
   "#f59e0b",
 ];
 
+const UNGROUPED_TAB_ID = "__ungrouped__";
+
 export default function GroupDonutChart({
   groups,
   assetClasses,
   snapshot,
 }: GroupDonutChartProps) {
-  const [selectedGroupId, setSelectedGroupId] = useState(groups[0]?.id ?? "");
-  const activeGroupId = groups.some((g) => g.id === selectedGroupId)
-    ? selectedGroupId
-    : groups[0]?.id;
+  const hasUngrouped = assetClasses.some((a) => !a.groupId);
+  const tabs = [
+    ...groups.map((g) => ({ id: g.id, name: g.name })),
+    ...(hasUngrouped ? [{ id: UNGROUPED_TAB_ID, name: UNGROUPED_LABEL }] : []),
+  ];
 
-  if (!activeGroupId) {
+  const [selectedTabId, setSelectedTabId] = useState(tabs[0]?.id ?? "");
+  const activeTabId = tabs.some((t) => t.id === selectedTabId)
+    ? selectedTabId
+    : tabs[0]?.id;
+
+  if (!activeTabId) {
     return (
       <div className="flex h-[220px] items-center justify-center rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
-        그룹을 추가하면 비율을 볼 수 있습니다
+        그룹을 추가하면 비율을 확인합니다
       </div>
     );
   }
 
-  const assetsInGroup = assetClasses.filter(
-    (a) => a.groupId === activeGroupId,
-  );
-  const groupTotal = snapshot.groupTotals[activeGroupId] ?? 0;
+  const assetsInTab =
+    activeTabId === UNGROUPED_TAB_ID
+      ? assetClasses.filter((a) => !a.groupId)
+      : assetClasses.filter((a) => a.groupId === activeTabId);
+  const tabTotal =
+    activeTabId === UNGROUPED_TAB_ID
+      ? snapshot.ungroupedTotalKRW
+      : (snapshot.groupTotals[activeTabId] ?? 0);
 
-  const { items: slices } = assetsInGroup.reduce<{
+  const { items: slices } = assetsInTab.reduce<{
     offset: number;
     items: Slice[];
   }>(
     (acc, asset, i) => {
-      const value = snapshot.assetBalances[asset.id] ?? 0;
-      const ratio = groupTotal > 0 ? value / groupTotal : 0;
+      const amount = snapshot.assetBalancesKRW[asset.id] ?? 0;
+      const ratio = tabTotal > 0 ? amount / tabTotal : 0;
       const dash = ratio * CIRCUMFERENCE;
       const slice: Slice = {
         id: asset.id,
         name: asset.name,
+        amount,
         ratio,
         color: SLICE_COLORS[i % SLICE_COLORS.length],
         dashArray: `${dash} ${CIRCUMFERENCE - dash}`,
@@ -79,25 +99,25 @@ export default function GroupDonutChart({
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <div className="flex flex-wrap gap-2">
-        {groups.map((group) => (
+        {tabs.map((tab) => (
           <button
-            key={group.id}
+            key={tab.id}
             type="button"
-            onClick={() => setSelectedGroupId(group.id)}
+            onClick={() => setSelectedTabId(tab.id)}
             className={`rounded-full px-3 py-1 text-xs ${
-              group.id === activeGroupId
+              tab.id === activeTabId
                 ? "bg-indigo-500 text-white"
                 : "bg-white/80 text-gray-600"
             }`}
           >
-            {group.name}
+            {tab.name}
           </button>
         ))}
       </div>
       <div className="mt-3 flex items-center gap-4">
         <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
           <g transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}>
-            {assetsInGroup.length === 0 ? (
+            {assetsInTab.length === 0 ? (
               <circle
                 cx={SIZE / 2}
                 cy={SIZE / 2}
@@ -130,7 +150,8 @@ export default function GroupDonutChart({
                 className="h-2.5 w-2.5 rounded-full"
                 style={{ backgroundColor: slice.color }}
               />
-              {slice.name} · {Math.round(slice.ratio * 100)}%
+              {slice.name} · {Math.round(slice.ratio * 100)}% ·{" "}
+              {formatKRW(slice.amount)}
             </li>
           ))}
         </ul>
