@@ -230,7 +230,6 @@ export default function AssetSimulator() {
           <TimelineSlider
             selectedMonth={selectedMonth}
             onChange={setSelectedMonth}
-            totalBalance={selectedSnapshot.totalBalance}
             today={today}
           />
           <AssetAreaChart
