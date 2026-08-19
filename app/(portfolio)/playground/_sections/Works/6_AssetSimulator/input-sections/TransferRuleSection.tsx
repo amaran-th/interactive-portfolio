@@ -30,6 +30,7 @@ export default function TransferRuleSection({
   const [mode, setMode] = useState<TransferMode>("fixed");
   const [amount, setAmount] = useState("");
   const [frequency, setFrequency] = useState<TransferFrequency>("monthly");
+  const [error, setError] = useState<string | null>(null);
   const amountRef = useRef<HTMLInputElement>(null);
 
   const nameOf = (id: string) =>
@@ -52,6 +53,7 @@ export default function TransferRuleSection({
     setMode("fixed");
     setAmount("");
     setFrequency("monthly");
+    setError(null);
   };
 
   const startEdit = (rule: TransferRule) => {
@@ -64,7 +66,11 @@ export default function TransferRuleSection({
   };
 
   const handleSubmit = () => {
-    if (!effectiveFrom || !effectiveTo || effectiveFrom === effectiveTo) return;
+    if (!effectiveFrom || !effectiveTo || effectiveFrom === effectiveTo) {
+      setError("이체할 수 있는 같은 통화의 자산군이 2개 이상 필요합니다.");
+      return;
+    }
+    setError(null);
     if (!amount || Number(amount) === 0) {
       amountRef.current?.focus();
       return;
@@ -181,6 +187,7 @@ export default function TransferRuleSection({
             <option value="yearly">매년</option>
           </select>
         </div>
+        {error && <p className="text-xs text-rose-500">{error}</p>}
         <div className="flex gap-2">
           <button
             type="button"

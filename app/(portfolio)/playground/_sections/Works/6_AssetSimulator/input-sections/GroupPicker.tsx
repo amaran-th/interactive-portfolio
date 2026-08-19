@@ -48,6 +48,9 @@ export default function GroupPicker({
           if (e.key === "Enter" || e.key === "Escape") {
             e.stopPropagation();
           }
+          if (e.key === "Escape") {
+            setCreating(false);
+          }
         }}
       >
         <input

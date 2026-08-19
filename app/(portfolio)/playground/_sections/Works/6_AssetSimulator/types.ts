@@ -155,3 +155,11 @@ export function formatMonthsFromNow(months: number): string {
   const remainder = months % 12;
   return remainder === 0 ? `${years}년 후` : `${years}년 ${remainder}개월 후`;
 }
+
+export function addMonths(date: Date, months: number): Date {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1);
+}
+
+export function toMonthInputValue(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}

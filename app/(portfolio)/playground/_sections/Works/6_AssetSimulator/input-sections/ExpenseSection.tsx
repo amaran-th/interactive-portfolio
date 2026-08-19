@@ -7,7 +7,9 @@ import {
   IrregularCashflow,
   NewFixedExpenseInput,
   NewIrregularCashflowInput,
+  addMonths,
   formatMonthsFromNow,
+  toMonthInputValue,
 } from "../types";
 import { monthIndexFromTargetDate } from "../simulation";
 
@@ -22,14 +24,6 @@ type ExpenseSectionProps = {
   onRemoveIrregularExpense: (id: string) => void;
   today: Date;
 };
-
-function addMonths(date: Date, months: number): Date {
-  return new Date(date.getFullYear(), date.getMonth() + months, 1);
-}
-
-function toMonthInputValue(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
 
 export default function ExpenseSection({
   fixedExpenses,
@@ -120,9 +114,13 @@ export default function ExpenseSection({
       return;
     }
     const monthsFromNow = monthIndexFromTargetDate(irregularDate, today);
-    if (monthsFromNow < 1 || monthsFromNow > HORIZON_MONTHS) {
+    if (
+      !Number.isFinite(monthsFromNow) ||
+      monthsFromNow < 1 ||
+      monthsFromNow > HORIZON_MONTHS
+    ) {
       setIrregularError(
-        `1개월 후부터 ${HORIZON_MONTHS}개월 후 사이의 날짜만 선택할 수 있습니다.`,
+        `1개월 후부터 ${formatMonthsFromNow(HORIZON_MONTHS)} 사이의 날짜만 선택할 수 있습니다.`,
       );
       irregularDateRef.current?.focus();
       return;
