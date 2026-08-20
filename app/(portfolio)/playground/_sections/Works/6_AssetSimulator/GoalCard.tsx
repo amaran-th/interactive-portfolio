@@ -73,6 +73,10 @@ export default function GoalCard({
             : "",
       );
       setAmount(String(goal.targetAmount));
+    } else {
+      setMetricType("total");
+      setTargetId("");
+      setAmount("");
     }
   }
 
