@@ -159,7 +159,12 @@ export default function GroupPicker({
                   </button>
                   <button
                     type="button"
-                    onClick={() => onRemoveGroup(group.id)}
+                    onClick={() => {
+                      if (value === group.id) {
+                        onChange(NONE_VALUE);
+                      }
+                      onRemoveGroup(group.id);
+                    }}
                     className="shrink-0 text-xs text-gray-400 hover:text-rose-500"
                     aria-label="그룹 삭제"
                   >

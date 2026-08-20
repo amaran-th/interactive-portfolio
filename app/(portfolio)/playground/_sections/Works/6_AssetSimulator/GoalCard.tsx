@@ -80,6 +80,19 @@ export default function GoalCard({
     }
   }
 
+  // Invalidate a stale targetId if the asset/group it points at no
+  // longer exists (e.g. deleted elsewhere while this form was left
+  // unsubmitted). Render-time check for the same reason as the sync
+  // above — this file avoids useEffect for prop-driven state sync.
+  if (
+    targetId &&
+    ((metricType === "asset" &&
+      !assetClasses.some((a) => a.id === targetId)) ||
+      (metricType === "group" && !groups.some((g) => g.id === targetId)))
+  ) {
+    setTargetId("");
+  }
+
   const achievementMonth = useMemo(() => {
     if (!goal) return undefined;
     return findGoalAchievementMonth(simulationInput, goal, today);
@@ -92,10 +105,10 @@ export default function GoalCard({
     if (metricType === "total") {
       metric = { type: "total" };
     } else if (metricType === "asset") {
-      if (!targetId) return;
+      if (!targetId || !assetClasses.some((a) => a.id === targetId)) return;
       metric = { type: "asset", assetId: targetId };
     } else {
-      if (!targetId) return;
+      if (!targetId || !groups.some((g) => g.id === targetId)) return;
       metric = { type: "group", groupId: targetId };
     }
     onSetGoal({ metric, targetAmount });
