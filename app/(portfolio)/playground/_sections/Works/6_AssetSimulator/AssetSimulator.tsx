@@ -27,6 +27,7 @@ import GroupDonutChart from "./GroupDonutChart";
 import FlowDiagram from "./FlowDiagram";
 import ComparisonBarChart from "./ComparisonBarChart";
 import GoalCard from "./GoalCard";
+import CashFlowChart from "./CashFlowChart";
 
 function withGuaranteedPrimary(assets: AssetClass[]): AssetClass[] {
   if (assets.some((a) => a.isPrimary && a.currency === "KRW")) {
@@ -321,6 +322,7 @@ export default function AssetSimulator() {
                 today={today}
                 selectedSnapshot={selectedSnapshot}
               />
+              <CashFlowChart snapshots={snapshots} selectedMonth={selectedMonth} />
             </div>
           </div>
         </div>
