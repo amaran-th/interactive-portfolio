@@ -15,6 +15,7 @@ import {
   NewTransferRuleInput,
   SimulationInput,
   TransferRule,
+  formatKRW,
   newId,
   nextAssetColor,
   nextGroupColor,
@@ -28,6 +29,7 @@ import FlowDiagram from "./FlowDiagram";
 import ComparisonBarChart from "./ComparisonBarChart";
 import GoalCard from "./GoalCard";
 import CashFlowChart from "./CashFlowChart";
+import HistoryPanel from "./HistoryPanel";
 
 function withGuaranteedPrimary(assets: AssetClass[]): AssetClass[] {
   if (assets.some((a) => a.isPrimary && a.currency === "KRW")) {
@@ -255,7 +257,25 @@ export default function AssetSimulator() {
             </label>
           </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-[360px_1fr]">
+        <div className="mb-4 grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
+            <p className="text-sm text-gray-500">현재 자산</p>
+            <p className="mt-1 text-2xl font-bold text-gray-800">
+              {formatKRW(snapshots[0]?.totalBalance ?? 0)}
+            </p>
+          </div>
+          <GoalCard
+            goal={goal}
+            onSetGoal={setGoal}
+            assetClasses={assetClasses}
+            groups={assetGroups}
+            simulationInput={simulationInput}
+            today={today}
+            selectedSnapshot={selectedSnapshot}
+          />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-[360px_1fr_320px]">
           <InputPanel
             groups={groups}
             onAddGroup={handleAddGroup}
@@ -283,12 +303,6 @@ export default function AssetSimulator() {
             horizonMonths={horizonMonths}
           />
           <div className="flex flex-col gap-4">
-            <TimelineSlider
-              selectedMonth={selectedMonth}
-              onChange={setSelectedMonth}
-              today={today}
-              horizonMonths={horizonMonths}
-            />
             <div className="grid gap-4 md:grid-cols-2">
               <AssetAreaChart
                 snapshots={snapshots}
@@ -313,18 +327,23 @@ export default function AssetSimulator() {
                 assetClasses={assetClasses}
                 exchangeRate={exchangeRate}
               />
-              <GoalCard
-                goal={goal}
-                onSetGoal={setGoal}
-                assetClasses={assetClasses}
-                groups={assetGroups}
-                simulationInput={simulationInput}
-                today={today}
-                selectedSnapshot={selectedSnapshot}
-              />
               <CashFlowChart snapshots={snapshots} selectedMonth={selectedMonth} />
             </div>
+            <TimelineSlider
+              selectedMonth={selectedMonth}
+              onChange={setSelectedMonth}
+              today={today}
+              horizonMonths={horizonMonths}
+            />
           </div>
+          <HistoryPanel
+            snapshots={snapshots}
+            incomes={incomes}
+            expenses={expenses}
+            assetClasses={assetClasses}
+            today={today}
+            selectedMonth={selectedMonth}
+          />
         </div>
       </div>
     </div>

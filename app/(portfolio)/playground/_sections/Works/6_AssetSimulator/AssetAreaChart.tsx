@@ -48,6 +48,7 @@ export default function AssetAreaChart({
     prevTop: number[];
     bands: {
       id: string;
+      name: string;
       fill: string;
       stroke: string | undefined;
       points: string;
@@ -75,6 +76,7 @@ export default function AssetAreaChart({
           ...acc.bands,
           {
             id: asset.id,
+            name: asset.name,
             fill: asset.color,
             stroke: group?.color,
             points: [...topPoints, ...bottomPoints].join(" "),
@@ -105,7 +107,9 @@ export default function AssetAreaChart({
             fillOpacity={0.55}
             stroke={band.stroke}
             strokeWidth={band.stroke ? 2 : 0}
-          />
+          >
+            <title>{band.name}</title>
+          </polygon>
         ))}
         <line
           x1={cursorX}
@@ -117,6 +121,17 @@ export default function AssetAreaChart({
           strokeDasharray="4 4"
         />
       </svg>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+        {assets.map((asset) => (
+          <span key={asset.id} className="flex items-center gap-1">
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: asset.color }}
+            />
+            {asset.name}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

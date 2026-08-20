@@ -23,6 +23,7 @@ const MAX_BAR_HEIGHT = 160;
 
 type Segment = {
   id: string;
+  name: string;
   fill: string;
   stroke: string | undefined;
   y: number;
@@ -80,6 +81,7 @@ export default function ComparisonBarChart({
             ...acc.segments,
             {
               id: asset.id,
+              name: asset.name,
               fill: asset.color,
               stroke: group?.color,
               y,
@@ -128,7 +130,9 @@ export default function ComparisonBarChart({
             fillOpacity={0.75}
             stroke={seg.stroke}
             strokeWidth={seg.stroke ? 2 : 0}
-          />
+          >
+            <title>{seg.name}</title>
+          </rect>
         ))}
         {futureSegments.map((seg) => (
           <rect
@@ -141,7 +145,9 @@ export default function ComparisonBarChart({
             fillOpacity={0.75}
             stroke={seg.stroke}
             strokeWidth={seg.stroke ? 2 : 0}
-          />
+          >
+            <title>{seg.name}</title>
+          </rect>
         ))}
         <text
           x={nowX + BAR_WIDTH / 2}
@@ -160,6 +166,17 @@ export default function ComparisonBarChart({
           {selectedMonth === 0 ? "지금" : formatMonthsFromNow(selectedMonth)}
         </text>
       </svg>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+        {assets.map((asset) => (
+          <span key={asset.id} className="flex items-center gap-1">
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: asset.color }}
+            />
+            {asset.name}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
