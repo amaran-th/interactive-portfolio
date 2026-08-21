@@ -68,6 +68,18 @@ export type Goal = {
   targetAmount: number;
 };
 
+export type Scenario = {
+  id: string;
+  name: string;
+  groups: Group[];
+  assetClasses: AssetClass[];
+  incomes: IncomeItem[];
+  expenses: ExpenseItem[];
+  transferRules: TransferRule[];
+  exchangeRate: number;
+  goal: Goal | null;
+};
+
 export type SimulationInput = {
   groups: Group[];
   assetClasses: AssetClass[];
