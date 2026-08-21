@@ -78,13 +78,16 @@ export default function GoalCard({
       setTargetId("");
       setAmount("");
     }
-  }
-
-  // Invalidate a stale targetId if the asset/group it points at no
-  // longer exists (e.g. deleted elsewhere while this form was left
-  // unsubmitted). Render-time check for the same reason as the sync
-  // above — this file avoids useEffect for prop-driven state sync.
-  if (
+  } else if (
+    // Invalidate a stale targetId if the asset/group it points at no
+    // longer exists (e.g. deleted elsewhere while this form was left
+    // unsubmitted). Render-time check for the same reason as the sync
+    // above — this file avoids useEffect for prop-driven state sync.
+    // Only runs when `goal` did NOT just change this render: when it did,
+    // the branch above already set a targetId that is valid by
+    // construction against the current assetClasses/groups, so re-checking
+    // it here against the (still-stale, pre-render) local targetId/metricType
+    // would incorrectly clobber what was just set.
     targetId &&
     ((metricType === "asset" &&
       !assetClasses.some((a) => a.id === targetId)) ||
