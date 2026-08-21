@@ -450,6 +450,7 @@ export default function AssetSimulator() {
 
         <div className="grid gap-4 md:grid-cols-[360px_1fr_320px]">
           <InputPanel
+            key={activeScenarioId}
             groups={activeScenario.groups}
             onAddGroup={handleAddGroup}
             onUpdateGroup={handleUpdateGroup}
