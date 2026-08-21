@@ -4,17 +4,14 @@ import { useMemo, useState } from "react";
 import {
   AssetClass,
   DEFAULT_HORIZON_YEARS,
-  ExpenseItem,
   Goal,
-  Group,
   HORIZON_PRESET_YEARS,
-  IncomeItem,
   NewAssetClassInput,
   NewExpenseItemInput,
   NewIncomeItemInput,
   NewTransferRuleInput,
+  Scenario,
   SimulationInput,
-  TransferRule,
   formatKRW,
   newId,
   nextAssetColor,
@@ -30,6 +27,8 @@ import ComparisonBarChart from "./ComparisonBarChart";
 import GoalCard from "./GoalCard";
 import CashFlowChart from "./CashFlowChart";
 import HistoryPanel from "./HistoryPanel";
+import ScenarioTabs from "./ScenarioTabs";
+import ScenarioComparisonChart from "./ScenarioComparisonChart";
 
 function withGuaranteedPrimary(assets: AssetClass[]): AssetClass[] {
   if (assets.some((a) => a.isPrimary && a.currency === "KRW")) {
@@ -52,18 +51,91 @@ function goalReferences(
   return goal.metric.type === "group" && goal.metric.groupId === id;
 }
 
+function emptyScenario(name: string): Scenario {
+  return {
+    id: newId(),
+    name,
+    groups: [],
+    assetClasses: [],
+    incomes: [],
+    expenses: [],
+    transferRules: [],
+    exchangeRate: 1350,
+    goal: null,
+  };
+}
+
+function duplicateScenario(scenario: Scenario): Scenario {
+  const groupIdMap = new Map(scenario.groups.map((g) => [g.id, newId()]));
+  const assetIdMap = new Map(scenario.assetClasses.map((a) => [a.id, newId()]));
+
+  const groups = scenario.groups.map((g) => ({
+    ...g,
+    id: groupIdMap.get(g.id)!,
+  }));
+  const assetClasses = scenario.assetClasses.map((a) => ({
+    ...a,
+    id: assetIdMap.get(a.id)!,
+    groupId: a.groupId ? groupIdMap.get(a.groupId) : undefined,
+  }));
+  const incomes = scenario.incomes.map((i) => ({
+    ...i,
+    id: newId(),
+    groupId: i.groupId ? groupIdMap.get(i.groupId) : undefined,
+  }));
+  const expenses = scenario.expenses.map((e) => ({
+    ...e,
+    id: newId(),
+    groupId: e.groupId ? groupIdMap.get(e.groupId) : undefined,
+  }));
+  const transferRules = scenario.transferRules.map((r) => ({
+    ...r,
+    id: newId(),
+    fromAssetId: assetIdMap.get(r.fromAssetId)!,
+    toAssetId: assetIdMap.get(r.toAssetId)!,
+  }));
+  const goal = scenario.goal
+    ? {
+        ...scenario.goal,
+        metric:
+          scenario.goal.metric.type === "asset"
+            ? {
+                type: "asset" as const,
+                assetId: assetIdMap.get(scenario.goal.metric.assetId)!,
+              }
+            : scenario.goal.metric.type === "group"
+              ? {
+                  type: "group" as const,
+                  groupId: groupIdMap.get(scenario.goal.metric.groupId)!,
+                }
+              : scenario.goal.metric,
+      }
+    : null;
+
+  return {
+    id: newId(),
+    name: `${scenario.name} 복사본`,
+    groups,
+    assetClasses,
+    incomes,
+    expenses,
+    transferRules,
+    exchangeRate: scenario.exchangeRate,
+    goal,
+  };
+}
+
 export default function AssetSimulator() {
   const today = useMemo(() => new Date(), []);
 
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [assetClasses, setAssetClasses] = useState<AssetClass[]>([]);
-  const [incomes, setIncomes] = useState<IncomeItem[]>([]);
-  const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
-  const [transferRules, setTransferRules] = useState<TransferRule[]>([]);
-  const [exchangeRate, setExchangeRate] = useState(1350);
+  const [scenarios, setScenarios] = useState<Scenario[]>(() => [
+    emptyScenario("시나리오 1"),
+  ]);
+  const [activeScenarioId, setActiveScenarioId] = useState(
+    () => scenarios[0].id,
+  );
   const [selectedMonth, setSelectedMonth] = useState(0);
   const [horizonYears, setHorizonYears] = useState(DEFAULT_HORIZON_YEARS);
-  const [goal, setGoal] = useState<Goal | null>(null);
 
   const horizonMonths = horizonYears * 12;
 
@@ -72,153 +144,233 @@ export default function AssetSimulator() {
     setSelectedMonth((prev) => Math.min(prev, years * 12));
   };
 
+  const updateActiveScenario = (
+    updater: (scenario: Scenario) => Scenario,
+  ) => {
+    setScenarios((prev) =>
+      prev.map((s) => (s.id === activeScenarioId ? updater(s) : s)),
+    );
+  };
+
+  const handleSelectScenario = (id: string) => setActiveScenarioId(id);
+
+  const handleRenameScenario = (id: string, name: string) => {
+    setScenarios((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
+  };
+
+  const handleDeleteScenario = (id: string) => {
+    if (scenarios.length <= 1) return;
+    const rest = scenarios.filter((s) => s.id !== id);
+    setScenarios(rest);
+    if (activeScenarioId === id) {
+      setActiveScenarioId(rest[0].id);
+    }
+  };
+
+  const handleDuplicateScenario = (id: string) => {
+    const source = scenarios.find((s) => s.id === id);
+    if (!source) return;
+    const clone = duplicateScenario(source);
+    setScenarios((prev) => [...prev, clone]);
+    setActiveScenarioId(clone.id);
+  };
+
+  const handleCreateScenario = () => {
+    const existingNames = new Set(scenarios.map((s) => s.name));
+    let n = scenarios.length + 1;
+    while (existingNames.has(`시나리오 ${n}`)) n++;
+    const created = emptyScenario(`시나리오 ${n}`);
+    setScenarios((prev) => [...prev, created]);
+    setActiveScenarioId(created.id);
+  };
+
   const handleAddGroup = (name: string): string => {
     const id = newId();
-    setGroups((prev) => [
-      ...prev,
-      { id, name, color: nextGroupColor(prev.length) },
-    ]);
+    updateActiveScenario((s) => ({
+      ...s,
+      groups: [...s.groups, { id, name, color: nextGroupColor(s.groups.length) }],
+    }));
     return id;
   };
   const handleUpdateGroup = (
     id: string,
     input: { name: string; color: string },
   ) => {
-    setGroups((prev) =>
-      prev.map((g) => (g.id === id ? { ...g, ...input } : g)),
-    );
+    updateActiveScenario((s) => ({
+      ...s,
+      groups: s.groups.map((g) => (g.id === id ? { ...g, ...input } : g)),
+    }));
   };
   const handleRemoveGroup = (id: string) => {
-    setGroups((prev) => prev.filter((g) => g.id !== id));
-    setAssetClasses((prev) =>
-      prev.map((a) => (a.groupId === id ? { ...a, groupId: undefined } : a)),
-    );
-    setIncomes((prev) =>
-      prev.map((i) => (i.groupId === id ? { ...i, groupId: undefined } : i)),
-    );
-    setExpenses((prev) =>
-      prev.map((e) => (e.groupId === id ? { ...e, groupId: undefined } : e)),
-    );
-    setGoal((prev) => (goalReferences(prev, "group", id) ? null : prev));
+    updateActiveScenario((s) => ({
+      ...s,
+      groups: s.groups.filter((g) => g.id !== id),
+      assetClasses: s.assetClasses.map((a) =>
+        a.groupId === id ? { ...a, groupId: undefined } : a,
+      ),
+      incomes: s.incomes.map((i) =>
+        i.groupId === id ? { ...i, groupId: undefined } : i,
+      ),
+      expenses: s.expenses.map((e) =>
+        e.groupId === id ? { ...e, groupId: undefined } : e,
+      ),
+      goal: goalReferences(s.goal, "group", id) ? null : s.goal,
+    }));
   };
 
   const handleAddAssetClass = (input: NewAssetClassInput) => {
-    setAssetClasses((prev) => {
+    updateActiveScenario((s) => {
       const withNew = [
         ...(input.isPrimary
-          ? prev.map((a) => ({ ...a, isPrimary: false }))
-          : prev),
-        { id: newId(), ...input, color: nextAssetColor(prev.length) },
+          ? s.assetClasses.map((a) => ({ ...a, isPrimary: false }))
+          : s.assetClasses),
+        { id: newId(), ...input, color: nextAssetColor(s.assetClasses.length) },
       ];
-      return withGuaranteedPrimary(withNew);
+      return { ...s, assetClasses: withGuaranteedPrimary(withNew) };
     });
   };
   const handleUpdateAssetClass = (id: string, input: NewAssetClassInput) => {
-    setAssetClasses((prev) => {
-      const updated = prev.map((a) => {
+    updateActiveScenario((s) => {
+      const updated = s.assetClasses.map((a) => {
         if (a.id === id) return { ...a, ...input };
         if (input.isPrimary) return { ...a, isPrimary: false };
         return a;
       });
-      return withGuaranteedPrimary(updated);
-    });
-    setTransferRules((prev) => {
-      const nextAssets = assetClasses.map((a) =>
-        a.id === id ? { ...a, ...input } : a,
-      );
-      return prev.filter((r) => {
-        const from = nextAssets.find((a) => a.id === r.fromAssetId);
-        const to = nextAssets.find((a) => a.id === r.toAssetId);
+      const nextAssetClasses = withGuaranteedPrimary(updated);
+      const nextTransferRules = s.transferRules.filter((r) => {
+        const from = nextAssetClasses.find((a) => a.id === r.fromAssetId);
+        const to = nextAssetClasses.find((a) => a.id === r.toAssetId);
         return from && to && from.currency === to.currency;
       });
+      return { ...s, assetClasses: nextAssetClasses, transferRules: nextTransferRules };
     });
   };
   const handleChangeAssetColor = (id: string, color: string) => {
-    setAssetClasses((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, color } : a)),
-    );
+    updateActiveScenario((s) => ({
+      ...s,
+      assetClasses: s.assetClasses.map((a) =>
+        a.id === id ? { ...a, color } : a,
+      ),
+    }));
   };
   const handleRemoveAssetClass = (id: string) => {
-    setAssetClasses((prev) => {
-      const removed = prev.find((a) => a.id === id);
-      const rest = prev.filter((a) => a.id !== id);
+    updateActiveScenario((s) => {
+      const removed = s.assetClasses.find((a) => a.id === id);
+      let rest = s.assetClasses.filter((a) => a.id !== id);
       if (removed?.isPrimary) {
         const nextPrimary = rest.find((a) => a.currency === "KRW");
         if (nextPrimary) {
-          return rest.map((a) =>
+          rest = rest.map((a) =>
             a.id === nextPrimary.id ? { ...a, isPrimary: true } : a,
           );
         }
       }
-      return rest;
+      return {
+        ...s,
+        assetClasses: rest,
+        transferRules: s.transferRules.filter(
+          (r) => r.fromAssetId !== id && r.toAssetId !== id,
+        ),
+        goal: goalReferences(s.goal, "asset", id) ? null : s.goal,
+      };
     });
-    setTransferRules((prev) =>
-      prev.filter((r) => r.fromAssetId !== id && r.toAssetId !== id),
-    );
-    setGoal((prev) => (goalReferences(prev, "asset", id) ? null : prev));
   };
   const handleSetPrimaryAsset = (id: string) => {
-    setAssetClasses((prev) =>
-      prev.map((a) => ({ ...a, isPrimary: a.id === id })),
-    );
+    updateActiveScenario((s) => ({
+      ...s,
+      assetClasses: s.assetClasses.map((a) => ({
+        ...a,
+        isPrimary: a.id === id,
+      })),
+    }));
   };
 
   const handleAddIncome = (input: NewIncomeItemInput) => {
-    setIncomes((prev) => [...prev, { id: newId(), ...input }]);
+    updateActiveScenario((s) => ({
+      ...s,
+      incomes: [...s.incomes, { id: newId(), ...input }],
+    }));
   };
   const handleUpdateIncome = (id: string, input: NewIncomeItemInput) => {
-    setIncomes((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, ...input } : i)),
-    );
+    updateActiveScenario((s) => ({
+      ...s,
+      incomes: s.incomes.map((i) => (i.id === id ? { ...i, ...input } : i)),
+    }));
   };
   const handleRemoveIncome = (id: string) => {
-    setIncomes((prev) => prev.filter((i) => i.id !== id));
+    updateActiveScenario((s) => ({
+      ...s,
+      incomes: s.incomes.filter((i) => i.id !== id),
+    }));
   };
 
   const handleAddExpense = (input: NewExpenseItemInput) => {
-    setExpenses((prev) => [...prev, { id: newId(), ...input }]);
+    updateActiveScenario((s) => ({
+      ...s,
+      expenses: [...s.expenses, { id: newId(), ...input }],
+    }));
   };
   const handleUpdateExpense = (id: string, input: NewExpenseItemInput) => {
-    setExpenses((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, ...input } : e)),
-    );
+    updateActiveScenario((s) => ({
+      ...s,
+      expenses: s.expenses.map((e) => (e.id === id ? { ...e, ...input } : e)),
+    }));
   };
   const handleRemoveExpense = (id: string) => {
-    setExpenses((prev) => prev.filter((e) => e.id !== id));
+    updateActiveScenario((s) => ({
+      ...s,
+      expenses: s.expenses.filter((e) => e.id !== id),
+    }));
   };
 
   const handleAddTransferRule = (input: NewTransferRuleInput) => {
-    setTransferRules((prev) => [...prev, { id: newId(), ...input }]);
+    updateActiveScenario((s) => ({
+      ...s,
+      transferRules: [...s.transferRules, { id: newId(), ...input }],
+    }));
   };
   const handleUpdateTransferRule = (
     id: string,
     input: NewTransferRuleInput,
   ) => {
-    setTransferRules((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, ...input } : r)),
-    );
+    updateActiveScenario((s) => ({
+      ...s,
+      transferRules: s.transferRules.map((r) =>
+        r.id === id ? { ...r, ...input } : r,
+      ),
+    }));
   };
   const handleRemoveTransferRule = (id: string) => {
-    setTransferRules((prev) => prev.filter((r) => r.id !== id));
+    updateActiveScenario((s) => ({
+      ...s,
+      transferRules: s.transferRules.filter((r) => r.id !== id),
+    }));
   };
+
+  const handleSetGoal = (goal: Goal | null) => {
+    updateActiveScenario((s) => ({ ...s, goal }));
+  };
+
+  const activeScenario =
+    scenarios.find((s) => s.id === activeScenarioId) ?? scenarios[0];
 
   const simulationInput = useMemo<SimulationInput>(
     () => ({
-      groups,
-      assetClasses,
-      incomes,
-      expenses,
-      transferRules,
-      exchangeRate,
+      groups: activeScenario.groups,
+      assetClasses: activeScenario.assetClasses,
+      incomes: activeScenario.incomes,
+      expenses: activeScenario.expenses,
+      transferRules: activeScenario.transferRules,
+      exchangeRate: activeScenario.exchangeRate,
     }),
-    [groups, assetClasses, incomes, expenses, transferRules, exchangeRate],
+    [activeScenario],
   );
 
   const snapshots = useSimulation(simulationInput, today, horizonMonths);
   const selectedSnapshot = snapshots[selectedMonth];
-  const primaryAsset = assetClasses.find((a) => a.isPrimary);
-  const assetGroups = groups.filter((g) =>
-    assetClasses.some((a) => a.groupId === g.id),
+  const primaryAsset = activeScenario.assetClasses.find((a) => a.isPrimary);
+  const assetGroups = activeScenario.groups.filter((g) =>
+    activeScenario.assetClasses.some((a) => a.groupId === g.id),
   );
 
   return (
@@ -248,15 +400,36 @@ export default function AssetSimulator() {
               <input
                 type="number"
                 min={1}
-                value={exchangeRate}
+                value={activeScenario.exchangeRate}
                 onChange={(e) =>
-                  setExchangeRate(Math.max(1, Number(e.target.value) || 1))
+                  updateActiveScenario((s) => ({
+                    ...s,
+                    exchangeRate: Math.max(1, Number(e.target.value) || 1),
+                  }))
                 }
                 className="w-24 rounded-full border border-white/60 bg-white/80 px-2 py-1 text-sm"
               />
             </label>
           </div>
         </div>
+
+        <ScenarioTabs
+          scenarios={scenarios}
+          activeScenarioId={activeScenarioId}
+          onSelect={handleSelectScenario}
+          onRename={handleRenameScenario}
+          onDelete={handleDeleteScenario}
+          onDuplicate={handleDuplicateScenario}
+          onCreate={handleCreateScenario}
+        />
+
+        <ScenarioComparisonChart
+          scenarios={scenarios}
+          today={today}
+          horizonMonths={horizonMonths}
+          selectedMonth={selectedMonth}
+        />
+
         <div className="mb-4 grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
             <p className="text-sm text-gray-500">현재 자산</p>
@@ -265,9 +438,9 @@ export default function AssetSimulator() {
             </p>
           </div>
           <GoalCard
-            goal={goal}
-            onSetGoal={setGoal}
-            assetClasses={assetClasses}
+            goal={activeScenario.goal}
+            onSetGoal={handleSetGoal}
+            assetClasses={activeScenario.assetClasses}
             groups={assetGroups}
             simulationInput={simulationInput}
             today={today}
@@ -277,25 +450,25 @@ export default function AssetSimulator() {
 
         <div className="grid gap-4 md:grid-cols-[360px_1fr_320px]">
           <InputPanel
-            groups={groups}
+            groups={activeScenario.groups}
             onAddGroup={handleAddGroup}
             onUpdateGroup={handleUpdateGroup}
             onRemoveGroup={handleRemoveGroup}
-            assetClasses={assetClasses}
+            assetClasses={activeScenario.assetClasses}
             onAddAssetClass={handleAddAssetClass}
             onUpdateAssetClass={handleUpdateAssetClass}
             onRemoveAssetClass={handleRemoveAssetClass}
             onSetPrimaryAsset={handleSetPrimaryAsset}
             onChangeAssetColor={handleChangeAssetColor}
-            incomes={incomes}
+            incomes={activeScenario.incomes}
             onAddIncome={handleAddIncome}
             onUpdateIncome={handleUpdateIncome}
             onRemoveIncome={handleRemoveIncome}
-            expenses={expenses}
+            expenses={activeScenario.expenses}
             onAddExpense={handleAddExpense}
             onUpdateExpense={handleUpdateExpense}
             onRemoveExpense={handleRemoveExpense}
-            transferRules={transferRules}
+            transferRules={activeScenario.transferRules}
             onAddTransferRule={handleAddTransferRule}
             onUpdateTransferRule={handleUpdateTransferRule}
             onRemoveTransferRule={handleRemoveTransferRule}
@@ -307,25 +480,25 @@ export default function AssetSimulator() {
               <AssetAreaChart
                 snapshots={snapshots}
                 groups={assetGroups}
-                assetClasses={assetClasses}
+                assetClasses={activeScenario.assetClasses}
                 selectedMonth={selectedMonth}
               />
               <ComparisonBarChart
                 snapshots={snapshots}
                 groups={assetGroups}
-                assetClasses={assetClasses}
+                assetClasses={activeScenario.assetClasses}
                 selectedMonth={selectedMonth}
               />
               <GroupDonutChart
                 groups={assetGroups}
-                assetClasses={assetClasses}
+                assetClasses={activeScenario.assetClasses}
                 snapshot={selectedSnapshot}
               />
               <FlowDiagram
                 snapshot={selectedSnapshot}
                 primaryAsset={primaryAsset}
-                assetClasses={assetClasses}
-                exchangeRate={exchangeRate}
+                assetClasses={activeScenario.assetClasses}
+                exchangeRate={activeScenario.exchangeRate}
               />
               <CashFlowChart snapshots={snapshots} selectedMonth={selectedMonth} />
             </div>
@@ -338,9 +511,9 @@ export default function AssetSimulator() {
           </div>
           <HistoryPanel
             snapshots={snapshots}
-            incomes={incomes}
-            expenses={expenses}
-            assetClasses={assetClasses}
+            incomes={activeScenario.incomes}
+            expenses={activeScenario.expenses}
+            assetClasses={activeScenario.assetClasses}
             today={today}
             selectedMonth={selectedMonth}
           />
