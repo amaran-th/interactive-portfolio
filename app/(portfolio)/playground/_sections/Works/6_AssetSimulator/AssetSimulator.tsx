@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AssetClass,
   DEFAULT_HORIZON_YEARS,
@@ -10,12 +10,15 @@ import {
   NewExpenseItemInput,
   NewIncomeItemInput,
   NewTransferRuleInput,
+  RepeatSchedule,
   Scenario,
   SimulationInput,
+  addMonths,
   formatKRW,
   newId,
   nextAssetColor,
   nextGroupColor,
+  toMonthInputValue,
 } from "./types";
 import { useSimulation } from "./useSimulation";
 import InputPanel from "./InputPanel";
@@ -59,6 +62,56 @@ function emptyScenario(name: string): Scenario {
     assetClasses: [],
     incomes: [],
     expenses: [],
+    transferRules: [],
+    exchangeRate: 1350,
+    goal: null,
+  };
+}
+
+// 첫 로드 시 온보딩용으로 예시 데이터를 채운 시나리오. 사용자의 실제 수정이
+// 아니므로 dirty 플래그와 무관하게, 어떤 핸들러도 거치지 않고 초기 state로
+// 직접 넣는다.
+function seedScenario(name: string, today: Date): Scenario {
+  const assetId = newId();
+  const monthlyRecurring = (startDate: string): RepeatSchedule => ({
+    mode: "recurring",
+    startDate,
+    frequency: "monthly",
+    until: { type: "indefinite" },
+  });
+  const nextMonth = toMonthInputValue(addMonths(today, 1));
+
+  return {
+    id: newId(),
+    name,
+    groups: [],
+    assetClasses: [
+      {
+        id: assetId,
+        name: "현금",
+        currency: "KRW",
+        initialBalance: 10_000_000,
+        annualReturnRate: 0,
+        isPrimary: true,
+        color: nextAssetColor(0),
+      },
+    ],
+    incomes: [
+      {
+        id: newId(),
+        name: "월급",
+        amount: 3_000_000,
+        schedule: monthlyRecurring(nextMonth),
+      },
+    ],
+    expenses: [
+      {
+        id: newId(),
+        name: "생활비",
+        amount: 1_000_000,
+        schedule: monthlyRecurring(nextMonth),
+      },
+    ],
     transferRules: [],
     exchangeRate: 1350,
     goal: null,
@@ -129,15 +182,26 @@ export default function AssetSimulator() {
   const today = useMemo(() => new Date(), []);
 
   const [scenarios, setScenarios] = useState<Scenario[]>(() => [
-    emptyScenario("시나리오 1"),
+    seedScenario("시나리오 1", today),
   ]);
   const [activeScenarioId, setActiveScenarioId] = useState(
     () => scenarios[0].id,
   );
   const [selectedMonth, setSelectedMonth] = useState(0);
   const [horizonYears, setHorizonYears] = useState(DEFAULT_HORIZON_YEARS);
+  const [isDirty, setIsDirty] = useState(false);
 
   const horizonMonths = horizonYears * 12;
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
 
   const handleChangeHorizon = (years: number) => {
     setHorizonYears(years);
@@ -147,6 +211,7 @@ export default function AssetSimulator() {
   const updateActiveScenario = (
     updater: (scenario: Scenario) => Scenario,
   ) => {
+    setIsDirty(true);
     setScenarios((prev) =>
       prev.map((s) => (s.id === activeScenarioId ? updater(s) : s)),
     );
@@ -155,11 +220,13 @@ export default function AssetSimulator() {
   const handleSelectScenario = (id: string) => setActiveScenarioId(id);
 
   const handleRenameScenario = (id: string, name: string) => {
+    setIsDirty(true);
     setScenarios((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
   };
 
   const handleDeleteScenario = (id: string) => {
     if (scenarios.length <= 1) return;
+    setIsDirty(true);
     const rest = scenarios.filter((s) => s.id !== id);
     setScenarios(rest);
     if (activeScenarioId === id) {
@@ -170,12 +237,14 @@ export default function AssetSimulator() {
   const handleDuplicateScenario = (id: string) => {
     const source = scenarios.find((s) => s.id === id);
     if (!source) return;
+    setIsDirty(true);
     const clone = duplicateScenario(source);
     setScenarios((prev) => [...prev, clone]);
     setActiveScenarioId(clone.id);
   };
 
   const handleCreateScenario = () => {
+    setIsDirty(true);
     const existingNames = new Set(scenarios.map((s) => s.name));
     let n = scenarios.length + 1;
     while (existingNames.has(`시나리오 ${n}`)) n++;
@@ -432,7 +501,7 @@ export default function AssetSimulator() {
 
         <div className="mb-4 grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-            <p className="text-sm text-gray-500">현재 자산</p>
+            <p className="text-sm text-gray-500">💰 현재 자산</p>
             <p className="mt-1 text-2xl font-bold text-gray-800">
               {formatKRW(snapshots[0]?.totalBalance ?? 0)}
             </p>
@@ -448,7 +517,7 @@ export default function AssetSimulator() {
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-[360px_1fr_320px]">
+        <div className="grid gap-4 md:grid-cols-[640px_1fr_320px]">
           <InputPanel
             key={activeScenarioId}
             groups={activeScenario.groups}
