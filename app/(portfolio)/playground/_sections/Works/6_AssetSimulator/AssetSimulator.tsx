@@ -517,7 +517,7 @@ export default function AssetSimulator() {
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-[640px_1fr_320px]">
+        <div className="grid gap-4 md:grid-cols-[minmax(240px,640px)_minmax(180px,1fr)_minmax(180px,320px)]">
           <InputPanel
             key={activeScenarioId}
             groups={activeScenario.groups}
@@ -546,7 +546,7 @@ export default function AssetSimulator() {
             horizonMonths={horizonMonths}
           />
           <div className="flex flex-col gap-4">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
               <AssetAreaChart
                 snapshots={snapshots}
                 groups={assetGroups}
