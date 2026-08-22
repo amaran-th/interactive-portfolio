@@ -45,7 +45,7 @@ type InputPanelProps = {
 
 export default function InputPanel(props: InputPanelProps) {
   return (
-    <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
+    <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))]">
       <GroupAssetSection
         groups={props.groups}
         onAddGroup={props.onAddGroup}

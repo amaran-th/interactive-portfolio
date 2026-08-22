@@ -444,7 +444,7 @@ export default function AssetSimulator() {
 
   return (
     <div className="h-full w-full overflow-y-auto bg-gradient-to-br from-indigo-100 via-blue-50 to-purple-100 p-4 text-gray-800">
-      <div className="mx-auto max-w-[1600px]">
+      <div className="mx-auto max-w-[1600px] @container">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold text-gray-800">자산 시뮬레이터</h2>
           <div className="flex flex-wrap items-center gap-3">
@@ -517,7 +517,7 @@ export default function AssetSimulator() {
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-[minmax(240px,640px)_minmax(180px,1fr)_minmax(180px,320px)]">
+        <div className="grid gap-4 @min-[650px]:grid-cols-[minmax(240px,640px)_minmax(180px,1fr)_minmax(180px,320px)]">
           <InputPanel
             key={activeScenarioId}
             groups={activeScenario.groups}
@@ -546,7 +546,7 @@ export default function AssetSimulator() {
             horizonMonths={horizonMonths}
           />
           <div className="flex flex-col gap-4">
-            <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
+            <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))]">
               <AssetAreaChart
                 snapshots={snapshots}
                 groups={assetGroups}
