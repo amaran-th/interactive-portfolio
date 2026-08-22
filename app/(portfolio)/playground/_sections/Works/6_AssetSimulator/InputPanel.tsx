@@ -45,7 +45,7 @@ type InputPanelProps = {
 
 export default function InputPanel(props: InputPanelProps) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="grid gap-4 md:grid-cols-2">
       <GroupAssetSection
         groups={props.groups}
         onAddGroup={props.onAddGroup}
