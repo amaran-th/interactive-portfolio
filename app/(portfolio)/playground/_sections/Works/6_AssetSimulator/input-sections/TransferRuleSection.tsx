@@ -96,7 +96,7 @@ export default function TransferRuleSection({
 
   const handleSubmit = () => {
     if (!effectiveFrom || !effectiveTo || effectiveFrom === effectiveTo) {
-      setError("이체할 수 있는 같은 통화의 자산군이 2개 이상 필요합니다.");
+      setError("이체할 수 있는 같은 통화의 자산이 2개 이상 필요합니다.");
       return;
     }
     if (!amount || Number(amount) === 0) {
@@ -133,7 +133,7 @@ export default function TransferRuleSection({
 
   return (
     <div className="rounded-2xl border border-amber-200 bg-white/70 p-4 backdrop-blur">
-      <h3 className="text-sm font-semibold text-amber-700">이체 규칙</h3>
+      <h3 className="text-sm font-semibold text-amber-700">🔁 이체 규칙</h3>
       <ul className="mt-2 flex flex-col gap-2">
         {transferRules.map((rule) => (
           <li
@@ -186,7 +186,7 @@ export default function TransferRuleSection({
             disabled={sameCurrencyAssets.length === 0}
           >
             {sameCurrencyAssets.length === 0 && (
-              <option value="">같은 통화 자산군이 없습니다</option>
+              <option value="">같은 통화 자산이 없습니다</option>
             )}
             {sameCurrencyAssets.map((asset) => (
               <option key={asset.id} value={asset.id}>
@@ -222,7 +222,7 @@ export default function TransferRuleSection({
             disabled={sameCurrencyAssets.length === 0}
             className="self-start rounded-full bg-amber-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {editingId ? "저장" : "이체 규칙 추가"}
+            {editingId ? "저장" : "➕ 이체 규칙 추가"}
           </button>
           {editingId && (
             <button

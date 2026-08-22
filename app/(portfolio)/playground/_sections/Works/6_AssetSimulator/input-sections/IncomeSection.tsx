@@ -123,7 +123,7 @@ export default function IncomeSection({
 
   return (
     <div className="rounded-2xl border border-emerald-200 bg-white/70 p-4 backdrop-blur">
-      <h3 className="text-sm font-semibold text-emerald-700">수입</h3>
+      <h3 className="text-sm font-semibold text-emerald-700">💵 수입</h3>
       <ul className="mt-2 flex flex-col gap-2">
         {incomes.map((item) => {
           const group = groups.find((g) => g.id === item.groupId);
@@ -191,7 +191,7 @@ export default function IncomeSection({
             onClick={handleSubmit}
             className="self-start rounded-full bg-emerald-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-600"
           >
-            {editingId ? "저장" : "추가"}
+            {editingId ? "저장" : "➕ 추가"}
           </button>
           {editingId && (
             <button
