@@ -90,7 +90,7 @@ function seedScenario(name: string, today: Date): Scenario {
         id: assetId,
         name: "현금",
         currency: "KRW",
-        initialBalance: 10_000_000,
+        initialBalance: 1_000_000,
         annualReturnRate: 0,
         isPrimary: true,
         color: nextAssetColor(0),
@@ -100,7 +100,7 @@ function seedScenario(name: string, today: Date): Scenario {
       {
         id: newId(),
         name: "월급",
-        amount: 3_000_000,
+        amount: 2_200_000,
         schedule: monthlyRecurring(nextMonth),
       },
     ],
@@ -108,7 +108,7 @@ function seedScenario(name: string, today: Date): Scenario {
       {
         id: newId(),
         name: "생활비",
-        amount: 1_000_000,
+        amount: 700_000,
         schedule: monthlyRecurring(nextMonth),
       },
     ],
