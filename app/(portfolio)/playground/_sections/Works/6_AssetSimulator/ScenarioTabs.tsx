@@ -112,7 +112,7 @@ export default function ScenarioTabs({
         onClick={() => onDuplicate(activeScenarioId)}
         className="rounded-full bg-white/80 px-3 py-1 text-xs text-gray-600 hover:bg-white"
       >
-        현재 탭 복제
+        📋 현재 탭 복제
       </button>
       <button
         type="button"
