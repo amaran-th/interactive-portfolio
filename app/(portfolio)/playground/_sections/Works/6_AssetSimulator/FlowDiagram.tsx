@@ -52,7 +52,7 @@ export default function FlowDiagram({
   if (!primaryAsset) {
     return (
       <div className="flex h-[220px] items-center justify-center rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
-        기본 계좌를 지정하면 흐름도가 나타납니다
+        📭 기본 계좌를 지정하면 흐름도가 나타납니다
       </div>
     );
   }
@@ -99,7 +99,8 @@ export default function FlowDiagram({
 
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
+      <p className="text-sm text-gray-500">🌊 자금 흐름</p>
+      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="mt-2 w-full">
         {snapshot.flow.incomeIn > 0 && (
           <line
             x1={140}

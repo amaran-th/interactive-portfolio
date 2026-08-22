@@ -33,7 +33,7 @@ export default function AssetAreaChart({
   if (assetClasses.length === 0 || snapshots.length === 0) {
     return (
       <div className="flex h-[260px] items-center justify-center rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
-        자산군을 추가하면 그래프가 나타납니다
+        📭 자산을 추가하면 그래프가 나타납니다
       </div>
     );
   }
@@ -93,7 +93,7 @@ export default function AssetAreaChart({
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <p className="text-sm text-gray-500">
-        총자산{" "}
+        📈 총자산{" "}
         <span className="text-lg font-semibold text-gray-800">
           {formatKRW(totalBalance)}
         </span>
