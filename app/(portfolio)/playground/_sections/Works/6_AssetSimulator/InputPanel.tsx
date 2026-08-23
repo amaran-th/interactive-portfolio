@@ -3,21 +3,26 @@
 import {
   AssetClass,
   ExpenseItem,
+  Goal,
   Group,
   IncomeItem,
+  MonthSnapshot,
   NewAssetClassInput,
   NewExpenseItemInput,
   NewIncomeItemInput,
   NewTransferRuleInput,
+  SimulationInput,
   TransferRule,
 } from "./types";
 import GroupAssetSection from "./input-sections/GroupAssetSection";
 import IncomeSection from "./input-sections/IncomeSection";
 import ExpenseSection from "./input-sections/ExpenseSection";
 import TransferRuleSection from "./input-sections/TransferRuleSection";
+import GoalCard from "./GoalCard";
 
 type InputPanelProps = {
   groups: Group[];
+  assetGroups: Group[];
   onAddGroup: (name: string) => string;
   onUpdateGroup: (id: string, input: { name: string; color: string }) => void;
   onRemoveGroup: (id: string) => void;
@@ -41,6 +46,10 @@ type InputPanelProps = {
   onRemoveTransferRule: (id: string) => void;
   today: Date;
   horizonMonths: number;
+  goal: Goal | null;
+  onSetGoal: (goal: Goal | null) => void;
+  simulationInput: SimulationInput;
+  selectedSnapshot: MonthSnapshot;
 };
 
 export default function InputPanel(props: InputPanelProps) {
@@ -90,6 +99,15 @@ export default function InputPanel(props: InputPanelProps) {
         onRemoveTransferRule={props.onRemoveTransferRule}
         today={props.today}
         horizonMonths={props.horizonMonths}
+      />
+      <GoalCard
+        goal={props.goal}
+        onSetGoal={props.onSetGoal}
+        assetClasses={props.assetClasses}
+        groups={props.assetGroups}
+        simulationInput={props.simulationInput}
+        today={props.today}
+        selectedSnapshot={props.selectedSnapshot}
       />
     </div>
   );
