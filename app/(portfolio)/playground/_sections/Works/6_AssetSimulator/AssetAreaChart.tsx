@@ -1,17 +1,23 @@
 "use client";
 
 import { AssetClass, Group, MonthSnapshot, formatKRW } from "./types";
+import TimelineSlider from "./TimelineSlider";
 
 type AssetAreaChartProps = {
   snapshots: MonthSnapshot[];
   groups: Group[];
   assetClasses: AssetClass[];
   selectedMonth: number;
+  onChangeMonth: (month: number) => void;
+  today: Date;
+  horizonMonths: number;
 };
 
 const WIDTH = 600;
 const HEIGHT = 220;
 const PADDING = 12;
+const BELOW_ZERO_CLIP_ID = "asset-area-below-zero-clip";
+const DEFICIT_COLOR = "#f43f5e";
 
 function orderedAssets(
   assetClasses: AssetClass[],
@@ -29,6 +35,9 @@ export default function AssetAreaChart({
   groups,
   assetClasses,
   selectedMonth,
+  onChangeMonth,
+  today,
+  horizonMonths,
 }: AssetAreaChartProps) {
   if (assetClasses.length === 0 || snapshots.length === 0) {
     return (
@@ -41,18 +50,18 @@ export default function AssetAreaChart({
   const assets = orderedAssets(assetClasses, groups);
   const maxTotal = Math.max(1, ...snapshots.map((s) => s.totalBalance));
   const stepX = (WIDTH - PADDING * 2) / (snapshots.length - 1);
-  const scaleY = (value: number) =>
-    HEIGHT - PADDING - (value / maxTotal) * (HEIGHT - PADDING * 2);
 
-  const { bands } = assets.reduce<{
+  const { bands: rawBands, minValue } = assets.reduce<{
     prevTop: number[];
     bands: {
       id: string;
       name: string;
       fill: string;
       stroke: string | undefined;
-      points: string;
+      bottom: number[];
+      top: number[];
     }[];
+    minValue: number;
   }>(
     (acc, asset) => {
       const bottom = acc.prevTop;
@@ -60,18 +69,11 @@ export default function AssetAreaChart({
         (snapshot, i) =>
           bottom[i] + (snapshot.assetBalancesKRW[asset.id] ?? 0),
       );
-
-      const topPoints = top.map(
-        (value, i) => `${PADDING + i * stepX},${scaleY(value)}`,
-      );
-      const bottomPoints = bottom
-        .map((value, i) => `${PADDING + i * stepX},${scaleY(value)}`)
-        .reverse();
-
       const group = groups.find((g) => g.id === asset.groupId);
 
       return {
         prevTop: top,
+        minValue: Math.min(acc.minValue, ...bottom, ...top),
         bands: [
           ...acc.bands,
           {
@@ -79,16 +81,44 @@ export default function AssetAreaChart({
             name: asset.name,
             fill: asset.color,
             stroke: group?.color,
-            points: [...topPoints, ...bottomPoints].join(" "),
+            bottom,
+            top,
           },
         ],
       };
     },
-    { prevTop: snapshots.map(() => 0), bands: [] },
+    { prevTop: snapshots.map(() => 0), bands: [], minValue: 0 },
   );
+
+  const domainMin = Math.min(0, minValue);
+  const domainMax = Math.max(1, maxTotal);
+  const domainRange = domainMax - domainMin || 1;
+  const scaleY = (value: number) =>
+    HEIGHT -
+    PADDING -
+    ((value - domainMin) / domainRange) * (HEIGHT - PADDING * 2);
+  const zeroY = scaleY(0);
+
+  const bands = rawBands.map((band) => {
+    const topPoints = band.top.map(
+      (value, i) => `${PADDING + i * stepX},${scaleY(value)}`,
+    );
+    const bottomPoints = band.bottom
+      .map((value, i) => `${PADDING + i * stepX},${scaleY(value)}`)
+      .reverse();
+    return {
+      id: band.id,
+      name: band.name,
+      fill: band.fill,
+      stroke: band.stroke,
+      points: [...topPoints, ...bottomPoints].join(" "),
+    };
+  });
 
   const cursorX = PADDING + selectedMonth * stepX;
   const totalBalance = snapshots[selectedMonth]?.totalBalance ?? 0;
+  const currentTotal = snapshots[0]?.totalBalance ?? 0;
+  const currentY = scaleY(currentTotal);
 
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
@@ -99,18 +129,46 @@ export default function AssetAreaChart({
         </span>
       </p>
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="mt-2 w-full">
+        <defs>
+          <clipPath id={BELOW_ZERO_CLIP_ID} clipPathUnits="userSpaceOnUse">
+            <rect
+              x={0}
+              y={zeroY}
+              width={WIDTH}
+              height={Math.max(0, HEIGHT - zeroY)}
+            />
+          </clipPath>
+        </defs>
         {bands.map((band) => (
-          <polygon
-            key={band.id}
-            points={band.points}
-            fill={band.fill}
-            fillOpacity={0.55}
-            stroke={band.stroke}
-            strokeWidth={band.stroke ? 2 : 0}
-          >
-            <title>{band.name}</title>
-          </polygon>
+          <g key={band.id}>
+            <polygon
+              points={band.points}
+              fill={band.fill}
+              fillOpacity={0.55}
+              stroke={band.stroke}
+              strokeWidth={band.stroke ? 2 : 0}
+            >
+              <title>{band.name}</title>
+            </polygon>
+            <polygon
+              points={band.points}
+              fill={DEFICIT_COLOR}
+              fillOpacity={0.55}
+              clipPath={`url(#${BELOW_ZERO_CLIP_ID})`}
+            />
+          </g>
         ))}
+        {domainMin < 0 && (
+          <line
+            x1={PADDING}
+            y1={zeroY}
+            x2={WIDTH - PADDING}
+            y2={zeroY}
+            stroke="#9ca3af"
+            strokeWidth={1}
+            strokeDasharray="2 2"
+          />
+        )}
         <line
           x1={cursorX}
           y1={PADDING}
@@ -120,6 +178,21 @@ export default function AssetAreaChart({
           strokeWidth={1.5}
           strokeDasharray="4 4"
         />
+        <circle
+          cx={PADDING}
+          cy={currentY}
+          r={4}
+          fill="#4338ca"
+          stroke="white"
+          strokeWidth={1.5}
+        />
+        <text
+          x={PADDING + 8}
+          y={Math.max(10, currentY - 6)}
+          className="fill-gray-700 text-[10px] font-medium"
+        >
+          현재 {formatKRW(currentTotal)}
+        </text>
       </svg>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
         {assets.map((asset) => (
@@ -131,6 +204,14 @@ export default function AssetAreaChart({
             {asset.name}
           </span>
         ))}
+      </div>
+      <div className="mt-3 border-t border-white/60 pt-3">
+        <TimelineSlider
+          selectedMonth={selectedMonth}
+          onChange={onChangeMonth}
+          today={today}
+          horizonMonths={horizonMonths}
+        />
       </div>
     </div>
   );

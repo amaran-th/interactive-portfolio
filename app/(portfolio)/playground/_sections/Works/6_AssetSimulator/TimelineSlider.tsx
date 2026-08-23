@@ -25,7 +25,7 @@ export default function TimelineSlider({
   horizonMonths,
 }: TimelineSliderProps) {
   return (
-    <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
+    <div>
       <span className="text-sm text-gray-500">
         {selectedMonth === 0
           ? "지금"
