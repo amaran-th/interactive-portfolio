@@ -11,6 +11,13 @@ type FlowDiagramProps = {
 
 const WIDTH = 600;
 const HEIGHT = 220;
+const NODE_WIDTH = 140;
+const NODE_HEIGHT = 44;
+const CENTER_Y = (HEIGHT - NODE_HEIGHT) / 2;
+const DEFICIT_COLOR = "#e11d48";
+const PRIMARY_COLOR = "#4338ca";
+const INCOME_COLOR = "#6366f1";
+const OUTFLOW_COLOR = "#a855f7";
 
 function NodeBox({
   x,
@@ -27,16 +34,27 @@ function NodeBox({
 }) {
   return (
     <g transform={`translate(${x}, ${y})`}>
-      <rect width={140} height={44} rx={12} fill={color} fillOpacity={0.85} />
+      <rect
+        width={NODE_WIDTH}
+        height={NODE_HEIGHT}
+        rx={12}
+        fill={color}
+        fillOpacity={0.85}
+      />
       <text
-        x={70}
+        x={NODE_WIDTH / 2}
         y={18}
         textAnchor="middle"
         className="fill-white text-[11px] font-medium"
       >
         {label}
       </text>
-      <text x={70} y={34} textAnchor="middle" className="fill-white text-[11px]">
+      <text
+        x={NODE_WIDTH / 2}
+        y={34}
+        textAnchor="middle"
+        className="fill-white text-[11px]"
+      >
         {Math.round(amount).toLocaleString()}원
       </text>
     </g>
@@ -59,9 +77,9 @@ export default function FlowDiagram({
 
   const destinationTotals = new Map<string, number>();
   for (const transfer of snapshot.flow.transfers) {
-    const fromAsset = assetClasses.find((a) => a.id === transfer.fromAssetId);
+    if (transfer.fromAssetId !== primaryAsset.id) continue;
     const amountKRW =
-      fromAsset?.currency === "USD"
+      primaryAsset.currency === "USD"
         ? transfer.amount * exchangeRate
         : transfer.amount;
     destinationTotals.set(
@@ -92,8 +110,12 @@ export default function FlowDiagram({
   );
   const strokeWidth = (amount: number) => 1 + (amount / maxAmount) * 10;
 
-  const incomeY = 20;
-  const primaryY = 88;
+  const primaryBalance = snapshot.assetBalances[primaryAsset.id] ?? 0;
+  const primaryColor = primaryBalance < 0 ? DEFICIT_COLOR : PRIMARY_COLOR;
+
+  const incomeX = 0;
+  const primaryX = 230;
+  const rightX = 460;
   const rightGap =
     rightEntries.length > 0 ? HEIGHT / (rightEntries.length + 1) : HEIGHT / 2;
 
@@ -101,54 +123,80 @@ export default function FlowDiagram({
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <p className="text-sm text-gray-500">🌊 자금 흐름</p>
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="mt-2 w-full">
+        <defs>
+          <marker
+            id="flow-arrow-income"
+            viewBox="0 0 10 10"
+            refX="9"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 z" fill={INCOME_COLOR} />
+          </marker>
+          <marker
+            id="flow-arrow-out"
+            viewBox="0 0 10 10"
+            refX="9"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 z" fill={OUTFLOW_COLOR} />
+          </marker>
+        </defs>
         {snapshot.flow.incomeIn > 0 && (
           <line
-            x1={140}
-            y1={incomeY + 22}
-            x2={230}
-            y2={primaryY + 22}
-            stroke="#6366f1"
+            x1={incomeX + NODE_WIDTH}
+            y1={CENTER_Y + NODE_HEIGHT / 2}
+            x2={primaryX - 6}
+            y2={CENTER_Y + NODE_HEIGHT / 2}
+            stroke={INCOME_COLOR}
             strokeWidth={strokeWidth(snapshot.flow.incomeIn)}
             strokeOpacity={0.5}
+            markerEnd="url(#flow-arrow-income)"
           />
         )}
         {rightEntries.map((entry, i) => (
           <line
             key={entry.id}
-            x1={370}
-            y1={primaryY + 22}
-            x2={460}
-            y2={rightGap * (i + 1) + 22}
-            stroke="#a855f7"
+            x1={primaryX + NODE_WIDTH}
+            y1={CENTER_Y + NODE_HEIGHT / 2}
+            x2={rightX - 6}
+            y2={rightGap * (i + 1) + NODE_HEIGHT / 2}
+            stroke={OUTFLOW_COLOR}
             strokeWidth={strokeWidth(entry.amount)}
             strokeOpacity={0.5}
+            markerEnd="url(#flow-arrow-out)"
           />
         ))}
 
         {snapshot.flow.incomeIn > 0 && (
           <NodeBox
-            x={0}
-            y={incomeY}
+            x={incomeX}
+            y={CENTER_Y}
             label="수입"
             amount={snapshot.flow.incomeIn}
-            color="#6366f1"
+            color={INCOME_COLOR}
           />
         )}
         <NodeBox
-          x={230}
-          y={primaryY}
+          x={primaryX}
+          y={CENTER_Y}
           label={primaryAsset.name}
-          amount={snapshot.assetBalances[primaryAsset.id] ?? 0}
-          color="#4338ca"
+          amount={primaryBalance}
+          color={primaryColor}
         />
         {rightEntries.map((entry, i) => (
           <NodeBox
             key={entry.id}
-            x={460}
+            x={rightX}
             y={rightGap * (i + 1)}
             label={entry.label}
             amount={entry.amount}
-            color="#a855f7"
+            color={OUTFLOW_COLOR}
           />
         ))}
       </svg>
