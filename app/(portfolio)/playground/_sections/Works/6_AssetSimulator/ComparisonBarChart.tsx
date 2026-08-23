@@ -20,6 +20,7 @@ const HEIGHT = 220;
 const BAR_WIDTH = 64;
 const BASE_Y = HEIGHT - 30;
 const MAX_BAR_HEIGHT = 160;
+const DEFICIT_COLOR = "#f43f5e";
 
 type Segment = {
   id: string;
@@ -73,7 +74,10 @@ export default function ComparisonBarChart({
       (acc, asset) => {
         const value = snapshot.assetBalancesKRW[asset.id] ?? 0;
         const height = (value / maxTotal) * MAX_BAR_HEIGHT;
-        const y = BASE_Y - acc.cursor - height;
+        const stackTop = BASE_Y - acc.cursor;
+        const isNegative = height < 0;
+        const rectY = isNegative ? stackTop : stackTop - height;
+        const rectHeight = Math.abs(height);
         const group = groups.find((g) => g.id === asset.groupId);
         return {
           cursor: acc.cursor + height,
@@ -82,10 +86,10 @@ export default function ComparisonBarChart({
             {
               id: asset.id,
               name: asset.name,
-              fill: asset.color,
+              fill: isNegative ? DEFICIT_COLOR : asset.color,
               stroke: group?.color,
-              y,
-              height,
+              y: rectY,
+              height: rectHeight,
             },
           ],
         };
@@ -104,6 +108,14 @@ export default function ComparisonBarChart({
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <p className="text-sm text-gray-500">📊 자산 비교</p>
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
+        <line
+          x1={0}
+          y1={BASE_Y}
+          x2={WIDTH}
+          y2={BASE_Y}
+          stroke="#e5e7eb"
+          strokeWidth={1}
+        />
         <text
           x={nowX + BAR_WIDTH / 2}
           y={16}
@@ -126,7 +138,7 @@ export default function ComparisonBarChart({
             x={nowX}
             y={seg.y}
             width={BAR_WIDTH}
-            height={Math.max(0, seg.height)}
+            height={seg.height}
             fill={seg.fill}
             fillOpacity={0.75}
             stroke={seg.stroke}
@@ -141,7 +153,7 @@ export default function ComparisonBarChart({
             x={futureX}
             y={seg.y}
             width={BAR_WIDTH}
-            height={Math.max(0, seg.height)}
+            height={seg.height}
             fill={seg.fill}
             fillOpacity={0.75}
             stroke={seg.stroke}
