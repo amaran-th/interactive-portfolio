@@ -14,7 +14,6 @@ import {
   Scenario,
   SimulationInput,
   addMonths,
-  formatKRW,
   newId,
   nextAssetColor,
   nextGroupColor,
@@ -22,12 +21,10 @@ import {
 } from "./types";
 import { useSimulation } from "./useSimulation";
 import InputPanel from "./InputPanel";
-import TimelineSlider from "./TimelineSlider";
 import AssetAreaChart from "./AssetAreaChart";
 import GroupDonutChart from "./GroupDonutChart";
 import FlowDiagram from "./FlowDiagram";
 import ComparisonBarChart from "./ComparisonBarChart";
-import GoalCard from "./GoalCard";
 import CashFlowChart from "./CashFlowChart";
 import HistoryPanel from "./HistoryPanel";
 import ScenarioTabs from "./ScenarioTabs";
@@ -499,28 +496,11 @@ export default function AssetSimulator() {
           selectedMonth={selectedMonth}
         />
 
-        <div className="mb-4 grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-            <p className="text-sm text-gray-500">💰 현재 자산</p>
-            <p className="mt-1 text-2xl font-bold text-gray-800">
-              {formatKRW(snapshots[0]?.totalBalance ?? 0)}
-            </p>
-          </div>
-          <GoalCard
-            goal={activeScenario.goal}
-            onSetGoal={handleSetGoal}
-            assetClasses={activeScenario.assetClasses}
-            groups={assetGroups}
-            simulationInput={simulationInput}
-            today={today}
-            selectedSnapshot={selectedSnapshot}
-          />
-        </div>
-
-        <div className="grid gap-4 @min-[650px]:grid-cols-[minmax(240px,640px)_minmax(180px,1fr)_minmax(180px,320px)]">
+        <div className="mb-4">
           <InputPanel
             key={activeScenarioId}
             groups={activeScenario.groups}
+            assetGroups={assetGroups}
             onAddGroup={handleAddGroup}
             onUpdateGroup={handleUpdateGroup}
             onRemoveGroup={handleRemoveGroup}
@@ -544,15 +524,25 @@ export default function AssetSimulator() {
             onRemoveTransferRule={handleRemoveTransferRule}
             today={today}
             horizonMonths={horizonMonths}
+            goal={activeScenario.goal}
+            onSetGoal={handleSetGoal}
+            simulationInput={simulationInput}
+            selectedSnapshot={selectedSnapshot}
           />
+        </div>
+
+        <div className="grid gap-4 @min-[650px]:grid-cols-[minmax(280px,1fr)_minmax(180px,320px)]">
           <div className="flex flex-col gap-4">
+            <AssetAreaChart
+              snapshots={snapshots}
+              groups={assetGroups}
+              assetClasses={activeScenario.assetClasses}
+              selectedMonth={selectedMonth}
+              onChangeMonth={setSelectedMonth}
+              today={today}
+              horizonMonths={horizonMonths}
+            />
             <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))]">
-              <AssetAreaChart
-                snapshots={snapshots}
-                groups={assetGroups}
-                assetClasses={activeScenario.assetClasses}
-                selectedMonth={selectedMonth}
-              />
               <ComparisonBarChart
                 snapshots={snapshots}
                 groups={assetGroups}
@@ -572,12 +562,6 @@ export default function AssetSimulator() {
               />
               <CashFlowChart snapshots={snapshots} selectedMonth={selectedMonth} />
             </div>
-            <TimelineSlider
-              selectedMonth={selectedMonth}
-              onChange={setSelectedMonth}
-              today={today}
-              horizonMonths={horizonMonths}
-            />
           </div>
           <HistoryPanel
             snapshots={snapshots}
