@@ -137,7 +137,14 @@ export default function ExpenseSection({
         </h3>
         <button
           type="button"
-          onClick={() => setShowForm((prev) => !prev)}
+          onClick={() => {
+            if (isFormVisible) {
+              resetForm();
+              setShowForm(false);
+            } else {
+              setShowForm(true);
+            }
+          }}
           className={`rounded-full p-1.5 ${
             isFormVisible
               ? "bg-rose-500 text-white"

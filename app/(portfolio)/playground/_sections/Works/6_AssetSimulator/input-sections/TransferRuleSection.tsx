@@ -1,7 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
 import { ArrowLeftRight, Plus, Settings } from "lucide-react";
+import { useRef, useState } from "react";
+import CustomSelect from "../CustomSelect";
+import { validateSchedule } from "../simulation";
 import {
   AssetClass,
   NewTransferRuleInput,
@@ -11,10 +13,8 @@ import {
   addMonths,
   toMonthInputValue,
 } from "../types";
-import { validateSchedule } from "../simulation";
-import ScheduleEditor from "./ScheduleEditor";
 import FloatingFormPanel from "./FloatingFormPanel";
-import CustomSelect from "../CustomSelect";
+import ScheduleEditor from "./ScheduleEditor";
 
 const TRANSFER_MODE_OPTIONS = [
   { value: "fixed", label: "고정 금액" },
@@ -149,11 +149,18 @@ export default function TransferRuleSection({
     >
       <div className="flex items-center justify-between">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-700">
-          <ArrowLeftRight className="h-4 w-4" /> 이체 규칙
+          <ArrowLeftRight className="h-4 w-4" /> 자산 내 이체 규칙
         </h3>
         <button
           type="button"
-          onClick={() => setShowForm((prev) => !prev)}
+          onClick={() => {
+            if (isFormVisible) {
+              resetForm();
+              setShowForm(false);
+            } else {
+              setShowForm(true);
+            }
+          }}
           className={`rounded-full p-1.5 ${
             isFormVisible
               ? "bg-amber-500 text-white"
@@ -193,80 +200,87 @@ export default function TransferRuleSection({
       </ul>
 
       {isFormVisible && (
-      <FloatingFormPanel onKeyDown={handleKeyDown} className="border-amber-200">
-        <div className="flex items-center gap-2">
-          <CustomSelect
-            value={effectiveFrom}
-            onChange={(v) => {
-              setFromAssetId(v);
-              setToAssetId("");
-            }}
-            options={assetClasses.map((asset) => ({
-              value: asset.id,
-              label: `${asset.name}(${asset.currency})`,
-            }))}
-            borderClassName="border-amber-200"
-            className="min-w-0 flex-1"
+        <FloatingFormPanel
+          onKeyDown={handleKeyDown}
+          className="border-amber-200"
+        >
+          <div className="flex items-center gap-2">
+            <CustomSelect
+              value={effectiveFrom}
+              onChange={(v) => {
+                setFromAssetId(v);
+                setToAssetId("");
+              }}
+              options={assetClasses.map((asset) => ({
+                value: asset.id,
+                label: `${asset.name}(${asset.currency})`,
+              }))}
+              borderClassName="border-amber-200"
+              className="min-w-0 flex-1"
+            />
+            <span className="text-gray-400">→</span>
+            <CustomSelect
+              value={effectiveTo}
+              onChange={setToAssetId}
+              options={sameCurrencyAssets.map((asset) => ({
+                value: asset.id,
+                label: `${asset.name}(${asset.currency})`,
+              }))}
+              placeholder="같은 통화 자산이 없습니다"
+              disabled={sameCurrencyAssets.length === 0}
+              borderClassName="border-amber-200"
+              className="min-w-0 flex-1"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <CustomSelect
+              value={mode}
+              onChange={(v) => setMode(v as TransferMode)}
+              options={TRANSFER_MODE_OPTIONS}
+              borderClassName="border-amber-200"
+              className="w-44 shrink-0"
+            />
+            <input
+              ref={amountRef}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              type="number"
+              placeholder={mode === "fixed" ? "금액" : "%"}
+              className="w-24 rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-amber-400"
+            />
+          </div>
+          <ScheduleEditor
+            value={schedule}
+            onChange={setSchedule}
+            today={today}
           />
-          <span className="text-gray-400">→</span>
-          <CustomSelect
-            value={effectiveTo}
-            onChange={setToAssetId}
-            options={sameCurrencyAssets.map((asset) => ({
-              value: asset.id,
-              label: `${asset.name}(${asset.currency})`,
-            }))}
-            placeholder="같은 통화 자산이 없습니다"
-            disabled={sameCurrencyAssets.length === 0}
-            borderClassName="border-amber-200"
-            className="min-w-0 flex-1"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <CustomSelect
-            value={mode}
-            onChange={(v) => setMode(v as TransferMode)}
-            options={TRANSFER_MODE_OPTIONS}
-            borderClassName="border-amber-200"
-            className="w-44 shrink-0"
-          />
-          <input
-            ref={amountRef}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            type="number"
-            placeholder={mode === "fixed" ? "금액" : "%"}
-            className="w-24 rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-amber-400"
-          />
-        </div>
-        <ScheduleEditor value={schedule} onChange={setSchedule} today={today} />
-        {error && <p className="text-xs text-rose-500">{error}</p>}
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={sameCurrencyAssets.length === 0}
-            className="inline-flex items-center gap-1.5 self-start rounded-full bg-amber-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {editingId ? (
-              "저장"
-            ) : (
-              <>
-                <Plus className="h-4 w-4" /> 이체 규칙 추가
-              </>
-            )}
-          </button>
-          {editingId && (
+          {error && <p className="text-xs text-rose-500">{error}</p>}
+          <div className="flex gap-2">
             <button
               type="button"
-              onClick={resetForm}
-              className="self-start rounded-full px-4 py-1.5 text-sm text-gray-500 hover:text-gray-700"
+              onClick={handleSubmit}
+              disabled={sameCurrencyAssets.length === 0}
+              className="inline-flex items-center gap-1.5 self-start rounded-full bg-amber-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              취소
+              {editingId ? (
+                "저장"
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" /> 이체 규칙 추가
+                </>
+              )}
             </button>
-          )}
-        </div>
-      </FloatingFormPanel>
+            {editingId && (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="self-start rounded-full px-4 py-1.5 text-sm text-gray-500 hover:text-gray-700"
+              >
+                취소
+              </button>
+            )}
+          </div>
+        </FloatingFormPanel>
       )}
     </div>
   );

@@ -137,7 +137,14 @@ export default function IncomeSection({
         </h3>
         <button
           type="button"
-          onClick={() => setShowForm((prev) => !prev)}
+          onClick={() => {
+            if (isFormVisible) {
+              resetForm();
+              setShowForm(false);
+            } else {
+              setShowForm(true);
+            }
+          }}
           className={`rounded-full p-1.5 ${
             isFormVisible
               ? "bg-emerald-500 text-white"
