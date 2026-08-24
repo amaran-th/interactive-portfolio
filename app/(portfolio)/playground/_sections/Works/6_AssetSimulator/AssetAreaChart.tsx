@@ -1,5 +1,6 @@
 "use client";
 
+import { Inbox, LineChart as LineChartIcon } from "lucide-react";
 import { AssetClass, Group, MonthSnapshot, formatKRW } from "./types";
 import TimelineSlider from "./TimelineSlider";
 
@@ -126,13 +127,13 @@ export default function AssetAreaChart({
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       {isEmpty ? (
-        <div className="flex h-[180px] items-center justify-center text-sm text-gray-400">
-          📭 자산을 추가하면 그래프가 나타납니다
+        <div className="flex h-[180px] items-center justify-center gap-1.5 text-sm text-gray-400">
+          <Inbox className="h-4 w-4" /> 자산을 추가하면 그래프가 나타납니다
         </div>
       ) : (
         <>
-          <p className="text-sm text-gray-500">
-            📈 총자산{" "}
+          <p className="flex items-center gap-1.5 text-sm text-gray-500">
+            <LineChartIcon className="h-4 w-4" /> 총자산{" "}
             <span className="text-lg font-semibold text-gray-800">
               {formatKRW(totalBalance)}
             </span>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Plus, TrendingDown } from "lucide-react";
 import {
   ExpenseItem,
   Group,
@@ -123,7 +124,9 @@ export default function ExpenseSection({
 
   return (
     <div className="rounded-2xl border border-rose-200 bg-white/70 p-4 backdrop-blur">
-      <h3 className="text-sm font-semibold text-rose-700">💸 지출</h3>
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-rose-700">
+        <TrendingDown className="h-4 w-4" /> 지출
+      </h3>
       <ul className="mt-2 flex flex-col gap-2">
         {expenses.map((item) => {
           const group = groups.find((g) => g.id === item.groupId);
@@ -189,9 +192,15 @@ export default function ExpenseSection({
           <button
             type="button"
             onClick={handleSubmit}
-            className="self-start rounded-full bg-rose-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-rose-600"
+            className="inline-flex items-center gap-1.5 self-start rounded-full bg-rose-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-rose-600"
           >
-            {editingId ? "저장" : "➕ 추가"}
+            {editingId ? (
+              "저장"
+            ) : (
+              <>
+                <Plus className="h-4 w-4" /> 추가
+              </>
+            )}
           </button>
           {editingId && (
             <button

@@ -1,5 +1,6 @@
 "use client";
 
+import { History, Inbox } from "lucide-react";
 import { AssetClass, ExpenseItem, IncomeItem, MonthSnapshot, formatKRW } from "./types";
 import { fires } from "./simulation";
 
@@ -40,9 +41,11 @@ export default function HistoryPanel({
   if (selectedMonth === 0 || snapshots.length === 0) {
     return (
       <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-        <h3 className="text-sm font-semibold text-gray-700">📝 누적 이력</h3>
-        <p className="mt-2 text-sm text-gray-400">
-          📭 슬라이더를 옮기면 지금부터의 이력이 나타납니다
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
+          <History className="h-4 w-4" /> 누적 이력
+        </h3>
+        <p className="mt-2 flex items-center gap-1.5 text-sm text-gray-400">
+          <Inbox className="h-4 w-4" /> 슬라이더를 옮기면 지금부터의 이력이 나타납니다
         </p>
       </div>
     );
@@ -100,8 +103,8 @@ export default function HistoryPanel({
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-      <h3 className="text-sm font-semibold text-gray-700">
-        📝 누적 이력 (지금 ~ {formatMonthLabel(selectedMonth, today)})
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
+        <History className="h-4 w-4" /> 누적 이력 (지금 ~ {formatMonthLabel(selectedMonth, today)})
       </h3>
       <div className="grid grid-cols-2 gap-2 text-sm">
         <div className="rounded-xl bg-white/80 p-2">

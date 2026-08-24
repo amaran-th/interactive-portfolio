@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Copy } from "lucide-react";
 import { Scenario } from "./types";
 
 type ScenarioTabsProps = {
@@ -110,9 +111,9 @@ export default function ScenarioTabs({
       <button
         type="button"
         onClick={() => onDuplicate(activeScenarioId)}
-        className="rounded-full bg-white/80 px-3 py-1 text-xs text-gray-600 hover:bg-white"
+        className="inline-flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 text-xs text-gray-600 hover:bg-white"
       >
-        📋 현재 탭 복제
+        <Copy className="h-3.5 w-3.5" /> 현재 탭 복제
       </button>
       <button
         type="button"

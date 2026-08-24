@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Landmark, Plus } from "lucide-react";
 import {
   AssetClass,
   Currency,
@@ -98,7 +99,9 @@ export default function GroupAssetSection({
 
   return (
     <div className="rounded-2xl border border-indigo-200 bg-white/70 p-4 backdrop-blur">
-      <h3 className="text-sm font-semibold text-indigo-700">🏦 현재 자산</h3>
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-indigo-700">
+        <Landmark className="h-4 w-4" /> 현재 자산
+      </h3>
       <ul className="mt-2 flex flex-col gap-2">
         {assetClasses.map((asset) => {
           const group = groups.find((g) => g.id === asset.groupId);
@@ -254,9 +257,15 @@ export default function GroupAssetSection({
           <button
             type="button"
             onClick={handleSubmit}
-            className="self-start rounded-full bg-indigo-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-600"
+            className="inline-flex items-center gap-1.5 self-start rounded-full bg-indigo-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-600"
           >
-            {editingId ? "저장" : "➕ 자산 추가"}
+            {editingId ? (
+              "저장"
+            ) : (
+              <>
+                <Plus className="h-4 w-4" /> 자산 추가
+              </>
+            )}
           </button>
           {editingId && (
             <button

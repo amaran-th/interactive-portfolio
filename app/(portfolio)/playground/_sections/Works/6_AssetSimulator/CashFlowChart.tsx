@@ -1,5 +1,6 @@
 "use client";
 
+import { Activity, Inbox } from "lucide-react";
 import { MonthSnapshot, formatKRW } from "./types";
 
 type CashFlowChartProps = {
@@ -18,8 +19,8 @@ export default function CashFlowChart({
 }: CashFlowChartProps) {
   if (snapshots.length === 0) {
     return (
-      <div className="flex h-[260px] items-center justify-center rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
-        📭 시뮬레이션을 시작하면 그래프가 나타납니다
+      <div className="flex h-[260px] items-center justify-center gap-1.5 rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
+        <Inbox className="h-4 w-4" /> 시뮬레이션을 시작하면 그래프가 나타납니다
       </div>
     );
   }
@@ -48,8 +49,8 @@ export default function CashFlowChart({
 
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-      <p className="text-sm text-gray-500">
-        💹 선택 시점 순수입{" "}
+      <p className="flex items-center gap-1.5 text-sm text-gray-500">
+        <Activity className="h-4 w-4" /> 선택 시점 순수입{" "}
         <span className="text-lg font-semibold text-gray-800">
           {formatKRW(netAmount)}
         </span>

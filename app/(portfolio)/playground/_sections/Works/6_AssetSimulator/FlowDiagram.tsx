@@ -1,5 +1,6 @@
 "use client";
 
+import { Inbox, Workflow } from "lucide-react";
 import { AssetClass, MonthSnapshot } from "./types";
 
 type FlowDiagramProps = {
@@ -69,8 +70,8 @@ export default function FlowDiagram({
 }: FlowDiagramProps) {
   if (!primaryAsset) {
     return (
-      <div className="flex h-[220px] items-center justify-center rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
-        📭 기본 계좌를 지정하면 흐름도가 나타납니다
+      <div className="flex h-[220px] items-center justify-center gap-1.5 rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
+        <Inbox className="h-4 w-4" /> 기본 계좌를 지정하면 흐름도가 나타납니다
       </div>
     );
   }
@@ -121,7 +122,9 @@ export default function FlowDiagram({
 
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-      <p className="text-sm text-gray-500">🌊 자금 흐름</p>
+      <p className="flex items-center gap-1.5 text-sm text-gray-500">
+        <Workflow className="h-4 w-4" /> 자금 흐름
+      </p>
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="mt-2 w-full">
         <defs>
           <marker

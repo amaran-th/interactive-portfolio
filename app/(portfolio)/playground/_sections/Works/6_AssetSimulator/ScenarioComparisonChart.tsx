@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { GitCompare, Inbox } from "lucide-react";
 import { GROUP_PALETTE, Scenario, SimulationInput } from "./types";
 import { runSimulation } from "./simulation";
 
@@ -44,8 +45,8 @@ export default function ScenarioComparisonChart({
 
   if (series.length === 0 || series[0].snapshots.length === 0) {
     return (
-      <div className="mb-4 flex h-[200px] items-center justify-center rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
-        📭 시나리오를 만들면 비교 그래프가 나타납니다
+      <div className="mb-4 flex h-[200px] items-center justify-center gap-1.5 rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
+        <Inbox className="h-4 w-4" /> 시나리오를 만들면 비교 그래프가 나타납니다
       </div>
     );
   }
@@ -62,7 +63,9 @@ export default function ScenarioComparisonChart({
 
   return (
     <div className="mb-4 rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-      <p className="text-sm text-gray-500">🆚 시나리오 비교 · 총자산 추이</p>
+      <p className="flex items-center gap-1.5 text-sm text-gray-500">
+        <GitCompare className="h-4 w-4" /> 시나리오 비교 · 총자산 추이
+      </p>
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="mt-2 w-full">
         {series.map((s) => {
           const points = s.snapshots

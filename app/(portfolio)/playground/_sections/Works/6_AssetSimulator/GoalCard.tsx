@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Target } from "lucide-react";
 import {
   AssetClass,
   Goal,
@@ -132,7 +133,9 @@ export default function GoalCard({
 
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-      <h3 className="text-sm font-semibold text-gray-700">🎯 목표</h3>
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
+        <Target className="h-4 w-4" /> 목표
+      </h3>
       <div className="mt-2 flex flex-col gap-2">
         <div className="flex gap-2">
           <select

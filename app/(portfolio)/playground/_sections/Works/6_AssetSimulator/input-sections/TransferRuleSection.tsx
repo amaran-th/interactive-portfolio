@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { ArrowLeftRight, Plus } from "lucide-react";
 import {
   AssetClass,
   NewTransferRuleInput,
@@ -133,7 +134,9 @@ export default function TransferRuleSection({
 
   return (
     <div className="rounded-2xl border border-amber-200 bg-white/70 p-4 backdrop-blur">
-      <h3 className="text-sm font-semibold text-amber-700">🔁 이체 규칙</h3>
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-700">
+        <ArrowLeftRight className="h-4 w-4" /> 이체 규칙
+      </h3>
       <ul className="mt-2 flex flex-col gap-2">
         {transferRules.map((rule) => (
           <li
@@ -220,9 +223,15 @@ export default function TransferRuleSection({
             type="button"
             onClick={handleSubmit}
             disabled={sameCurrencyAssets.length === 0}
-            className="self-start rounded-full bg-amber-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 self-start rounded-full bg-amber-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {editingId ? "저장" : "➕ 이체 규칙 추가"}
+            {editingId ? (
+              "저장"
+            ) : (
+              <>
+                <Plus className="h-4 w-4" /> 이체 규칙 추가
+              </>
+            )}
           </button>
           {editingId && (
             <button

@@ -1,5 +1,6 @@
 "use client";
 
+import { BarChart3, Inbox } from "lucide-react";
 import {
   AssetClass,
   Group,
@@ -98,8 +99,8 @@ export default function ComparisonBarChart({
 }: ComparisonBarChartProps) {
   if (assetClasses.length === 0 || snapshots.length === 0) {
     return (
-      <div className="flex h-[220px] items-center justify-center rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
-        📭 자산을 추가하면 비교 그래프가 나타납니다
+      <div className="flex h-[220px] items-center justify-center gap-1.5 rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
+        <Inbox className="h-4 w-4" /> 자산을 추가하면 비교 그래프가 나타납니다
       </div>
     );
   }
@@ -138,7 +139,9 @@ export default function ComparisonBarChart({
 
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-      <p className="text-sm text-gray-500">📊 자산 비교</p>
+      <p className="flex items-center gap-1.5 text-sm text-gray-500">
+        <BarChart3 className="h-4 w-4" /> 자산 비교
+      </p>
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
         <defs>
           <clipPath id={BELOW_ZERO_CLIP_ID} clipPathUnits="userSpaceOnUse">

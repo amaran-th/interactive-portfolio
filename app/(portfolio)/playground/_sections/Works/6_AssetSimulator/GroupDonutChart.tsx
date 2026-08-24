@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Inbox, PieChart as PieChartIcon } from "lucide-react";
 import {
   AssetClass,
   Group,
@@ -50,8 +51,8 @@ export default function GroupDonutChart({
 
   if (!activeTabId) {
     return (
-      <div className="flex h-[220px] items-center justify-center rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
-        📭 자산을 추가하면 비율이 나타납니다
+      <div className="flex h-[220px] items-center justify-center gap-1.5 rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
+        <Inbox className="h-4 w-4" /> 자산을 추가하면 비율이 나타납니다
       </div>
     );
   }
@@ -89,7 +90,9 @@ export default function GroupDonutChart({
 
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-      <p className="text-sm text-gray-500">🥧 그룹별 비율</p>
+      <p className="flex items-center gap-1.5 text-sm text-gray-500">
+        <PieChartIcon className="h-4 w-4" /> 그룹별 비율
+      </p>
       <div className="mt-2 flex flex-wrap gap-2">
         {tabs.map((tab) => (
           <button
