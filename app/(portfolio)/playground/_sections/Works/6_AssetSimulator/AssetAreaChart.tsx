@@ -169,17 +169,22 @@ export default function AssetAreaChart({
                 />
               </g>
             ))}
-            {domainMin < 0 && (
-              <line
-                x1={PADDING}
-                y1={zeroY}
-                x2={WIDTH - PADDING}
-                y2={zeroY}
-                stroke="#9ca3af"
-                strokeWidth={1}
-                strokeDasharray="2 2"
-              />
-            )}
+            <line
+              x1={PADDING}
+              y1={zeroY}
+              x2={WIDTH - PADDING}
+              y2={zeroY}
+              stroke="#9ca3af"
+              strokeWidth={1}
+              strokeDasharray="2 2"
+            />
+            <text
+              x={PADDING}
+              y={Math.min(HEIGHT - PADDING - 3, zeroY - 3)}
+              className="fill-gray-400 text-[9px]"
+            >
+              0
+            </text>
             <line
               x1={cursorX}
               y1={PADDING}
