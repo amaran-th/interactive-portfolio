@@ -446,22 +446,6 @@ export default function AssetSimulator() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold text-gray-800">자산 시뮬레이터</h2>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1">
-              {HORIZON_PRESET_YEARS.map((years) => (
-                <button
-                  key={years}
-                  type="button"
-                  onClick={() => handleChangeHorizon(years)}
-                  className={`rounded-full px-3 py-1 text-xs ${
-                    horizonYears === years
-                      ? "bg-indigo-500 text-white"
-                      : "bg-white/80 text-gray-600"
-                  }`}
-                >
-                  {years}년
-                </button>
-              ))}
-            </div>
             <label className="flex items-center gap-2 text-xs text-gray-600">
               환율(1달러 = 원)
               <input
@@ -538,6 +522,22 @@ export default function AssetSimulator() {
 
         <div className="grid gap-4 @min-[650px]:grid-cols-[minmax(280px,1fr)_minmax(180px,320px)]">
           <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-1">
+              {HORIZON_PRESET_YEARS.map((years) => (
+                <button
+                  key={years}
+                  type="button"
+                  onClick={() => handleChangeHorizon(years)}
+                  className={`rounded-full px-3 py-1 text-xs ${
+                    horizonYears === years
+                      ? "bg-indigo-500 text-white"
+                      : "bg-white/80 text-gray-600"
+                  }`}
+                >
+                  {years}년
+                </button>
+              ))}
+            </div>
             <AssetAreaChart
               snapshots={snapshots}
               groups={assetGroups}

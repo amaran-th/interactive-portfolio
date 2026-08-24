@@ -24,6 +24,11 @@ export default function TimelineSlider({
   today,
   horizonMonths,
 }: TimelineSliderProps) {
+  const yearMarks: number[] = [];
+  for (let month = 12; month <= horizonMonths; month += 12) {
+    yearMarks.push(month);
+  }
+
   return (
     <div>
       <span className="text-sm text-gray-500">
@@ -31,14 +36,27 @@ export default function TimelineSlider({
           ? "지금"
           : `${formatMonthsFromNow(selectedMonth)} · ${formatMonthLabel(selectedMonth, today)}`}
       </span>
-      <input
-        type="range"
-        min={0}
-        max={horizonMonths}
-        value={selectedMonth}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="mt-3 w-full accent-indigo-500"
-      />
+      <div className="relative mt-3 pb-2">
+        <input
+          type="range"
+          min={0}
+          max={horizonMonths}
+          value={selectedMonth}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full accent-indigo-500"
+        />
+        <div className="pointer-events-none absolute inset-x-0 top-full">
+          {yearMarks.map((month) => (
+            <div
+              key={month}
+              className={`absolute top-0 w-px ${
+                month % 60 === 0 ? "h-2 bg-gray-400" : "h-1.5 bg-gray-300"
+              }`}
+              style={{ left: `${(month / horizonMonths) * 100}%` }}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
