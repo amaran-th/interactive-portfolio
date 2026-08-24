@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import { Target } from "lucide-react";
+import { useMemo, useState } from "react";
+import CustomSelect from "./CustomSelect";
+import { findGoalAchievementMonth } from "./simulation";
 import {
   AssetClass,
   Goal,
@@ -11,8 +13,6 @@ import {
   SimulationInput,
   formatMonthsFromNow,
 } from "./types";
-import { findGoalAchievementMonth } from "./simulation";
-import CustomSelect from "./CustomSelect";
 
 const METRIC_TYPE_OPTIONS = [
   { value: "total", label: "총자산" },
@@ -44,11 +44,7 @@ function metricValueFromSnapshot(
 }
 
 function formatAchievementDate(monthIndex: number, today: Date): string {
-  const date = new Date(
-    today.getFullYear(),
-    today.getMonth() + monthIndex,
-    1,
-  );
+  const date = new Date(today.getFullYear(), today.getMonth() + monthIndex, 1);
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
@@ -97,8 +93,7 @@ export default function GoalCard({
     // it here against the (still-stale, pre-render) local targetId/metricType
     // would incorrectly clobber what was just set.
     targetId &&
-    ((metricType === "asset" &&
-      !assetClasses.some((a) => a.id === targetId)) ||
+    ((metricType === "asset" && !assetClasses.some((a) => a.id === targetId)) ||
       (metricType === "group" && !groups.some((g) => g.id === targetId)))
   ) {
     setTargetId("");
@@ -141,7 +136,7 @@ export default function GoalCard({
   return (
     <div>
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
-        <Target className="h-4 w-4" /> 목표
+        <Target className="h-4 w-4" /> 목표 자산
       </h3>
       <div className="mt-2 flex flex-col gap-2">
         <div className="flex gap-2">
@@ -154,38 +149,36 @@ export default function GoalCard({
             options={METRIC_TYPE_OPTIONS}
             className="w-32 shrink-0"
           />
-          {metricType === "asset" && (
-            <CustomSelect
-              value={targetId}
-              onChange={setTargetId}
-              options={assetClasses.map((asset) => ({
-                value: asset.id,
-                label: asset.name,
-              }))}
-              placeholder="자산 선택"
-              className="min-w-0 flex-1"
-            />
-          )}
-          {metricType === "group" && (
-            <CustomSelect
-              value={targetId}
-              onChange={setTargetId}
-              options={groups.map((group) => ({
-                value: group.id,
-                label: group.name,
-              }))}
-              placeholder="그룹 선택"
-              className="min-w-0 flex-1"
-            />
-          )}
+          <input
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            type="number"
+            placeholder="목표 금액(원)"
+            className="min-w-0 flex-1 rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-gray-400"
+          />
         </div>
-        <input
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          type="number"
-          placeholder="목표 금액(원)"
-          className="rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-gray-400"
-        />
+        {metricType === "asset" && (
+          <CustomSelect
+            value={targetId}
+            onChange={setTargetId}
+            options={assetClasses.map((asset) => ({
+              value: asset.id,
+              label: asset.name,
+            }))}
+            placeholder="자산 선택"
+          />
+        )}
+        {metricType === "group" && (
+          <CustomSelect
+            value={targetId}
+            onChange={setTargetId}
+            options={groups.map((group) => ({
+              value: group.id,
+              label: group.name,
+            }))}
+            placeholder="그룹 선택"
+          />
+        )}
         <div className="flex gap-2">
           <button
             type="button"
@@ -234,4 +227,3 @@ export default function GoalCard({
     </div>
   );
 }
-
