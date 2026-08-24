@@ -22,6 +22,15 @@ const BASE_Y = HEIGHT - 30;
 const MAX_BAR_HEIGHT = 160;
 const DEFICIT_COLOR = "#f43f5e";
 
+type RawSegment = {
+  id: string;
+  name: string;
+  fill: string;
+  stroke: string | undefined;
+  bottom: number;
+  top: number;
+};
+
 type Segment = {
   id: string;
   name: string;
@@ -42,6 +51,44 @@ function orderedAssets(
   return [...grouped, ...ungrouped];
 }
 
+function buildRawSegments(
+  snapshot: MonthSnapshot,
+  assets: AssetClass[],
+  groups: Group[],
+): { segments: RawSegment[]; min: number; max: number } {
+  const result = assets.reduce<{
+    cursor: number;
+    min: number;
+    max: number;
+    segments: RawSegment[];
+  }>(
+    (acc, asset) => {
+      const value = snapshot.assetBalancesKRW[asset.id] ?? 0;
+      const bottom = acc.cursor;
+      const top = acc.cursor + value;
+      const group = groups.find((g) => g.id === asset.groupId);
+      return {
+        cursor: top,
+        min: Math.min(acc.min, bottom, top),
+        max: Math.max(acc.max, bottom, top),
+        segments: [
+          ...acc.segments,
+          {
+            id: asset.id,
+            name: asset.name,
+            fill: asset.color,
+            stroke: group?.color,
+            bottom,
+            top,
+          },
+        ],
+      };
+    },
+    { cursor: 0, min: 0, max: 0, segments: [] },
+  );
+  return { segments: result.segments, min: result.min, max: result.max };
+}
+
 export default function ComparisonBarChart({
   snapshots,
   groups,
@@ -60,47 +107,31 @@ export default function ComparisonBarChart({
   const futureSnapshot = snapshots[selectedMonth];
   const assets = orderedAssets(assetClasses, groups);
 
-  const maxTotal = Math.max(
-    1,
-    nowSnapshot.totalBalance,
-    futureSnapshot.totalBalance,
-  );
+  const nowRaw = buildRawSegments(nowSnapshot, assets, groups);
+  const futureRaw = buildRawSegments(futureSnapshot, assets, groups);
+  const domainMin = Math.min(0, nowRaw.min, futureRaw.min);
+  const domainMax = Math.max(1, nowRaw.max, futureRaw.max);
+  const domainRange = domainMax - domainMin || 1;
+  const scaleY = (value: number) =>
+    BASE_Y - ((value - domainMin) / domainRange) * MAX_BAR_HEIGHT;
+  const zeroY = scaleY(0);
 
-  const buildSegments = (snapshot: MonthSnapshot): Segment[] => {
-    const { segments } = assets.reduce<{
-      cursor: number;
-      segments: Segment[];
-    }>(
-      (acc, asset) => {
-        const value = snapshot.assetBalancesKRW[asset.id] ?? 0;
-        const height = (value / maxTotal) * MAX_BAR_HEIGHT;
-        const stackTop = BASE_Y - acc.cursor;
-        const isNegative = height < 0;
-        const rectY = isNegative ? stackTop : stackTop - height;
-        const rectHeight = Math.abs(height);
-        const group = groups.find((g) => g.id === asset.groupId);
-        return {
-          cursor: acc.cursor + height,
-          segments: [
-            ...acc.segments,
-            {
-              id: asset.id,
-              name: asset.name,
-              fill: isNegative ? DEFICIT_COLOR : asset.color,
-              stroke: group?.color,
-              y: rectY,
-              height: rectHeight,
-            },
-          ],
-        };
-      },
-      { cursor: 0, segments: [] },
-    );
-    return segments;
-  };
+  const toSegments = (raw: RawSegment[]): Segment[] =>
+    raw.map((seg) => {
+      const yBottom = scaleY(seg.bottom);
+      const yTop = scaleY(seg.top);
+      return {
+        id: seg.id,
+        name: seg.name,
+        fill: seg.top < seg.bottom ? DEFICIT_COLOR : seg.fill,
+        stroke: seg.stroke,
+        y: Math.min(yTop, yBottom),
+        height: Math.abs(yBottom - yTop),
+      };
+    });
 
-  const nowSegments = buildSegments(nowSnapshot);
-  const futureSegments = buildSegments(futureSnapshot);
+  const nowSegments = toSegments(nowRaw.segments);
+  const futureSegments = toSegments(futureRaw.segments);
   const nowX = WIDTH / 2 - BAR_WIDTH - 16;
   const futureX = WIDTH / 2 + 16;
 
@@ -110,9 +141,9 @@ export default function ComparisonBarChart({
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
         <line
           x1={0}
-          y1={BASE_Y}
+          y1={zeroY}
           x2={WIDTH}
-          y2={BASE_Y}
+          y2={zeroY}
           stroke="#e5e7eb"
           strokeWidth={1}
         />
