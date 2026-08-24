@@ -13,6 +13,7 @@ import {
 } from "../types";
 import { validateSchedule } from "../simulation";
 import ScheduleEditor from "./ScheduleEditor";
+import FloatingFormPanel from "./FloatingFormPanel";
 
 type TransferRuleSectionProps = {
   assetClasses: AssetClass[];
@@ -60,7 +61,7 @@ export default function TransferRuleSection({
     defaultSchedule(today),
   );
   const [error, setError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(true);
+  const [showForm, setShowForm] = useState(false);
   const isFormVisible = showForm || Boolean(editingId);
   const amountRef = useRef<HTMLInputElement>(null);
 
@@ -135,7 +136,7 @@ export default function TransferRuleSection({
   };
 
   return (
-    <div className="rounded-2xl border border-amber-200 bg-white/70 p-4 backdrop-blur">
+    <div className="relative rounded-2xl border border-amber-200 bg-white/70 p-4 backdrop-blur">
       <div className="flex items-center justify-between">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-700">
           <ArrowLeftRight className="h-4 w-4" /> 이체 규칙
@@ -182,7 +183,7 @@ export default function TransferRuleSection({
       </ul>
 
       {isFormVisible && (
-      <div className="mt-3 flex flex-col gap-2" onKeyDown={handleKeyDown}>
+      <FloatingFormPanel onKeyDown={handleKeyDown} className="border-amber-200">
         <div className="flex items-center gap-2">
           <select
             value={effectiveFrom}
@@ -260,7 +261,7 @@ export default function TransferRuleSection({
             </button>
           )}
         </div>
-      </div>
+      </FloatingFormPanel>
       )}
     </div>
   );

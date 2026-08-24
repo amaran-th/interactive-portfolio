@@ -14,6 +14,7 @@ import {
 } from "../types";
 import GroupPicker from "./GroupPicker";
 import GoalCard from "../GoalCard";
+import FloatingFormPanel from "./FloatingFormPanel";
 
 type GroupAssetSectionProps = {
   groups: Group[];
@@ -61,7 +62,7 @@ export default function GroupAssetSection({
   const [returnRate, setReturnRate] = useState("0");
   const [makePrimary, setMakePrimary] = useState(false);
   const [colorPickerId, setColorPickerId] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(true);
+  const [showForm, setShowForm] = useState(false);
   const isFormVisible = showForm || Boolean(editingId);
 
   const nameRef = useRef<HTMLInputElement>(null);
@@ -116,7 +117,7 @@ export default function GroupAssetSection({
   };
 
   return (
-    <div className="rounded-2xl border border-indigo-200 bg-white/70 p-4 backdrop-blur md:col-span-2">
+    <div className="relative rounded-2xl border border-indigo-200 bg-white/70 p-4 backdrop-blur md:col-span-2">
       <GoalCard
         goal={goal}
         onSetGoal={onSetGoal}
@@ -229,7 +230,7 @@ export default function GroupAssetSection({
       </ul>
 
       {isFormVisible && (
-      <div className="mt-3 flex flex-col gap-2" onKeyDown={handleKeyDown}>
+      <FloatingFormPanel onKeyDown={handleKeyDown} className="border-indigo-200">
         <div className="flex gap-2">
           <input
             ref={nameRef}
@@ -319,7 +320,7 @@ export default function GroupAssetSection({
             </button>
           )}
         </div>
-      </div>
+      </FloatingFormPanel>
       )}
     </div>
   );

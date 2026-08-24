@@ -13,6 +13,7 @@ import {
 import { validateSchedule } from "../simulation";
 import GroupPicker from "./GroupPicker";
 import ScheduleEditor from "./ScheduleEditor";
+import FloatingFormPanel from "./FloatingFormPanel";
 
 type ExpenseSectionProps = {
   groups: Group[];
@@ -65,7 +66,7 @@ export default function ExpenseSection({
     defaultSchedule(today),
   );
   const [error, setError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(true);
+  const [showForm, setShowForm] = useState(false);
   const isFormVisible = showForm || Boolean(editingId);
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -125,7 +126,7 @@ export default function ExpenseSection({
   };
 
   return (
-    <div className="rounded-2xl border border-rose-200 bg-white/70 p-4 backdrop-blur">
+    <div className="relative rounded-2xl border border-rose-200 bg-white/70 p-4 backdrop-blur">
       <div className="flex items-center justify-between">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-rose-700">
           <TrendingDown className="h-4 w-4" /> 지출
@@ -177,7 +178,7 @@ export default function ExpenseSection({
         })}
       </ul>
       {isFormVisible && (
-      <div className="mt-3 flex flex-col gap-2" onKeyDown={handleKeyDown}>
+      <FloatingFormPanel onKeyDown={handleKeyDown} className="border-rose-200">
         <div className="flex gap-2">
           <input
             ref={nameRef}
@@ -229,7 +230,7 @@ export default function ExpenseSection({
             </button>
           )}
         </div>
-      </div>
+      </FloatingFormPanel>
       )}
     </div>
   );
