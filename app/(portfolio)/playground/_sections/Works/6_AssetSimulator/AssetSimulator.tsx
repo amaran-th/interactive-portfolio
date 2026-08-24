@@ -489,7 +489,6 @@ export default function AssetSimulator() {
           <InputPanel
             key={activeScenarioId}
             groups={activeScenario.groups}
-            assetGroups={assetGroups}
             onAddGroup={handleAddGroup}
             onUpdateGroup={handleUpdateGroup}
             onRemoveGroup={handleRemoveGroup}
@@ -513,10 +512,6 @@ export default function AssetSimulator() {
             onRemoveTransferRule={handleRemoveTransferRule}
             today={today}
             horizonMonths={horizonMonths}
-            goal={activeScenario.goal}
-            onSetGoal={handleSetGoal}
-            simulationInput={simulationInput}
-            selectedSnapshot={selectedSnapshot}
           />
         </div>
 
@@ -546,6 +541,10 @@ export default function AssetSimulator() {
               onChangeMonth={setSelectedMonth}
               today={today}
               horizonMonths={horizonMonths}
+              goal={activeScenario.goal}
+              onSetGoal={handleSetGoal}
+              simulationInput={simulationInput}
+              selectedSnapshot={selectedSnapshot}
             />
             <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))]">
               <ComparisonBarChart

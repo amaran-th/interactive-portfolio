@@ -1,8 +1,16 @@
 "use client";
 
 import { Inbox, LineChart as LineChartIcon } from "lucide-react";
-import { AssetClass, Group, MonthSnapshot, formatKRW } from "./types";
+import {
+  AssetClass,
+  Goal,
+  Group,
+  MonthSnapshot,
+  SimulationInput,
+  formatKRW,
+} from "./types";
 import TimelineSlider from "./TimelineSlider";
+import GoalCard from "./GoalCard";
 
 type AssetAreaChartProps = {
   snapshots: MonthSnapshot[];
@@ -12,6 +20,10 @@ type AssetAreaChartProps = {
   onChangeMonth: (month: number) => void;
   today: Date;
   horizonMonths: number;
+  goal: Goal | null;
+  onSetGoal: (goal: Goal | null) => void;
+  simulationInput: SimulationInput;
+  selectedSnapshot: MonthSnapshot;
 };
 
 const WIDTH = 600;
@@ -39,6 +51,10 @@ export default function AssetAreaChart({
   onChangeMonth,
   today,
   horizonMonths,
+  goal,
+  onSetGoal,
+  simulationInput,
+  selectedSnapshot,
 }: AssetAreaChartProps) {
   const isEmpty = assetClasses.length === 0 || snapshots.length === 0;
 
@@ -138,7 +154,18 @@ export default function AssetAreaChart({
               {formatKRW(totalBalance)}
             </span>
           </p>
-          <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="mt-2 w-full">
+          <div className="mt-3 border-t border-white/60 pt-3">
+            <GoalCard
+              goal={goal}
+              onSetGoal={onSetGoal}
+              assetClasses={assetClasses}
+              groups={groups}
+              simulationInput={simulationInput}
+              today={today}
+              selectedSnapshot={selectedSnapshot}
+            />
+          </div>
+          <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="mt-3 w-full">
             <defs>
               <clipPath id={BELOW_ZERO_CLIP_ID} clipPathUnits="userSpaceOnUse">
                 <rect

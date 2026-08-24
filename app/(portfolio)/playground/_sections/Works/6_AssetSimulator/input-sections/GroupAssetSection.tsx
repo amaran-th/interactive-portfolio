@@ -5,15 +5,11 @@ import { Landmark, Plus, Settings } from "lucide-react";
 import {
   AssetClass,
   Currency,
-  Goal,
   GROUP_PALETTE,
   Group,
-  MonthSnapshot,
   NewAssetClassInput,
-  SimulationInput,
 } from "../types";
 import GroupPicker from "./GroupPicker";
-import GoalCard from "../GoalCard";
 import FloatingFormPanel from "./FloatingFormPanel";
 import CustomSelect from "../CustomSelect";
 
@@ -24,7 +20,6 @@ const CURRENCY_OPTIONS = [
 
 type GroupAssetSectionProps = {
   groups: Group[];
-  assetGroups: Group[];
   onAddGroup: (name: string) => string;
   onUpdateGroup: (id: string, input: { name: string; color: string }) => void;
   onRemoveGroup: (id: string) => void;
@@ -34,16 +29,10 @@ type GroupAssetSectionProps = {
   onRemoveAssetClass: (id: string) => void;
   onSetPrimaryAsset: (id: string) => void;
   onChangeAssetColor: (id: string, color: string) => void;
-  goal: Goal | null;
-  onSetGoal: (goal: Goal | null) => void;
-  simulationInput: SimulationInput;
-  today: Date;
-  selectedSnapshot: MonthSnapshot;
 };
 
 export default function GroupAssetSection({
   groups,
-  assetGroups,
   onAddGroup,
   onUpdateGroup,
   onRemoveGroup,
@@ -53,11 +42,6 @@ export default function GroupAssetSection({
   onRemoveAssetClass,
   onSetPrimaryAsset,
   onChangeAssetColor,
-  goal,
-  onSetGoal,
-  simulationInput,
-  today,
-  selectedSnapshot,
 }: GroupAssetSectionProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -128,16 +112,7 @@ export default function GroupAssetSection({
         isFormVisible ? "z-30" : ""
       }`}
     >
-      <GoalCard
-        goal={goal}
-        onSetGoal={onSetGoal}
-        assetClasses={assetClasses}
-        groups={assetGroups}
-        simulationInput={simulationInput}
-        today={today}
-        selectedSnapshot={selectedSnapshot}
-      />
-      <div className="mt-4 flex items-center justify-between border-t border-indigo-100 pt-4">
+      <div className="flex items-center justify-between">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-indigo-700">
           <Landmark className="h-4 w-4" /> 현재 자산
         </h3>
