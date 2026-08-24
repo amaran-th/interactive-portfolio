@@ -36,7 +36,7 @@ export default function TimelineSlider({
           ? "지금"
           : `${formatMonthsFromNow(selectedMonth)} · ${formatMonthLabel(selectedMonth, today)}`}
       </span>
-      <div className="relative mt-3 pb-2">
+      <div className="mt-3">
         <input
           type="range"
           min={0}
@@ -45,12 +45,14 @@ export default function TimelineSlider({
           onChange={(e) => onChange(Number(e.target.value))}
           className="w-full accent-indigo-500"
         />
-        <div className="pointer-events-none absolute inset-x-0 top-full">
+        <div className="relative mt-1 h-2.5">
           {yearMarks.map((month) => (
             <div
               key={month}
-              className={`absolute top-0 w-px ${
-                month % 60 === 0 ? "h-2 bg-gray-400" : "h-1.5 bg-gray-300"
+              className={`absolute top-0 -translate-x-1/2 rounded-full ${
+                month % 60 === 0
+                  ? "h-2.5 w-1 bg-gray-500"
+                  : "h-1.5 w-0.5 bg-gray-400"
               }`}
               style={{ left: `${(month / horizonMonths) * 100}%` }}
             />
