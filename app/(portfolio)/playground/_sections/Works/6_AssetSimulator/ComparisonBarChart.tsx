@@ -21,6 +21,7 @@ const BAR_WIDTH = 64;
 const BASE_Y = HEIGHT - 30;
 const MAX_BAR_HEIGHT = 160;
 const DEFICIT_COLOR = "#f43f5e";
+const BELOW_ZERO_CLIP_ID = "comparison-bar-below-zero-clip";
 
 type RawSegment = {
   id: string;
@@ -123,7 +124,7 @@ export default function ComparisonBarChart({
       return {
         id: seg.id,
         name: seg.name,
-        fill: seg.top < seg.bottom ? DEFICIT_COLOR : seg.fill,
+        fill: seg.fill,
         stroke: seg.stroke,
         y: Math.min(yTop, yBottom),
         height: Math.abs(yBottom - yTop),
@@ -139,6 +140,16 @@ export default function ComparisonBarChart({
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <p className="text-sm text-gray-500">📊 자산 비교</p>
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
+        <defs>
+          <clipPath id={BELOW_ZERO_CLIP_ID} clipPathUnits="userSpaceOnUse">
+            <rect
+              x={0}
+              y={zeroY}
+              width={WIDTH}
+              height={Math.max(0, HEIGHT - zeroY)}
+            />
+          </clipPath>
+        </defs>
         <line
           x1={0}
           y1={zeroY}
@@ -164,34 +175,56 @@ export default function ComparisonBarChart({
           {formatKRW(futureSnapshot.totalBalance)}
         </text>
         {nowSegments.map((seg) => (
-          <rect
-            key={seg.id}
-            x={nowX}
-            y={seg.y}
-            width={BAR_WIDTH}
-            height={seg.height}
-            fill={seg.fill}
-            fillOpacity={0.75}
-            stroke={seg.stroke}
-            strokeWidth={seg.stroke ? 2 : 0}
-          >
-            <title>{seg.name}</title>
-          </rect>
+          <g key={seg.id}>
+            <rect
+              x={nowX}
+              y={seg.y}
+              width={BAR_WIDTH}
+              height={seg.height}
+              fill={seg.fill}
+              fillOpacity={0.75}
+              stroke={seg.stroke}
+              strokeWidth={seg.stroke ? 2 : 0}
+            >
+              <title>{seg.name}</title>
+            </rect>
+            <rect
+              x={nowX}
+              y={seg.y}
+              width={BAR_WIDTH}
+              height={seg.height}
+              fill={DEFICIT_COLOR}
+              fillOpacity={0.75}
+              clipPath={`url(#${BELOW_ZERO_CLIP_ID})`}
+              pointerEvents="none"
+            />
+          </g>
         ))}
         {futureSegments.map((seg) => (
-          <rect
-            key={seg.id}
-            x={futureX}
-            y={seg.y}
-            width={BAR_WIDTH}
-            height={seg.height}
-            fill={seg.fill}
-            fillOpacity={0.75}
-            stroke={seg.stroke}
-            strokeWidth={seg.stroke ? 2 : 0}
-          >
-            <title>{seg.name}</title>
-          </rect>
+          <g key={seg.id}>
+            <rect
+              x={futureX}
+              y={seg.y}
+              width={BAR_WIDTH}
+              height={seg.height}
+              fill={seg.fill}
+              fillOpacity={0.75}
+              stroke={seg.stroke}
+              strokeWidth={seg.stroke ? 2 : 0}
+            >
+              <title>{seg.name}</title>
+            </rect>
+            <rect
+              x={futureX}
+              y={seg.y}
+              width={BAR_WIDTH}
+              height={seg.height}
+              fill={DEFICIT_COLOR}
+              fillOpacity={0.75}
+              clipPath={`url(#${BELOW_ZERO_CLIP_ID})`}
+              pointerEvents="none"
+            />
+          </g>
         ))}
         <text
           x={nowX + BAR_WIDTH / 2}

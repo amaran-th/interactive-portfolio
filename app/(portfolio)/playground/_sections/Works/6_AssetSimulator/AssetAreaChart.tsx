@@ -39,19 +39,15 @@ export default function AssetAreaChart({
   today,
   horizonMonths,
 }: AssetAreaChartProps) {
-  if (assetClasses.length === 0 || snapshots.length === 0) {
-    return (
-      <div className="flex h-[260px] items-center justify-center rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
-        📭 자산을 추가하면 그래프가 나타납니다
-      </div>
-    );
-  }
+  const isEmpty = assetClasses.length === 0 || snapshots.length === 0;
 
-  const assets = orderedAssets(assetClasses, groups);
-  const maxTotal = Math.max(1, ...snapshots.map((s) => s.totalBalance));
-  const stepX = (WIDTH - PADDING * 2) / (snapshots.length - 1);
+  const assets = isEmpty ? [] : orderedAssets(assetClasses, groups);
+  const maxTotal = isEmpty
+    ? 1
+    : Math.max(1, ...snapshots.map((s) => s.totalBalance));
+  const stepX = isEmpty ? 1 : (WIDTH - PADDING * 2) / (snapshots.length - 1);
 
-  const { bands: rawBands, minValue } = assets.reduce<{
+  const { bands: rawBands, minValue, maxValue } = assets.reduce<{
     prevTop: number[];
     bands: {
       id: string;
@@ -62,6 +58,7 @@ export default function AssetAreaChart({
       top: number[];
     }[];
     minValue: number;
+    maxValue: number;
   }>(
     (acc, asset) => {
       const bottom = acc.prevTop;
@@ -74,6 +71,7 @@ export default function AssetAreaChart({
       return {
         prevTop: top,
         minValue: Math.min(acc.minValue, ...bottom, ...top),
+        maxValue: Math.max(acc.maxValue, ...bottom, ...top),
         bands: [
           ...acc.bands,
           {
@@ -87,11 +85,16 @@ export default function AssetAreaChart({
         ],
       };
     },
-    { prevTop: snapshots.map(() => 0), bands: [], minValue: 0 },
+    {
+      prevTop: snapshots.map(() => 0),
+      bands: [],
+      minValue: 0,
+      maxValue: 0,
+    },
   );
 
   const domainMin = Math.min(0, minValue);
-  const domainMax = Math.max(1, maxTotal);
+  const domainMax = Math.max(1, maxTotal, maxValue);
   const domainRange = domainMax - domainMin || 1;
   const scaleY = (value: number) =>
     HEIGHT -
@@ -122,89 +125,98 @@ export default function AssetAreaChart({
 
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-      <p className="text-sm text-gray-500">
-        📈 총자산{" "}
-        <span className="text-lg font-semibold text-gray-800">
-          {formatKRW(totalBalance)}
-        </span>
-      </p>
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="mt-2 w-full">
-        <defs>
-          <clipPath id={BELOW_ZERO_CLIP_ID} clipPathUnits="userSpaceOnUse">
-            <rect
-              x={0}
-              y={zeroY}
-              width={WIDTH}
-              height={Math.max(0, HEIGHT - zeroY)}
+      {isEmpty ? (
+        <div className="flex h-[180px] items-center justify-center text-sm text-gray-400">
+          📭 자산을 추가하면 그래프가 나타납니다
+        </div>
+      ) : (
+        <>
+          <p className="text-sm text-gray-500">
+            📈 총자산{" "}
+            <span className="text-lg font-semibold text-gray-800">
+              {formatKRW(totalBalance)}
+            </span>
+          </p>
+          <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="mt-2 w-full">
+            <defs>
+              <clipPath id={BELOW_ZERO_CLIP_ID} clipPathUnits="userSpaceOnUse">
+                <rect
+                  x={0}
+                  y={zeroY}
+                  width={WIDTH}
+                  height={Math.max(0, HEIGHT - zeroY)}
+                />
+              </clipPath>
+            </defs>
+            {bands.map((band) => (
+              <g key={band.id}>
+                <polygon
+                  points={band.points}
+                  fill={band.fill}
+                  fillOpacity={0.55}
+                  stroke={band.stroke}
+                  strokeWidth={band.stroke ? 2 : 0}
+                >
+                  <title>{band.name}</title>
+                </polygon>
+                <polygon
+                  points={band.points}
+                  fill={DEFICIT_COLOR}
+                  fillOpacity={0.55}
+                  clipPath={`url(#${BELOW_ZERO_CLIP_ID})`}
+                  pointerEvents="none"
+                />
+              </g>
+            ))}
+            {domainMin < 0 && (
+              <line
+                x1={PADDING}
+                y1={zeroY}
+                x2={WIDTH - PADDING}
+                y2={zeroY}
+                stroke="#9ca3af"
+                strokeWidth={1}
+                strokeDasharray="2 2"
+              />
+            )}
+            <line
+              x1={cursorX}
+              y1={PADDING}
+              x2={cursorX}
+              y2={HEIGHT - PADDING}
+              stroke="#4338ca"
+              strokeWidth={1.5}
+              strokeDasharray="4 4"
             />
-          </clipPath>
-        </defs>
-        {bands.map((band) => (
-          <g key={band.id}>
-            <polygon
-              points={band.points}
-              fill={band.fill}
-              fillOpacity={0.55}
-              stroke={band.stroke}
-              strokeWidth={band.stroke ? 2 : 0}
+            <circle
+              cx={PADDING}
+              cy={currentY}
+              r={4}
+              fill="#4338ca"
+              stroke="white"
+              strokeWidth={1.5}
+            />
+            <text
+              x={PADDING + 8}
+              y={Math.max(10, currentY - 6)}
+              className="fill-gray-700 text-[10px] font-medium"
             >
-              <title>{band.name}</title>
-            </polygon>
-            <polygon
-              points={band.points}
-              fill={DEFICIT_COLOR}
-              fillOpacity={0.55}
-              clipPath={`url(#${BELOW_ZERO_CLIP_ID})`}
-            />
-          </g>
-        ))}
-        {domainMin < 0 && (
-          <line
-            x1={PADDING}
-            y1={zeroY}
-            x2={WIDTH - PADDING}
-            y2={zeroY}
-            stroke="#9ca3af"
-            strokeWidth={1}
-            strokeDasharray="2 2"
-          />
-        )}
-        <line
-          x1={cursorX}
-          y1={PADDING}
-          x2={cursorX}
-          y2={HEIGHT - PADDING}
-          stroke="#4338ca"
-          strokeWidth={1.5}
-          strokeDasharray="4 4"
-        />
-        <circle
-          cx={PADDING}
-          cy={currentY}
-          r={4}
-          fill="#4338ca"
-          stroke="white"
-          strokeWidth={1.5}
-        />
-        <text
-          x={PADDING + 8}
-          y={Math.max(10, currentY - 6)}
-          className="fill-gray-700 text-[10px] font-medium"
-        >
-          현재 {formatKRW(currentTotal)}
-        </text>
-      </svg>
-      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
-        {assets.map((asset) => (
-          <span key={asset.id} className="flex items-center gap-1">
-            <span
-              className="h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: asset.color }}
-            />
-            {asset.name}
-          </span>
-        ))}
-      </div>
+              현재 {formatKRW(currentTotal)}
+            </text>
+          </svg>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+            {assets.map((asset) => (
+              <span key={asset.id} className="flex items-center gap-1">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: asset.color }}
+                />
+                {asset.name}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
       <div className="mt-3 border-t border-white/60 pt-3">
         <TimelineSlider
           selectedMonth={selectedMonth}
