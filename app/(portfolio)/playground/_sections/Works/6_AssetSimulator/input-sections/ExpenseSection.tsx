@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Plus, TrendingDown } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus, TrendingDown } from "lucide-react";
 import {
   ExpenseItem,
   Group,
@@ -65,6 +65,8 @@ export default function ExpenseSection({
     defaultSchedule(today),
   );
   const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(true);
+  const isFormVisible = showForm || Boolean(editingId);
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
 
@@ -160,7 +162,20 @@ export default function ExpenseSection({
           );
         })}
       </ul>
-      <div className="mt-3 flex flex-col gap-2" onKeyDown={handleKeyDown}>
+      <button
+        type="button"
+        onClick={() => setShowForm((prev) => !prev)}
+        className="mt-3 inline-flex items-center gap-1 text-xs text-rose-600 hover:text-rose-700"
+      >
+        {isFormVisible ? (
+          <ChevronUp className="h-3.5 w-3.5" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5" />
+        )}
+        입력 폼
+      </button>
+      {isFormVisible && (
+      <div className="mt-2 flex flex-col gap-2" onKeyDown={handleKeyDown}>
         <div className="flex gap-2">
           <input
             ref={nameRef}
@@ -213,6 +228,7 @@ export default function ExpenseSection({
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

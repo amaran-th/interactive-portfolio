@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Landmark, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, Landmark, Plus } from "lucide-react";
 import {
   AssetClass,
   Currency,
@@ -61,6 +61,8 @@ export default function GroupAssetSection({
   const [returnRate, setReturnRate] = useState("0");
   const [makePrimary, setMakePrimary] = useState(false);
   const [colorPickerId, setColorPickerId] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(true);
+  const isFormVisible = showForm || Boolean(editingId);
 
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -212,7 +214,21 @@ export default function GroupAssetSection({
         })}
       </ul>
 
-      <div className="mt-3 flex flex-col gap-2" onKeyDown={handleKeyDown}>
+      <button
+        type="button"
+        onClick={() => setShowForm((prev) => !prev)}
+        className="mt-3 inline-flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700"
+      >
+        {isFormVisible ? (
+          <ChevronUp className="h-3.5 w-3.5" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5" />
+        )}
+        입력 폼
+      </button>
+
+      {isFormVisible && (
+      <div className="mt-2 flex flex-col gap-2" onKeyDown={handleKeyDown}>
         <div className="flex gap-2">
           <input
             ref={nameRef}
@@ -303,6 +319,7 @@ export default function GroupAssetSection({
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

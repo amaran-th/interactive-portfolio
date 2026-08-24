@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ArrowLeftRight, Plus } from "lucide-react";
+import { ArrowLeftRight, ChevronDown, ChevronUp, Plus } from "lucide-react";
 import {
   AssetClass,
   NewTransferRuleInput,
@@ -60,6 +60,8 @@ export default function TransferRuleSection({
     defaultSchedule(today),
   );
   const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(true);
+  const isFormVisible = showForm || Boolean(editingId);
   const amountRef = useRef<HTMLInputElement>(null);
 
   const nameOf = (id: string) =>
@@ -165,7 +167,21 @@ export default function TransferRuleSection({
         ))}
       </ul>
 
-      <div className="mt-3 flex flex-col gap-2" onKeyDown={handleKeyDown}>
+      <button
+        type="button"
+        onClick={() => setShowForm((prev) => !prev)}
+        className="mt-3 inline-flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700"
+      >
+        {isFormVisible ? (
+          <ChevronUp className="h-3.5 w-3.5" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5" />
+        )}
+        입력 폼
+      </button>
+
+      {isFormVisible && (
+      <div className="mt-2 flex flex-col gap-2" onKeyDown={handleKeyDown}>
         <div className="flex items-center gap-2">
           <select
             value={effectiveFrom}
@@ -244,6 +260,7 @@ export default function TransferRuleSection({
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
