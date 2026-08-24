@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, GitCompare } from "lucide-react";
+import { Copy, GitCompare, Pencil, X } from "lucide-react";
 import { Scenario } from "./types";
 
 type ScenarioTabsProps = {
@@ -44,14 +44,14 @@ export default function ScenarioTabs({
   };
 
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2">
-      <ul className="flex flex-wrap items-center gap-1">
+    <div className="mb-4 flex flex-wrap items-center gap-2.5">
+      <ul className="flex flex-wrap items-center gap-1.5">
         {scenarios.map((scenario) => {
           const active = scenario.id === activeScenarioId;
           return (
             <li
               key={scenario.id}
-              className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs ${
+              className={`flex items-center gap-0.5 rounded-full py-1 pl-3 pr-1.5 text-xs ${
                 active ? "bg-indigo-500 text-white" : "bg-white/80 text-gray-600"
               }`}
             >
@@ -84,29 +84,29 @@ export default function ScenarioTabs({
               <button
                 type="button"
                 onClick={() => startRename(scenario)}
-                className={
+                className={`rounded-full p-1 ${
                   active
-                    ? "text-white/70 hover:text-white"
-                    : "text-gray-400 hover:text-gray-700"
-                }
+                    ? "text-white/70 hover:bg-white/20 hover:text-white"
+                    : "text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                }`}
                 aria-label="시나리오 이름 수정"
               >
-                ✎
+                <Pencil className="h-3 w-3" />
               </button>
               <button
                 type="button"
                 onClick={() => onDelete(scenario.id)}
                 disabled={scenarios.length <= 1}
-                className={
+                className={`rounded-full p-1 ${
                   scenarios.length <= 1
                     ? "cursor-not-allowed text-white/30"
                     : active
-                      ? "text-white/70 hover:text-white"
-                      : "text-gray-400 hover:text-rose-500"
-                }
+                      ? "text-white/70 hover:bg-white/20 hover:text-white"
+                      : "text-gray-400 hover:bg-rose-50 hover:text-rose-500"
+                }`}
                 aria-label="시나리오 삭제"
               >
-                ✕
+                <X className="h-3 w-3" />
               </button>
             </li>
           );

@@ -190,7 +190,7 @@ export default function TransferRuleSection({
               setFromAssetId(e.target.value);
               setToAssetId("");
             }}
-            className="flex-1 rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-sm"
+            className="min-w-0 flex-1 rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-sm"
           >
             {assetClasses.map((asset) => (
               <option key={asset.id} value={asset.id}>
@@ -202,7 +202,7 @@ export default function TransferRuleSection({
           <select
             value={effectiveTo}
             onChange={(e) => setToAssetId(e.target.value)}
-            className="flex-1 rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-sm"
+            className="min-w-0 flex-1 rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-sm"
             disabled={sameCurrencyAssets.length === 0}
           >
             {sameCurrencyAssets.length === 0 && (
