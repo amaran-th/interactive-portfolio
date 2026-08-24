@@ -187,6 +187,7 @@ export default function AssetSimulator() {
   const [selectedMonth, setSelectedMonth] = useState(0);
   const [horizonYears, setHorizonYears] = useState(DEFAULT_HORIZON_YEARS);
   const [isDirty, setIsDirty] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
 
   const horizonMonths = horizonYears * 12;
 
@@ -487,14 +488,18 @@ export default function AssetSimulator() {
           onDelete={handleDeleteScenario}
           onDuplicate={handleDuplicateScenario}
           onCreate={handleCreateScenario}
+          showComparison={showComparison}
+          onToggleComparison={() => setShowComparison((prev) => !prev)}
         />
 
-        <ScenarioComparisonChart
-          scenarios={scenarios}
-          today={today}
-          horizonMonths={horizonMonths}
-          selectedMonth={selectedMonth}
-        />
+        {showComparison && (
+          <ScenarioComparisonChart
+            scenarios={scenarios}
+            today={today}
+            horizonMonths={horizonMonths}
+            selectedMonth={selectedMonth}
+          />
+        )}
 
         <div className="mb-4">
           <InputPanel

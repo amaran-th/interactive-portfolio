@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Copy } from "lucide-react";
+import { Copy, GitCompare } from "lucide-react";
 import { Scenario } from "./types";
 
 type ScenarioTabsProps = {
@@ -12,6 +12,8 @@ type ScenarioTabsProps = {
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
   onCreate: () => void;
+  showComparison: boolean;
+  onToggleComparison: () => void;
 };
 
 export default function ScenarioTabs({
@@ -22,6 +24,8 @@ export default function ScenarioTabs({
   onDelete,
   onDuplicate,
   onCreate,
+  showComparison,
+  onToggleComparison,
 }: ScenarioTabsProps) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -121,6 +125,17 @@ export default function ScenarioTabs({
         className="rounded-full bg-white/80 px-3 py-1 text-xs text-indigo-600 hover:bg-white"
       >
         + 새 시나리오
+      </button>
+      <button
+        type="button"
+        onClick={onToggleComparison}
+        className={`ml-auto inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs ${
+          showComparison
+            ? "bg-indigo-500 text-white"
+            : "bg-white/80 text-gray-600 hover:bg-white"
+        }`}
+      >
+        <GitCompare className="h-3.5 w-3.5" /> 시나리오 비교
       </button>
     </div>
   );
