@@ -132,7 +132,7 @@ export default function GoalCard({
     goal && goal.targetAmount > 0 ? currentValue / goal.targetAmount : 0;
 
   return (
-    <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
+    <div>
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
         <Target className="h-4 w-4" /> 목표
       </h3>
@@ -234,3 +234,4 @@ export default function GoalCard({
     </div>
   );
 }
+

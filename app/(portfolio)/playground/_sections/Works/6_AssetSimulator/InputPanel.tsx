@@ -18,7 +18,6 @@ import GroupAssetSection from "./input-sections/GroupAssetSection";
 import IncomeSection from "./input-sections/IncomeSection";
 import ExpenseSection from "./input-sections/ExpenseSection";
 import TransferRuleSection from "./input-sections/TransferRuleSection";
-import GoalCard from "./GoalCard";
 
 type InputPanelProps = {
   groups: Group[];
@@ -57,6 +56,7 @@ export default function InputPanel(props: InputPanelProps) {
     <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))]">
       <GroupAssetSection
         groups={props.groups}
+        assetGroups={props.assetGroups}
         onAddGroup={props.onAddGroup}
         onUpdateGroup={props.onUpdateGroup}
         onRemoveGroup={props.onRemoveGroup}
@@ -66,6 +66,11 @@ export default function InputPanel(props: InputPanelProps) {
         onRemoveAssetClass={props.onRemoveAssetClass}
         onSetPrimaryAsset={props.onSetPrimaryAsset}
         onChangeAssetColor={props.onChangeAssetColor}
+        goal={props.goal}
+        onSetGoal={props.onSetGoal}
+        simulationInput={props.simulationInput}
+        today={props.today}
+        selectedSnapshot={props.selectedSnapshot}
       />
       <IncomeSection
         groups={props.groups}
@@ -99,15 +104,6 @@ export default function InputPanel(props: InputPanelProps) {
         onRemoveTransferRule={props.onRemoveTransferRule}
         today={props.today}
         horizonMonths={props.horizonMonths}
-      />
-      <GoalCard
-        goal={props.goal}
-        onSetGoal={props.onSetGoal}
-        assetClasses={props.assetClasses}
-        groups={props.assetGroups}
-        simulationInput={props.simulationInput}
-        today={props.today}
-        selectedSnapshot={props.selectedSnapshot}
       />
     </div>
   );
