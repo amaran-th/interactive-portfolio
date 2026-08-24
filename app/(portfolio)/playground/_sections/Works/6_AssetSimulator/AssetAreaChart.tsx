@@ -121,8 +121,8 @@ export default function AssetAreaChart({
 
   const cursorX = PADDING + selectedMonth * stepX;
   const totalBalance = snapshots[selectedMonth]?.totalBalance ?? 0;
-  const currentTotal = snapshots[0]?.totalBalance ?? 0;
-  const currentY = scaleY(currentTotal);
+  const cursorY = scaleY(totalBalance);
+  const nearRightEdge = cursorX > WIDTH - PADDING - 60;
 
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
@@ -195,19 +195,20 @@ export default function AssetAreaChart({
               strokeDasharray="4 4"
             />
             <circle
-              cx={PADDING}
-              cy={currentY}
+              cx={cursorX}
+              cy={cursorY}
               r={4}
               fill="#4338ca"
               stroke="white"
               strokeWidth={1.5}
             />
             <text
-              x={PADDING + 8}
-              y={Math.max(10, currentY - 6)}
+              x={nearRightEdge ? cursorX - 8 : cursorX + 8}
+              y={Math.max(10, cursorY - 6)}
+              textAnchor={nearRightEdge ? "end" : "start"}
               className="fill-gray-700 text-[10px] font-medium"
             >
-              현재 {formatKRW(currentTotal)}
+              {formatKRW(totalBalance)}
             </text>
           </svg>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">

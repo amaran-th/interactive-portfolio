@@ -45,18 +45,31 @@ export default function TimelineSlider({
           onChange={(e) => onChange(Number(e.target.value))}
           className="w-full accent-indigo-500"
         />
-        <div className="relative mt-1 h-2.5">
-          {yearMarks.map((month) => (
-            <div
-              key={month}
-              className={`absolute top-0 -translate-x-1/2 rounded-full ${
-                month % 60 === 0
-                  ? "h-2.5 w-1 bg-gray-500"
-                  : "h-1.5 w-0.5 bg-gray-400"
-              }`}
-              style={{ left: `${(month / horizonMonths) * 100}%` }}
-            />
-          ))}
+        <div className="relative mt-1 h-4">
+          {yearMarks.map((month) => {
+            const isMajor = month % 60 === 0;
+            const isActive = selectedMonth === month;
+            return (
+              <button
+                key={month}
+                type="button"
+                onClick={() => onChange(month)}
+                aria-label={`${month / 12}년 지점으로 이동`}
+                className="group absolute top-1/2 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+                style={{ left: `${(month / horizonMonths) * 100}%` }}
+              >
+                <span
+                  className={`rounded-full transition-colors ${
+                    isMajor ? "h-2.5 w-2.5" : "h-1.5 w-1.5"
+                  } ${
+                    isActive
+                      ? "bg-indigo-500"
+                      : "bg-gray-400 group-hover:bg-indigo-400"
+                  }`}
+                />
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
