@@ -12,6 +12,13 @@ import {
   formatMonthsFromNow,
 } from "./types";
 import { findGoalAchievementMonth } from "./simulation";
+import CustomSelect from "./CustomSelect";
+
+const METRIC_TYPE_OPTIONS = [
+  { value: "total", label: "총자산" },
+  { value: "asset", label: "특정 자산" },
+  { value: "group", label: "특정 그룹" },
+];
 
 type GoalCardProps = {
   goal: Goal | null;
@@ -138,45 +145,38 @@ export default function GoalCard({
       </h3>
       <div className="mt-2 flex flex-col gap-2">
         <div className="flex gap-2">
-          <select
+          <CustomSelect
             value={metricType}
-            onChange={(e) => {
-              setMetricType(e.target.value as MetricType);
+            onChange={(v) => {
+              setMetricType(v as MetricType);
               setTargetId("");
             }}
-            className="rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-sm"
-          >
-            <option value="total">총자산</option>
-            <option value="asset">특정 자산</option>
-            <option value="group">특정 그룹</option>
-          </select>
+            options={METRIC_TYPE_OPTIONS}
+            className="w-32 shrink-0"
+          />
           {metricType === "asset" && (
-            <select
+            <CustomSelect
               value={targetId}
-              onChange={(e) => setTargetId(e.target.value)}
-              className="flex-1 rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-sm"
-            >
-              <option value="">자산 선택</option>
-              {assetClasses.map((asset) => (
-                <option key={asset.id} value={asset.id}>
-                  {asset.name}
-                </option>
-              ))}
-            </select>
+              onChange={setTargetId}
+              options={assetClasses.map((asset) => ({
+                value: asset.id,
+                label: asset.name,
+              }))}
+              placeholder="자산 선택"
+              className="min-w-0 flex-1"
+            />
           )}
           {metricType === "group" && (
-            <select
+            <CustomSelect
               value={targetId}
-              onChange={(e) => setTargetId(e.target.value)}
-              className="flex-1 rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-sm"
-            >
-              <option value="">그룹 선택</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
-            </select>
+              onChange={setTargetId}
+              options={groups.map((group) => ({
+                value: group.id,
+                label: group.name,
+              }))}
+              placeholder="그룹 선택"
+              className="min-w-0 flex-1"
+            />
           )}
         </div>
         <input

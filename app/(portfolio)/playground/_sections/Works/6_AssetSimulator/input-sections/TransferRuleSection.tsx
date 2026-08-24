@@ -14,6 +14,12 @@ import {
 import { validateSchedule } from "../simulation";
 import ScheduleEditor from "./ScheduleEditor";
 import FloatingFormPanel from "./FloatingFormPanel";
+import CustomSelect from "../CustomSelect";
+
+const TRANSFER_MODE_OPTIONS = [
+  { value: "fixed", label: "고정 금액" },
+  { value: "percentOfSource", label: "출발 잔액 비율(%)" },
+];
 
 type TransferRuleSectionProps = {
   assetClasses: AssetClass[];
@@ -136,7 +142,11 @@ export default function TransferRuleSection({
   };
 
   return (
-    <div className="relative rounded-2xl border border-amber-200 bg-white/70 p-4 backdrop-blur">
+    <div
+      className={`relative rounded-2xl border border-amber-200 bg-white/70 p-4 backdrop-blur ${
+        isFormVisible ? "z-30" : ""
+      }`}
+    >
       <div className="flex items-center justify-between">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-700">
           <ArrowLeftRight className="h-4 w-4" /> 이체 규칙
@@ -185,46 +195,41 @@ export default function TransferRuleSection({
       {isFormVisible && (
       <FloatingFormPanel onKeyDown={handleKeyDown} className="border-amber-200">
         <div className="flex items-center gap-2">
-          <select
+          <CustomSelect
             value={effectiveFrom}
-            onChange={(e) => {
-              setFromAssetId(e.target.value);
+            onChange={(v) => {
+              setFromAssetId(v);
               setToAssetId("");
             }}
-            className="min-w-0 flex-1 rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-sm"
-          >
-            {assetClasses.map((asset) => (
-              <option key={asset.id} value={asset.id}>
-                {asset.name}({asset.currency})
-              </option>
-            ))}
-          </select>
+            options={assetClasses.map((asset) => ({
+              value: asset.id,
+              label: `${asset.name}(${asset.currency})`,
+            }))}
+            borderClassName="border-amber-200"
+            className="min-w-0 flex-1"
+          />
           <span className="text-gray-400">→</span>
-          <select
+          <CustomSelect
             value={effectiveTo}
-            onChange={(e) => setToAssetId(e.target.value)}
-            className="min-w-0 flex-1 rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-sm"
+            onChange={setToAssetId}
+            options={sameCurrencyAssets.map((asset) => ({
+              value: asset.id,
+              label: `${asset.name}(${asset.currency})`,
+            }))}
+            placeholder="같은 통화 자산이 없습니다"
             disabled={sameCurrencyAssets.length === 0}
-          >
-            {sameCurrencyAssets.length === 0 && (
-              <option value="">같은 통화 자산이 없습니다</option>
-            )}
-            {sameCurrencyAssets.map((asset) => (
-              <option key={asset.id} value={asset.id}>
-                {asset.name}({asset.currency})
-              </option>
-            ))}
-          </select>
+            borderClassName="border-amber-200"
+            className="min-w-0 flex-1"
+          />
         </div>
         <div className="flex items-center gap-2">
-          <select
+          <CustomSelect
             value={mode}
-            onChange={(e) => setMode(e.target.value as TransferMode)}
-            className="rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-sm"
-          >
-            <option value="fixed">고정 금액</option>
-            <option value="percentOfSource">출발 잔액 비율(%)</option>
-          </select>
+            onChange={(v) => setMode(v as TransferMode)}
+            options={TRANSFER_MODE_OPTIONS}
+            borderClassName="border-amber-200"
+            className="w-44 shrink-0"
+          />
           <input
             ref={amountRef}
             value={amount}

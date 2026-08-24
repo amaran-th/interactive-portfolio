@@ -15,6 +15,12 @@ import {
 import GroupPicker from "./GroupPicker";
 import GoalCard from "../GoalCard";
 import FloatingFormPanel from "./FloatingFormPanel";
+import CustomSelect from "../CustomSelect";
+
+const CURRENCY_OPTIONS = [
+  { value: "KRW", label: "KRW(원)" },
+  { value: "USD", label: "USD(달러)" },
+];
 
 type GroupAssetSectionProps = {
   groups: Group[];
@@ -117,7 +123,11 @@ export default function GroupAssetSection({
   };
 
   return (
-    <div className="relative rounded-2xl border border-indigo-200 bg-white/70 p-4 backdrop-blur md:col-span-2">
+    <div
+      className={`relative rounded-2xl border border-indigo-200 bg-white/70 p-4 backdrop-blur md:col-span-2 ${
+        isFormVisible ? "z-30" : ""
+      }`}
+    >
       <GoalCard
         goal={goal}
         onSetGoal={onSetGoal}
@@ -249,18 +259,17 @@ export default function GroupAssetSection({
           />
         </div>
         <div className="flex gap-2">
-          <select
+          <CustomSelect
             value={currency}
-            onChange={(e) => {
-              const next = e.target.value as Currency;
+            onChange={(v) => {
+              const next = v as Currency;
               setCurrency(next);
               if (next === "USD") setMakePrimary(false);
             }}
-            className="rounded-full border border-indigo-200 bg-white/80 px-3 py-1.5 text-sm"
-          >
-            <option value="KRW">KRW(원)</option>
-            <option value="USD">USD(달러)</option>
-          </select>
+            options={CURRENCY_OPTIONS}
+            borderClassName="border-indigo-200"
+            className="w-32 shrink-0"
+          />
           <input
             value={balance}
             onChange={(e) => setBalance(e.target.value)}

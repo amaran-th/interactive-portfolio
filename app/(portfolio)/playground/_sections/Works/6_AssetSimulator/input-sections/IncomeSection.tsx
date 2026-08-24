@@ -126,7 +126,11 @@ export default function IncomeSection({
   };
 
   return (
-    <div className="relative rounded-2xl border border-emerald-200 bg-white/70 p-4 backdrop-blur">
+    <div
+      className={`relative rounded-2xl border border-emerald-200 bg-white/70 p-4 backdrop-blur ${
+        isFormVisible ? "z-30" : ""
+      }`}
+    >
       <div className="flex items-center justify-between">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700">
           <TrendingUp className="h-4 w-4" /> 수입

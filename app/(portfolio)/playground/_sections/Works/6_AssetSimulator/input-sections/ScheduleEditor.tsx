@@ -7,6 +7,18 @@ import {
   toMonthInputValue,
 } from "../types";
 import { monthIndexFromTargetDate } from "../simulation";
+import CustomSelect from "../CustomSelect";
+
+const FREQUENCY_OPTIONS = [
+  { value: "monthly", label: "매월" },
+  { value: "yearly", label: "매년" },
+];
+
+const UNTIL_TYPE_OPTIONS = [
+  { value: "indefinite", label: "무기한" },
+  { value: "date", label: "특정 날짜까지" },
+  { value: "count", label: "횟수" },
+];
 
 type ScheduleEditorProps = {
   value: RepeatSchedule;
@@ -107,30 +119,23 @@ export default function ScheduleEditor({
         </span>
       </div>
       <div className="flex items-center gap-2">
-        <select
+        <CustomSelect
           value={value.frequency}
-          onChange={(e) =>
+          onChange={(v) =>
             onChange({
               ...value,
-              frequency: e.target.value as "monthly" | "yearly",
+              frequency: v as "monthly" | "yearly",
             })
           }
-          className="rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-sm"
-        >
-          <option value="monthly">매월</option>
-          <option value="yearly">매년</option>
-        </select>
-        <select
+          options={FREQUENCY_OPTIONS}
+          className="w-24 shrink-0"
+        />
+        <CustomSelect
           value={value.until.type}
-          onChange={(e) =>
-            handleUntilTypeChange(e.target.value as RepeatUntil["type"])
-          }
-          className="rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-sm"
-        >
-          <option value="indefinite">무기한</option>
-          <option value="date">특정 날짜까지</option>
-          <option value="count">횟수</option>
-        </select>
+          onChange={(v) => handleUntilTypeChange(v as RepeatUntil["type"])}
+          options={UNTIL_TYPE_OPTIONS}
+          className="w-36 shrink-0"
+        />
       </div>
       {value.until.type === "date" && (
         <div className="flex items-center gap-2">
