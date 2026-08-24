@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ArrowLeftRight, ChevronDown, ChevronUp, Plus } from "lucide-react";
+import { ArrowLeftRight, Plus, Settings } from "lucide-react";
 import {
   AssetClass,
   NewTransferRuleInput,
@@ -136,9 +136,23 @@ export default function TransferRuleSection({
 
   return (
     <div className="rounded-2xl border border-amber-200 bg-white/70 p-4 backdrop-blur">
-      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-700">
-        <ArrowLeftRight className="h-4 w-4" /> 이체 규칙
-      </h3>
+      <div className="flex items-center justify-between">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-700">
+          <ArrowLeftRight className="h-4 w-4" /> 이체 규칙
+        </h3>
+        <button
+          type="button"
+          onClick={() => setShowForm((prev) => !prev)}
+          className={`rounded-full p-1.5 ${
+            isFormVisible
+              ? "bg-amber-500 text-white"
+              : "text-amber-600 hover:bg-amber-100"
+          }`}
+          aria-label="입력 폼 토글"
+        >
+          <Settings className="h-4 w-4" />
+        </button>
+      </div>
       <ul className="mt-2 flex flex-col gap-2">
         {transferRules.map((rule) => (
           <li
@@ -167,21 +181,8 @@ export default function TransferRuleSection({
         ))}
       </ul>
 
-      <button
-        type="button"
-        onClick={() => setShowForm((prev) => !prev)}
-        className="mt-3 inline-flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700"
-      >
-        {isFormVisible ? (
-          <ChevronUp className="h-3.5 w-3.5" />
-        ) : (
-          <ChevronDown className="h-3.5 w-3.5" />
-        )}
-        입력 폼
-      </button>
-
       {isFormVisible && (
-      <div className="mt-2 flex flex-col gap-2" onKeyDown={handleKeyDown}>
+      <div className="mt-3 flex flex-col gap-2" onKeyDown={handleKeyDown}>
         <div className="flex items-center gap-2">
           <select
             value={effectiveFrom}

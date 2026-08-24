@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Plus, TrendingUp } from "lucide-react";
+import { Plus, Settings, TrendingUp } from "lucide-react";
 import {
   Group,
   IncomeItem,
@@ -126,9 +126,23 @@ export default function IncomeSection({
 
   return (
     <div className="rounded-2xl border border-emerald-200 bg-white/70 p-4 backdrop-blur">
-      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700">
-        <TrendingUp className="h-4 w-4" /> 수입
-      </h3>
+      <div className="flex items-center justify-between">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700">
+          <TrendingUp className="h-4 w-4" /> 수입
+        </h3>
+        <button
+          type="button"
+          onClick={() => setShowForm((prev) => !prev)}
+          className={`rounded-full p-1.5 ${
+            isFormVisible
+              ? "bg-emerald-500 text-white"
+              : "text-emerald-600 hover:bg-emerald-100"
+          }`}
+          aria-label="입력 폼 토글"
+        >
+          <Settings className="h-4 w-4" />
+        </button>
+      </div>
       <ul className="mt-2 flex flex-col gap-2">
         {incomes.map((item) => {
           const group = groups.find((g) => g.id === item.groupId);
@@ -162,20 +176,8 @@ export default function IncomeSection({
           );
         })}
       </ul>
-      <button
-        type="button"
-        onClick={() => setShowForm((prev) => !prev)}
-        className="mt-3 inline-flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700"
-      >
-        {isFormVisible ? (
-          <ChevronUp className="h-3.5 w-3.5" />
-        ) : (
-          <ChevronDown className="h-3.5 w-3.5" />
-        )}
-        입력 폼
-      </button>
       {isFormVisible && (
-      <div className="mt-2 flex flex-col gap-2" onKeyDown={handleKeyDown}>
+      <div className="mt-3 flex flex-col gap-2" onKeyDown={handleKeyDown}>
         <div className="flex gap-2">
           <input
             ref={nameRef}

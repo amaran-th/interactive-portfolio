@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Landmark, Plus } from "lucide-react";
+import { Landmark, Plus, Settings } from "lucide-react";
 import {
   AssetClass,
   Currency,
@@ -126,9 +126,23 @@ export default function GroupAssetSection({
         today={today}
         selectedSnapshot={selectedSnapshot}
       />
-      <h3 className="mt-4 flex items-center gap-1.5 border-t border-indigo-100 pt-4 text-sm font-semibold text-indigo-700">
-        <Landmark className="h-4 w-4" /> 현재 자산
-      </h3>
+      <div className="mt-4 flex items-center justify-between border-t border-indigo-100 pt-4">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-indigo-700">
+          <Landmark className="h-4 w-4" /> 현재 자산
+        </h3>
+        <button
+          type="button"
+          onClick={() => setShowForm((prev) => !prev)}
+          className={`rounded-full p-1.5 ${
+            isFormVisible
+              ? "bg-indigo-500 text-white"
+              : "text-indigo-600 hover:bg-indigo-100"
+          }`}
+          aria-label="입력 폼 토글"
+        >
+          <Settings className="h-4 w-4" />
+        </button>
+      </div>
       <ul className="mt-2 flex flex-col gap-2">
         {assetClasses.map((asset) => {
           const group = groups.find((g) => g.id === asset.groupId);
@@ -214,21 +228,8 @@ export default function GroupAssetSection({
         })}
       </ul>
 
-      <button
-        type="button"
-        onClick={() => setShowForm((prev) => !prev)}
-        className="mt-3 inline-flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700"
-      >
-        {isFormVisible ? (
-          <ChevronUp className="h-3.5 w-3.5" />
-        ) : (
-          <ChevronDown className="h-3.5 w-3.5" />
-        )}
-        입력 폼
-      </button>
-
       {isFormVisible && (
-      <div className="mt-2 flex flex-col gap-2" onKeyDown={handleKeyDown}>
+      <div className="mt-3 flex flex-col gap-2" onKeyDown={handleKeyDown}>
         <div className="flex gap-2">
           <input
             ref={nameRef}
