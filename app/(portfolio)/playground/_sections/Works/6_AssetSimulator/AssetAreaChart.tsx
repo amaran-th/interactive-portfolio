@@ -31,7 +31,7 @@ type AssetAreaChartProps = {
 };
 
 const WIDTH = 600;
-const HEIGHT = 220;
+const HEIGHT = 150;
 const PADDING = 12;
 const BELOW_ZERO_CLIP_ID = "asset-area-below-zero-clip";
 const DEFICIT_COLOR = "#f43f5e";
@@ -147,6 +147,7 @@ export default function AssetAreaChart({
   const displayBalance = inflationEnabled
     ? toRealValue(totalBalance, selectedMonth, inflationRate)
     : totalBalance;
+  const currentBalance = snapshots[0]?.totalBalance ?? 0;
   const cursorY = scaleY(totalBalance);
   const nearRightEdge = cursorX > WIDTH - PADDING - 60;
 
@@ -182,9 +183,9 @@ export default function AssetAreaChart({
           <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
             <p className="flex items-center gap-1.5">
               <LineChartIcon className="h-4 w-4" />{" "}
-              {inflationEnabled ? "현재 자산(오늘 가치)" : "현재 자산"}{" "}
+              현재 자산{" "}
               <span className="text-lg font-semibold text-gray-800">
-                {formatKRW(displayBalance)}
+                {formatKRW(currentBalance)}
               </span>
             </p>
             <GoalCard

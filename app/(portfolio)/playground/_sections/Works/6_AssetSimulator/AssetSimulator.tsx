@@ -652,7 +652,7 @@ export default function AssetSimulator() {
                 ›
               </button>
             </div>
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap items-start gap-4">
               <div className="min-w-80 flex-2">
                 <AssetAreaChart
                   snapshots={snapshots}

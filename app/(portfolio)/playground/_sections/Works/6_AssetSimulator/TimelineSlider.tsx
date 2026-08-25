@@ -31,6 +31,14 @@ export default function TimelineSlider({
   const progressPct =
     horizonMonths > 0 ? (selectedMonth / horizonMonths) * 100 : 0;
 
+  const snapToYearMark = (raw: number): number => {
+    const nearestMark = yearMarks.reduce((closest, mark) =>
+      Math.abs(mark - raw) < Math.abs(closest - raw) ? mark : closest,
+    );
+    const snapDistance = Math.max(1, Math.round(horizonMonths / 120));
+    return Math.abs(nearestMark - raw) <= snapDistance ? nearestMark : raw;
+  };
+
   return (
     <div>
       <span className="text-sm text-gray-500">
@@ -48,24 +56,18 @@ export default function TimelineSlider({
           const isMajor = month % 60 === 0;
           const isPast = month <= selectedMonth;
           return (
-            <button
+            <span
               key={month}
-              type="button"
-              onClick={() => onChange(month)}
-              aria-label={month === 0 ? "지금으로 이동" : `${month / 12}년 지점으로 이동`}
-              className="group absolute top-1/2 z-20 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center"
+              aria-hidden="true"
+              className={`pointer-events-none absolute top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-white transition-all ${
+                isMajor ? "h-3 w-3" : "h-2 w-2"
+              } ${isPast ? "border-indigo-500" : "border-gray-300"}`}
               style={{ left: `${(month / horizonMonths) * 100}%` }}
-            >
-              <span
-                className={`rounded-full border-2 bg-white transition-all group-hover:scale-125 group-hover:border-indigo-500 ${
-                  isMajor ? "h-3 w-3" : "h-2 w-2"
-                } ${isPast ? "border-indigo-500" : "border-gray-300"}`}
-              />
-            </button>
+            />
           );
         })}
         <div
-          className="pointer-events-none absolute top-1/2 z-30 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-indigo-600 shadow"
+          className="pointer-events-none absolute top-1/2 z-20 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-indigo-600 shadow"
           style={{ left: `${progressPct}%` }}
         />
         <input
@@ -73,8 +75,8 @@ export default function TimelineSlider({
           min={0}
           max={horizonMonths}
           value={selectedMonth}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+          onChange={(e) => onChange(snapToYearMark(Number(e.target.value)))}
+          className="absolute inset-0 z-30 h-full w-full cursor-pointer opacity-0"
         />
       </div>
     </div>

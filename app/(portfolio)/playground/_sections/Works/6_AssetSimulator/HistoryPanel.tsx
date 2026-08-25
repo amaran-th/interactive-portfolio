@@ -21,6 +21,18 @@ type HistoryEntry = {
   amount: number;
 };
 
+type MonthGroup = {
+  month: number;
+  year: number;
+  monthOfYear: number;
+  entries: HistoryEntry[];
+};
+
+type YearGroup = {
+  year: number;
+  months: MonthGroup[];
+};
+
 function formatMonthLabel(monthIndex: number, today: Date): string {
   const date = new Date(
     today.getFullYear(),
@@ -28,6 +40,36 @@ function formatMonthLabel(monthIndex: number, today: Date): string {
     1,
   );
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function groupByYearAndMonth(
+  entries: HistoryEntry[],
+  today: Date,
+): YearGroup[] {
+  const byMonth = new Map<number, HistoryEntry[]>();
+  for (const entry of entries) {
+    const list = byMonth.get(entry.month) ?? [];
+    list.push(entry);
+    byMonth.set(entry.month, list);
+  }
+
+  const yearMap = new Map<number, MonthGroup[]>();
+  for (const month of Array.from(byMonth.keys()).sort((a, b) => a - b)) {
+    const date = new Date(today.getFullYear(), today.getMonth() + month, 1);
+    const year = date.getFullYear();
+    const list = yearMap.get(year) ?? [];
+    list.push({
+      month,
+      year,
+      monthOfYear: date.getMonth() + 1,
+      entries: byMonth.get(month)!,
+    });
+    yearMap.set(year, list);
+  }
+
+  return Array.from(yearMap.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([year, months]) => ({ year, months }));
 }
 
 export default function HistoryPanel({
@@ -100,6 +142,7 @@ export default function HistoryPanel({
   }
 
   const netIncome = totalIncome - totalExpense;
+  const yearGroups = groupByYearAndMonth(entries, today);
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
@@ -132,34 +175,48 @@ export default function HistoryPanel({
           </p>
         </div>
       </div>
-      <ul className="flex max-h-[400px] flex-col gap-1 overflow-y-auto text-xs">
-        {entries.map((entry) => (
-          <li
-            key={entry.key}
-            className="flex items-center justify-between rounded-lg bg-white/80 px-2 py-1.5"
-          >
-            <span className="text-gray-500">
-              {formatMonthLabel(entry.month, today)} · {entry.label}
-            </span>
-            <span
-              className={
-                entry.kind === "income"
-                  ? "text-emerald-600"
-                  : entry.kind === "expense"
-                    ? "text-rose-500"
-                    : "text-amber-600"
-              }
-            >
-              {entry.kind === "expense"
-                ? "-"
-                : entry.kind === "income"
-                  ? "+"
-                  : ""}
-              {formatKRW(entry.amount)}
-            </span>
-          </li>
+      <div className="flex max-h-100 flex-col gap-3 overflow-y-auto text-xs">
+        {yearGroups.map((yearGroup) => (
+          <div key={yearGroup.year} className="flex flex-col gap-2">
+            <p className="text-[11px] font-semibold text-gray-500">
+              {yearGroup.year}년
+            </p>
+            {yearGroup.months.map((monthGroup) => (
+              <div key={monthGroup.month} className="flex flex-col gap-1">
+                <p className="pl-1 text-[11px] text-gray-400">
+                  {monthGroup.monthOfYear}월
+                </p>
+                <ul className="flex flex-col gap-1">
+                  {monthGroup.entries.map((entry) => (
+                    <li
+                      key={entry.key}
+                      className="flex items-center justify-between rounded-lg bg-white/80 px-2 py-1.5"
+                    >
+                      <span className="text-gray-500">{entry.label}</span>
+                      <span
+                        className={
+                          entry.kind === "income"
+                            ? "text-emerald-600"
+                            : entry.kind === "expense"
+                              ? "text-rose-500"
+                              : "text-amber-600"
+                        }
+                      >
+                        {entry.kind === "expense"
+                          ? "-"
+                          : entry.kind === "income"
+                            ? "+"
+                            : ""}
+                        {formatKRW(entry.amount)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }
