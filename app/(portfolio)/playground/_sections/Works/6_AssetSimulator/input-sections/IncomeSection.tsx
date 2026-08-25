@@ -162,28 +162,39 @@ export default function IncomeSection({
             <li
               key={item.id}
               onClick={() => startEdit(item)}
-              className="flex cursor-pointer items-center justify-between rounded-xl border border-emerald-100 bg-white/80 px-3 py-2 text-sm hover:border-emerald-300"
+              className="flex cursor-pointer items-center justify-between gap-2 rounded-xl border border-emerald-100 bg-white/80 px-3 py-2 text-sm hover:border-emerald-300"
             >
-              <span className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 {group && (
                   <span
-                    className="h-2.5 w-2.5 rounded-full"
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{ backgroundColor: group.color }}
                   />
                 )}
-                {item.name} · {item.amount.toLocaleString()}원 ·{" "}
-                {scheduleSummary(item.schedule)}
-              </span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemoveIncome(item.id);
-                }}
-                className="text-gray-400 hover:text-gray-700"
-              >
-                ✕
-              </button>
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-gray-800">
+                    {item.name}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {scheduleSummary(item.schedule)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="font-semibold text-emerald-600">
+                  {item.amount.toLocaleString()}원
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveIncome(item.id);
+                  }}
+                  className="text-gray-400 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
             </li>
           );
         })}

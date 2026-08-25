@@ -149,7 +149,7 @@ export default function TransferRuleSection({
     >
       <div className="flex items-center justify-between">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-700">
-          <ArrowLeftRight className="h-4 w-4" /> 자산 내 이체 규칙
+          <ArrowLeftRight className="h-4 w-4" /> 자산 내 이체
         </h3>
         <button
           type="button"
@@ -176,25 +176,33 @@ export default function TransferRuleSection({
           <li
             key={rule.id}
             onClick={() => startEdit(rule)}
-            className="flex cursor-pointer items-center justify-between rounded-xl border border-amber-100 bg-white/80 px-3 py-2 text-sm hover:border-amber-300"
+            className="flex cursor-pointer items-center justify-between gap-2 rounded-xl border border-amber-100 bg-white/80 px-3 py-2 text-sm hover:border-amber-300"
           >
-            <span>
-              {nameOf(rule.fromAssetId)} → {nameOf(rule.toAssetId)} ·{" "}
-              {rule.mode === "fixed"
-                ? `${rule.amount.toLocaleString()}원`
-                : `${rule.amount}%`}{" "}
-              · {scheduleSummary(rule.schedule)}
-            </span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemoveTransferRule(rule.id);
-              }}
-              className="text-gray-400 hover:text-gray-700"
-            >
-              ✕
-            </button>
+            <div className="min-w-0">
+              <p className="truncate font-medium text-gray-800">
+                {nameOf(rule.fromAssetId)} → {nameOf(rule.toAssetId)}
+              </p>
+              <p className="text-xs text-gray-400">
+                {scheduleSummary(rule.schedule)}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="font-semibold text-amber-600">
+                {rule.mode === "fixed"
+                  ? `${rule.amount.toLocaleString()}원`
+                  : `${rule.amount}%`}
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveTransferRule(rule.id);
+                }}
+                className="text-gray-400 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
           </li>
         ))}
       </ul>
