@@ -189,7 +189,7 @@ export default function GoalCard({
           </span>
           <ArrowRight className="h-3.5 w-3.5 shrink-0 text-gray-300" />
           <span className="text-xs text-gray-400">목표</span>
-          {isEditing ? (
+          {isEditing || !goal ? (
             <input
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
