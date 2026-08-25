@@ -63,6 +63,8 @@ function emptyScenario(name: string): Scenario {
     transferRules: [],
     exchangeRate: 1350,
     goal: null,
+    inflationEnabled: false,
+    inflationRate: 3,
   };
 }
 
@@ -132,6 +134,8 @@ function seedScenario(name: string, today: Date): Scenario {
     ],
     exchangeRate: 1350,
     goal: null,
+    inflationEnabled: false,
+    inflationRate: 3,
   };
 }
 
@@ -192,6 +196,8 @@ function duplicateScenario(scenario: Scenario): Scenario {
     transferRules,
     exchangeRate: scenario.exchangeRate,
     goal,
+    inflationEnabled: scenario.inflationEnabled,
+    inflationRate: scenario.inflationRate,
   };
 }
 
@@ -488,6 +494,17 @@ export default function AssetSimulator() {
     }
   };
 
+  const handleToggleInflation = () => {
+    updateActiveScenario((s) => ({
+      ...s,
+      inflationEnabled: !s.inflationEnabled,
+    }));
+  };
+
+  const handleSetInflationRate = (rate: number) => {
+    updateActiveScenario((s) => ({ ...s, inflationRate: rate }));
+  };
+
   const snapshots = useSimulation(simulationInput, today, horizonMonths);
   const selectedSnapshot = snapshots[selectedMonth];
   const primaryAsset = activeScenario.assetClasses.find((a) => a.isPrimary);
@@ -602,6 +619,10 @@ export default function AssetSimulator() {
               goal={activeScenario.goal}
               onSetGoal={handleSetGoal}
               simulationInput={simulationInput}
+              inflationEnabled={activeScenario.inflationEnabled}
+              inflationRate={activeScenario.inflationRate}
+              onToggleInflation={handleToggleInflation}
+              onSetInflationRate={handleSetInflationRate}
             />
             <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))]">
               <ComparisonBarChart

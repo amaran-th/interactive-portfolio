@@ -78,6 +78,8 @@ export type Scenario = {
   transferRules: TransferRule[];
   exchangeRate: number;
   goal: Goal | null;
+  inflationEnabled: boolean;
+  inflationRate: number;
 };
 
 export type SimulationInput = {
@@ -169,6 +171,14 @@ export function nextAssetColor(existingCount: number): string {
 
 export function newId(): string {
   return crypto.randomUUID();
+}
+
+export function toRealValue(
+  nominal: number,
+  months: number,
+  annualRatePercent: number,
+): number {
+  return nominal / Math.pow(1 + annualRatePercent / 100, months / 12);
 }
 
 export function formatKRW(amount: number): string {

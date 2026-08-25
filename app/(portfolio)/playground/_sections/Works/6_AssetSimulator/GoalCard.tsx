@@ -10,7 +10,9 @@ import {
   GoalMetric,
   Group,
   SimulationInput,
+  formatKRW,
   formatMonthsFromNow,
+  toRealValue,
 } from "./types";
 
 const METRIC_TYPE_OPTIONS = [
@@ -26,6 +28,8 @@ type GoalCardProps = {
   groups: Group[];
   simulationInput: SimulationInput;
   today: Date;
+  inflationEnabled: boolean;
+  inflationRate: number;
 };
 
 type MetricType = GoalMetric["type"];
@@ -42,6 +46,8 @@ export default function GoalCard({
   groups,
   simulationInput,
   today,
+  inflationEnabled,
+  inflationRate,
 }: GoalCardProps) {
   const [metricType, setMetricType] = useState<MetricType>("total");
   const [targetId, setTargetId] = useState("");
@@ -183,7 +189,21 @@ export default function GoalCard({
             <span className="text-emerald-600">이미 달성했습니다</span>
           ) : (
             <>
-              약 {formatMonthsFromNow(achievementMonth)} (
+              목표 {formatKRW(goal.targetAmount)}
+              {inflationEnabled && (
+                <>
+                  (오늘 가치 약{" "}
+                  {formatKRW(
+                    toRealValue(
+                      goal.targetAmount,
+                      achievementMonth,
+                      inflationRate,
+                    ),
+                  )}
+                  )
+                </>
+              )}{" "}
+              · 약 {formatMonthsFromNow(achievementMonth)} (
               {formatAchievementDate(achievementMonth, today)}) 달성 예상
             </>
           )}

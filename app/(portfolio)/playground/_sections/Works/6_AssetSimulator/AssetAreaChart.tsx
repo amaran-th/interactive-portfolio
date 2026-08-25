@@ -8,6 +8,7 @@ import {
   MonthSnapshot,
   SimulationInput,
   formatKRW,
+  toRealValue,
 } from "./types";
 import TimelineSlider from "./TimelineSlider";
 import GoalCard from "./GoalCard";
@@ -23,6 +24,10 @@ type AssetAreaChartProps = {
   goal: Goal | null;
   onSetGoal: (goal: Goal | null) => void;
   simulationInput: SimulationInput;
+  inflationEnabled: boolean;
+  inflationRate: number;
+  onToggleInflation: () => void;
+  onSetInflationRate: (rate: number) => void;
 };
 
 const WIDTH = 600;
@@ -53,6 +58,10 @@ export default function AssetAreaChart({
   goal,
   onSetGoal,
   simulationInput,
+  inflationEnabled,
+  inflationRate,
+  onToggleInflation,
+  onSetInflationRate,
 }: AssetAreaChartProps) {
   const isEmpty = assetClasses.length === 0 || snapshots.length === 0;
 
@@ -135,6 +144,9 @@ export default function AssetAreaChart({
 
   const cursorX = PADDING + selectedMonth * stepX;
   const totalBalance = snapshots[selectedMonth]?.totalBalance ?? 0;
+  const displayBalance = inflationEnabled
+    ? toRealValue(totalBalance, selectedMonth, inflationRate)
+    : totalBalance;
   const cursorY = scaleY(totalBalance);
   const nearRightEdge = cursorX > WIDTH - PADDING - 60;
 
@@ -169,9 +181,10 @@ export default function AssetAreaChart({
         <>
           <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
             <p className="flex items-center gap-1.5">
-              <LineChartIcon className="h-4 w-4" /> 현재 자산{" "}
+              <LineChartIcon className="h-4 w-4" />{" "}
+              {inflationEnabled ? "현재 자산(오늘 가치)" : "현재 자산"}{" "}
               <span className="text-lg font-semibold text-gray-800">
-                {formatKRW(totalBalance)}
+                {formatKRW(displayBalance)}
               </span>
             </p>
             <GoalCard
@@ -181,7 +194,32 @@ export default function AssetAreaChart({
               groups={groups}
               simulationInput={simulationInput}
               today={today}
+              inflationEnabled={inflationEnabled}
+              inflationRate={inflationRate}
             />
+            <div className="flex w-full items-center gap-1.5 text-xs text-gray-500">
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={inflationEnabled}
+                  onChange={onToggleInflation}
+                />
+                물가상승률 반영
+              </label>
+              {inflationEnabled && (
+                <>
+                  <input
+                    type="number"
+                    value={inflationRate}
+                    onChange={(e) =>
+                      onSetInflationRate(Number(e.target.value) || 0)
+                    }
+                    className="w-14 rounded-full border border-gray-200 bg-white/80 px-2 py-0.5 text-xs outline-none focus:border-gray-400"
+                  />
+                  <span>% (연간)</span>
+                </>
+              )}
+            </div>
           </div>
           <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="mt-3 w-full">
             <defs>
@@ -267,7 +305,7 @@ export default function AssetAreaChart({
               textAnchor={nearRightEdge ? "end" : "start"}
               className="fill-gray-700 text-[10px] font-medium"
             >
-              {formatKRW(totalBalance)}
+              {formatKRW(displayBalance)}
             </text>
           </svg>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
