@@ -518,38 +518,40 @@ export default function AssetSimulator() {
   return (
     <div className="h-full w-full overflow-y-auto bg-gradient-to-br from-indigo-100 via-blue-50 to-purple-100 p-4 text-gray-800">
       <div className="mx-auto max-w-[1600px] @container">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-bold text-gray-800">자산 시뮬레이터</h2>
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-xs text-gray-600">
-              환율(1달러 = 원)
-              <input
-                type="number"
-                min={1}
-                value={activeScenario.exchangeRate}
-                onChange={(e) =>
-                  updateActiveScenario((s) => ({
-                    ...s,
-                    exchangeRate: Math.max(1, Number(e.target.value) || 1),
-                  }))
-                }
-                className="w-24 rounded-full border border-white/60 bg-white/80 px-2 py-1 text-sm"
-              />
-            </label>
+        <div className="sticky top-0 z-40 -mx-4 bg-gradient-to-br from-indigo-100 via-blue-50 to-purple-100 px-4 pb-3 pt-1">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-bold text-gray-800">자산 시뮬레이터</h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-xs text-gray-600">
+                환율(1달러 = 원)
+                <input
+                  type="number"
+                  min={1}
+                  value={activeScenario.exchangeRate}
+                  onChange={(e) =>
+                    updateActiveScenario((s) => ({
+                      ...s,
+                      exchangeRate: Math.max(1, Number(e.target.value) || 1),
+                    }))
+                  }
+                  className="w-24 rounded-full border border-white/60 bg-white/80 px-2 py-1 text-sm"
+                />
+              </label>
+            </div>
           </div>
-        </div>
 
-        <ScenarioTabs
-          scenarios={scenarios}
-          activeScenarioId={activeScenarioId}
-          onSelect={handleSelectScenario}
-          onRename={handleRenameScenario}
-          onDelete={handleDeleteScenario}
-          onDuplicate={handleDuplicateScenario}
-          onCreate={handleCreateScenario}
-          showComparison={showComparison}
-          onToggleComparison={() => setShowComparison((prev) => !prev)}
-        />
+          <ScenarioTabs
+            scenarios={scenarios}
+            activeScenarioId={activeScenarioId}
+            onSelect={handleSelectScenario}
+            onRename={handleRenameScenario}
+            onDelete={handleDeleteScenario}
+            onDuplicate={handleDuplicateScenario}
+            onCreate={handleCreateScenario}
+            showComparison={showComparison}
+            onToggleComparison={() => setShowComparison((prev) => !prev)}
+          />
+        </div>
 
         {showComparison && (
           <ScenarioComparisonChart
