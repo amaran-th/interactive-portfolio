@@ -574,7 +574,6 @@ export default function AssetSimulator() {
               goal={activeScenario.goal}
               onSetGoal={handleSetGoal}
               simulationInput={simulationInput}
-              selectedSnapshot={selectedSnapshot}
             />
             <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))]">
               <ComparisonBarChart

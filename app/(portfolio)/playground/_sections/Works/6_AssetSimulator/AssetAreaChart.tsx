@@ -23,7 +23,6 @@ type AssetAreaChartProps = {
   goal: Goal | null;
   onSetGoal: (goal: Goal | null) => void;
   simulationInput: SimulationInput;
-  selectedSnapshot: MonthSnapshot;
 };
 
 const WIDTH = 600;
@@ -54,7 +53,6 @@ export default function AssetAreaChart({
   goal,
   onSetGoal,
   simulationInput,
-  selectedSnapshot,
 }: AssetAreaChartProps) {
   const isEmpty = assetClasses.length === 0 || snapshots.length === 0;
 
@@ -169,13 +167,13 @@ export default function AssetAreaChart({
         </div>
       ) : (
         <>
-          <p className="flex items-center gap-1.5 text-sm text-gray-500">
-            <LineChartIcon className="h-4 w-4" /> 총자산{" "}
-            <span className="text-lg font-semibold text-gray-800">
-              {formatKRW(totalBalance)}
-            </span>
-          </p>
-          <div className="mt-3 border-t border-white/60 pt-3">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+            <p className="flex items-center gap-1.5">
+              <LineChartIcon className="h-4 w-4" /> 현재 자산{" "}
+              <span className="text-lg font-semibold text-gray-800">
+                {formatKRW(totalBalance)}
+              </span>
+            </p>
             <GoalCard
               goal={goal}
               onSetGoal={onSetGoal}
@@ -183,7 +181,6 @@ export default function AssetAreaChart({
               groups={groups}
               simulationInput={simulationInput}
               today={today}
-              selectedSnapshot={selectedSnapshot}
             />
           </div>
           <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="mt-3 w-full">

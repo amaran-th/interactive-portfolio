@@ -9,7 +9,6 @@ import {
   Goal,
   GoalMetric,
   Group,
-  MonthSnapshot,
   SimulationInput,
   formatMonthsFromNow,
 } from "./types";
@@ -27,21 +26,9 @@ type GoalCardProps = {
   groups: Group[];
   simulationInput: SimulationInput;
   today: Date;
-  selectedSnapshot: MonthSnapshot;
 };
 
 type MetricType = GoalMetric["type"];
-
-function metricValueFromSnapshot(
-  metric: GoalMetric,
-  snapshot: MonthSnapshot,
-): number {
-  if (metric.type === "total") return snapshot.totalBalance;
-  if (metric.type === "asset") {
-    return snapshot.assetBalancesKRW[metric.assetId] ?? 0;
-  }
-  return snapshot.groupTotals[metric.groupId] ?? 0;
-}
 
 function formatAchievementDate(monthIndex: number, today: Date): string {
   const date = new Date(today.getFullYear(), today.getMonth() + monthIndex, 1);
@@ -55,7 +42,6 @@ export default function GoalCard({
   groups,
   simulationInput,
   today,
-  selectedSnapshot,
 }: GoalCardProps) {
   const [metricType, setMetricType] = useState<MetricType>("total");
   const [targetId, setTargetId] = useState("");
@@ -127,37 +113,44 @@ export default function GoalCard({
     setAmount("");
   };
 
-  const currentValue = goal
-    ? metricValueFromSnapshot(goal.metric, selectedSnapshot)
-    : 0;
-  const progressRatio =
-    goal && goal.targetAmount > 0 ? currentValue / goal.targetAmount : 0;
-
   return (
-    <div>
-      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
-        <Target className="h-4 w-4" /> 목표 자산
-      </h3>
-      <div className="mt-2 flex flex-col gap-2">
-        <div className="flex gap-2">
-          <CustomSelect
-            value={metricType}
-            onChange={(v) => {
-              setMetricType(v as MetricType);
-              setTargetId("");
-            }}
-            options={METRIC_TYPE_OPTIONS}
-            className="w-32 shrink-0"
-          />
-          <input
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            type="number"
-            placeholder="목표 금액(원)"
-            className="min-w-0 flex-1 rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-gray-400"
-          />
-        </div>
-        {metricType === "asset" && (
+    <>
+      <span className="text-gray-300">·</span>
+      <Target className="h-4 w-4 shrink-0 text-gray-400" />
+      <CustomSelect
+        value={metricType}
+        onChange={(v) => {
+          setMetricType(v as MetricType);
+          setTargetId("");
+        }}
+        options={METRIC_TYPE_OPTIONS}
+        className="w-28 shrink-0"
+      />
+      <input
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        type="number"
+        placeholder="목표 금액(원)"
+        className="w-36 rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-gray-400"
+      />
+      <button
+        type="button"
+        onClick={handleSubmit}
+        className="shrink-0 rounded-full bg-gray-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
+      >
+        목표 설정
+      </button>
+      {goal && (
+        <button
+          type="button"
+          onClick={handleClear}
+          className="shrink-0 rounded-full px-4 py-1.5 text-sm text-gray-500 hover:text-gray-700"
+        >
+          목표 해제
+        </button>
+      )}
+      {metricType === "asset" && (
+        <div className="w-full">
           <CustomSelect
             value={targetId}
             onChange={setTargetId}
@@ -167,8 +160,10 @@ export default function GoalCard({
             }))}
             placeholder="자산 선택"
           />
-        )}
-        {metricType === "group" && (
+        </div>
+      )}
+      {metricType === "group" && (
+        <div className="w-full">
           <CustomSelect
             value={targetId}
             onChange={setTargetId}
@@ -178,52 +173,22 @@ export default function GoalCard({
             }))}
             placeholder="그룹 선택"
           />
-        )}
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={handleSubmit}
-            className="self-start rounded-full bg-gray-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
-          >
-            목표 설정
-          </button>
-          {goal && (
-            <button
-              type="button"
-              onClick={handleClear}
-              className="self-start rounded-full px-4 py-1.5 text-sm text-gray-500 hover:text-gray-700"
-            >
-              목표 해제
-            </button>
-          )}
         </div>
-        {goal && (
-          <div className="mt-1 rounded-xl bg-white/80 p-3 text-sm">
-            {achievementMonth === undefined ? null : achievementMonth ===
-              null ? (
-              <p className="text-rose-500">500년 내 달성 불가</p>
-            ) : achievementMonth === 0 ? (
-              <p className="text-emerald-600">이미 달성했습니다</p>
-            ) : (
-              <p className="text-gray-700">
-                약 {formatMonthsFromNow(achievementMonth)} (
-                {formatAchievementDate(achievementMonth, today)}) 달성 예상
-              </p>
-            )}
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-200">
-              <div
-                className="h-full rounded-full bg-indigo-500"
-                style={{
-                  width: `${Math.min(100, Math.max(0, progressRatio * 100))}%`,
-                }}
-              />
-            </div>
-            <p className="mt-1 text-xs text-gray-400">
-              진행률 {Math.round(progressRatio * 100)}%
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
+      )}
+      {goal && achievementMonth !== undefined && (
+        <p className="w-full text-xs text-gray-500">
+          {achievementMonth === null ? (
+            <span className="text-rose-500">500년 내 달성 불가</span>
+          ) : achievementMonth === 0 ? (
+            <span className="text-emerald-600">이미 달성했습니다</span>
+          ) : (
+            <>
+              약 {formatMonthsFromNow(achievementMonth)} (
+              {formatAchievementDate(achievementMonth, today)}) 달성 예상
+            </>
+          )}
+        </p>
+      )}
+    </>
   );
 }
