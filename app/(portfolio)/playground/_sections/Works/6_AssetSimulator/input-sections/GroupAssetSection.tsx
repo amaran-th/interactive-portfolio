@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Landmark, Plus, Settings } from "lucide-react";
+import { Landmark, Plus, Settings, TrendingDown } from "lucide-react";
 import {
   AssetClass,
   Currency,
@@ -51,6 +51,7 @@ export default function GroupAssetSection({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [returnRate, setReturnRate] = useState("0");
   const [makePrimary, setMakePrimary] = useState(false);
+  const [isLiability, setIsLiability] = useState(false);
   const [colorPickerId, setColorPickerId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const isFormVisible = showForm || Boolean(editingId);
@@ -65,6 +66,7 @@ export default function GroupAssetSection({
     setBalance("");
     setReturnRate("0");
     setMakePrimary(false);
+    setIsLiability(false);
   };
 
   const startEdit = (asset: AssetClass) => {
@@ -72,9 +74,10 @@ export default function GroupAssetSection({
     setName(asset.name);
     setGroupId(asset.groupId ?? "");
     setCurrency(asset.currency);
-    setBalance(String(asset.initialBalance));
+    setBalance(String(Math.abs(asset.initialBalance)));
     setReturnRate(String(asset.annualReturnRate));
     setMakePrimary(asset.isPrimary);
+    setIsLiability(asset.initialBalance < 0);
     setShowAdvanced(asset.annualReturnRate !== 0);
   };
 
@@ -87,9 +90,9 @@ export default function GroupAssetSection({
       name: name.trim(),
       groupId: groupId || undefined,
       currency,
-      initialBalance: Number(balance) || 0,
+      initialBalance: (isLiability ? -1 : 1) * (Number(balance) || 0),
       annualReturnRate: Number(returnRate) || 0,
-      isPrimary: currency === "KRW" && makePrimary,
+      isPrimary: currency === "KRW" && makePrimary && !isLiability,
     };
     if (editingId) {
       onUpdateAssetClass(editingId, input);
@@ -175,8 +178,17 @@ export default function GroupAssetSection({
                       style={{ backgroundColor: group.color }}
                     />
                   )}
+                  {asset.initialBalance < 0 && (
+                    <TrendingDown className="h-3.5 w-3.5 shrink-0 text-rose-500" />
+                  )}
                   <span>{asset.name}</span>
-                  <span className="text-gray-400">
+                  <span
+                    className={
+                      asset.initialBalance < 0
+                        ? "text-rose-500"
+                        : "text-gray-400"
+                    }
+                  >
                     {asset.currency === "USD"
                       ? `$${asset.initialBalance.toLocaleString()}`
                       : `${asset.initialBalance.toLocaleString()}원`}
@@ -184,6 +196,11 @@ export default function GroupAssetSection({
                   {asset.isPrimary && (
                     <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-600">
                       기본 계좌
+                    </span>
+                  )}
+                  {asset.initialBalance < 0 && (
+                    <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-600">
+                      부채
                     </span>
                   )}
                 </span>
@@ -256,18 +273,31 @@ export default function GroupAssetSection({
             value={balance}
             onChange={(e) => setBalance(e.target.value)}
             type="number"
-            placeholder="현재 잔액"
+            placeholder={isLiability ? "대출/부채 금액" : "현재 잔액"}
             className="flex-1 rounded-full border border-indigo-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-indigo-400"
           />
         </div>
         <label className="flex items-center gap-2 text-xs text-gray-600">
           <input
             type="checkbox"
+            checked={isLiability}
+            onChange={(e) => {
+              setIsLiability(e.target.checked);
+              if (e.target.checked) setMakePrimary(false);
+            }}
+          />
+          부채로 추가(대출 등)
+        </label>
+        <label className="flex items-center gap-2 text-xs text-gray-600">
+          <input
+            type="checkbox"
             checked={makePrimary}
-            disabled={currency === "USD"}
+            disabled={currency === "USD" || isLiability}
             onChange={(e) => setMakePrimary(e.target.checked)}
           />
-          기본 계좌로 지정{currency === "USD" && " (KRW 자산만 가능)"}
+          기본 계좌로 지정
+          {currency === "USD" && " (KRW 자산만 가능)"}
+          {isLiability && " (부채는 지정 불가)"}
         </label>
         <button
           type="button"
@@ -278,7 +308,7 @@ export default function GroupAssetSection({
         </button>
         {showAdvanced && (
           <label className="flex items-center gap-2 text-xs text-gray-600">
-            연 수익률(%)
+            {isLiability ? "연 이자율(%)" : "연 수익률(%)"}
             <input
               value={returnRate}
               onChange={(e) => setReturnRate(e.target.value)}
