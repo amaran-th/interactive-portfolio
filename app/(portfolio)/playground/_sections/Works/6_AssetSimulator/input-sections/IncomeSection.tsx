@@ -137,7 +137,7 @@ export default function IncomeSection({
 
   return (
     <div
-      className={`relative min-w-[220px] flex-1 rounded-2xl border border-emerald-200 bg-white/70 p-4 backdrop-blur ${
+      className={`relative min-w-[220px] basis-full @min-[500px]:flex-1 rounded-2xl border border-emerald-200 bg-white/70 p-4 backdrop-blur ${
         isFormVisible ? "z-30" : ""
       }`}
     >

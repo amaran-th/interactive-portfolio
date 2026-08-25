@@ -117,7 +117,7 @@ export default function GroupAssetSection({
 
   return (
     <div
-      className={`relative min-w-[280px] flex-[1.5] rounded-2xl border border-indigo-200 bg-white/70 p-4 backdrop-blur ${
+      className={`relative min-w-[280px] basis-full rounded-2xl border border-indigo-200 bg-white/70 p-4 backdrop-blur ${
         isFormVisible ? "z-30" : ""
       }`}
     >

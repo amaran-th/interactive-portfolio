@@ -153,7 +153,7 @@ export default function TransferRuleSection({
 
   return (
     <div
-      className={`relative min-w-[220px] flex-1 rounded-2xl border border-amber-200 bg-white/70 p-4 backdrop-blur ${
+      className={`relative min-w-55 basis-full @min-[500px]:flex-1 rounded-2xl border border-amber-200 bg-white/70 p-4 backdrop-blur ${
         isFormVisible ? "z-30" : ""
       }`}
     >
