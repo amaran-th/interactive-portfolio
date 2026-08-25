@@ -627,7 +627,7 @@ export default function AssetSimulator() {
               onToggleInflation={handleToggleInflation}
               onSetInflationRate={handleSetInflationRate}
             />
-            <div className="flex items-center justify-center gap-3">
+            <div className="hidden @max-[500px]:flex items-center justify-center gap-3">
               <button
                 type="button"
                 onClick={() =>
@@ -668,8 +668,14 @@ export default function AssetSimulator() {
                 ›
               </button>
             </div>
-            <div>
-              <div className={activeChartIndex === 0 ? "block" : "hidden"}>
+            <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))]">
+              <div
+                className={
+                  activeChartIndex === 0
+                    ? "block"
+                    : "block @max-[500px]:hidden"
+                }
+              >
                 <ComparisonBarChart
                   snapshots={snapshots}
                   groups={assetGroups}
@@ -677,14 +683,26 @@ export default function AssetSimulator() {
                   selectedMonth={selectedMonth}
                 />
               </div>
-              <div className={activeChartIndex === 1 ? "block" : "hidden"}>
+              <div
+                className={
+                  activeChartIndex === 1
+                    ? "block"
+                    : "block @max-[500px]:hidden"
+                }
+              >
                 <GroupDonutChart
                   groups={assetGroups}
                   assetClasses={activeScenario.assetClasses}
                   snapshot={selectedSnapshot}
                 />
               </div>
-              <div className={activeChartIndex === 2 ? "block" : "hidden"}>
+              <div
+                className={
+                  activeChartIndex === 2
+                    ? "block"
+                    : "block @max-[500px]:hidden"
+                }
+              >
                 <FlowDiagram
                   snapshot={selectedSnapshot}
                   primaryAsset={primaryAsset}
@@ -692,7 +710,13 @@ export default function AssetSimulator() {
                   exchangeRate={activeScenario.exchangeRate}
                 />
               </div>
-              <div className={activeChartIndex === 3 ? "block" : "hidden"}>
+              <div
+                className={
+                  activeChartIndex === 3
+                    ? "block"
+                    : "block @max-[500px]:hidden"
+                }
+              >
                 <CashFlowChart
                   snapshots={snapshots}
                   selectedMonth={selectedMonth}

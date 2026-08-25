@@ -151,30 +151,59 @@ export default function FlowDiagram({
           </marker>
         </defs>
         {snapshot.flow.incomeIn > 0 && (
-          <line
-            x1={incomeX + NODE_WIDTH}
-            y1={CENTER_Y + NODE_HEIGHT / 2}
-            x2={primaryX - 6}
-            y2={CENTER_Y + NODE_HEIGHT / 2}
-            stroke={INCOME_COLOR}
-            strokeWidth={strokeWidth(snapshot.flow.incomeIn)}
-            strokeOpacity={0.5}
-            markerEnd="url(#flow-arrow-income)"
-          />
+          <>
+            <line
+              x1={incomeX + NODE_WIDTH}
+              y1={CENTER_Y + NODE_HEIGHT / 2}
+              x2={primaryX - 6}
+              y2={CENTER_Y + NODE_HEIGHT / 2}
+              stroke={INCOME_COLOR}
+              strokeWidth={strokeWidth(snapshot.flow.incomeIn)}
+              strokeOpacity={0.5}
+              markerEnd="url(#flow-arrow-income)"
+            />
+            <text
+              x={(incomeX + NODE_WIDTH + primaryX - 6) / 2}
+              y={CENTER_Y + NODE_HEIGHT / 2 - 8}
+              textAnchor="middle"
+              stroke="white"
+              strokeWidth={3}
+              paintOrder="stroke"
+              className="fill-gray-700 text-[10px] font-medium"
+            >
+              {Math.round(snapshot.flow.incomeIn).toLocaleString()}원
+            </text>
+          </>
         )}
-        {rightEntries.map((entry, i) => (
-          <line
-            key={entry.id}
-            x1={primaryX + NODE_WIDTH}
-            y1={CENTER_Y + NODE_HEIGHT / 2}
-            x2={rightX - 6}
-            y2={rightGap * (i + 1) + NODE_HEIGHT / 2}
-            stroke={OUTFLOW_COLOR}
-            strokeWidth={strokeWidth(entry.amount)}
-            strokeOpacity={0.5}
-            markerEnd="url(#flow-arrow-out)"
-          />
-        ))}
+        {rightEntries.map((entry, i) => {
+          const y1 = CENTER_Y + NODE_HEIGHT / 2;
+          const y2 = rightGap * (i + 1) + NODE_HEIGHT / 2;
+          return (
+            <g key={entry.id}>
+              <line
+                x1={primaryX + NODE_WIDTH}
+                y1={y1}
+                x2={rightX - 6}
+                y2={y2}
+                stroke={OUTFLOW_COLOR}
+                strokeWidth={strokeWidth(entry.amount)}
+                strokeOpacity={0.5}
+                markerEnd="url(#flow-arrow-out)"
+              />
+              <text
+                x={(primaryX + NODE_WIDTH + rightX - 6) / 2}
+                y={(y1 + y2) / 2 - 8}
+                textAnchor="middle"
+                stroke="white"
+                strokeWidth={3}
+                paintOrder="stroke"
+                className="fill-gray-700 text-[10px] font-medium"
+              >
+                {Math.round(entry.amount).toLocaleString()}원
+              </text>
+            </g>
+          );
+        })}
 
         {snapshot.flow.incomeIn > 0 && (
           <NodeBox
