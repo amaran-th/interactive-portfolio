@@ -611,22 +611,6 @@ export default function AssetSimulator() {
                 </button>
               ))}
             </div>
-            <AssetAreaChart
-              snapshots={snapshots}
-              groups={assetGroups}
-              assetClasses={activeScenario.assetClasses}
-              selectedMonth={selectedMonth}
-              onChangeMonth={setSelectedMonth}
-              today={today}
-              horizonMonths={horizonMonths}
-              goal={activeScenario.goal}
-              onSetGoal={handleSetGoal}
-              simulationInput={simulationInput}
-              inflationEnabled={activeScenario.inflationEnabled}
-              inflationRate={activeScenario.inflationRate}
-              onToggleInflation={handleToggleInflation}
-              onSetInflationRate={handleSetInflationRate}
-            />
             <div className="hidden @max-[500px]:flex items-center justify-center gap-3">
               <button
                 type="button"
@@ -668,13 +652,31 @@ export default function AssetSimulator() {
                 ›
               </button>
             </div>
-            <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))]">
+            <div className="flex flex-wrap gap-4">
+              <div className="min-w-80 flex-2">
+                <AssetAreaChart
+                  snapshots={snapshots}
+                  groups={assetGroups}
+                  assetClasses={activeScenario.assetClasses}
+                  selectedMonth={selectedMonth}
+                  onChangeMonth={setSelectedMonth}
+                  today={today}
+                  horizonMonths={horizonMonths}
+                  goal={activeScenario.goal}
+                  onSetGoal={handleSetGoal}
+                  simulationInput={simulationInput}
+                  inflationEnabled={activeScenario.inflationEnabled}
+                  inflationRate={activeScenario.inflationRate}
+                  onToggleInflation={handleToggleInflation}
+                  onSetInflationRate={handleSetInflationRate}
+                />
+              </div>
               <div
-                className={
+                className={`min-w-50 flex-1 ${
                   activeChartIndex === 0
                     ? "block"
                     : "block @max-[500px]:hidden"
-                }
+                }`}
               >
                 <ComparisonBarChart
                   snapshots={snapshots}
@@ -684,11 +686,11 @@ export default function AssetSimulator() {
                 />
               </div>
               <div
-                className={
+                className={`min-w-50 flex-1 ${
                   activeChartIndex === 1
                     ? "block"
                     : "block @max-[500px]:hidden"
-                }
+                }`}
               >
                 <GroupDonutChart
                   groups={assetGroups}
@@ -697,11 +699,11 @@ export default function AssetSimulator() {
                 />
               </div>
               <div
-                className={
+                className={`min-w-50 flex-1 ${
                   activeChartIndex === 2
                     ? "block"
                     : "block @max-[500px]:hidden"
-                }
+                }`}
               >
                 <FlowDiagram
                   snapshot={selectedSnapshot}
@@ -711,11 +713,11 @@ export default function AssetSimulator() {
                 />
               </div>
               <div
-                className={
+                className={`min-w-50 flex-1 ${
                   activeChartIndex === 3
                     ? "block"
                     : "block @max-[500px]:hidden"
-                }
+                }`}
               >
                 <CashFlowChart
                   snapshots={snapshots}
