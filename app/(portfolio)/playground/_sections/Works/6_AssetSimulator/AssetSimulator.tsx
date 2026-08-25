@@ -70,6 +70,7 @@ function emptyScenario(name: string): Scenario {
 // 직접 넣는다.
 function seedScenario(name: string, today: Date): Scenario {
   const assetId = newId();
+  const savingsAssetId = newId();
   const monthlyRecurring = (startDate: string): RepeatSchedule => ({
     mode: "recurring",
     startDate,
@@ -92,12 +93,21 @@ function seedScenario(name: string, today: Date): Scenario {
         isPrimary: true,
         color: nextAssetColor(0),
       },
+      {
+        id: savingsAssetId,
+        name: "적금",
+        currency: "KRW",
+        initialBalance: 0,
+        annualReturnRate: 0,
+        isPrimary: false,
+        color: nextAssetColor(1),
+      },
     ],
     incomes: [
       {
         id: newId(),
         name: "월급",
-        amount: 2_200_000,
+        amount: 700_000,
         schedule: monthlyRecurring(nextMonth),
       },
     ],
@@ -109,7 +119,16 @@ function seedScenario(name: string, today: Date): Scenario {
         schedule: monthlyRecurring(nextMonth),
       },
     ],
-    transferRules: [],
+    transferRules: [
+      {
+        id: newId(),
+        fromAssetId: assetId,
+        toAssetId: savingsAssetId,
+        mode: "fixed",
+        amount: 100_000,
+        schedule: monthlyRecurring(nextMonth),
+      },
+    ],
     exchangeRate: 1350,
     goal: null,
   };
