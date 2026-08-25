@@ -140,6 +140,27 @@ export default function AssetAreaChart({
   const cursorY = scaleY(totalBalance);
   const nearRightEdge = cursorX > WIDTH - PADDING - 60;
 
+  const maxFlow = isEmpty
+    ? 1
+    : Math.max(
+        1,
+        ...snapshots.map((s) => Math.max(s.flow.incomeIn, s.flow.expenseOut)),
+      );
+  const scaleFlow = (value: number) =>
+    HEIGHT - PADDING - (value / maxFlow) * (HEIGHT - PADDING * 2);
+  const incomePoints = snapshots
+    .map(
+      (snapshot, i) =>
+        `${PADDING + i * stepX},${scaleFlow(snapshot.flow.incomeIn)}`,
+    )
+    .join(" ");
+  const expensePoints = snapshots
+    .map(
+      (snapshot, i) =>
+        `${PADDING + i * stepX},${scaleFlow(snapshot.flow.expenseOut)}`,
+    )
+    .join(" ");
+
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       {isEmpty ? (
@@ -196,6 +217,20 @@ export default function AssetAreaChart({
                 />
               </g>
             ))}
+            <polyline
+              points={incomePoints}
+              fill="none"
+              stroke="#10b981"
+              strokeWidth={1.5}
+              strokeOpacity={0.8}
+            />
+            <polyline
+              points={expensePoints}
+              fill="none"
+              stroke="#f43f5e"
+              strokeWidth={1.5}
+              strokeOpacity={0.8}
+            />
             <line
               x1={PADDING}
               y1={zeroY}
@@ -248,6 +283,14 @@ export default function AssetAreaChart({
                 {asset.name}
               </span>
             ))}
+            <span className="flex items-center gap-1">
+              <span className="h-0.5 w-3 rounded-full bg-emerald-500" />
+              수입
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="h-0.5 w-3 rounded-full bg-rose-500" />
+              지출
+            </span>
           </div>
         </>
       )}
