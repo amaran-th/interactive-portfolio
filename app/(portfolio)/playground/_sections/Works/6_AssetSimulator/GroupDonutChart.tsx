@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Inbox, PieChart as PieChartIcon } from "lucide-react";
+import { Inbox, PieChart as PieChartIcon, TrendingDown } from "lucide-react";
 import {
   AssetClass,
   Group,
@@ -24,6 +24,7 @@ type Slice = {
   color: string;
   dashArray: string;
   dashOffset: number;
+  isLiability: boolean;
 };
 
 const SIZE = 160;
@@ -48,6 +49,10 @@ export default function GroupDonutChart({
   const activeTabId = tabs.some((t) => t.id === selectedTabId)
     ? selectedTabId
     : tabs[0]?.id;
+  const hasLiabilities = assetClasses.some(
+    (a) => (snapshot.assetBalancesKRW[a.id] ?? 0) < 0,
+  );
+  const [includeLiabilities, setIncludeLiabilities] = useState(false);
 
   if (!activeTabId) {
     return (
@@ -57,14 +62,17 @@ export default function GroupDonutChart({
     );
   }
 
-  const assetsInTab =
+  const assetsInGroup =
     activeTabId === UNGROUPED_TAB_ID
       ? assetClasses.filter((a) => !a.groupId)
       : assetClasses.filter((a) => a.groupId === activeTabId);
-  const tabTotal =
-    activeTabId === UNGROUPED_TAB_ID
-      ? snapshot.ungroupedTotalKRW
-      : (snapshot.groupTotals[activeTabId] ?? 0);
+  const assetsInTab = includeLiabilities
+    ? assetsInGroup
+    : assetsInGroup.filter((a) => (snapshot.assetBalancesKRW[a.id] ?? 0) >= 0);
+  const tabTotal = assetsInTab.reduce(
+    (sum, a) => sum + Math.abs(snapshot.assetBalancesKRW[a.id] ?? 0),
+    0,
+  );
 
   const { items: slices } = assetsInTab.reduce<{
     offset: number;
@@ -72,7 +80,7 @@ export default function GroupDonutChart({
   }>(
     (acc, asset) => {
       const amount = snapshot.assetBalancesKRW[asset.id] ?? 0;
-      const ratio = tabTotal > 0 ? amount / tabTotal : 0;
+      const ratio = tabTotal > 0 ? Math.abs(amount) / tabTotal : 0;
       const dash = ratio * CIRCUMFERENCE;
       const slice: Slice = {
         id: asset.id,
@@ -82,6 +90,7 @@ export default function GroupDonutChart({
         color: asset.color,
         dashArray: `${dash} ${CIRCUMFERENCE - dash}`,
         dashOffset: -acc.offset,
+        isLiability: amount < 0,
       };
       return { offset: acc.offset + dash, items: [...acc.items, slice] };
     },
@@ -90,9 +99,21 @@ export default function GroupDonutChart({
 
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-      <p className="flex items-center gap-1.5 text-sm text-gray-500">
-        <PieChartIcon className="h-4 w-4" /> 그룹별 비율
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-sm text-gray-500">
+          <PieChartIcon className="h-4 w-4" /> 그룹별 비율
+        </p>
+        {hasLiabilities && (
+          <label className="flex items-center gap-1.5 text-xs text-gray-500">
+            <input
+              type="checkbox"
+              checked={includeLiabilities}
+              onChange={(e) => setIncludeLiabilities(e.target.checked)}
+            />
+            부채 포함
+          </label>
+        )}
+      </div>
       <div className="mt-2 flex flex-wrap gap-2">
         {tabs.map((tab) => (
           <button
@@ -145,8 +166,13 @@ export default function GroupDonutChart({
                 className="h-2.5 w-2.5 rounded-full"
                 style={{ backgroundColor: slice.color }}
               />
+              {slice.isLiability && (
+                <TrendingDown className="h-3.5 w-3.5 shrink-0 text-rose-500" />
+              )}
               {slice.name} · {Math.round(slice.ratio * 100)}% ·{" "}
-              {formatKRW(slice.amount)}
+              <span className={slice.isLiability ? "text-rose-500" : ""}>
+                {formatKRW(slice.amount)}
+              </span>
             </li>
           ))}
         </ul>
