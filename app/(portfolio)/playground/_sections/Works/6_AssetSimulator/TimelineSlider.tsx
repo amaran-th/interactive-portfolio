@@ -53,11 +53,11 @@ export default function TimelineSlider({
               type="button"
               onClick={() => onChange(month)}
               aria-label={`${month / 12}년 지점으로 이동`}
-              className="absolute top-1/2 z-20 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+              className="group absolute top-1/2 z-20 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center"
               style={{ left: `${(month / horizonMonths) * 100}%` }}
             >
               <span
-                className={`rounded-full border-2 bg-white transition-colors ${
+                className={`rounded-full border-2 bg-white transition-all group-hover:scale-125 group-hover:border-indigo-500 ${
                   isMajor ? "h-3 w-3" : "h-2 w-2"
                 } ${isPast ? "border-indigo-500" : "border-gray-300"}`}
               />
