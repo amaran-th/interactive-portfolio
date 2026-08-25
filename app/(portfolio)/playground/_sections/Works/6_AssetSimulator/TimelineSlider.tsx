@@ -25,7 +25,7 @@ export default function TimelineSlider({
   horizonMonths,
 }: TimelineSliderProps) {
   const yearMarks: number[] = [];
-  for (let month = 12; month <= horizonMonths; month += 12) {
+  for (let month = 0; month <= horizonMonths; month += 12) {
     yearMarks.push(month);
   }
   const progressPct =
@@ -52,7 +52,7 @@ export default function TimelineSlider({
               key={month}
               type="button"
               onClick={() => onChange(month)}
-              aria-label={`${month / 12}년 지점으로 이동`}
+              aria-label={month === 0 ? "지금으로 이동" : `${month / 12}년 지점으로 이동`}
               className="group absolute top-1/2 z-20 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center"
               style={{ left: `${(month / horizonMonths) * 100}%` }}
             >
