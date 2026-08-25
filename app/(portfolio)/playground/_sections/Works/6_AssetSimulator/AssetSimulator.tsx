@@ -116,7 +116,7 @@ function seedScenario(name: string, today: Date): Scenario {
       {
         id: newId(),
         name: "생활비",
-        amount: 700_000,
+        amount: 400_000,
         schedule: monthlyRecurring(nextMonth),
       },
     ],
