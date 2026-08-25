@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Plus, Settings, TrendingDown } from "lucide-react";
+import { GripVertical, Plus, Settings, TrendingDown } from "lucide-react";
 import {
   ExpenseItem,
   Group,
@@ -24,6 +24,7 @@ type ExpenseSectionProps = {
   onAddExpense: (input: NewExpenseItemInput) => void;
   onUpdateExpense: (id: string, input: NewExpenseItemInput) => void;
   onRemoveExpense: (id: string) => void;
+  onReorderExpense: (from: number, to: number) => void;
   today: Date;
   horizonMonths: number;
 };
@@ -55,6 +56,7 @@ export default function ExpenseSection({
   onAddExpense,
   onUpdateExpense,
   onRemoveExpense,
+  onReorderExpense,
   today,
   horizonMonths,
 }: ExpenseSectionProps) {
@@ -68,6 +70,8 @@ export default function ExpenseSection({
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const isFormVisible = showForm || Boolean(editingId);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
 
@@ -156,15 +160,51 @@ export default function ExpenseSection({
         </button>
       </div>
       <ul className="mt-2 flex flex-col gap-2">
-        {expenses.map((item) => {
+        {expenses.map((item, index) => {
           const group = groups.find((g) => g.id === item.groupId);
           return (
             <li
               key={item.id}
               onClick={() => startEdit(item)}
-              className="flex cursor-pointer items-center justify-between gap-2 rounded-xl border border-rose-100 bg-white/80 px-3 py-2 text-sm hover:border-rose-300"
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (dragIndex !== null && dragIndex !== index) {
+                  setOverIndex(index);
+                }
+              }}
+              onDragLeave={() =>
+                setOverIndex((prev) => (prev === index ? null : prev))
+              }
+              onDrop={() => {
+                if (dragIndex !== null && dragIndex !== index) {
+                  onReorderExpense(dragIndex, index);
+                }
+                setDragIndex(null);
+                setOverIndex(null);
+              }}
+              className={`flex cursor-pointer items-center justify-between gap-2 rounded-xl border bg-white/80 px-3 py-2 text-sm transition-colors ${
+                overIndex === index
+                  ? "border-rose-400 bg-rose-50"
+                  : "border-rose-100 hover:border-rose-300"
+              }`}
             >
               <div className="flex min-w-0 items-center gap-2">
+                <span
+                  draggable
+                  onClick={(e) => e.stopPropagation()}
+                  onDragStart={(e) => {
+                    e.stopPropagation();
+                    setDragIndex(index);
+                  }}
+                  onDragEnd={() => {
+                    setDragIndex(null);
+                    setOverIndex(null);
+                  }}
+                  aria-label="순서 변경"
+                  className="shrink-0 cursor-grab text-gray-300 hover:text-gray-500 active:cursor-grabbing"
+                >
+                  <GripVertical className="h-4 w-4" />
+                </span>
                 {group && (
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full"

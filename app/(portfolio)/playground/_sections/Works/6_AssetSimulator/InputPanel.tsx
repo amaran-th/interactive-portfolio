@@ -31,14 +31,17 @@ type InputPanelProps = {
   onAddIncome: (input: NewIncomeItemInput) => void;
   onUpdateIncome: (id: string, input: NewIncomeItemInput) => void;
   onRemoveIncome: (id: string) => void;
+  onReorderIncome: (from: number, to: number) => void;
   expenses: ExpenseItem[];
   onAddExpense: (input: NewExpenseItemInput) => void;
   onUpdateExpense: (id: string, input: NewExpenseItemInput) => void;
   onRemoveExpense: (id: string) => void;
+  onReorderExpense: (from: number, to: number) => void;
   transferRules: TransferRule[];
   onAddTransferRule: (input: NewTransferRuleInput) => void;
   onUpdateTransferRule: (id: string, input: NewTransferRuleInput) => void;
   onRemoveTransferRule: (id: string) => void;
+  onReorderTransferRule: (from: number, to: number) => void;
   today: Date;
   horizonMonths: number;
 };
@@ -67,6 +70,7 @@ export default function InputPanel(props: InputPanelProps) {
         onAddIncome={props.onAddIncome}
         onUpdateIncome={props.onUpdateIncome}
         onRemoveIncome={props.onRemoveIncome}
+        onReorderIncome={props.onReorderIncome}
         today={props.today}
         horizonMonths={props.horizonMonths}
       />
@@ -79,6 +83,7 @@ export default function InputPanel(props: InputPanelProps) {
         onAddExpense={props.onAddExpense}
         onUpdateExpense={props.onUpdateExpense}
         onRemoveExpense={props.onRemoveExpense}
+        onReorderExpense={props.onReorderExpense}
         today={props.today}
         horizonMonths={props.horizonMonths}
       />
@@ -88,6 +93,7 @@ export default function InputPanel(props: InputPanelProps) {
         onAddTransferRule={props.onAddTransferRule}
         onUpdateTransferRule={props.onUpdateTransferRule}
         onRemoveTransferRule={props.onRemoveTransferRule}
+        onReorderTransferRule={props.onReorderTransferRule}
         today={props.today}
         horizonMonths={props.horizonMonths}
       />

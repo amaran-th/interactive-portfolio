@@ -372,6 +372,13 @@ export default function AssetSimulator() {
     }));
   };
 
+  const reorderArray = <T,>(list: T[], from: number, to: number): T[] => {
+    const next = [...list];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    return next;
+  };
+
   const handleAddIncome = (input: NewIncomeItemInput) => {
     updateActiveScenario((s) => ({
       ...s,
@@ -388,6 +395,12 @@ export default function AssetSimulator() {
     updateActiveScenario((s) => ({
       ...s,
       incomes: s.incomes.filter((i) => i.id !== id),
+    }));
+  };
+  const handleReorderIncome = (from: number, to: number) => {
+    updateActiveScenario((s) => ({
+      ...s,
+      incomes: reorderArray(s.incomes, from, to),
     }));
   };
 
@@ -407,6 +420,12 @@ export default function AssetSimulator() {
     updateActiveScenario((s) => ({
       ...s,
       expenses: s.expenses.filter((e) => e.id !== id),
+    }));
+  };
+  const handleReorderExpense = (from: number, to: number) => {
+    updateActiveScenario((s) => ({
+      ...s,
+      expenses: reorderArray(s.expenses, from, to),
     }));
   };
 
@@ -431,6 +450,12 @@ export default function AssetSimulator() {
     updateActiveScenario((s) => ({
       ...s,
       transferRules: s.transferRules.filter((r) => r.id !== id),
+    }));
+  };
+  const handleReorderTransferRule = (from: number, to: number) => {
+    updateActiveScenario((s) => ({
+      ...s,
+      transferRules: reorderArray(s.transferRules, from, to),
     }));
   };
 
@@ -532,14 +557,17 @@ export default function AssetSimulator() {
             onAddIncome={handleAddIncome}
             onUpdateIncome={handleUpdateIncome}
             onRemoveIncome={handleRemoveIncome}
+            onReorderIncome={handleReorderIncome}
             expenses={activeScenario.expenses}
             onAddExpense={handleAddExpense}
             onUpdateExpense={handleUpdateExpense}
             onRemoveExpense={handleRemoveExpense}
+            onReorderExpense={handleReorderExpense}
             transferRules={activeScenario.transferRules}
             onAddTransferRule={handleAddTransferRule}
             onUpdateTransferRule={handleUpdateTransferRule}
             onRemoveTransferRule={handleRemoveTransferRule}
+            onReorderTransferRule={handleReorderTransferRule}
             today={today}
             horizonMonths={horizonMonths}
           />

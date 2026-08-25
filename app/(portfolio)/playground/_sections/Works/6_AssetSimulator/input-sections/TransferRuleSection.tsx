@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, Plus, Settings } from "lucide-react";
+import { ArrowLeftRight, GripVertical, Plus, Settings } from "lucide-react";
 import { useRef, useState } from "react";
 import CustomSelect from "../CustomSelect";
 import { validateSchedule } from "../simulation";
@@ -27,6 +27,7 @@ type TransferRuleSectionProps = {
   onAddTransferRule: (input: NewTransferRuleInput) => void;
   onUpdateTransferRule: (id: string, input: NewTransferRuleInput) => void;
   onRemoveTransferRule: (id: string) => void;
+  onReorderTransferRule: (from: number, to: number) => void;
   today: Date;
   horizonMonths: number;
 };
@@ -55,6 +56,7 @@ export default function TransferRuleSection({
   onAddTransferRule,
   onUpdateTransferRule,
   onRemoveTransferRule,
+  onReorderTransferRule,
   today,
   horizonMonths,
 }: TransferRuleSectionProps) {
@@ -69,6 +71,8 @@ export default function TransferRuleSection({
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const isFormVisible = showForm || Boolean(editingId);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
   const amountRef = useRef<HTMLInputElement>(null);
 
   const nameOf = (id: string) =>
@@ -172,19 +176,57 @@ export default function TransferRuleSection({
         </button>
       </div>
       <ul className="mt-2 flex flex-col gap-2">
-        {transferRules.map((rule) => (
+        {transferRules.map((rule, index) => (
           <li
             key={rule.id}
             onClick={() => startEdit(rule)}
-            className="flex cursor-pointer items-center justify-between gap-2 rounded-xl border border-amber-100 bg-white/80 px-3 py-2 text-sm hover:border-amber-300"
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (dragIndex !== null && dragIndex !== index) {
+                setOverIndex(index);
+              }
+            }}
+            onDragLeave={() =>
+              setOverIndex((prev) => (prev === index ? null : prev))
+            }
+            onDrop={() => {
+              if (dragIndex !== null && dragIndex !== index) {
+                onReorderTransferRule(dragIndex, index);
+              }
+              setDragIndex(null);
+              setOverIndex(null);
+            }}
+            className={`flex cursor-pointer items-center justify-between gap-2 rounded-xl border bg-white/80 px-3 py-2 text-sm transition-colors ${
+              overIndex === index
+                ? "border-amber-400 bg-amber-50"
+                : "border-amber-100 hover:border-amber-300"
+            }`}
           >
-            <div className="min-w-0">
-              <p className="truncate font-medium text-gray-800">
-                {nameOf(rule.fromAssetId)} → {nameOf(rule.toAssetId)}
-              </p>
-              <p className="text-xs text-gray-400">
-                {scheduleSummary(rule.schedule)}
-              </p>
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                draggable
+                onClick={(e) => e.stopPropagation()}
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  setDragIndex(index);
+                }}
+                onDragEnd={() => {
+                  setDragIndex(null);
+                  setOverIndex(null);
+                }}
+                aria-label="순서 변경"
+                className="shrink-0 cursor-grab text-gray-300 hover:text-gray-500 active:cursor-grabbing"
+              >
+                <GripVertical className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-medium text-gray-800">
+                  {nameOf(rule.fromAssetId)} → {nameOf(rule.toAssetId)}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {scheduleSummary(rule.schedule)}
+                </p>
+              </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <span className="font-semibold text-amber-600">
