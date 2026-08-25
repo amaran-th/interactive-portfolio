@@ -48,14 +48,15 @@ export default function CashFlowChart({
     (selected?.flow.incomeIn ?? 0) - (selected?.flow.expenseOut ?? 0);
 
   return (
-    <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
+    <div className="flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <p className="flex items-center gap-1.5 text-sm text-gray-500">
         <Activity className="h-4 w-4" /> 선택 시점 순수입{" "}
         <span className="text-lg font-semibold text-gray-800">
           {formatKRW(netAmount)}
         </span>
       </p>
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="mt-2 w-full">
+      <div className="mt-2 flex flex-1 items-center justify-center">
+      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
         <line
           x1={PADDING}
           y1={BASELINE_Y}
@@ -105,6 +106,7 @@ export default function CashFlowChart({
           strokeDasharray="4 4"
         />
       </svg>
+      </div>
       <div className="mt-2 flex gap-4 text-xs text-gray-500">
         <span className="flex items-center gap-1">
           <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />

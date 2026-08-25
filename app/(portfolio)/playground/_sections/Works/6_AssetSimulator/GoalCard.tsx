@@ -1,6 +1,6 @@
 "use client";
 
-import { Target } from "lucide-react";
+import { Target, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import CustomSelect from "./CustomSelect";
 import { findGoalAchievementMonth } from "./simulation";
@@ -9,10 +9,10 @@ import {
   Goal,
   GoalMetric,
   Group,
+  MonthSnapshot,
   SimulationInput,
   formatKRW,
   formatMonthsFromNow,
-  toRealValue,
 } from "./types";
 
 const METRIC_TYPE_OPTIONS = [
@@ -27,16 +27,16 @@ type GoalCardProps = {
   assetClasses: AssetClass[];
   groups: Group[];
   simulationInput: SimulationInput;
+  snapshots: MonthSnapshot[];
   today: Date;
-  inflationEnabled: boolean;
-  inflationRate: number;
 };
 
 type MetricType = GoalMetric["type"];
 
-function formatAchievementDate(monthIndex: number, today: Date): string {
-  const date = new Date(today.getFullYear(), today.getMonth() + monthIndex, 1);
-  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}`;
+function metricTargetIdOf(metric: GoalMetric): string {
+  if (metric.type === "asset") return metric.assetId;
+  if (metric.type === "group") return metric.groupId;
+  return "";
 }
 
 export default function GoalCard({
@@ -45,13 +45,13 @@ export default function GoalCard({
   assetClasses,
   groups,
   simulationInput,
+  snapshots,
   today,
-  inflationEnabled,
-  inflationRate,
 }: GoalCardProps) {
   const [metricType, setMetricType] = useState<MetricType>("total");
   const [targetId, setTargetId] = useState("");
   const [amount, setAmount] = useState("");
+  const [isEditing, setIsEditing] = useState(true);
   const [syncedGoal, setSyncedGoal] = useState<Goal | null>(null);
 
   // Adjust state during render when `goal` changes, instead of in an
@@ -59,15 +59,10 @@ export default function GoalCard({
   // state sync; see https://react.dev/learn/you-might-not-need-an-effect).
   if (goal !== syncedGoal) {
     setSyncedGoal(goal);
+    setIsEditing(!goal);
     if (goal) {
       setMetricType(goal.metric.type);
-      setTargetId(
-        goal.metric.type === "asset"
-          ? goal.metric.assetId
-          : goal.metric.type === "group"
-            ? goal.metric.groupId
-            : "",
-      );
+      setTargetId(metricTargetIdOf(goal.metric));
       setAmount(String(goal.targetAmount));
     } else {
       setMetricType("total");
@@ -79,17 +74,22 @@ export default function GoalCard({
     // longer exists (e.g. deleted elsewhere while this form was left
     // unsubmitted). Render-time check for the same reason as the sync
     // above — this file avoids useEffect for prop-driven state sync.
-    // Only runs when `goal` did NOT just change this render: when it did,
-    // the branch above already set a targetId that is valid by
-    // construction against the current assetClasses/groups, so re-checking
-    // it here against the (still-stale, pre-render) local targetId/metricType
-    // would incorrectly clobber what was just set.
     targetId &&
     ((metricType === "asset" && !assetClasses.some((a) => a.id === targetId)) ||
       (metricType === "group" && !groups.some((g) => g.id === targetId)))
   ) {
     setTargetId("");
   }
+
+  const currentValue = useMemo(() => {
+    const snapshot = snapshots[0];
+    if (!snapshot) return 0;
+    if (metricType === "total") return snapshot.totalBalance;
+    if (!targetId) return 0;
+    return metricType === "asset"
+      ? (snapshot.assetBalancesKRW[targetId] ?? 0)
+      : (snapshot.groupTotals[targetId] ?? 0);
+  }, [snapshots, metricType, targetId]);
 
   const achievementMonth = useMemo(() => {
     if (!goal) return undefined;
@@ -112,103 +112,121 @@ export default function GoalCard({
     onSetGoal({ metric, targetAmount });
   };
 
-  const handleClear = () => {
-    onSetGoal(null);
-    setMetricType("total");
-    setTargetId("");
-    setAmount("");
+  const handleCancelEdit = () => {
+    if (goal) {
+      setMetricType(goal.metric.type);
+      setTargetId(metricTargetIdOf(goal.metric));
+      setAmount(String(goal.targetAmount));
+    }
+    setIsEditing(false);
   };
 
+  const handleClear = () => {
+    onSetGoal(null);
+  };
+
+  const targetOptions =
+    metricType === "asset"
+      ? assetClasses.map((asset) => ({ value: asset.id, label: asset.name }))
+      : groups.map((group) => ({ value: group.id, label: group.name }));
+
   return (
-    <>
-      <span className="text-gray-300">·</span>
-      <Target className="h-4 w-4 shrink-0 text-gray-400" />
-      <CustomSelect
-        value={metricType}
-        onChange={(v) => {
-          setMetricType(v as MetricType);
-          setTargetId("");
-        }}
-        options={METRIC_TYPE_OPTIONS}
-        className="w-28 shrink-0"
-      />
-      <input
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        type="number"
-        placeholder="목표 금액(원)"
-        className="w-36 rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-gray-400"
-      />
-      <button
-        type="button"
-        onClick={handleSubmit}
-        className="shrink-0 rounded-full bg-gray-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
-      >
-        목표 설정
-      </button>
-      {goal && (
-        <button
-          type="button"
-          onClick={handleClear}
-          className="shrink-0 rounded-full px-4 py-1.5 text-sm text-gray-500 hover:text-gray-700"
-        >
-          목표 해제
-        </button>
-      )}
-      {metricType === "asset" && (
-        <div className="w-full">
+    <div className="flex w-full flex-wrap items-end gap-x-3 gap-y-1.5 border-t border-white/60 pt-2">
+      <div className="flex items-center gap-1.5">
+        <Target className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+        <CustomSelect
+          value={metricType}
+          onChange={(v) => {
+            setMetricType(v as MetricType);
+            setTargetId("");
+            setIsEditing(true);
+          }}
+          options={METRIC_TYPE_OPTIONS}
+          className="w-24 shrink-0"
+        />
+        {(metricType === "asset" || metricType === "group") && (
           <CustomSelect
             value={targetId}
             onChange={setTargetId}
-            options={assetClasses.map((asset) => ({
-              value: asset.id,
-              label: asset.name,
-            }))}
-            placeholder="자산 선택"
+            options={targetOptions}
+            placeholder={metricType === "asset" ? "자산 선택" : "그룹 선택"}
+            className="w-24 shrink-0"
           />
+        )}
+      </div>
+      <div className="flex flex-1 items-end justify-between gap-2">
+        <div className="flex flex-col items-start">
+          <span className="text-[10px] text-gray-400">현재</span>
+          <span className="text-sm font-semibold text-gray-800">
+            {formatKRW(currentValue)}
+          </span>
         </div>
-      )}
-      {metricType === "group" && (
-        <div className="w-full">
-          <CustomSelect
-            value={targetId}
-            onChange={setTargetId}
-            options={groups.map((group) => ({
-              value: group.id,
-              label: group.name,
-            }))}
-            placeholder="그룹 선택"
-          />
+        <div className="flex flex-1 flex-col items-center px-1">
+          <span className="whitespace-nowrap text-[10px] text-gray-400">
+            {goal && achievementMonth !== undefined
+              ? achievementMonth === null
+                ? "500년 내 불가"
+                : achievementMonth === 0
+                  ? "달성"
+                  : formatMonthsFromNow(achievementMonth)
+              : ""}
+          </span>
+          <div className="flex w-full items-center text-gray-300">
+            <span className="h-px flex-1 bg-gray-300" />
+            <span className="text-xs">▸</span>
+          </div>
         </div>
-      )}
-      {goal && achievementMonth !== undefined && (
-        <p className="w-full text-xs text-gray-500">
-          {achievementMonth === null ? (
-            <span className="text-rose-500">500년 내 달성 불가</span>
-          ) : achievementMonth === 0 ? (
-            <span className="text-emerald-600">이미 달성했습니다</span>
+        <div className="flex flex-col items-end">
+          <span className="text-[10px] text-gray-400">목표</span>
+          {isEditing ? (
+            <div className="flex items-center gap-1">
+              <input
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                type="number"
+                placeholder="금액"
+                className="w-24 rounded-full border border-gray-200 bg-white/80 px-2 py-0.5 text-right text-sm outline-none focus:border-gray-400"
+              />
+              <button
+                type="button"
+                onClick={handleSubmit}
+                aria-label="목표 저장"
+                className="shrink-0 rounded-full bg-gray-700 px-2 py-0.5 text-xs font-medium text-white hover:bg-gray-800"
+              >
+                저장
+              </button>
+              {goal && (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  aria-label="편집 취소"
+                  className="shrink-0 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           ) : (
-            <>
-              목표 {formatKRW(goal.targetAmount)}
-              {inflationEnabled && (
-                <>
-                  (오늘 가치 약{" "}
-                  {formatKRW(
-                    toRealValue(
-                      goal.targetAmount,
-                      achievementMonth,
-                      inflationRate,
-                    ),
-                  )}
-                  )
-                </>
-              )}{" "}
-              · 약 {formatMonthsFromNow(achievementMonth)} (
-              {formatAchievementDate(achievementMonth, today)}) 달성 예상
-            </>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="text-sm font-semibold text-gray-800 hover:text-indigo-600"
+              >
+                {formatKRW(goal!.targetAmount)}
+              </button>
+              <button
+                type="button"
+                onClick={handleClear}
+                aria-label="목표 해제"
+                className="shrink-0 text-gray-300 hover:text-rose-500"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
           )}
-        </p>
-      )}
-    </>
+        </div>
+      </div>
+    </div>
   );
 }

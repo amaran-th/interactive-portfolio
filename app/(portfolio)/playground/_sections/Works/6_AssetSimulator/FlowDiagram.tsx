@@ -121,11 +121,12 @@ export default function FlowDiagram({
     rightEntries.length > 0 ? HEIGHT / (rightEntries.length + 1) : HEIGHT / 2;
 
   return (
-    <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
+    <div className="flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <p className="flex items-center gap-1.5 text-sm text-gray-500">
         <Workflow className="h-4 w-4" /> 자금 흐름
       </p>
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="mt-2 w-full">
+      <div className="mt-2 flex flex-1 items-center justify-center">
+      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
         <defs>
           <marker
             id="flow-arrow-income"
@@ -232,6 +233,7 @@ export default function FlowDiagram({
           />
         ))}
       </svg>
+      </div>
     </div>
   );
 }

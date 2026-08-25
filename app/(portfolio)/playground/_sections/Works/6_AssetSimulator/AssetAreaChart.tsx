@@ -1,6 +1,6 @@
 "use client";
 
-import { Inbox, LineChart as LineChartIcon } from "lucide-react";
+import { Inbox } from "lucide-react";
 import {
   AssetClass,
   Goal,
@@ -147,7 +147,6 @@ export default function AssetAreaChart({
   const displayBalance = inflationEnabled
     ? toRealValue(totalBalance, selectedMonth, inflationRate)
     : totalBalance;
-  const currentBalance = snapshots[0]?.totalBalance ?? 0;
   const cursorY = scaleY(totalBalance);
   const nearRightEdge = cursorX > WIDTH - PADDING - 60;
 
@@ -181,22 +180,14 @@ export default function AssetAreaChart({
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
-            <p className="flex items-center gap-1.5">
-              <LineChartIcon className="h-4 w-4" />{" "}
-              현재 자산{" "}
-              <span className="text-lg font-semibold text-gray-800">
-                {formatKRW(currentBalance)}
-              </span>
-            </p>
             <GoalCard
               goal={goal}
               onSetGoal={onSetGoal}
               assetClasses={assetClasses}
               groups={groups}
               simulationInput={simulationInput}
+              snapshots={snapshots}
               today={today}
-              inflationEnabled={inflationEnabled}
-              inflationRate={inflationRate}
             />
             <div className="flex w-full items-center gap-1.5 text-xs text-gray-500">
               <label className="flex items-center gap-1.5">

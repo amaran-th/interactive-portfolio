@@ -652,8 +652,8 @@ export default function AssetSimulator() {
                 ›
               </button>
             </div>
-            <div className="flex flex-wrap items-start gap-4">
-              <div className="min-w-80 flex-2">
+            <div className="grid grid-cols-1 gap-4 @min-[500px]:grid-cols-2 @min-[900px]:grid-cols-3">
+              <div className="min-w-80 @min-[500px]:col-span-2">
                 <AssetAreaChart
                   snapshots={snapshots}
                   groups={assetGroups}
@@ -672,7 +672,7 @@ export default function AssetSimulator() {
                 />
               </div>
               <div
-                className={`min-w-50 flex-1 ${
+                className={`min-w-50 ${
                   activeChartIndex === 0
                     ? "block"
                     : "block @max-[500px]:hidden"
@@ -686,7 +686,7 @@ export default function AssetSimulator() {
                 />
               </div>
               <div
-                className={`min-w-50 flex-1 ${
+                className={`min-w-50 ${
                   activeChartIndex === 1
                     ? "block"
                     : "block @max-[500px]:hidden"
@@ -699,7 +699,7 @@ export default function AssetSimulator() {
                 />
               </div>
               <div
-                className={`min-w-50 flex-1 ${
+                className={`min-w-50 ${
                   activeChartIndex === 2
                     ? "block"
                     : "block @max-[500px]:hidden"
@@ -713,7 +713,7 @@ export default function AssetSimulator() {
                 />
               </div>
               <div
-                className={`min-w-50 flex-1 ${
+                className={`min-w-50 ${
                   activeChartIndex === 3
                     ? "block"
                     : "block @max-[500px]:hidden"

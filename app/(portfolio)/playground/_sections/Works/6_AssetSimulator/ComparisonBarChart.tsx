@@ -138,10 +138,11 @@ export default function ComparisonBarChart({
   const futureX = WIDTH / 2 + 16;
 
   return (
-    <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
+    <div className="flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <p className="flex items-center gap-1.5 text-sm text-gray-500">
         <BarChart3 className="h-4 w-4" /> 자산 비교
       </p>
+      <div className="flex flex-1 items-center justify-center">
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
         <defs>
           <clipPath id={BELOW_ZERO_CLIP_ID} clipPathUnits="userSpaceOnUse">
@@ -246,6 +247,7 @@ export default function ComparisonBarChart({
           {selectedMonth === 0 ? "지금" : formatMonthsFromNow(selectedMonth)}
         </text>
       </svg>
+      </div>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
         {assets.map((asset) => (
           <span key={asset.id} className="flex items-center gap-1">

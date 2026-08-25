@@ -98,7 +98,7 @@ export default function GroupDonutChart({
   );
 
   return (
-    <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
+    <div className="flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-sm text-gray-500">
           <PieChartIcon className="h-4 w-4" /> 그룹별 비율
@@ -130,7 +130,7 @@ export default function GroupDonutChart({
           </button>
         ))}
       </div>
-      <div className="mt-3 flex items-center gap-4">
+      <div className="mt-3 flex flex-1 items-center gap-4">
         <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
           <g transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}>
             {assetsInTab.length === 0 ? (
