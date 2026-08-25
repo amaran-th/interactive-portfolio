@@ -20,6 +20,7 @@ import {
   toMonthInputValue,
 } from "./types";
 import { useSimulation } from "./useSimulation";
+import { findGoalAchievementMonth } from "./simulation";
 import InputPanel from "./InputPanel";
 import AssetAreaChart from "./AssetAreaChart";
 import GroupDonutChart from "./GroupDonutChart";
@@ -433,10 +434,6 @@ export default function AssetSimulator() {
     }));
   };
 
-  const handleSetGoal = (goal: Goal | null) => {
-    updateActiveScenario((s) => ({ ...s, goal }));
-  };
-
   const activeScenario =
     scenarios.find((s) => s.id === activeScenarioId) ?? scenarios[0];
 
@@ -451,6 +448,20 @@ export default function AssetSimulator() {
     }),
     [activeScenario],
   );
+
+  const handleSetGoal = (goal: Goal | null) => {
+    updateActiveScenario((s) => ({ ...s, goal }));
+    if (goal) {
+      const achievementMonth = findGoalAchievementMonth(
+        simulationInput,
+        goal,
+        today,
+      );
+      if (achievementMonth !== null) {
+        setSelectedMonth(Math.min(achievementMonth, horizonMonths));
+      }
+    }
+  };
 
   const snapshots = useSimulation(simulationInput, today, horizonMonths);
   const selectedSnapshot = snapshots[selectedMonth];
