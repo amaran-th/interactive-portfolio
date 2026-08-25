@@ -25,6 +25,9 @@ type IncomeSectionProps = {
   onUpdateIncome: (id: string, input: NewIncomeItemInput) => void;
   onRemoveIncome: (id: string) => void;
   onReorderIncome: (from: number, to: number) => void;
+  isFormOpen: boolean;
+  onOpenForm: () => void;
+  onCloseForm: () => void;
   today: Date;
   horizonMonths: number;
 };
@@ -57,6 +60,9 @@ export default function IncomeSection({
   onUpdateIncome,
   onRemoveIncome,
   onReorderIncome,
+  isFormOpen,
+  onOpenForm,
+  onCloseForm,
   today,
   horizonMonths,
 }: IncomeSectionProps) {
@@ -68,8 +74,7 @@ export default function IncomeSection({
     defaultSchedule(today),
   );
   const [error, setError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const isFormVisible = showForm || Boolean(editingId);
+  const isFormVisible = isFormOpen || Boolean(editingId);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -85,6 +90,7 @@ export default function IncomeSection({
   };
 
   const startEdit = (item: IncomeItem) => {
+    onOpenForm();
     setEditingId(item.id);
     setName(item.name);
     setAmount(String(item.amount));
@@ -131,7 +137,7 @@ export default function IncomeSection({
 
   return (
     <div
-      className={`relative rounded-2xl border border-emerald-200 bg-white/70 p-4 backdrop-blur ${
+      className={`relative min-w-[220px] flex-1 rounded-2xl border border-emerald-200 bg-white/70 p-4 backdrop-blur ${
         isFormVisible ? "z-30" : ""
       }`}
     >
@@ -144,9 +150,9 @@ export default function IncomeSection({
           onClick={() => {
             if (isFormVisible) {
               resetForm();
-              setShowForm(false);
+              onCloseForm();
             } else {
-              setShowForm(true);
+              onOpenForm();
             }
           }}
           className={`rounded-full p-1.5 ${

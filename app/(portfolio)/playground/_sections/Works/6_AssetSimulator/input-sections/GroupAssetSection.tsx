@@ -29,6 +29,9 @@ type GroupAssetSectionProps = {
   onRemoveAssetClass: (id: string) => void;
   onSetPrimaryAsset: (id: string) => void;
   onChangeAssetColor: (id: string, color: string) => void;
+  isFormOpen: boolean;
+  onOpenForm: () => void;
+  onCloseForm: () => void;
 };
 
 export default function GroupAssetSection({
@@ -42,6 +45,9 @@ export default function GroupAssetSection({
   onRemoveAssetClass,
   onSetPrimaryAsset,
   onChangeAssetColor,
+  isFormOpen,
+  onOpenForm,
+  onCloseForm,
 }: GroupAssetSectionProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -53,8 +59,7 @@ export default function GroupAssetSection({
   const [makePrimary, setMakePrimary] = useState(false);
   const [isLiability, setIsLiability] = useState(false);
   const [colorPickerId, setColorPickerId] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const isFormVisible = showForm || Boolean(editingId);
+  const isFormVisible = isFormOpen || Boolean(editingId);
 
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -70,6 +75,7 @@ export default function GroupAssetSection({
   };
 
   const startEdit = (asset: AssetClass) => {
+    onOpenForm();
     setEditingId(asset.id);
     setName(asset.name);
     setGroupId(asset.groupId ?? "");
@@ -111,7 +117,7 @@ export default function GroupAssetSection({
 
   return (
     <div
-      className={`relative rounded-2xl border border-indigo-200 bg-white/70 p-4 backdrop-blur md:col-span-2 ${
+      className={`relative min-w-[280px] flex-[1.5] rounded-2xl border border-indigo-200 bg-white/70 p-4 backdrop-blur ${
         isFormVisible ? "z-30" : ""
       }`}
     >
@@ -124,9 +130,9 @@ export default function GroupAssetSection({
           onClick={() => {
             if (isFormVisible) {
               resetForm();
-              setShowForm(false);
+              onCloseForm();
             } else {
-              setShowForm(true);
+              onOpenForm();
             }
           }}
           className={`rounded-full p-1.5 ${

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   AssetClass,
   ExpenseItem,
@@ -46,9 +47,13 @@ type InputPanelProps = {
   horizonMonths: number;
 };
 
+type OpenSection = "asset" | "income" | "expense" | "transfer" | null;
+
 export default function InputPanel(props: InputPanelProps) {
+  const [openSection, setOpenSection] = useState<OpenSection>(null);
+
   return (
-    <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))]">
+    <div className="flex flex-wrap gap-4">
       <GroupAssetSection
         groups={props.groups}
         onAddGroup={props.onAddGroup}
@@ -60,6 +65,9 @@ export default function InputPanel(props: InputPanelProps) {
         onRemoveAssetClass={props.onRemoveAssetClass}
         onSetPrimaryAsset={props.onSetPrimaryAsset}
         onChangeAssetColor={props.onChangeAssetColor}
+        isFormOpen={openSection === "asset"}
+        onOpenForm={() => setOpenSection("asset")}
+        onCloseForm={() => setOpenSection(null)}
       />
       <IncomeSection
         groups={props.groups}
@@ -71,6 +79,9 @@ export default function InputPanel(props: InputPanelProps) {
         onUpdateIncome={props.onUpdateIncome}
         onRemoveIncome={props.onRemoveIncome}
         onReorderIncome={props.onReorderIncome}
+        isFormOpen={openSection === "income"}
+        onOpenForm={() => setOpenSection("income")}
+        onCloseForm={() => setOpenSection(null)}
         today={props.today}
         horizonMonths={props.horizonMonths}
       />
@@ -84,6 +95,9 @@ export default function InputPanel(props: InputPanelProps) {
         onUpdateExpense={props.onUpdateExpense}
         onRemoveExpense={props.onRemoveExpense}
         onReorderExpense={props.onReorderExpense}
+        isFormOpen={openSection === "expense"}
+        onOpenForm={() => setOpenSection("expense")}
+        onCloseForm={() => setOpenSection(null)}
         today={props.today}
         horizonMonths={props.horizonMonths}
       />
@@ -94,6 +108,9 @@ export default function InputPanel(props: InputPanelProps) {
         onUpdateTransferRule={props.onUpdateTransferRule}
         onRemoveTransferRule={props.onRemoveTransferRule}
         onReorderTransferRule={props.onReorderTransferRule}
+        isFormOpen={openSection === "transfer"}
+        onOpenForm={() => setOpenSection("transfer")}
+        onCloseForm={() => setOpenSection(null)}
         today={props.today}
         horizonMonths={props.horizonMonths}
       />

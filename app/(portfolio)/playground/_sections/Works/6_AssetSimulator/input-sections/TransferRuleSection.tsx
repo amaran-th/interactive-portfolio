@@ -28,6 +28,9 @@ type TransferRuleSectionProps = {
   onUpdateTransferRule: (id: string, input: NewTransferRuleInput) => void;
   onRemoveTransferRule: (id: string) => void;
   onReorderTransferRule: (from: number, to: number) => void;
+  isFormOpen: boolean;
+  onOpenForm: () => void;
+  onCloseForm: () => void;
   today: Date;
   horizonMonths: number;
 };
@@ -57,6 +60,9 @@ export default function TransferRuleSection({
   onUpdateTransferRule,
   onRemoveTransferRule,
   onReorderTransferRule,
+  isFormOpen,
+  onOpenForm,
+  onCloseForm,
   today,
   horizonMonths,
 }: TransferRuleSectionProps) {
@@ -69,8 +75,7 @@ export default function TransferRuleSection({
     defaultSchedule(today),
   );
   const [error, setError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const isFormVisible = showForm || Boolean(editingId);
+  const isFormVisible = isFormOpen || Boolean(editingId);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -99,6 +104,7 @@ export default function TransferRuleSection({
   };
 
   const startEdit = (rule: TransferRule) => {
+    onOpenForm();
     setEditingId(rule.id);
     setFromAssetId(rule.fromAssetId);
     setToAssetId(rule.toAssetId);
@@ -147,7 +153,7 @@ export default function TransferRuleSection({
 
   return (
     <div
-      className={`relative rounded-2xl border border-amber-200 bg-white/70 p-4 backdrop-blur ${
+      className={`relative min-w-[220px] flex-1 rounded-2xl border border-amber-200 bg-white/70 p-4 backdrop-blur ${
         isFormVisible ? "z-30" : ""
       }`}
     >
@@ -160,9 +166,9 @@ export default function TransferRuleSection({
           onClick={() => {
             if (isFormVisible) {
               resetForm();
-              setShowForm(false);
+              onCloseForm();
             } else {
-              setShowForm(true);
+              onOpenForm();
             }
           }}
           className={`rounded-full p-1.5 ${
