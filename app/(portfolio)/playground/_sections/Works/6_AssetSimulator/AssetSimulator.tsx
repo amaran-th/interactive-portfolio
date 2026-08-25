@@ -40,6 +40,8 @@ function withGuaranteedPrimary(assets: AssetClass[]): AssetClass[] {
   return assets.map((a) => ({ ...a, isPrimary: a.id === candidate.id }));
 }
 
+const CHART_PANEL_COUNT_ARRAY = [0, 1, 2, 3] as const;
+
 function goalReferences(
   goal: Goal | null,
   kind: "asset" | "group",
@@ -214,6 +216,7 @@ export default function AssetSimulator() {
   const [horizonYears, setHorizonYears] = useState(DEFAULT_HORIZON_YEARS);
   const [isDirty, setIsDirty] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
+  const [activeChartIndex, setActiveChartIndex] = useState(0);
 
   const horizonMonths = horizonYears * 12;
 
@@ -624,25 +627,77 @@ export default function AssetSimulator() {
               onToggleInflation={handleToggleInflation}
               onSetInflationRate={handleSetInflationRate}
             />
-            <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))]">
-              <ComparisonBarChart
-                snapshots={snapshots}
-                groups={assetGroups}
-                assetClasses={activeScenario.assetClasses}
-                selectedMonth={selectedMonth}
-              />
-              <GroupDonutChart
-                groups={assetGroups}
-                assetClasses={activeScenario.assetClasses}
-                snapshot={selectedSnapshot}
-              />
-              <FlowDiagram
-                snapshot={selectedSnapshot}
-                primaryAsset={primaryAsset}
-                assetClasses={activeScenario.assetClasses}
-                exchangeRate={activeScenario.exchangeRate}
-              />
-              <CashFlowChart snapshots={snapshots} selectedMonth={selectedMonth} />
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveChartIndex((i) => Math.max(0, i - 1))
+                }
+                disabled={activeChartIndex === 0}
+                className="text-gray-400 disabled:opacity-30"
+                aria-label="이전 차트"
+              >
+                ‹
+              </button>
+              <div className="flex gap-1.5">
+                {CHART_PANEL_COUNT_ARRAY.map((i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setActiveChartIndex(i)}
+                    aria-label={`${i + 1}번째 차트로 이동`}
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      i === activeChartIndex ? "bg-indigo-500" : "bg-gray-300"
+                    }`}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveChartIndex((i) =>
+                    Math.min(CHART_PANEL_COUNT_ARRAY.length - 1, i + 1),
+                  )
+                }
+                disabled={
+                  activeChartIndex === CHART_PANEL_COUNT_ARRAY.length - 1
+                }
+                className="text-gray-400 disabled:opacity-30"
+                aria-label="다음 차트"
+              >
+                ›
+              </button>
+            </div>
+            <div>
+              <div className={activeChartIndex === 0 ? "block" : "hidden"}>
+                <ComparisonBarChart
+                  snapshots={snapshots}
+                  groups={assetGroups}
+                  assetClasses={activeScenario.assetClasses}
+                  selectedMonth={selectedMonth}
+                />
+              </div>
+              <div className={activeChartIndex === 1 ? "block" : "hidden"}>
+                <GroupDonutChart
+                  groups={assetGroups}
+                  assetClasses={activeScenario.assetClasses}
+                  snapshot={selectedSnapshot}
+                />
+              </div>
+              <div className={activeChartIndex === 2 ? "block" : "hidden"}>
+                <FlowDiagram
+                  snapshot={selectedSnapshot}
+                  primaryAsset={primaryAsset}
+                  assetClasses={activeScenario.assetClasses}
+                  exchangeRate={activeScenario.exchangeRate}
+                />
+              </div>
+              <div className={activeChartIndex === 3 ? "block" : "hidden"}>
+                <CashFlowChart
+                  snapshots={snapshots}
+                  selectedMonth={selectedMonth}
+                />
+              </div>
             </div>
           </div>
           <HistoryPanel
