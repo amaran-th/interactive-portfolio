@@ -1,6 +1,7 @@
 "use client";
 
 import { BarChart3, Inbox } from "lucide-react";
+import { useState } from "react";
 import {
   AssetClass,
   Group,
@@ -8,6 +9,7 @@ import {
   formatKRW,
   formatMonthsFromNow,
 } from "./types";
+import ChartTooltip from "./ChartTooltip";
 
 type ComparisonBarChartProps = {
   snapshots: MonthSnapshot[];
@@ -40,6 +42,13 @@ type Segment = {
   stroke: string | undefined;
   y: number;
   height: number;
+  amount: number;
+};
+
+type HoveredSegment = {
+  barLabel: string;
+  segment: Segment;
+  x: number;
 };
 
 function orderedAssets(
@@ -97,6 +106,8 @@ export default function ComparisonBarChart({
   assetClasses,
   selectedMonth,
 }: ComparisonBarChartProps) {
+  const [hovered, setHovered] = useState<HoveredSegment | null>(null);
+
   if (assetClasses.length === 0 || snapshots.length === 0) {
     return (
       <div className="flex h-[220px] items-center justify-center gap-1.5 rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
@@ -129,6 +140,7 @@ export default function ComparisonBarChart({
         stroke: seg.stroke,
         y: Math.min(yTop, yBottom),
         height: Math.abs(yBottom - yTop),
+        amount: seg.top - seg.bottom,
       };
     });
 
@@ -179,7 +191,17 @@ export default function ComparisonBarChart({
           {formatKRW(futureSnapshot.totalBalance)}
         </text>
         {nowSegments.map((seg) => (
-          <g key={seg.id}>
+          <g
+            key={seg.id}
+            onPointerEnter={() =>
+              setHovered({
+                barLabel: "지금",
+                segment: seg,
+                x: nowX + BAR_WIDTH,
+              })
+            }
+            onPointerLeave={() => setHovered(null)}
+          >
             <rect
               x={nowX}
               y={seg.y}
@@ -189,9 +211,7 @@ export default function ComparisonBarChart({
               fillOpacity={0.75}
               stroke={seg.stroke}
               strokeWidth={seg.stroke ? 2 : 0}
-            >
-              <title>{seg.name}</title>
-            </rect>
+            />
             <rect
               x={nowX}
               y={seg.y}
@@ -205,7 +225,20 @@ export default function ComparisonBarChart({
           </g>
         ))}
         {futureSegments.map((seg) => (
-          <g key={seg.id}>
+          <g
+            key={seg.id}
+            onPointerEnter={() =>
+              setHovered({
+                barLabel:
+                  selectedMonth === 0
+                    ? "지금"
+                    : formatMonthsFromNow(selectedMonth),
+                segment: seg,
+                x: futureX + BAR_WIDTH,
+              })
+            }
+            onPointerLeave={() => setHovered(null)}
+          >
             <rect
               x={futureX}
               y={seg.y}
@@ -215,9 +248,7 @@ export default function ComparisonBarChart({
               fillOpacity={0.75}
               stroke={seg.stroke}
               strokeWidth={seg.stroke ? 2 : 0}
-            >
-              <title>{seg.name}</title>
-            </rect>
+            />
             <rect
               x={futureX}
               y={seg.y}
@@ -246,6 +277,18 @@ export default function ComparisonBarChart({
         >
           {selectedMonth === 0 ? "지금" : formatMonthsFromNow(selectedMonth)}
         </text>
+        {hovered && (
+          <ChartTooltip
+            x={hovered.x}
+            y={hovered.segment.y + hovered.segment.height / 2}
+            viewBoxWidth={WIDTH}
+            viewBoxHeight={HEIGHT}
+            lines={[
+              `${hovered.barLabel} · ${hovered.segment.name}`,
+              formatKRW(hovered.segment.amount),
+            ]}
+          />
+        )}
       </svg>
       </div>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">

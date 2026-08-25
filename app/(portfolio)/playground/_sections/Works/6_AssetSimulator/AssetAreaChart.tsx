@@ -1,6 +1,7 @@
 "use client";
 
 import { Inbox } from "lucide-react";
+import { useState } from "react";
 import {
   AssetClass,
   Goal,
@@ -12,6 +13,7 @@ import {
 } from "./types";
 import TimelineSlider from "./TimelineSlider";
 import GoalCard from "./GoalCard";
+import ChartTooltip from "./ChartTooltip";
 
 type AssetAreaChartProps = {
   snapshots: MonthSnapshot[];
@@ -47,6 +49,16 @@ function orderedAssets(
   return [...grouped, ...ungrouped];
 }
 
+function monthLabel(monthIndex: number, today: Date): string {
+  if (monthIndex === 0) return "지금";
+  const date = new Date(
+    today.getFullYear(),
+    today.getMonth() + monthIndex,
+    1,
+  );
+  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export default function AssetAreaChart({
   snapshots,
   groups,
@@ -64,6 +76,7 @@ export default function AssetAreaChart({
   onSetInflationRate,
 }: AssetAreaChartProps) {
   const isEmpty = assetClasses.length === 0 || snapshots.length === 0;
+  const [hoverMonth, setHoverMonth] = useState<number | null>(null);
 
   const assets = isEmpty ? [] : orderedAssets(assetClasses, groups);
   const maxTotal = isEmpty
@@ -150,26 +163,26 @@ export default function AssetAreaChart({
   const cursorY = scaleY(totalBalance);
   const nearRightEdge = cursorX > WIDTH - PADDING - 60;
 
-  const maxFlow = isEmpty
-    ? 1
-    : Math.max(
-        1,
-        ...snapshots.map((s) => Math.max(s.flow.incomeIn, s.flow.expenseOut)),
-      );
-  const scaleFlow = (value: number) =>
-    HEIGHT - PADDING - (value / maxFlow) * (HEIGHT - PADDING * 2);
-  const incomePoints = snapshots
-    .map(
-      (snapshot, i) =>
-        `${PADDING + i * stepX},${scaleFlow(snapshot.flow.incomeIn)}`,
-    )
-    .join(" ");
-  const expensePoints = snapshots
-    .map(
-      (snapshot, i) =>
-        `${PADDING + i * stepX},${scaleFlow(snapshot.flow.expenseOut)}`,
-    )
-    .join(" ");
+  const hoverSnapshot = hoverMonth !== null ? snapshots[hoverMonth] : null;
+  const hoverX = hoverMonth !== null ? PADDING + hoverMonth * stepX : 0;
+  const hoverY = hoverSnapshot ? scaleY(hoverSnapshot.totalBalance) : 0;
+  const tooltipLines = hoverSnapshot
+    ? [
+        monthLabel(hoverMonth!, today),
+        `총자산 ${formatKRW(hoverSnapshot.totalBalance)}`,
+        ...assets.map(
+          (asset) =>
+            `${asset.name} ${formatKRW(hoverSnapshot.assetBalancesKRW[asset.id] ?? 0)}`,
+        ),
+      ]
+    : [];
+
+  const handlePointerMove = (e: React.PointerEvent<SVGRectElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    const month = Math.round(ratio * (snapshots.length - 1));
+    setHoverMonth(Math.max(0, Math.min(snapshots.length - 1, month)));
+  };
 
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
@@ -244,20 +257,6 @@ export default function AssetAreaChart({
                 />
               </g>
             ))}
-            <polyline
-              points={incomePoints}
-              fill="none"
-              stroke="#10b981"
-              strokeWidth={1.5}
-              strokeOpacity={0.8}
-            />
-            <polyline
-              points={expensePoints}
-              fill="none"
-              stroke="#f43f5e"
-              strokeWidth={1.5}
-              strokeOpacity={0.8}
-            />
             <line
               x1={PADDING}
               y1={zeroY}
@@ -299,6 +298,24 @@ export default function AssetAreaChart({
             >
               {formatKRW(displayBalance)}
             </text>
+            <rect
+              x={0}
+              y={0}
+              width={WIDTH}
+              height={HEIGHT}
+              fill="transparent"
+              onPointerMove={handlePointerMove}
+              onPointerLeave={() => setHoverMonth(null)}
+            />
+            {hoverSnapshot && (
+              <ChartTooltip
+                x={hoverX}
+                y={hoverY}
+                viewBoxWidth={WIDTH}
+                viewBoxHeight={HEIGHT}
+                lines={tooltipLines}
+              />
+            )}
           </svg>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
             {assets.map((asset) => (
@@ -310,14 +327,6 @@ export default function AssetAreaChart({
                 {asset.name}
               </span>
             ))}
-            <span className="flex items-center gap-1">
-              <span className="h-0.5 w-3 rounded-full bg-emerald-500" />
-              수입
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="h-0.5 w-3 rounded-full bg-rose-500" />
-              지출
-            </span>
           </div>
         </>
       )}

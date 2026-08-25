@@ -9,6 +9,7 @@ import {
   UNGROUPED_LABEL,
   formatKRW,
 } from "./types";
+import ChartTooltip from "./ChartTooltip";
 
 type GroupDonutChartProps = {
   groups: Group[];
@@ -53,6 +54,8 @@ export default function GroupDonutChart({
     (a) => (snapshot.assetBalancesKRW[a.id] ?? 0) < 0,
   );
   const [includeLiabilities, setIncludeLiabilities] = useState(false);
+  const [hoveredSlice, setHoveredSlice] = useState<Slice | null>(null);
+  const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
 
   if (!activeTabId) {
     return (
@@ -154,10 +157,32 @@ export default function GroupDonutChart({
                   strokeWidth={STROKE}
                   strokeDasharray={slice.dashArray}
                   strokeDashoffset={slice.dashOffset}
+                  onPointerMove={(e) => {
+                    const rect = e.currentTarget
+                      .ownerSVGElement!.getBoundingClientRect();
+                    setHoverPos({
+                      x: e.clientX - rect.left,
+                      y: e.clientY - rect.top,
+                    });
+                    setHoveredSlice(slice);
+                  }}
+                  onPointerLeave={() => setHoveredSlice(null)}
                 />
               ))
             )}
           </g>
+          {hoveredSlice && (
+            <ChartTooltip
+              x={hoverPos.x}
+              y={hoverPos.y}
+              viewBoxWidth={SIZE}
+              viewBoxHeight={SIZE}
+              lines={[
+                hoveredSlice.name,
+                `${Math.round(hoveredSlice.ratio * 100)}% · ${formatKRW(hoveredSlice.amount)}`,
+              ]}
+            />
+          )}
         </svg>
         <ul className="flex flex-col gap-1 text-sm">
           {slices.map((slice) => (

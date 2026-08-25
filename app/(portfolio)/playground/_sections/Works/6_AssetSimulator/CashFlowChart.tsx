@@ -1,7 +1,9 @@
 "use client";
 
 import { Activity, Inbox } from "lucide-react";
-import { MonthSnapshot, formatKRW } from "./types";
+import { useState } from "react";
+import { MonthSnapshot, formatKRW, formatMonthsFromNow } from "./types";
+import ChartTooltip from "./ChartTooltip";
 
 type CashFlowChartProps = {
   snapshots: MonthSnapshot[];
@@ -17,6 +19,8 @@ export default function CashFlowChart({
   snapshots,
   selectedMonth,
 }: CashFlowChartProps) {
+  const [hoverMonth, setHoverMonth] = useState<number | null>(null);
+
   if (snapshots.length === 0) {
     return (
       <div className="flex h-[260px] items-center justify-center gap-1.5 rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
@@ -46,6 +50,8 @@ export default function CashFlowChart({
   const selected = snapshots[selectedMonth];
   const netAmount =
     (selected?.flow.incomeIn ?? 0) - (selected?.flow.expenseOut ?? 0);
+
+  const hoverSnapshot = hoverMonth !== null ? snapshots[hoverMonth] : null;
 
   return (
     <div className="flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
@@ -78,6 +84,7 @@ export default function CashFlowChart({
                 height={incomeHeight}
                 fill="#10b981"
                 fillOpacity={0.7}
+                pointerEvents="none"
               />
               <rect
                 x={x}
@@ -86,6 +93,7 @@ export default function CashFlowChart({
                 height={expenseHeight}
                 fill="#f43f5e"
                 fillOpacity={0.7}
+                pointerEvents="none"
               />
             </g>
           );
@@ -95,6 +103,7 @@ export default function CashFlowChart({
           fill="none"
           stroke="#1f2937"
           strokeWidth={1.5}
+          pointerEvents="none"
         />
         <line
           x1={cursorX}
@@ -104,7 +113,34 @@ export default function CashFlowChart({
           stroke="#4338ca"
           strokeWidth={1.5}
           strokeDasharray="4 4"
+          pointerEvents="none"
         />
+        {snapshots.map((snapshot, i) => (
+          <rect
+            key={`hover-${snapshot.monthIndex}`}
+            x={PADDING + i * stepX - stepX / 2}
+            y={0}
+            width={stepX}
+            height={HEIGHT}
+            fill="transparent"
+            onPointerEnter={() => setHoverMonth(i)}
+            onPointerLeave={() => setHoverMonth(null)}
+          />
+        ))}
+        {hoverSnapshot && hoverMonth !== null && (
+          <ChartTooltip
+            x={PADDING + hoverMonth * stepX}
+            y={BASELINE_Y}
+            viewBoxWidth={WIDTH}
+            viewBoxHeight={HEIGHT}
+            lines={[
+              hoverMonth === 0 ? "지금" : formatMonthsFromNow(hoverMonth),
+              `수입 ${formatKRW(hoverSnapshot.flow.incomeIn)}`,
+              `지출 ${formatKRW(hoverSnapshot.flow.expenseOut)}`,
+              `순수입 ${formatKRW(hoverSnapshot.flow.incomeIn - hoverSnapshot.flow.expenseOut)}`,
+            ]}
+          />
+        )}
       </svg>
       </div>
       <div className="mt-2 flex gap-4 text-xs text-gray-500">
