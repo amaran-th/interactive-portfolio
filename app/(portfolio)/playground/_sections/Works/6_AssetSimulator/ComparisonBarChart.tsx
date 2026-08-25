@@ -197,7 +197,7 @@ export default function ComparisonBarChart({
               setHovered({
                 barLabel: "지금",
                 segment: seg,
-                x: nowX + BAR_WIDTH,
+                x: nowX + BAR_WIDTH / 2,
               })
             }
             onPointerLeave={() => setHovered(null)}
@@ -234,7 +234,7 @@ export default function ComparisonBarChart({
                     ? "지금"
                     : formatMonthsFromNow(selectedMonth),
                 segment: seg,
-                x: futureX + BAR_WIDTH,
+                x: futureX + BAR_WIDTH / 2,
               })
             }
             onPointerLeave={() => setHovered(null)}
@@ -280,9 +280,10 @@ export default function ComparisonBarChart({
         {hovered && (
           <ChartTooltip
             x={hovered.x}
-            y={hovered.segment.y + hovered.segment.height / 2}
+            y={hovered.segment.y}
             viewBoxWidth={WIDTH}
             viewBoxHeight={HEIGHT}
+            anchor="above"
             lines={[
               `${hovered.barLabel} · ${hovered.segment.name}`,
               formatKRW(hovered.segment.amount),

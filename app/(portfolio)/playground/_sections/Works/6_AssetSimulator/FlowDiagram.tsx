@@ -171,7 +171,7 @@ export default function FlowDiagram({
               x2={primaryX - 6}
               y2={CENTER_Y + NODE_HEIGHT / 2}
               stroke={INCOME_COLOR}
-              strokeWidth={Math.max(10, strokeWidth(snapshot.flow.incomeIn))}
+              strokeWidth={Math.max(24, strokeWidth(snapshot.flow.incomeIn))}
               strokeOpacity={0}
               pointerEvents="stroke"
               onPointerEnter={() =>
@@ -218,7 +218,7 @@ export default function FlowDiagram({
                 x2={rightX - 6}
                 y2={y2}
                 stroke={OUTFLOW_COLOR}
-                strokeWidth={Math.max(10, strokeWidth(entry.amount))}
+                strokeWidth={Math.max(24, strokeWidth(entry.amount))}
                 strokeOpacity={0}
                 pointerEvents="stroke"
                 onPointerEnter={() =>

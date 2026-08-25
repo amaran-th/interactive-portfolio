@@ -53,6 +53,13 @@ export default function CashFlowChart({
 
   const hoverSnapshot = hoverMonth !== null ? snapshots[hoverMonth] : null;
 
+  const handlePointerMove = (e: React.PointerEvent<SVGRectElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    const month = Math.round(ratio * (snapshots.length - 1));
+    setHoverMonth(Math.max(0, Math.min(snapshots.length - 1, month)));
+  };
+
   return (
     <div className="flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <p className="flex items-center gap-1.5 text-sm text-gray-500">
@@ -115,18 +122,15 @@ export default function CashFlowChart({
           strokeDasharray="4 4"
           pointerEvents="none"
         />
-        {snapshots.map((snapshot, i) => (
-          <rect
-            key={`hover-${snapshot.monthIndex}`}
-            x={PADDING + i * stepX - stepX / 2}
-            y={0}
-            width={stepX}
-            height={HEIGHT}
-            fill="transparent"
-            onPointerEnter={() => setHoverMonth(i)}
-            onPointerLeave={() => setHoverMonth(null)}
-          />
-        ))}
+        <rect
+          x={0}
+          y={0}
+          width={WIDTH}
+          height={HEIGHT}
+          fill="transparent"
+          onPointerMove={handlePointerMove}
+          onPointerLeave={() => setHoverMonth(null)}
+        />
         {hoverSnapshot && hoverMonth !== null && (
           <ChartTooltip
             x={PADDING + hoverMonth * stepX}

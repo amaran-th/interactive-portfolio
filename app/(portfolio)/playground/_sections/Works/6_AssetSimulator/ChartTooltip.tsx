@@ -6,6 +6,14 @@ type ChartTooltipProps = {
   viewBoxWidth: number;
   viewBoxHeight: number;
   lines: string[];
+  /**
+   * "point" (default) offsets sideways from (x, y), flipping to the left
+   * edge when it would overflow — meant for a cursor/point on a continuous
+   * chart. "above" centers horizontally on x and sits above y, flipping
+   * below when it would overflow — meant for a discrete element (a bar,
+   * a node) where a sideways offset could overlap a neighboring element.
+   */
+  anchor?: "point" | "above";
 };
 
 const LINE_HEIGHT = 14;
@@ -19,16 +27,26 @@ export default function ChartTooltip({
   viewBoxWidth,
   viewBoxHeight,
   lines,
+  anchor = "point",
 }: ChartTooltipProps) {
   const boxWidth =
     Math.max(...lines.map((line) => line.length)) * CHAR_WIDTH + PADDING_X * 2;
   const boxHeight = lines.length * LINE_HEIGHT + PADDING_Y * 2;
-  const flipLeft = x + 10 + boxWidth > viewBoxWidth;
-  const boxX = flipLeft ? x - 10 - boxWidth : x + 10;
-  const boxY = Math.min(
-    Math.max(0, y - boxHeight / 2),
-    viewBoxHeight - boxHeight,
-  );
+
+  let boxX: number;
+  let boxY: number;
+  if (anchor === "above") {
+    boxX = Math.min(
+      Math.max(0, x - boxWidth / 2),
+      viewBoxWidth - boxWidth,
+    );
+    const flipBelow = y - 8 - boxHeight < 0;
+    boxY = flipBelow ? y + 8 : y - 8 - boxHeight;
+  } else {
+    const flipLeft = x + 10 + boxWidth > viewBoxWidth;
+    boxX = flipLeft ? x - 10 - boxWidth : x + 10;
+    boxY = Math.min(Math.max(0, y - boxHeight / 2), viewBoxHeight - boxHeight);
+  }
 
   return (
     <g className="pointer-events-none">
