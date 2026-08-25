@@ -179,14 +179,19 @@ export function runSimulation(
       if (!fires(rule.schedule, month, today)) continue;
 
       const sourceBalance = balances[rule.fromAssetId] ?? 0;
+      const destBalance = balances[rule.toAssetId] ?? 0;
       const requested =
         rule.mode === "fixed"
           ? rule.amount
           : sourceBalance * (rule.amount / 100);
-      const amount = Math.max(0, Math.min(requested, sourceBalance));
+      let amount = Math.max(0, Math.min(requested, sourceBalance));
+      // 목적지가 부채(음수 잔액)면 남은 빚 이상 갚아 흑자로 넘어가지 않도록 clamp.
+      if (destBalance < 0) {
+        amount = Math.min(amount, -destBalance);
+      }
 
       balances[rule.fromAssetId] = sourceBalance - amount;
-      balances[rule.toAssetId] = (balances[rule.toAssetId] ?? 0) + amount;
+      balances[rule.toAssetId] = destBalance + amount;
       flow.transfers.push({
         ruleId: rule.id,
         fromAssetId: rule.fromAssetId,
