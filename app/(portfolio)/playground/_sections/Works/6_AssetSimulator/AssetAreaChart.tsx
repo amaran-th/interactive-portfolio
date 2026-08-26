@@ -219,9 +219,18 @@ export default function AssetAreaChart({
       : hoverFlow && hoverMonth !== null
         ? [
             monthLabel(hoverMonth, today),
-            `수입 ${formatKRW(hoverFlow.incomeIn)}`,
-            `지출 ${formatKRW(hoverFlow.expenseOut)}`,
-            `순수입 ${formatKRW(hoverFlow.incomeIn - hoverFlow.expenseOut)}`,
+            {
+              text: `수입 ${formatKRW(hoverFlow.incomeIn)}`,
+              className: "text-emerald-600",
+            },
+            {
+              text: `지출 ${formatKRW(hoverFlow.expenseOut)}`,
+              className: "text-rose-500",
+            },
+            {
+              text: `순수입 ${formatKRW(hoverFlow.incomeIn - hoverFlow.expenseOut)}`,
+              className: "font-medium text-gray-800",
+            },
           ]
         : [];
 

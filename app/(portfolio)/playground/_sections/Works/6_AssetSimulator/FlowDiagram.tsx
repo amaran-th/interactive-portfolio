@@ -121,12 +121,7 @@ export default function FlowDiagram({
     }
   }
 
-  const maxAmount = Math.max(
-    1,
-    snapshot.flow.incomeIn,
-    ...rightEntries.map((entry) => entry.amount),
-  );
-  const strokeWidth = (amount: number) => 1 + (amount / maxAmount) * 10;
+  const FLOW_LINE_WIDTH = 3;
 
   const primaryBalance = snapshot.assetBalances[primaryAsset.id] ?? 0;
   const primaryColor = primaryBalance < 0 ? DEFICIT_COLOR : PRIMARY_COLOR;
@@ -161,8 +156,9 @@ export default function FlowDiagram({
             viewBox="0 0 10 10"
             refX="9"
             refY="5"
-            markerWidth="6"
-            markerHeight="6"
+            markerWidth="8"
+            markerHeight="8"
+            markerUnits="userSpaceOnUse"
             orient="auto-start-reverse"
           >
             <path d="M 0 0 L 10 5 L 0 10 z" fill={INCOME_COLOR} />
@@ -172,8 +168,9 @@ export default function FlowDiagram({
             viewBox="0 0 10 10"
             refX="9"
             refY="5"
-            markerWidth="6"
-            markerHeight="6"
+            markerWidth="8"
+            markerHeight="8"
+            markerUnits="userSpaceOnUse"
             orient="auto-start-reverse"
           >
             <path d="M 0 0 L 10 5 L 0 10 z" fill={OUTFLOW_COLOR} />
@@ -187,7 +184,7 @@ export default function FlowDiagram({
               x2={primaryX - 6}
               y2={CENTER_Y + NODE_HEIGHT / 2}
               stroke={INCOME_COLOR}
-              strokeWidth={Math.max(24, strokeWidth(snapshot.flow.incomeIn))}
+              strokeWidth={24}
               strokeOpacity={0}
               pointerEvents="stroke"
               onPointerMove={(e) =>
@@ -205,7 +202,7 @@ export default function FlowDiagram({
               x2={primaryX - 6}
               y2={CENTER_Y + NODE_HEIGHT / 2}
               stroke={INCOME_COLOR}
-              strokeWidth={strokeWidth(snapshot.flow.incomeIn)}
+              strokeWidth={FLOW_LINE_WIDTH}
               strokeOpacity={0.5}
               markerEnd="url(#flow-arrow-income)"
               pointerEvents="none"
@@ -234,7 +231,7 @@ export default function FlowDiagram({
                 x2={rightX - 6}
                 y2={y2}
                 stroke={OUTFLOW_COLOR}
-                strokeWidth={Math.max(24, strokeWidth(entry.amount))}
+                strokeWidth={24}
                 strokeOpacity={0}
                 pointerEvents="stroke"
                 onPointerMove={(e) =>
@@ -252,7 +249,7 @@ export default function FlowDiagram({
                 x2={rightX - 6}
                 y2={y2}
                 stroke={OUTFLOW_COLOR}
-                strokeWidth={strokeWidth(entry.amount)}
+                strokeWidth={FLOW_LINE_WIDTH}
                 strokeOpacity={0.5}
                 markerEnd="url(#flow-arrow-out)"
                 pointerEvents="none"

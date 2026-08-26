@@ -2,12 +2,18 @@
 
 import { CSSProperties } from "react";
 
+export type TooltipLine = string | { text: string; className?: string };
+
 type ChartTooltipProps = {
   /** Position within the nearest `position: relative` ancestor, 0-100. */
   xPercent: number;
   yPercent: number;
-  /** First line is the title; the rest render as detail rows below a divider. */
-  lines: string[];
+  /**
+   * First line is the title; the rest render as detail rows below a
+   * divider. A detail line may be a plain string (default gray) or
+   * `{ text, className }` to override its color/weight.
+   */
+  lines: TooltipLine[];
   /**
    * "point" (default) offsets sideways from (x, y), flipping to the left
    * edge when close to the right side — meant for a cursor/point on a
@@ -44,6 +50,7 @@ export default function ChartTooltip({
         };
 
   const [title, ...details] = lines;
+  const titleText = typeof title === "string" ? title : title.text;
 
   return (
     <div
@@ -57,15 +64,22 @@ export default function ChartTooltip({
             style={{ backgroundColor: accentColor }}
           />
         )}
-        <p className="font-semibold text-gray-900">{title}</p>
+        <p className="font-semibold text-gray-900">{titleText}</p>
       </div>
       {details.length > 0 && (
         <div className="mt-1.5 flex flex-col gap-0.5 border-t border-gray-100 pt-1.5">
-          {details.map((line, i) => (
-            <p key={i} className="text-gray-500">
-              {line}
-            </p>
-          ))}
+          {details.map((line, i) => {
+            const text = typeof line === "string" ? line : line.text;
+            const className =
+              typeof line === "string"
+                ? "text-gray-500"
+                : (line.className ?? "text-gray-500");
+            return (
+              <p key={i} className={className}>
+                {text}
+              </p>
+            );
+          })}
         </div>
       )}
     </div>
