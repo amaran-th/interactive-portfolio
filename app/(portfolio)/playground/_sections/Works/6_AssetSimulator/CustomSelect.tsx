@@ -25,6 +25,8 @@ type CustomSelectProps = {
   disabled?: boolean;
   className?: string;
   borderClassName?: string;
+  /** Smaller, lighter trigger — for a select that's secondary to nearby content. */
+  compact?: boolean;
 };
 
 export default function CustomSelect({
@@ -36,6 +38,7 @@ export default function CustomSelect({
   disabled = false,
   className = "",
   borderClassName = "border-gray-200",
+  compact = false,
 }: CustomSelectProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -87,14 +90,18 @@ export default function CustomSelect({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((prev) => !prev)}
-        className={`flex w-full items-center justify-between gap-1.5 rounded-full border bg-white/80 px-3 py-1.5 text-left text-sm ${borderClassName} ${
-          disabled ? "cursor-not-allowed opacity-50" : ""
-        }`}
+        className={`flex w-full items-center justify-between gap-1 rounded-full text-left ${
+          compact
+            ? "border border-transparent bg-transparent px-1.5 py-0.5 text-xs text-gray-500 hover:border-gray-200 hover:bg-white/60"
+            : `border bg-white/80 px-3 py-1.5 text-sm ${borderClassName}`
+        } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
       >
         <span className={`truncate ${selected ? "" : "text-gray-400"}`}>
           {selected ? selected.label : placeholder}
         </span>
-        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+        <ChevronDown
+          className={`shrink-0 text-gray-400 ${compact ? "h-3 w-3" : "h-3.5 w-3.5"}`}
+        />
       </button>
       {open && (
         <div className="absolute left-0 top-full z-20 mt-1 max-h-64 w-max min-w-full overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 shadow-lg">

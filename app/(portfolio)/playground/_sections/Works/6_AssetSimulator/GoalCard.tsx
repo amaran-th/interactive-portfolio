@@ -177,7 +177,7 @@ export default function GoalCard({
       : null;
 
   return (
-    <div className="flex w-full flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-white/60 pt-2 text-sm">
+    <div className="flex w-full flex-col gap-1 border-t border-white/60 pt-2">
       <CustomSelect
         value={encodeSelection(metricType, targetId)}
         onChange={(v) => {
@@ -188,7 +188,8 @@ export default function GoalCard({
         }}
         groups={selectionGroups}
         placeholder="지표 선택"
-        className="w-36 shrink-0"
+        className="w-fit"
+        compact
       />
       {needsTargetSelection ? (
         <p className="text-xs text-gray-400">
@@ -196,12 +197,12 @@ export default function GoalCard({
           설정할 수 있어요
         </p>
       ) : (
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-gray-400">현재</span>
-          <span className="font-semibold text-gray-800">
+          <span className="text-lg font-bold text-gray-900">
             {formatKRW(currentValue)}
           </span>
-          <ArrowRight className="h-3.5 w-3.5 shrink-0 text-gray-300" />
+          <ArrowRight className="h-4 w-4 shrink-0 text-gray-300" />
           <span className="text-xs text-gray-400">목표</span>
           {isEditing || !goal ? (
             <input
@@ -221,13 +222,13 @@ export default function GoalCard({
               autoFocus
               type="number"
               placeholder="금액"
-              className="w-24 rounded-full border border-gray-200 bg-white/80 px-2 py-0.5 text-sm outline-none focus:border-gray-400"
+              className="w-28 rounded-full border border-gray-200 bg-white/80 px-2.5 py-1 text-lg font-bold outline-none focus:border-gray-400"
             />
           ) : (
             <button
               type="button"
               onClick={() => setIsEditing(true)}
-              className="font-semibold text-gray-800 hover:text-indigo-600"
+              className="text-lg font-bold text-gray-900 hover:text-indigo-600"
             >
               {formatKRW(goal!.targetAmount)}
             </button>
