@@ -1,7 +1,8 @@
 "use client";
 
-import { Inbox } from "lucide-react";
-import { useState } from "react";
+import { Inbox, TriangleAlert } from "lucide-react";
+import { useMemo, useState } from "react";
+import { findGoalAchievementMonth } from "./simulation";
 import {
   AssetClass,
   Goal,
@@ -74,6 +75,15 @@ export default function AssetAreaChart({
   const isEmpty = assetClasses.length === 0 || snapshots.length === 0;
   const [hoverMonth, setHoverMonth] = useState<number | null>(null);
   const [hoverPercent, setHoverPercent] = useState({ x: 0, y: 0 });
+
+  const goalAchievementMonth = useMemo(() => {
+    if (!goal) return undefined;
+    return findGoalAchievementMonth(simulationInput, goal, today);
+  }, [goal, simulationInput, today]);
+  const goalUnreachableInRange =
+    goal !== null &&
+    goalAchievementMonth !== undefined &&
+    (goalAchievementMonth === null || goalAchievementMonth > horizonMonths);
 
   const assets = isEmpty ? [] : orderedAssets(assetClasses, groups);
   const maxTotal = isEmpty
@@ -291,6 +301,14 @@ export default function AssetAreaChart({
               yPercent={hoverPercent.y}
               lines={tooltipLines}
             />
+          )}
+          {goalUnreachableInRange && (
+            <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center px-2">
+              <div className="flex items-center gap-1.5 rounded-full border border-rose-300 bg-rose-50/95 px-3 py-1.5 text-xs font-medium text-rose-600 shadow-sm backdrop-blur-sm">
+                <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
+                이 범위 내에서는 목표에 도달할 수 없어요
+              </div>
+            </div>
           )}
           </div>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
