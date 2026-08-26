@@ -19,8 +19,11 @@ const NODE_HEIGHT = 44;
 const CENTER_Y = (HEIGHT - NODE_HEIGHT) / 2;
 const DEFICIT_COLOR = "#e11d48";
 const PRIMARY_COLOR = "#4338ca";
-const INCOME_COLOR = "#6366f1";
-const OUTFLOW_COLOR = "#a855f7";
+// Matches the 수입/지출/이체 section colors used in the input panel
+// (emerald/rose/amber), so the same category reads the same color here.
+const INCOME_COLOR = "#10b981";
+const EXPENSE_COLOR = "#f43f5e";
+const TRANSFER_COLOR = "#f59e0b";
 
 function NodeBox({
   x,
@@ -112,25 +115,27 @@ export default function FlowDiagram({
     amount: number;
     color: string;
   }[] = [];
-  if (snapshot.flow.expenseOut > 0) {
+  const hasExpense = snapshot.flow.expenseOut > 0;
+  if (hasExpense) {
     rightEntries.push({
       id: "expense",
       label: "지출",
       amount: snapshot.flow.expenseOut,
-      color: OUTFLOW_COLOR,
+      color: EXPENSE_COLOR,
     });
   }
   for (const [assetId, amount] of destinationTotals) {
     const asset = assetClasses.find((a) => a.id === assetId);
     if (asset && amount > 0) {
       // A transfer to another asset isn't money leaving net worth like an
-      // expense — give it that asset's own color instead of the outflow
-      // (expense) color so the two aren't visually conflated.
+      // expense — use the shared transfer color (matching the 이체 section
+      // elsewhere) instead of the expense color, so the two categories
+      // never read as the same thing.
       rightEntries.push({
         id: assetId,
         label: asset.name,
         amount,
-        color: asset.color,
+        color: TRANSFER_COLOR,
       });
     }
   }
@@ -145,6 +150,12 @@ export default function FlowDiagram({
   const rightX = 460;
   const rightGap =
     rightEntries.length > 0 ? HEIGHT / (rightEntries.length + 1) : HEIGHT / 2;
+  // Nudge every entry after the expense entry down a bit, so the 지출
+  // node and the 이체 nodes read as two separate clusters (not just a
+  // color change within one continuous list).
+  const GROUP_GAP = hasExpense && rightEntries.length > 1 ? 14 : 0;
+  const entryTopY = (i: number) =>
+    rightGap * (i + 1) + (hasExpense && i >= 1 ? GROUP_GAP : 0);
 
   const pointerPercent = (
     e: React.PointerEvent<SVGRectElement | SVGLineElement>,
@@ -227,7 +238,7 @@ export default function FlowDiagram({
         )}
         {rightEntries.map((entry, i) => {
           const y1 = CENTER_Y + NODE_HEIGHT / 2;
-          const y2 = rightGap * (i + 1) + NODE_HEIGHT / 2;
+          const y2 = entryTopY(i) + NODE_HEIGHT / 2;
           return (
             <g key={entry.id}>
               <line
@@ -310,7 +321,7 @@ export default function FlowDiagram({
           <NodeBox
             key={entry.id}
             x={rightX}
-            y={rightGap * (i + 1)}
+            y={entryTopY(i)}
             label={entry.label}
             amount={entry.amount}
             color={entry.color}
