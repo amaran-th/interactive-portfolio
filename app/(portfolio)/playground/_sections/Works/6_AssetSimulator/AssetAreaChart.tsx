@@ -1,8 +1,16 @@
 "use client";
 
-import { Activity, Inbox, LineChart as LineChartIcon, TriangleAlert } from "lucide-react";
+import {
+  Activity,
+  Inbox,
+  LineChart as LineChartIcon,
+  TriangleAlert,
+} from "lucide-react";
 import { useMemo, useState } from "react";
+import ChartTooltip from "./ChartTooltip";
+import GoalCard from "./GoalCard";
 import { findGoalAchievementMonth } from "./simulation";
+import TimelineSlider from "./TimelineSlider";
 import {
   AssetClass,
   Goal,
@@ -12,9 +20,6 @@ import {
   formatKRW,
   toRealValue,
 } from "./types";
-import TimelineSlider from "./TimelineSlider";
-import GoalCard from "./GoalCard";
-import ChartTooltip from "./ChartTooltip";
 
 type AssetAreaChartProps = {
   snapshots: MonthSnapshot[];
@@ -53,11 +58,7 @@ function orderedAssets(
 
 function monthLabel(monthIndex: number, today: Date): string {
   if (monthIndex === 0) return "지금";
-  const date = new Date(
-    today.getFullYear(),
-    today.getMonth() + monthIndex,
-    1,
-  );
+  const date = new Date(today.getFullYear(), today.getMonth() + monthIndex, 1);
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
@@ -95,7 +96,11 @@ export default function AssetAreaChart({
     : Math.max(1, ...snapshots.map((s) => s.totalBalance));
   const stepX = isEmpty ? 1 : (WIDTH - PADDING * 2) / (snapshots.length - 1);
 
-  const { bands: rawBands, minValue, maxValue } = assets.reduce<{
+  const {
+    bands: rawBands,
+    minValue,
+    maxValue,
+  } = assets.reduce<{
     prevTop: number[];
     bands: {
       id: string;
@@ -111,8 +116,7 @@ export default function AssetAreaChart({
     (acc, asset) => {
       const bottom = acc.prevTop;
       const top = snapshots.map(
-        (snapshot, i) =>
-          bottom[i] + (snapshot.assetBalancesKRW[asset.id] ?? 0),
+        (snapshot, i) => bottom[i] + (snapshot.assetBalancesKRW[asset.id] ?? 0),
       );
       const group = groups.find((g) => g.id === asset.groupId);
 
@@ -167,6 +171,7 @@ export default function AssetAreaChart({
   });
 
   const cursorX = PADDING + selectedMonth * stepX;
+  const hoverX = hoverMonth !== null ? PADDING + hoverMonth * stepX : null;
   const totalBalance = snapshots[selectedMonth]?.totalBalance ?? 0;
   const displayBalance = inflationEnabled
     ? toRealValue(totalBalance, selectedMonth, inflationRate)
@@ -200,7 +205,8 @@ export default function AssetAreaChart({
     })
     .join(" ");
   const selectedFlow = flows[selectedMonth];
-  const netAmount = (selectedFlow?.incomeIn ?? 0) - (selectedFlow?.expenseOut ?? 0);
+  const netAmount =
+    (selectedFlow?.incomeIn ?? 0) - (selectedFlow?.expenseOut ?? 0);
   const hoverFlow = hoverMonth !== null ? flows[hoverMonth] : null;
 
   const hoverSnapshot = hoverMonth !== null ? snapshots[hoverMonth] : null;
@@ -291,7 +297,7 @@ export default function AssetAreaChart({
             </div>
           ) : (
             <p className="mt-2 flex items-center gap-1.5 text-sm text-gray-500">
-              <Activity className="h-4 w-4" /> 선택 시점 순수입
+              <Activity className="h-4 w-4" /> 순수입
               {inflationEnabled && (
                 <span className="text-xs text-gray-400">(오늘 가치)</span>
               )}{" "}
@@ -301,169 +307,224 @@ export default function AssetAreaChart({
             </p>
           )}
           <div className="relative mt-3 w-full">
-          {mode === "asset" ? (
-            <svg viewBox={`0 0 ${WIDTH} ${ASSET_HEIGHT}`} className="w-full">
-              <defs>
-                <clipPath id={BELOW_ZERO_CLIP_ID} clipPathUnits="userSpaceOnUse">
-                  <rect
-                    x={0}
-                    y={zeroY}
-                    width={WIDTH}
-                    height={Math.max(0, ASSET_HEIGHT - zeroY)}
-                  />
-                </clipPath>
-              </defs>
-              {bands.map((band) => (
-                <g key={band.id}>
-                  <polygon
-                    points={band.points}
-                    fill={band.fill}
-                    fillOpacity={0.55}
-                    stroke={band.stroke}
-                    strokeWidth={band.stroke ? 2 : 0}
+            {mode === "asset" ? (
+              <svg viewBox={`0 0 ${WIDTH} ${ASSET_HEIGHT}`} className="w-full">
+                <defs>
+                  <clipPath
+                    id={BELOW_ZERO_CLIP_ID}
+                    clipPathUnits="userSpaceOnUse"
                   >
-                    <title>{band.name}</title>
-                  </polygon>
-                  <polygon
-                    points={band.points}
-                    fill={DEFICIT_COLOR}
-                    fillOpacity={0.55}
-                    clipPath={`url(#${BELOW_ZERO_CLIP_ID})`}
-                    pointerEvents="none"
-                  />
-                </g>
-              ))}
-              <line
-                x1={PADDING}
-                y1={zeroY}
-                x2={WIDTH - PADDING}
-                y2={zeroY}
-                stroke="#9ca3af"
-                strokeWidth={1}
-                strokeDasharray="2 2"
-              />
-              <text
-                x={PADDING}
-                y={Math.min(ASSET_HEIGHT - PADDING - 3, zeroY - 3)}
-                className="fill-gray-400 text-[9px]"
-              >
-                0
-              </text>
-              <line
-                x1={cursorX}
-                y1={PADDING}
-                x2={cursorX}
-                y2={ASSET_HEIGHT - PADDING}
-                stroke="#4338ca"
-                strokeWidth={1.5}
-                strokeDasharray="4 4"
-              />
-              <circle
-                cx={cursorX}
-                cy={cursorY}
-                r={4}
-                fill="#4338ca"
-                stroke="white"
-                strokeWidth={1.5}
-              />
-              <text
-                x={nearRightEdge ? cursorX - 8 : cursorX + 8}
-                y={Math.max(10, cursorY - 6)}
-                textAnchor={nearRightEdge ? "end" : "start"}
-                className="fill-gray-700 text-[10px] font-medium"
-              >
-                {formatKRW(displayBalance)}
-              </text>
-              <rect
-                x={0}
-                y={0}
-                width={WIDTH}
-                height={ASSET_HEIGHT}
-                fill="transparent"
-                onPointerMove={handlePointerMove}
-                onPointerLeave={() => setHoverMonth(null)}
-              />
-            </svg>
-          ) : (
-            <svg viewBox={`0 0 ${WIDTH} ${FLOW_HEIGHT}`} className="w-full">
-              <line
-                x1={PADDING}
-                y1={flowBaselineY}
-                x2={WIDTH - PADDING}
-                y2={flowBaselineY}
-                stroke="#d1d5db"
-                strokeWidth={1}
-              />
-              {snapshots.map((snapshot, i) => {
-                const x = PADDING + i * stepX - flowBarWidth / 2;
-                const incomeHeight = scaleFlow(flows[i].incomeIn);
-                const expenseHeight = scaleFlow(flows[i].expenseOut);
-                return (
-                  <g key={snapshot.monthIndex}>
                     <rect
-                      x={x}
-                      y={flowBaselineY - incomeHeight}
-                      width={flowBarWidth}
-                      height={incomeHeight}
-                      fill="#10b981"
-                      fillOpacity={0.7}
-                      pointerEvents="none"
+                      x={0}
+                      y={zeroY}
+                      width={WIDTH}
+                      height={Math.max(0, ASSET_HEIGHT - zeroY)}
                     />
-                    <rect
-                      x={x}
-                      y={flowBaselineY}
-                      width={flowBarWidth}
-                      height={expenseHeight}
-                      fill="#f43f5e"
-                      fillOpacity={0.7}
+                  </clipPath>
+                </defs>
+                {bands.map((band) => (
+                  <g key={band.id}>
+                    <polygon
+                      points={band.points}
+                      fill={band.fill}
+                      fillOpacity={0.55}
+                      stroke={band.stroke}
+                      strokeWidth={band.stroke ? 2 : 0}
+                    >
+                      <title>{band.name}</title>
+                    </polygon>
+                    <polygon
+                      points={band.points}
+                      fill={DEFICIT_COLOR}
+                      fillOpacity={0.55}
+                      clipPath={`url(#${BELOW_ZERO_CLIP_ID})`}
                       pointerEvents="none"
                     />
                   </g>
-                );
-              })}
-              <polyline
-                points={netPoints}
-                fill="none"
-                stroke="#1f2937"
-                strokeWidth={1.5}
-                pointerEvents="none"
+                ))}
+                <line
+                  x1={PADDING}
+                  y1={zeroY}
+                  x2={WIDTH - PADDING}
+                  y2={zeroY}
+                  stroke="#9ca3af"
+                  strokeWidth={1}
+                  strokeDasharray="2 2"
+                />
+                <text
+                  x={PADDING}
+                  y={Math.min(ASSET_HEIGHT - PADDING - 3, zeroY - 3)}
+                  className="fill-gray-400 text-[9px]"
+                >
+                  0
+                </text>
+                <line
+                  x1={cursorX}
+                  y1={PADDING}
+                  x2={cursorX}
+                  y2={ASSET_HEIGHT - PADDING}
+                  stroke="#4338ca"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                />
+                <circle
+                  cx={cursorX}
+                  cy={cursorY}
+                  r={4}
+                  fill="#4338ca"
+                  stroke="white"
+                  strokeWidth={1.5}
+                />
+                <text
+                  x={nearRightEdge ? cursorX - 8 : cursorX + 8}
+                  y={Math.max(10, cursorY - 6)}
+                  textAnchor={nearRightEdge ? "end" : "start"}
+                  className="fill-gray-700 text-[10px] font-medium"
+                >
+                  {formatKRW(displayBalance)}
+                </text>
+                {hoverX !== null && (
+                  <>
+                    <line
+                      x1={hoverX}
+                      y1={PADDING}
+                      x2={hoverX}
+                      y2={ASSET_HEIGHT - PADDING}
+                      stroke="#9ca3af"
+                      strokeWidth={1}
+                      strokeDasharray="2 2"
+                      pointerEvents="none"
+                    />
+                    {rawBands.map((band) => (
+                      <circle
+                        key={`hover-${band.id}`}
+                        cx={hoverX}
+                        cy={scaleY(band.top[hoverMonth!])}
+                        r={3}
+                        fill={band.fill}
+                        stroke="white"
+                        strokeWidth={1.2}
+                        pointerEvents="none"
+                      />
+                    ))}
+                  </>
+                )}
+                <rect
+                  x={0}
+                  y={0}
+                  width={WIDTH}
+                  height={ASSET_HEIGHT}
+                  fill="transparent"
+                  onPointerMove={handlePointerMove}
+                  onPointerLeave={() => setHoverMonth(null)}
+                />
+              </svg>
+            ) : (
+              <svg viewBox={`0 0 ${WIDTH} ${FLOW_HEIGHT}`} className="w-full">
+                <line
+                  x1={PADDING}
+                  y1={flowBaselineY}
+                  x2={WIDTH - PADDING}
+                  y2={flowBaselineY}
+                  stroke="#d1d5db"
+                  strokeWidth={1}
+                />
+                {snapshots.map((snapshot, i) => {
+                  const x = PADDING + i * stepX - flowBarWidth / 2;
+                  const incomeHeight = scaleFlow(flows[i].incomeIn);
+                  const expenseHeight = scaleFlow(flows[i].expenseOut);
+                  return (
+                    <g key={snapshot.monthIndex}>
+                      <rect
+                        x={x}
+                        y={flowBaselineY - incomeHeight}
+                        width={flowBarWidth}
+                        height={incomeHeight}
+                        fill="#10b981"
+                        fillOpacity={0.7}
+                        pointerEvents="none"
+                      />
+                      <rect
+                        x={x}
+                        y={flowBaselineY}
+                        width={flowBarWidth}
+                        height={expenseHeight}
+                        fill="#f43f5e"
+                        fillOpacity={0.7}
+                        pointerEvents="none"
+                      />
+                    </g>
+                  );
+                })}
+                <polyline
+                  points={netPoints}
+                  fill="none"
+                  stroke="#1f2937"
+                  strokeWidth={1.5}
+                  pointerEvents="none"
+                />
+                <line
+                  x1={cursorX}
+                  y1={PADDING}
+                  x2={cursorX}
+                  y2={FLOW_HEIGHT - PADDING}
+                  stroke="#4338ca"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  pointerEvents="none"
+                />
+                {hoverX !== null && hoverFlow && (
+                  <>
+                    <line
+                      x1={hoverX}
+                      y1={PADDING}
+                      x2={hoverX}
+                      y2={FLOW_HEIGHT - PADDING}
+                      stroke="#9ca3af"
+                      strokeWidth={1}
+                      strokeDasharray="2 2"
+                      pointerEvents="none"
+                    />
+                    <circle
+                      cx={hoverX}
+                      cy={
+                        flowBaselineY -
+                        scaleFlow(hoverFlow.incomeIn - hoverFlow.expenseOut)
+                      }
+                      r={4}
+                      fill="#1f2937"
+                      stroke="white"
+                      strokeWidth={1.5}
+                      pointerEvents="none"
+                    />
+                  </>
+                )}
+                <rect
+                  x={0}
+                  y={0}
+                  width={WIDTH}
+                  height={FLOW_HEIGHT}
+                  fill="transparent"
+                  onPointerMove={handlePointerMove}
+                  onPointerLeave={() => setHoverMonth(null)}
+                />
+              </svg>
+            )}
+            {tooltipLines.length > 0 && (
+              <ChartTooltip
+                xPercent={hoverPercent.x}
+                yPercent={hoverPercent.y}
+                lines={tooltipLines}
               />
-              <line
-                x1={cursorX}
-                y1={PADDING}
-                x2={cursorX}
-                y2={FLOW_HEIGHT - PADDING}
-                stroke="#4338ca"
-                strokeWidth={1.5}
-                strokeDasharray="4 4"
-                pointerEvents="none"
-              />
-              <rect
-                x={0}
-                y={0}
-                width={WIDTH}
-                height={FLOW_HEIGHT}
-                fill="transparent"
-                onPointerMove={handlePointerMove}
-                onPointerLeave={() => setHoverMonth(null)}
-              />
-            </svg>
-          )}
-          {tooltipLines.length > 0 && (
-            <ChartTooltip
-              xPercent={hoverPercent.x}
-              yPercent={hoverPercent.y}
-              lines={tooltipLines}
-            />
-          )}
-          {mode === "asset" && goalUnreachableInRange && (
-            <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center px-2">
-              <div className="flex items-center gap-1.5 rounded-full border border-rose-300 bg-rose-50/95 px-3 py-1.5 text-xs font-medium text-rose-600 shadow-sm backdrop-blur-sm">
-                <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
-                이 범위 내에서는 목표에 도달할 수 없어요
+            )}
+            {mode === "asset" && goalUnreachableInRange && (
+              <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center px-2">
+                <div className="flex items-center gap-1.5 rounded-full border border-rose-300 bg-rose-50/95 px-3 py-1.5 text-xs font-medium text-rose-600 shadow-sm backdrop-blur-sm">
+                  <TriangleAlert className="h-3.5 w-3.5 shrink-0" />이 범위
+                  내에서는 목표에 도달할 수 없어요
+                </div>
               </div>
-            </div>
-          )}
+            )}
           </div>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
             {mode === "asset" ? (

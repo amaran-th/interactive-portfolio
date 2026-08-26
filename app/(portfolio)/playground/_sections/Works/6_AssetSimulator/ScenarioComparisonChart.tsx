@@ -74,6 +74,7 @@ export default function ScenarioComparisonChart({
   const scaleY = (value: number) =>
     HEIGHT - PADDING - (value / maxTotal) * (HEIGHT - PADDING * 2);
   const cursorX = PADDING + selectedMonth * stepX;
+  const hoverX = hoverMonth !== null ? PADDING + hoverMonth * stepX : null;
 
   const hoverLines =
     hoverMonth !== null
@@ -131,6 +132,32 @@ export default function ScenarioComparisonChart({
           strokeDasharray="4 4"
           pointerEvents="none"
         />
+        {hoverX !== null && (
+          <>
+            <line
+              x1={hoverX}
+              y1={PADDING}
+              x2={hoverX}
+              y2={HEIGHT - PADDING}
+              stroke="#9ca3af"
+              strokeWidth={1}
+              strokeDasharray="2 2"
+              pointerEvents="none"
+            />
+            {series.map((s) => (
+              <circle
+                key={`hover-${s.id}`}
+                cx={hoverX}
+                cy={scaleY(s.snapshots[hoverMonth!]?.totalBalance ?? 0)}
+                r={4}
+                fill={s.color}
+                stroke="white"
+                strokeWidth={1.5}
+                pointerEvents="none"
+              />
+            ))}
+          </>
+        )}
         <rect
           x={0}
           y={0}
