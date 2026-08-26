@@ -223,7 +223,14 @@ export default function ExpenseSection({
         })}
       </ul>
       {isFormVisible && (
-      <FloatingFormPanel onKeyDown={handleKeyDown} className="border-rose-200">
+      <FloatingFormPanel
+        onKeyDown={handleKeyDown}
+        onClose={() => {
+          resetForm();
+          onCloseForm();
+        }}
+        className="border-rose-200"
+      >
         <div className="flex gap-2">
           <input
             ref={nameRef}

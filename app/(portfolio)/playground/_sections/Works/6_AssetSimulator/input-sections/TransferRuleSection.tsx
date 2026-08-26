@@ -235,6 +235,10 @@ export default function TransferRuleSection({
       {isFormVisible && (
         <FloatingFormPanel
           onKeyDown={handleKeyDown}
+          onClose={() => {
+            resetForm();
+            onCloseForm();
+          }}
           className="border-amber-200"
         >
           <div className="flex items-center gap-2">

@@ -245,7 +245,14 @@ export default function GroupAssetSection({
       </ul>
 
       {isFormVisible && (
-      <FloatingFormPanel onKeyDown={handleKeyDown} className="border-indigo-200">
+      <FloatingFormPanel
+        onKeyDown={handleKeyDown}
+        onClose={() => {
+          resetForm();
+          onCloseForm();
+        }}
+        className="border-indigo-200"
+      >
         <div className="flex gap-2">
           <input
             ref={nameRef}
