@@ -52,7 +52,6 @@ type RawSegment = {
   id: string;
   name: string;
   fill: string;
-  stroke: string | undefined;
   bottom: number;
   top: number;
 };
@@ -61,7 +60,6 @@ type Segment = {
   id: string;
   name: string;
   fill: string;
-  stroke: string | undefined;
   y: number;
   height: number;
   amount: number;
@@ -75,36 +73,14 @@ type HoveredBar = {
   yPercent: number;
 };
 
-function orderedAssets(
-  assetClasses: AssetClass[],
-  groups: Group[],
-): AssetClass[] {
-  const grouped = groups.flatMap((g) =>
-    assetClasses.filter((a) => a.groupId === g.id),
-  );
-  const ungrouped = assetClasses.filter((a) => !a.groupId);
-  return [...grouped, ...ungrouped];
-}
-
 type LegendItem = { id: string; name: string; color: string };
 
 /**
- * A group with no groupId assigned is, by itself, a single-member group —
- * so it keeps its own color instead of borrowing one. Groups actually
- * containing assets get one combined segment in the group's own color.
+ * A group with no members contributes nothing and is left out. An asset
+ * with no group is, by itself, a single-member group, so it keeps its own
+ * color instead of borrowing one.
  */
-function orderedLegendItems(
-  assetClasses: AssetClass[],
-  groups: Group[],
-  viewMode: "asset" | "group",
-): LegendItem[] {
-  if (viewMode === "asset") {
-    return orderedAssets(assetClasses, groups).map((a) => ({
-      id: a.id,
-      name: a.name,
-      color: a.color,
-    }));
-  }
+function legendItems(assetClasses: AssetClass[], groups: Group[]): LegendItem[] {
   const nonEmptyGroups = groups.filter((g) =>
     assetClasses.some((a) => a.groupId === g.id),
   );
@@ -115,47 +91,9 @@ function orderedLegendItems(
   ];
 }
 
+/** One segment per group (assets inside share the group's own color) plus
+ * one segment per ungrouped asset (its own color). */
 function buildRawSegments(
-  snapshot: MonthSnapshot,
-  assets: AssetClass[],
-  groups: Group[],
-): { segments: RawSegment[]; min: number; max: number } {
-  const result = assets.reduce<{
-    cursor: number;
-    min: number;
-    max: number;
-    segments: RawSegment[];
-  }>(
-    (acc, asset) => {
-      const value = snapshot.assetBalancesKRW[asset.id] ?? 0;
-      const bottom = acc.cursor;
-      const top = acc.cursor + value;
-      const group = groups.find((g) => g.id === asset.groupId);
-      return {
-        cursor: top,
-        min: Math.min(acc.min, bottom, top),
-        max: Math.max(acc.max, bottom, top),
-        segments: [
-          ...acc.segments,
-          {
-            id: asset.id,
-            name: asset.name,
-            fill: asset.color,
-            stroke: group?.color,
-            bottom,
-            top,
-          },
-        ],
-      };
-    },
-    { cursor: 0, min: 0, max: 0, segments: [] },
-  );
-  return { segments: result.segments, min: result.min, max: result.max };
-}
-
-/** Same shape as buildRawSegments, but one segment per group (assets inside
- * share the group's own color) plus one segment per ungrouped asset. */
-function buildRawGroupSegments(
   snapshot: MonthSnapshot,
   groups: Group[],
   assetClasses: AssetClass[],
@@ -194,14 +132,7 @@ function buildRawGroupSegments(
         max: Math.max(acc.max, bottom, top),
         segments: [
           ...acc.segments,
-          {
-            id: item.id,
-            name: item.name,
-            fill: item.fill,
-            stroke: undefined,
-            bottom,
-            top,
-          },
+          { id: item.id, name: item.name, fill: item.fill, bottom, top },
         ],
       };
     },
@@ -219,7 +150,6 @@ export default function ComparisonBarChart({
   inflationRate,
 }: ComparisonBarChartProps) {
   const [hovered, setHovered] = useState<HoveredBar | null>(null);
-  const [viewMode, setViewMode] = useState<"asset" | "group">("asset");
 
   if (assetClasses.length === 0 || snapshots.length === 0) {
     return (
@@ -241,18 +171,9 @@ export default function ComparisonBarChart({
     inflationEnabled,
     inflationRate,
   );
-  const assets = orderedAssets(assetClasses, groups);
-  const canGroupByGroup = groups.length > 0;
-  const effectiveViewMode = canGroupByGroup ? viewMode : "asset";
 
-  const nowRaw =
-    effectiveViewMode === "asset"
-      ? buildRawSegments(nowSnapshot, assets, groups)
-      : buildRawGroupSegments(nowSnapshot, groups, assetClasses);
-  const futureRaw =
-    effectiveViewMode === "asset"
-      ? buildRawSegments(futureSnapshot, assets, groups)
-      : buildRawGroupSegments(futureSnapshot, groups, assetClasses);
+  const nowRaw = buildRawSegments(nowSnapshot, groups, assetClasses);
+  const futureRaw = buildRawSegments(futureSnapshot, groups, assetClasses);
   const domainMin = Math.min(0, nowRaw.min, futureRaw.min);
   const domainMax = Math.max(1, nowRaw.max, futureRaw.max);
   const domainRange = domainMax - domainMin || 1;
@@ -268,7 +189,6 @@ export default function ComparisonBarChart({
         id: seg.id,
         name: seg.name,
         fill: seg.fill,
-        stroke: seg.stroke,
         y: Math.min(yTop, yBottom),
         height: Math.abs(yBottom - yTop),
         amount: seg.top - seg.bottom,
@@ -304,32 +224,6 @@ export default function ComparisonBarChart({
           <span className="text-xs text-gray-400">(오늘 가치)</span>
         )}
       </p>
-      {canGroupByGroup && (
-        <div className="mt-2 flex items-center gap-1 self-start rounded-full bg-gray-100 p-0.5 text-xs">
-          <button
-            type="button"
-            onClick={() => setViewMode("asset")}
-            className={`rounded-full px-2.5 py-1 ${
-              effectiveViewMode === "asset"
-                ? "bg-white font-medium text-gray-800 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            항목별
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("group")}
-            className={`rounded-full px-2.5 py-1 ${
-              effectiveViewMode === "group"
-                ? "bg-white font-medium text-gray-800 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            그룹별
-          </button>
-        </div>
-      )}
       <div className="flex flex-1 items-center justify-center">
       <div className="relative w-full">
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
@@ -382,8 +276,6 @@ export default function ComparisonBarChart({
                 height={seg.height}
                 fill={seg.fill}
                 fillOpacity={0.75}
-                stroke={seg.stroke}
-                strokeWidth={seg.stroke ? 2 : 0}
               />
               <rect
                 x={nowX}
@@ -418,8 +310,6 @@ export default function ComparisonBarChart({
                 height={seg.height}
                 fill={seg.fill}
                 fillOpacity={0.75}
-                stroke={seg.stroke}
-                strokeWidth={seg.stroke ? 2 : 0}
               />
               <rect
                 x={futureX}
@@ -468,17 +358,15 @@ export default function ComparisonBarChart({
       </div>
       </div>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
-        {orderedLegendItems(assetClasses, groups, effectiveViewMode).map(
-          (item) => (
-            <span key={item.id} className="flex items-center gap-1">
-              <span
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: item.color }}
-              />
-              {item.name}
-            </span>
-          ),
-        )}
+        {legendItems(assetClasses, groups).map((item) => (
+          <span key={item.id} className="flex items-center gap-1">
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
+            {item.name}
+          </span>
+        ))}
       </div>
     </div>
   );

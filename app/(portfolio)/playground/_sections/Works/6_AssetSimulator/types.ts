@@ -158,7 +158,6 @@ export const GROUP_PALETTE = [
   "#fca5a5",
 ];
 
-export const UNGROUPED_LABEL = "미분류";
 export const UNGROUPED_COLOR = "#9ca3af";
 
 export function nextGroupColor(existingCount: number): string {
@@ -167,6 +166,16 @@ export function nextGroupColor(existingCount: number): string {
 
 export function nextAssetColor(existingCount: number): string {
   return GROUP_PALETTE[existingCount % GROUP_PALETTE.length];
+}
+
+/**
+ * A grouped asset has no color of its own — it shares its group's color.
+ * An asset with no group is, by itself, a single-member group, so it keeps
+ * its own color.
+ */
+export function assetColor(asset: AssetClass, groups: Group[]): string {
+  const group = groups.find((g) => g.id === asset.groupId);
+  return group ? group.color : asset.color;
 }
 
 export function newId(): string {

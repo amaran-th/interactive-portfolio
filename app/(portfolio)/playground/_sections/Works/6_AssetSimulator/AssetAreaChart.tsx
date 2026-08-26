@@ -17,6 +17,7 @@ import {
   Group,
   MonthSnapshot,
   SimulationInput,
+  assetColor,
   formatKRW,
   toRealValue,
 } from "./types";
@@ -106,7 +107,6 @@ export default function AssetAreaChart({
       id: string;
       name: string;
       fill: string;
-      stroke: string | undefined;
       bottom: number[];
       top: number[];
     }[];
@@ -118,7 +118,6 @@ export default function AssetAreaChart({
       const top = snapshots.map(
         (snapshot, i) => bottom[i] + (snapshot.assetBalancesKRW[asset.id] ?? 0),
       );
-      const group = groups.find((g) => g.id === asset.groupId);
 
       return {
         prevTop: top,
@@ -129,8 +128,7 @@ export default function AssetAreaChart({
           {
             id: asset.id,
             name: asset.name,
-            fill: asset.color,
-            stroke: group?.color,
+            fill: assetColor(asset, groups),
             bottom,
             top,
           },
@@ -165,7 +163,6 @@ export default function AssetAreaChart({
       id: band.id,
       name: band.name,
       fill: band.fill,
-      stroke: band.stroke,
       points: [...topPoints, ...bottomPoints].join(" "),
     };
   });
@@ -328,8 +325,9 @@ export default function AssetAreaChart({
                       points={band.points}
                       fill={band.fill}
                       fillOpacity={0.55}
-                      stroke={band.stroke}
-                      strokeWidth={band.stroke ? 2 : 0}
+                      stroke="white"
+                      strokeWidth={1}
+                      strokeOpacity={0.6}
                     >
                       <title>{band.name}</title>
                     </polygon>
@@ -532,7 +530,7 @@ export default function AssetAreaChart({
                 <span key={asset.id} className="flex items-center gap-1">
                   <span
                     className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: asset.color }}
+                    style={{ backgroundColor: assetColor(asset, groups) }}
                   />
                   {asset.name}
                 </span>

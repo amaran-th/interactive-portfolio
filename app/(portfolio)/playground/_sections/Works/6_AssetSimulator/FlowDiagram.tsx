@@ -2,13 +2,14 @@
 
 import { Inbox, Workflow } from "lucide-react";
 import { useState } from "react";
-import { AssetClass, MonthSnapshot, formatKRW } from "./types";
+import { AssetClass, Group, MonthSnapshot, assetColor, formatKRW } from "./types";
 import ChartTooltip from "./ChartTooltip";
 
 type FlowDiagramProps = {
   snapshot: MonthSnapshot;
   primaryAsset: AssetClass | undefined;
   assetClasses: AssetClass[];
+  groups: Group[];
   exchangeRate: number;
 };
 
@@ -87,6 +88,7 @@ export default function FlowDiagram({
   snapshot,
   primaryAsset,
   assetClasses,
+  groups,
   exchangeRate,
 }: FlowDiagramProps) {
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltip | null>(null);
@@ -134,7 +136,7 @@ export default function FlowDiagram({
         label: asset.name,
         amount,
         balance: snapshot.assetBalancesKRW[assetId] ?? 0,
-        color: asset.color,
+        color: assetColor(asset, groups),
       });
     }
   }

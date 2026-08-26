@@ -166,22 +166,24 @@ export default function GroupAssetSection({
                     onClick={(e) => e.stopPropagation()}
                     onChange={() => onSetPrimaryAsset(asset.id)}
                   />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setColorPickerId((prev) =>
-                        prev === asset.id ? null : asset.id,
-                      );
-                    }}
-                    className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10"
-                    style={{ backgroundColor: asset.color }}
-                    aria-label="자산 색상 변경"
-                  />
-                  {group && (
+                  {group ? (
+                    // 그룹에 속한 자산은 개별 색상이 없다 — 그룹 색을 그대로 쓴다.
                     <span
-                      className="h-2.5 w-2.5 rounded-full ring-2 ring-white"
+                      className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10"
                       style={{ backgroundColor: group.color }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setColorPickerId((prev) =>
+                          prev === asset.id ? null : asset.id,
+                        );
+                      }}
+                      className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10"
+                      style={{ backgroundColor: asset.color }}
+                      aria-label="자산 색상 변경"
                     />
                   )}
                   {asset.initialBalance < 0 && (
@@ -221,7 +223,7 @@ export default function GroupAssetSection({
                   ✕
                 </button>
               </div>
-              {colorPickerId === asset.id && (
+              {!group && colorPickerId === asset.id && (
                 <div className="flex flex-wrap gap-1.5 pl-6">
                   {GROUP_PALETTE.map((color) => (
                     <button

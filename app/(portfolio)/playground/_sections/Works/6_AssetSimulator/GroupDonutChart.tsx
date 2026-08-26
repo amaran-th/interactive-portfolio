@@ -4,9 +4,9 @@ import { useState } from "react";
 import { Inbox, PieChart as PieChartIcon, TrendingDown } from "lucide-react";
 import {
   AssetClass,
+  GROUP_PALETTE,
   Group,
   MonthSnapshot,
-  UNGROUPED_LABEL,
   formatKRW,
 } from "./types";
 import ChartTooltip from "./ChartTooltip";
@@ -16,6 +16,8 @@ type GroupDonutChartProps = {
   assetClasses: AssetClass[];
   snapshot: MonthSnapshot;
 };
+
+type Item = { id: string; name: string; amount: number; color: string };
 
 type Slice = {
   id: string;
@@ -33,17 +35,16 @@ const STROKE = 24;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-const UNGROUPED_TAB_ID = "__ungrouped__";
+const ALL_TAB_ID = "__all__";
 
 export default function GroupDonutChart({
   groups,
   assetClasses,
   snapshot,
 }: GroupDonutChartProps) {
-  const hasUngrouped = assetClasses.some((a) => !a.groupId);
   const tabs = [
+    { id: ALL_TAB_ID, name: "전체" },
     ...groups.map((g) => ({ id: g.id, name: g.name })),
-    ...(hasUngrouped ? [{ id: UNGROUPED_TAB_ID, name: UNGROUPED_LABEL }] : []),
   ];
 
   const [selectedTabId, setSelectedTabId] = useState(tabs[0]?.id ?? "");
@@ -57,7 +58,7 @@ export default function GroupDonutChart({
   const [hoveredSlice, setHoveredSlice] = useState<Slice | null>(null);
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
 
-  if (!activeTabId) {
+  if (assetClasses.length === 0) {
     return (
       <div className="flex h-[220px] items-center justify-center gap-1.5 rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
         <Inbox className="h-4 w-4" /> 자산을 추가하면 비율이 나타납니다
@@ -65,35 +66,68 @@ export default function GroupDonutChart({
     );
   }
 
-  const assetsInGroup =
-    activeTabId === UNGROUPED_TAB_ID
-      ? assetClasses.filter((a) => !a.groupId)
-      : assetClasses.filter((a) => a.groupId === activeTabId);
-  const assetsInTab = includeLiabilities
-    ? assetsInGroup
-    : assetsInGroup.filter((a) => (snapshot.assetBalancesKRW[a.id] ?? 0) >= 0);
-  const tabTotal = assetsInTab.reduce(
-    (sum, a) => sum + Math.abs(snapshot.assetBalancesKRW[a.id] ?? 0),
+  // "전체" 탭: 그룹은 하나로 합쳐 그룹 색으로, 미분류 자산은 자기 색으로
+  // — 자산 비교 그래프와 같은 방식. 특정 그룹 탭에서는 그 안의 자산들이
+  // 다른 곳에서 전부 그룹 색을 공유하므로, 여기서는 도넛 안에서만 쓰는
+  // 색을 따로 생성해 슬라이스가 서로 구분되게 한다.
+  const items: Item[] =
+    activeTabId === ALL_TAB_ID
+      ? [
+          ...groups
+            .filter((g) => assetClasses.some((a) => a.groupId === g.id))
+            .map((g) => ({
+              id: g.id,
+              name: g.name,
+              amount: assetClasses
+                .filter((a) => a.groupId === g.id)
+                .reduce(
+                  (sum, a) => sum + (snapshot.assetBalancesKRW[a.id] ?? 0),
+                  0,
+                ),
+              color: g.color,
+            })),
+          ...assetClasses
+            .filter((a) => !a.groupId)
+            .map((a) => ({
+              id: a.id,
+              name: a.name,
+              amount: snapshot.assetBalancesKRW[a.id] ?? 0,
+              color: a.color,
+            })),
+        ]
+      : assetClasses
+          .filter((a) => a.groupId === activeTabId)
+          .map((a, i) => ({
+            id: a.id,
+            name: a.name,
+            amount: snapshot.assetBalancesKRW[a.id] ?? 0,
+            color: GROUP_PALETTE[i % GROUP_PALETTE.length],
+          }));
+
+  const itemsInTab = includeLiabilities
+    ? items
+    : items.filter((item) => item.amount >= 0);
+  const tabTotal = itemsInTab.reduce(
+    (sum, item) => sum + Math.abs(item.amount),
     0,
   );
 
-  const { items: slices } = assetsInTab.reduce<{
+  const { items: slices } = itemsInTab.reduce<{
     offset: number;
     items: Slice[];
   }>(
-    (acc, asset) => {
-      const amount = snapshot.assetBalancesKRW[asset.id] ?? 0;
-      const ratio = tabTotal > 0 ? Math.abs(amount) / tabTotal : 0;
+    (acc, item) => {
+      const ratio = tabTotal > 0 ? Math.abs(item.amount) / tabTotal : 0;
       const dash = ratio * CIRCUMFERENCE;
       const slice: Slice = {
-        id: asset.id,
-        name: asset.name,
-        amount,
+        id: item.id,
+        name: item.name,
+        amount: item.amount,
         ratio,
-        color: asset.color,
+        color: item.color,
         dashArray: `${dash} ${CIRCUMFERENCE - dash}`,
         dashOffset: -acc.offset,
-        isLiability: amount < 0,
+        isLiability: item.amount < 0,
       };
       return { offset: acc.offset + dash, items: [...acc.items, slice] };
     },
@@ -104,7 +138,7 @@ export default function GroupDonutChart({
     <div className="flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-sm text-gray-500">
-          <PieChartIcon className="h-4 w-4" /> 그룹별 비율
+          <PieChartIcon className="h-4 w-4" /> 자산 비율
         </p>
         {hasLiabilities && (
           <label className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -137,7 +171,7 @@ export default function GroupDonutChart({
         <div className="relative shrink-0">
         <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
           <g transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}>
-            {assetsInTab.length === 0 ? (
+            {tabTotal === 0 ? (
               <circle
                 cx={SIZE / 2}
                 cy={SIZE / 2}
@@ -173,6 +207,11 @@ export default function GroupDonutChart({
             )}
           </g>
         </svg>
+        {tabTotal === 0 && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-5 text-center text-[11px] text-gray-400">
+            표시할 데이터가 없어요
+          </div>
+        )}
         {hoveredSlice && (
           <ChartTooltip
             xPercent={(hoverPos.x / SIZE) * 100}

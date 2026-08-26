@@ -815,6 +815,7 @@ export default function AssetSimulator() {
                   snapshot={selectedSnapshot}
                   primaryAsset={primaryAsset}
                   assetClasses={activeScenario.assetClasses}
+                  groups={activeScenario.groups}
                   exchangeRate={activeScenario.exchangeRate}
                 />
               </div>
