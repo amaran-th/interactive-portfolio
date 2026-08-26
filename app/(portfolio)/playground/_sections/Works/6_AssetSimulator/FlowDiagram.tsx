@@ -14,9 +14,11 @@ type FlowDiagramProps = {
 };
 
 const WIDTH = 600;
-const HEIGHT = 220;
 const NODE_WIDTH = 140;
 const NODE_HEIGHT = 44;
+const TOP_PAD = 20;
+const ASSET_GAP = 28;
+const MIN_HEIGHT = 180;
 const DEFICIT_COLOR = "#e11d48";
 const PRIMARY_COLOR = "#4338ca";
 // Matches the 수입/지출/이체 section colors used in the input panel
@@ -148,13 +150,28 @@ export default function FlowDiagram({
   const rightX = 460;
 
   const assetCount = 1 + transferEntries.length;
-  const assetGap = HEIGHT / (assetCount + 1);
-  const assetTopY = (i: number) => assetGap * (i + 1);
-  const primaryY = assetTopY(0);
+  const assetTopY = (i: number) => TOP_PAD + i * (NODE_HEIGHT + ASSET_GAP);
+  const primaryY = TOP_PAD;
   const primaryRowCenter = primaryY + NODE_HEIGHT / 2;
+  const HEIGHT = Math.max(
+    MIN_HEIGHT,
+    assetTopY(assetCount - 1) + NODE_HEIGHT + TOP_PAD,
+  );
+
+  // 이체 대상 박스로 가는 화살표는 현금 바로 아래를 지나가는 대신, 옆으로
+  // 살짝 비켜난 "레일"을 타고 내려가다 각자의 박스 앞에서 꺾어 들어가게
+  // 그려서 먼저 있는 박스와 절대 겹치지 않게 한다.
+  const railX = primaryX + NODE_WIDTH + 24;
+  const dropY = primaryY + NODE_HEIGHT + 10;
+  const transferPath = (rowCenterY: number) =>
+    `M ${primaryX + NODE_WIDTH / 2} ${primaryY + NODE_HEIGHT} ` +
+    `L ${primaryX + NODE_WIDTH / 2} ${dropY} ` +
+    `L ${railX} ${dropY} ` +
+    `L ${railX} ${rowCenterY} ` +
+    `L ${primaryX + NODE_WIDTH} ${rowCenterY}`;
 
   const pointerPercent = (
-    e: React.PointerEvent<SVGRectElement | SVGLineElement>,
+    e: React.PointerEvent<SVGRectElement | SVGLineElement | SVGPathElement>,
   ) => {
     const rect = e.currentTarget.ownerSVGElement!.getBoundingClientRect();
     return {
@@ -277,16 +294,13 @@ export default function FlowDiagram({
           </g>
         )}
         {transferEntries.map((entry, i) => {
-          const x = primaryX + NODE_WIDTH / 2;
-          const y1 = primaryY + NODE_HEIGHT;
-          const y2 = assetTopY(i + 1) - 6;
+          const rowCenterY = assetTopY(i + 1) + NODE_HEIGHT / 2;
+          const d = transferPath(rowCenterY);
           return (
             <g key={entry.id}>
-              <line
-                x1={x}
-                y1={y1}
-                x2={x}
-                y2={y2}
+              <path
+                d={d}
+                fill="none"
                 stroke={entry.color}
                 strokeWidth={24}
                 strokeOpacity={0}
@@ -300,11 +314,9 @@ export default function FlowDiagram({
                 }
                 onPointerLeave={() => setHoverTooltip(null)}
               />
-              <line
-                x1={x}
-                y1={y1}
-                x2={x}
-                y2={y2}
+              <path
+                d={d}
+                fill="none"
                 stroke={entry.color}
                 strokeWidth={FLOW_LINE_WIDTH}
                 strokeOpacity={0.5}
@@ -312,8 +324,8 @@ export default function FlowDiagram({
                 pointerEvents="none"
               />
               <text
-                x={x + 8}
-                y={(y1 + y2) / 2 + 3}
+                x={railX + 6}
+                y={rowCenterY - 6}
                 textAnchor="start"
                 stroke="white"
                 strokeWidth={3}
