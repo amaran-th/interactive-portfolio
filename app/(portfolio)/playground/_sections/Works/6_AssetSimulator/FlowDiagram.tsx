@@ -118,7 +118,15 @@ export default function FlowDiagram({
     id: string;
     label: string;
     amount: number;
-    color: string;
+    /** Arrow color: flow category (지출=rose, 이체=amber), matching 수입/지출/이체 elsewhere. */
+    arrowColor: string;
+    /** Node box color: what the destination actually IS. 지출 has no asset
+     * identity of its own, so it stays the category color; a transfer
+     * destination is a real asset, so its box uses that asset's own color
+     * (same one shown in the asset list, group chart, comparison chart) —
+     * otherwise it reads as just another flow category like 지출, not as
+     * the same asset it is everywhere else in the app. */
+    boxColor: string;
   }[] = [];
   const hasExpense = snapshot.flow.expenseOut > 0;
   if (hasExpense) {
@@ -126,21 +134,19 @@ export default function FlowDiagram({
       id: "expense",
       label: "지출",
       amount: snapshot.flow.expenseOut,
-      color: EXPENSE_COLOR,
+      arrowColor: EXPENSE_COLOR,
+      boxColor: EXPENSE_COLOR,
     });
   }
   for (const [assetId, amount] of destinationTotals) {
     const asset = assetClasses.find((a) => a.id === assetId);
     if (asset && amount > 0) {
-      // A transfer to another asset isn't money leaving net worth like an
-      // expense — use the shared transfer color (matching the 이체 section
-      // elsewhere) instead of the expense color, so the two categories
-      // never read as the same thing.
       rightEntries.push({
         id: assetId,
         label: asset.name,
         amount,
-        color: TRANSFER_COLOR,
+        arrowColor: TRANSFER_COLOR,
+        boxColor: asset.color,
       });
     }
   }
@@ -256,14 +262,14 @@ export default function FlowDiagram({
                 y1={y1}
                 x2={rightX - 6}
                 y2={y2}
-                stroke={entry.color}
+                stroke={entry.arrowColor}
                 strokeWidth={24}
                 strokeOpacity={0}
                 pointerEvents="stroke"
                 onPointerMove={(e) =>
                   setHoverTooltip({
                     ...pointerPercent(e),
-                    color: entry.color,
+                    color: entry.arrowColor,
                     lines: [`${primaryAsset.name} → ${entry.label}`, formatKRW(entry.amount)],
                   })
                 }
@@ -274,7 +280,7 @@ export default function FlowDiagram({
                 y1={y1}
                 x2={rightX - 6}
                 y2={y2}
-                stroke={entry.color}
+                stroke={entry.arrowColor}
                 strokeWidth={FLOW_LINE_WIDTH}
                 strokeOpacity={0.5}
                 markerEnd="url(#flow-arrow)"
@@ -345,12 +351,12 @@ export default function FlowDiagram({
             y={entryTopY(i)}
             label={entry.label}
             amount={entry.amount}
-            color={entry.color}
+            color={entry.boxColor}
             showAmount={false}
             onHoverMove={(e) =>
               setHoverTooltip({
                 ...pointerPercent(e),
-                color: entry.color,
+                color: entry.boxColor,
                 lines: [entry.label, formatKRW(entry.amount)],
               })
             }
