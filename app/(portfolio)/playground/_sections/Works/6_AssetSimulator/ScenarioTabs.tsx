@@ -51,7 +51,7 @@ export default function ScenarioTabs({
           return (
             <li
               key={scenario.id}
-              className={`flex items-center gap-0.5 rounded-full py-1 pl-3 pr-1.5 text-xs ${
+              className={`flex h-7 items-center gap-0.5 rounded-full pl-3 pr-1.5 text-xs ${
                 active
                   ? "bg-indigo-500 text-white"
                   : "bg-white/80 text-gray-600"
@@ -117,21 +117,21 @@ export default function ScenarioTabs({
       <button
         type="button"
         onClick={() => onDuplicate(activeScenarioId)}
-        className="inline-flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 text-xs text-gray-600 hover:bg-white"
+        className="inline-flex h-7 items-center gap-1 rounded-full bg-white/80 px-3 text-xs text-gray-600 hover:bg-white"
       >
         <Copy className="h-3.5 w-3.5" /> 현재 탭 복제
       </button>
       <button
         type="button"
         onClick={onCreate}
-        className="rounded-full bg-white/80 px-3 py-1 text-xs text-indigo-600 hover:bg-white"
+        className="inline-flex h-7 items-center rounded-full bg-white/80 px-3 text-xs text-indigo-600 hover:bg-white"
       >
         + 새 시나리오
       </button>
       <button
         type="button"
         onClick={onToggleComparison}
-        className={`ml-auto inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs ${
+        className={`ml-auto inline-flex h-7 items-center gap-1 rounded-full px-3 text-xs ${
           showComparison
             ? "bg-indigo-500 text-white"
             : "bg-white/80 text-gray-600 hover:bg-white"
