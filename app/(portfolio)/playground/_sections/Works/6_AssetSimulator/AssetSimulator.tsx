@@ -491,8 +491,8 @@ export default function AssetSimulator() {
         goal,
         today,
       );
-      if (achievementMonth !== null) {
-        setSelectedMonth(Math.min(achievementMonth, horizonMonths));
+      if (achievementMonth !== null && achievementMonth <= horizonMonths) {
+        setSelectedMonth(achievementMonth);
       }
     }
   };
