@@ -280,7 +280,9 @@ export default function EditView({ state, setState, onOpen }: EditViewProps) {
               <li>
                 <span className="font-bold text-[#77b98a]">1.</span> &lsquo;목표
                 추가&rsquo;로 올해 세운 목표의 카테고리를 작성해주세요.{" "}
-                <span className="text-[#c3b49b]">(예: 자기계발)</span>
+                <span className="text-[#c3b49b]">
+                  (예: 공부, 습관, 대인관계, 쉼, 일)
+                </span>
               </li>
               <li>
                 <span className="font-bold text-[#77b98a]">2.</span> 카테고리
