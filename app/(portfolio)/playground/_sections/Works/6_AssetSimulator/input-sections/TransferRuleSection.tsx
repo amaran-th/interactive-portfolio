@@ -15,6 +15,7 @@ import {
 } from "../types";
 import FloatingFormPanel from "./FloatingFormPanel";
 import ScheduleEditor from "./ScheduleEditor";
+import { useDragReorder } from "./useDragReorder";
 
 const TRANSFER_MODE_OPTIONS = [
   { value: "fixed", label: "고정 금액" },
@@ -76,8 +77,10 @@ export default function TransferRuleSection({
   );
   const [error, setError] = useState<string | null>(null);
   const isFormVisible = isFormOpen || Boolean(editingId);
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [overIndex, setOverIndex] = useState<number | null>(null);
+  const { registerItemRef, startDrag, getItemStyle } = useDragReorder(
+    transferRules.length,
+    onReorderTransferRule,
+  );
   const amountRef = useRef<HTMLInputElement>(null);
 
   const nameOf = (id: string) =>
@@ -185,43 +188,17 @@ export default function TransferRuleSection({
         {transferRules.map((rule, index) => (
           <li
             key={rule.id}
+            ref={registerItemRef(index)}
             onClick={() => startEdit(rule)}
-            onDragOver={(e) => {
-              e.preventDefault();
-              if (dragIndex !== null && dragIndex !== index) {
-                setOverIndex(index);
-              }
-            }}
-            onDragLeave={() =>
-              setOverIndex((prev) => (prev === index ? null : prev))
-            }
-            onDrop={() => {
-              if (dragIndex !== null && dragIndex !== index) {
-                onReorderTransferRule(dragIndex, index);
-              }
-              setDragIndex(null);
-              setOverIndex(null);
-            }}
-            className={`flex cursor-pointer items-center justify-between gap-2 rounded-xl border bg-white/80 px-3 py-2 text-sm transition-colors ${
-              overIndex === index
-                ? "border-amber-400 bg-amber-50"
-                : "border-amber-100 hover:border-amber-300"
-            }`}
+            style={getItemStyle(index)}
+            className="flex cursor-pointer items-center justify-between gap-2 rounded-xl border border-amber-100 bg-white/80 px-3 py-2 text-sm hover:border-amber-300"
           >
             <div className="flex min-w-0 items-center gap-2">
               <span
-                draggable
+                onPointerDown={startDrag(index)}
                 onClick={(e) => e.stopPropagation()}
-                onDragStart={(e) => {
-                  e.stopPropagation();
-                  setDragIndex(index);
-                }}
-                onDragEnd={() => {
-                  setDragIndex(null);
-                  setOverIndex(null);
-                }}
                 aria-label="순서 변경"
-                className="shrink-0 cursor-grab text-gray-300 hover:text-gray-500 active:cursor-grabbing"
+                className="shrink-0 touch-none cursor-grab text-gray-300 hover:text-gray-500 active:cursor-grabbing"
               >
                 <GripVertical className="h-4 w-4" />
               </span>

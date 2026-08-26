@@ -91,7 +91,7 @@ export default function FlowDiagram({
   if (!primaryAsset) {
     return (
       <div className="flex h-[220px] items-center justify-center gap-1.5 rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
-        <Inbox className="h-4 w-4" /> 기본 계좌를 지정하면 흐름도가 나타납니다
+        <Inbox className="h-4 w-4" /> 기본 자산을 지정하면 흐름도가 나타납니다
       </div>
     );
   }

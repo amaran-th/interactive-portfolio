@@ -201,7 +201,7 @@ export default function GroupAssetSection({
                   </span>
                   {asset.isPrimary && (
                     <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-600">
-                      기본 계좌
+                      기본 자산
                     </span>
                   )}
                   {asset.initialBalance < 0 && (
@@ -301,10 +301,13 @@ export default function GroupAssetSection({
             disabled={currency === "USD" || isLiability}
             onChange={(e) => setMakePrimary(e.target.checked)}
           />
-          기본 계좌로 지정
+          기본 자산으로 지정
           {currency === "USD" && " (KRW 자산만 가능)"}
           {isLiability && " (부채는 지정 불가)"}
         </label>
+        <p className="pl-6 text-[11px] text-gray-400">
+          수입은 기본 자산으로 들어오고, 지출은 기본 자산에서 나가요
+        </p>
         <button
           type="button"
           onClick={() => setShowAdvanced((prev) => !prev)}
