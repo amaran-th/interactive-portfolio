@@ -106,18 +106,32 @@ export default function FlowDiagram({
     );
   }
 
-  const rightEntries: { id: string; label: string; amount: number }[] = [];
+  const rightEntries: {
+    id: string;
+    label: string;
+    amount: number;
+    color: string;
+  }[] = [];
   if (snapshot.flow.expenseOut > 0) {
     rightEntries.push({
       id: "expense",
       label: "지출",
       amount: snapshot.flow.expenseOut,
+      color: OUTFLOW_COLOR,
     });
   }
   for (const [assetId, amount] of destinationTotals) {
     const asset = assetClasses.find((a) => a.id === assetId);
     if (asset && amount > 0) {
-      rightEntries.push({ id: assetId, label: asset.name, amount });
+      // A transfer to another asset isn't money leaving net worth like an
+      // expense — give it that asset's own color instead of the outflow
+      // (expense) color so the two aren't visually conflated.
+      rightEntries.push({
+        id: assetId,
+        label: asset.name,
+        amount,
+        color: asset.color,
+      });
     }
   }
 
@@ -152,7 +166,7 @@ export default function FlowDiagram({
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
         <defs>
           <marker
-            id="flow-arrow-income"
+            id="flow-arrow"
             viewBox="0 0 10 10"
             refX="9"
             refY="5"
@@ -161,19 +175,10 @@ export default function FlowDiagram({
             markerUnits="userSpaceOnUse"
             orient="auto-start-reverse"
           >
-            <path d="M 0 0 L 10 5 L 0 10 z" fill={INCOME_COLOR} />
-          </marker>
-          <marker
-            id="flow-arrow-out"
-            viewBox="0 0 10 10"
-            refX="9"
-            refY="5"
-            markerWidth="8"
-            markerHeight="8"
-            markerUnits="userSpaceOnUse"
-            orient="auto-start-reverse"
-          >
-            <path d="M 0 0 L 10 5 L 0 10 z" fill={OUTFLOW_COLOR} />
+            {/* Inherits whichever line's stroke color references this marker,
+                so one definition covers income, expense, and every transfer's
+                own asset color. */}
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
           </marker>
         </defs>
         {snapshot.flow.incomeIn > 0 && (
@@ -204,7 +209,7 @@ export default function FlowDiagram({
               stroke={INCOME_COLOR}
               strokeWidth={FLOW_LINE_WIDTH}
               strokeOpacity={0.5}
-              markerEnd="url(#flow-arrow-income)"
+              markerEnd="url(#flow-arrow)"
               pointerEvents="none"
             />
             <text
@@ -230,14 +235,14 @@ export default function FlowDiagram({
                 y1={y1}
                 x2={rightX - 6}
                 y2={y2}
-                stroke={OUTFLOW_COLOR}
+                stroke={entry.color}
                 strokeWidth={24}
                 strokeOpacity={0}
                 pointerEvents="stroke"
                 onPointerMove={(e) =>
                   setHoverTooltip({
                     ...pointerPercent(e),
-                    color: OUTFLOW_COLOR,
+                    color: entry.color,
                     lines: [`${primaryAsset.name} → ${entry.label}`, formatKRW(entry.amount)],
                   })
                 }
@@ -248,10 +253,10 @@ export default function FlowDiagram({
                 y1={y1}
                 x2={rightX - 6}
                 y2={y2}
-                stroke={OUTFLOW_COLOR}
+                stroke={entry.color}
                 strokeWidth={FLOW_LINE_WIDTH}
                 strokeOpacity={0.5}
-                markerEnd="url(#flow-arrow-out)"
+                markerEnd="url(#flow-arrow)"
                 pointerEvents="none"
               />
               <text
@@ -308,11 +313,11 @@ export default function FlowDiagram({
             y={rightGap * (i + 1)}
             label={entry.label}
             amount={entry.amount}
-            color={OUTFLOW_COLOR}
+            color={entry.color}
             onHoverMove={(e) =>
               setHoverTooltip({
                 ...pointerPercent(e),
-                color: OUTFLOW_COLOR,
+                color: entry.color,
                 lines: [entry.label, formatKRW(entry.amount)],
               })
             }
