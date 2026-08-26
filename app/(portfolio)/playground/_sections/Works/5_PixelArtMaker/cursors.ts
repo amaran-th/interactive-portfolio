@@ -16,7 +16,7 @@ function imageCursor(
   return `image-set(url("${CURSOR_BASE_PATH}/${file}") 2x) ${hotspotX} ${hotspotY}, ${fallback}`;
 }
 
-export const CURSOR_NORMAL = imageCursor("default.png", 8, 5, "default");
+export const CURSOR_NORMAL = imageCursor("default.png", 9, 6, "default");
 export const CURSOR_POINTING = imageCursor("pointer.png", 13.5, 5, "pointer");
 export const CURSOR_MOVE = imageCursor("move.png", 16, 15, "move");
 export const CURSOR_TEXT = imageCursor("text.png", 16, 15, "text");
