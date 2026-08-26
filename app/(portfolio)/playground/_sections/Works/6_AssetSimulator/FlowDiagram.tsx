@@ -16,14 +16,12 @@ const WIDTH = 600;
 const HEIGHT = 220;
 const NODE_WIDTH = 140;
 const NODE_HEIGHT = 44;
-const CENTER_Y = (HEIGHT - NODE_HEIGHT) / 2;
 const DEFICIT_COLOR = "#e11d48";
 const PRIMARY_COLOR = "#4338ca";
 // Matches the 수입/지출/이체 section colors used in the input panel
 // (emerald/rose/amber), so the same category reads the same color here.
 const INCOME_COLOR = "#10b981";
 const EXPENSE_COLOR = "#f43f5e";
-const TRANSFER_COLOR = "#f59e0b";
 
 function NodeBox({
   x,
@@ -114,64 +112,44 @@ export default function FlowDiagram({
     );
   }
 
-  const rightEntries: {
+  const primaryBalance = snapshot.assetBalances[primaryAsset.id] ?? 0;
+  const primaryColor = primaryBalance < 0 ? DEFICIT_COLOR : PRIMARY_COLOR;
+  const hasExpense = snapshot.flow.expenseOut > 0;
+
+  // 이체 대상도 현금과 같은 실제 자산이라, 지출과 같은 열에 두지 않고
+  // 기본 자산과 같은 열에 세로로 쌓는다. 박스에는 이번 달 이체액이 아니라
+  // 그 자산의 실제 잔액을 보여준다 — 자산 목록·자산 비교와 같은 정보.
+  const transferEntries: {
     id: string;
     label: string;
     amount: number;
-    /** Arrow color: flow category (지출=rose, 이체=amber), matching 수입/지출/이체 elsewhere. */
-    arrowColor: string;
-    /** Node box color: what the destination actually IS. 지출 has no asset
-     * identity of its own, so it stays the category color; a transfer
-     * destination is a real asset, so its box uses that asset's own color
-     * (same one shown in the asset list, group chart, comparison chart) —
-     * otherwise it reads as just another flow category like 지출, not as
-     * the same asset it is everywhere else in the app. */
-    boxColor: string;
+    balance: number;
+    color: string;
   }[] = [];
-  const hasExpense = snapshot.flow.expenseOut > 0;
-  if (hasExpense) {
-    rightEntries.push({
-      id: "expense",
-      label: "지출",
-      amount: snapshot.flow.expenseOut,
-      arrowColor: EXPENSE_COLOR,
-      boxColor: EXPENSE_COLOR,
-    });
-  }
   for (const [assetId, amount] of destinationTotals) {
     const asset = assetClasses.find((a) => a.id === assetId);
     if (asset && amount > 0) {
-      rightEntries.push({
+      transferEntries.push({
         id: assetId,
         label: asset.name,
         amount,
-        arrowColor: TRANSFER_COLOR,
-        boxColor: asset.color,
+        balance: snapshot.assetBalancesKRW[assetId] ?? 0,
+        color: asset.color,
       });
     }
   }
 
   const FLOW_LINE_WIDTH = 3;
 
-  const primaryBalance = snapshot.assetBalances[primaryAsset.id] ?? 0;
-  const primaryColor = primaryBalance < 0 ? DEFICIT_COLOR : PRIMARY_COLOR;
-
   const incomeX = 0;
   const primaryX = 230;
   const rightX = 460;
-  const rightGap =
-    rightEntries.length > 0 ? HEIGHT / (rightEntries.length + 1) : HEIGHT / 2;
-  // Nudge every entry after the expense entry down a bit, so the 지출
-  // node and the 이체 nodes read as two separate clusters (not just a
-  // color change within one continuous list) — 적금 같은 이체 대상은
-  // 지출이 아니라 다른 자산으로 옮겨가는 것뿐이라 뚜렷이 구분돼야 한다.
-  const GROUP_GAP = hasExpense && rightEntries.length > 1 ? 20 : 0;
-  const entryTopY = (i: number) =>
-    rightGap * (i + 1) + (hasExpense && i >= 1 ? GROUP_GAP : 0);
-  // Index of the first transfer entry within rightEntries (transfers always
-  // follow the expense entry, if any).
-  const transferStartIndex = hasExpense ? 1 : 0;
-  const hasTransferEntries = rightEntries.length > transferStartIndex;
+
+  const assetCount = 1 + transferEntries.length;
+  const assetGap = HEIGHT / (assetCount + 1);
+  const assetTopY = (i: number) => assetGap * (i + 1);
+  const primaryY = assetTopY(0);
+  const primaryRowCenter = primaryY + NODE_HEIGHT / 2;
 
   const pointerPercent = (
     e: React.PointerEvent<SVGRectElement | SVGLineElement>,
@@ -212,9 +190,9 @@ export default function FlowDiagram({
           <>
             <line
               x1={incomeX + NODE_WIDTH}
-              y1={CENTER_Y + NODE_HEIGHT / 2}
+              y1={primaryRowCenter}
               x2={primaryX - 6}
-              y2={CENTER_Y + NODE_HEIGHT / 2}
+              y2={primaryRowCenter}
               stroke={INCOME_COLOR}
               strokeWidth={24}
               strokeOpacity={0}
@@ -230,9 +208,9 @@ export default function FlowDiagram({
             />
             <line
               x1={incomeX + NODE_WIDTH}
-              y1={CENTER_Y + NODE_HEIGHT / 2}
+              y1={primaryRowCenter}
               x2={primaryX - 6}
-              y2={CENTER_Y + NODE_HEIGHT / 2}
+              y2={primaryRowCenter}
               stroke={INCOME_COLOR}
               strokeWidth={FLOW_LINE_WIDTH}
               strokeOpacity={0.5}
@@ -241,7 +219,7 @@ export default function FlowDiagram({
             />
             <text
               x={(incomeX + NODE_WIDTH + primaryX - 6) / 2}
-              y={CENTER_Y + NODE_HEIGHT / 2 - 8}
+              y={primaryRowCenter - 8}
               textAnchor="middle"
               stroke="white"
               strokeWidth={3}
@@ -252,44 +230,89 @@ export default function FlowDiagram({
             </text>
           </>
         )}
-        {rightEntries.map((entry, i) => {
-          const y1 = CENTER_Y + NODE_HEIGHT / 2;
-          const y2 = entryTopY(i) + NODE_HEIGHT / 2;
+        {hasExpense && (
+          <g>
+            <line
+              x1={primaryX + NODE_WIDTH}
+              y1={primaryRowCenter}
+              x2={rightX - 6}
+              y2={primaryRowCenter}
+              stroke={EXPENSE_COLOR}
+              strokeWidth={24}
+              strokeOpacity={0}
+              pointerEvents="stroke"
+              onPointerMove={(e) =>
+                setHoverTooltip({
+                  ...pointerPercent(e),
+                  color: EXPENSE_COLOR,
+                  lines: [`${primaryAsset.name} → 지출`, formatKRW(snapshot.flow.expenseOut)],
+                })
+              }
+              onPointerLeave={() => setHoverTooltip(null)}
+            />
+            <line
+              x1={primaryX + NODE_WIDTH}
+              y1={primaryRowCenter}
+              x2={rightX - 6}
+              y2={primaryRowCenter}
+              stroke={EXPENSE_COLOR}
+              strokeWidth={FLOW_LINE_WIDTH}
+              strokeOpacity={0.5}
+              markerEnd="url(#flow-arrow)"
+              pointerEvents="none"
+            />
+            <text
+              x={(primaryX + NODE_WIDTH + rightX - 6) / 2}
+              y={primaryRowCenter - 8}
+              textAnchor="middle"
+              stroke="white"
+              strokeWidth={3}
+              paintOrder="stroke"
+              className="fill-gray-700 text-[10px] font-medium"
+            >
+              {Math.round(snapshot.flow.expenseOut).toLocaleString()}원
+            </text>
+          </g>
+        )}
+        {transferEntries.map((entry, i) => {
+          const x = primaryX + NODE_WIDTH / 2;
+          const y1 = primaryY + NODE_HEIGHT;
+          const y2 = assetTopY(i + 1) - 6;
           return (
             <g key={entry.id}>
               <line
-                x1={primaryX + NODE_WIDTH}
+                x1={x}
                 y1={y1}
-                x2={rightX - 6}
+                x2={x}
                 y2={y2}
-                stroke={entry.arrowColor}
+                stroke={entry.color}
                 strokeWidth={24}
                 strokeOpacity={0}
                 pointerEvents="stroke"
                 onPointerMove={(e) =>
                   setHoverTooltip({
                     ...pointerPercent(e),
-                    color: entry.arrowColor,
+                    color: entry.color,
                     lines: [`${primaryAsset.name} → ${entry.label}`, formatKRW(entry.amount)],
                   })
                 }
                 onPointerLeave={() => setHoverTooltip(null)}
               />
               <line
-                x1={primaryX + NODE_WIDTH}
+                x1={x}
                 y1={y1}
-                x2={rightX - 6}
+                x2={x}
                 y2={y2}
-                stroke={entry.arrowColor}
+                stroke={entry.color}
                 strokeWidth={FLOW_LINE_WIDTH}
                 strokeOpacity={0.5}
                 markerEnd="url(#flow-arrow)"
                 pointerEvents="none"
               />
               <text
-                x={(primaryX + NODE_WIDTH + rightX - 6) / 2}
-                y={(y1 + y2) / 2 - 8}
-                textAnchor="middle"
+                x={x + 8}
+                y={(y1 + y2) / 2 + 3}
+                textAnchor="start"
                 stroke="white"
                 strokeWidth={3}
                 paintOrder="stroke"
@@ -304,7 +327,7 @@ export default function FlowDiagram({
         {snapshot.flow.incomeIn > 0 && (
           <NodeBox
             x={incomeX}
-            y={CENTER_Y}
+            y={primaryY}
             label="수입"
             amount={snapshot.flow.incomeIn}
             color={INCOME_COLOR}
@@ -319,9 +342,29 @@ export default function FlowDiagram({
             onHoverEnd={() => setHoverTooltip(null)}
           />
         )}
+        {hasExpense && (
+          <NodeBox
+            x={rightX}
+            y={primaryY}
+            label="지출"
+            amount={snapshot.flow.expenseOut}
+            color={EXPENSE_COLOR}
+            showAmount={false}
+            onHoverMove={(e) =>
+              setHoverTooltip({
+                ...pointerPercent(e),
+                color: EXPENSE_COLOR,
+                lines: ["지출", formatKRW(snapshot.flow.expenseOut)],
+              })
+            }
+            onHoverEnd={() => setHoverTooltip(null)}
+          />
+        )}
+        {/* 기본 자산 열: 현금과 이체로 늘어난 자산을 같은 x축에 세로로 쌓아
+            같은 종류(자산)라는 걸 위치만으로도 보여준다. */}
         <NodeBox
           x={primaryX}
-          y={CENTER_Y}
+          y={primaryY}
           label={primaryAsset.name}
           amount={primaryBalance}
           color={primaryColor}
@@ -334,30 +377,19 @@ export default function FlowDiagram({
           }
           onHoverEnd={() => setHoverTooltip(null)}
         />
-        {hasTransferEntries && (
-          <text
-            x={rightX + NODE_WIDTH / 2}
-            y={entryTopY(transferStartIndex) - 6}
-            textAnchor="middle"
-            className="fill-gray-400 text-[9px] font-medium"
-          >
-            이체
-          </text>
-        )}
-        {rightEntries.map((entry, i) => (
+        {transferEntries.map((entry, i) => (
           <NodeBox
             key={entry.id}
-            x={rightX}
-            y={entryTopY(i)}
+            x={primaryX}
+            y={assetTopY(i + 1)}
             label={entry.label}
-            amount={entry.amount}
-            color={entry.boxColor}
-            showAmount={false}
+            amount={entry.balance}
+            color={entry.color}
             onHoverMove={(e) =>
               setHoverTooltip({
                 ...pointerPercent(e),
-                color: entry.boxColor,
-                lines: [entry.label, formatKRW(entry.amount)],
+                color: entry.color,
+                lines: [entry.label, formatKRW(entry.balance)],
               })
             }
             onHoverEnd={() => setHoverTooltip(null)}
