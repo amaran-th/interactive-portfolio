@@ -222,6 +222,18 @@ export function uid(): string {
   return Math.random().toString(36).slice(2, 9);
 }
 
+// 저장 결과 — "quota"는 용량 초과를 별도로 구분해 UI에서 안내 문구를 다르게 보여줄 수 있게 한다.
+export type SaveResult = "ok" | "quota" | "error";
+
+export function isQuotaExceededError(e: unknown): boolean {
+  return (
+    e instanceof DOMException &&
+    (e.name === "QuotaExceededError" ||
+      e.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+      e.code === 22)
+  );
+}
+
 function loadLibrary(): AssetLibrary {
   if (typeof window === "undefined") return { pixelArt: [], beatPatterns: [] };
   try {
@@ -240,7 +252,7 @@ function loadLibrary(): AssetLibrary {
   }
 }
 
-function saveLibrary(lib: AssetLibrary): boolean {
+function saveLibrary(lib: AssetLibrary): SaveResult {
   try {
     const stored: {
       pixelArt: StoredPixelArtV3[];
@@ -250,9 +262,9 @@ function saveLibrary(lib: AssetLibrary): boolean {
       beatPatterns: lib.beatPatterns,
     };
     localStorage.setItem(LIBRARY_KEY, JSON.stringify(stored));
-    return true;
-  } catch {
-    return false;
+    return "ok";
+  } catch (e) {
+    return isQuotaExceededError(e) ? "quota" : "error";
   }
 }
 
@@ -270,7 +282,7 @@ export function resolvePixelArt(id: string): PixelArt | undefined {
   return getPixelArt(id) ?? findBuiltin(id);
 }
 
-export function savePixelArt(art: PixelArt): boolean {
+export function savePixelArt(art: PixelArt): SaveResult {
   const lib = loadLibrary();
   const idx = lib.pixelArt.findIndex((p) => p.id === art.id);
   if (idx >= 0) lib.pixelArt[idx] = art;

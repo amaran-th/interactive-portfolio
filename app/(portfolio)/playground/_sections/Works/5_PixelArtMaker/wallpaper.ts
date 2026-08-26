@@ -1,8 +1,10 @@
 import {
   encodeStored,
+  isQuotaExceededError,
   PackedPixels,
   PixelArt,
   PixelLayer,
+  SaveResult,
   unpackPixels,
 } from "../_shared/assetLibrary";
 
@@ -164,14 +166,14 @@ export function getWallpaper(): PixelArt {
   return fresh;
 }
 
-export function saveWallpaper(art: PixelArt): boolean {
+export function saveWallpaper(art: PixelArt): SaveResult {
   // id·name은 항상 고정값으로 강제한다 — 편집기에서 실수로라도 바뀌지 않도록.
   const locked: PixelArt = { ...art, id: WALLPAPER_ID, name: WALLPAPER_NAME };
   try {
     localStorage.setItem(WALLPAPER_KEY, JSON.stringify(encodeStored(locked)));
-    return true;
-  } catch {
-    return false;
+    return "ok";
+  } catch (e) {
+    return isQuotaExceededError(e) ? "quota" : "error";
   }
 }
 
