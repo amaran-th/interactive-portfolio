@@ -157,10 +157,15 @@ export default function FlowDiagram({
     rightEntries.length > 0 ? HEIGHT / (rightEntries.length + 1) : HEIGHT / 2;
   // Nudge every entry after the expense entry down a bit, so the 지출
   // node and the 이체 nodes read as two separate clusters (not just a
-  // color change within one continuous list).
-  const GROUP_GAP = hasExpense && rightEntries.length > 1 ? 14 : 0;
+  // color change within one continuous list) — 적금 같은 이체 대상은
+  // 지출이 아니라 다른 자산으로 옮겨가는 것뿐이라 뚜렷이 구분돼야 한다.
+  const GROUP_GAP = hasExpense && rightEntries.length > 1 ? 20 : 0;
   const entryTopY = (i: number) =>
     rightGap * (i + 1) + (hasExpense && i >= 1 ? GROUP_GAP : 0);
+  // Index of the first transfer entry within rightEntries (transfers always
+  // follow the expense entry, if any).
+  const transferStartIndex = hasExpense ? 1 : 0;
+  const hasTransferEntries = rightEntries.length > transferStartIndex;
 
   const pointerPercent = (
     e: React.PointerEvent<SVGRectElement | SVGLineElement>,
@@ -323,6 +328,16 @@ export default function FlowDiagram({
           }
           onHoverEnd={() => setHoverTooltip(null)}
         />
+        {hasTransferEntries && (
+          <text
+            x={rightX + NODE_WIDTH / 2}
+            y={entryTopY(transferStartIndex) - 6}
+            textAnchor="middle"
+            className="fill-gray-400 text-[9px] font-medium"
+          >
+            이체
+          </text>
+        )}
         {rightEntries.map((entry, i) => (
           <NodeBox
             key={entry.id}
