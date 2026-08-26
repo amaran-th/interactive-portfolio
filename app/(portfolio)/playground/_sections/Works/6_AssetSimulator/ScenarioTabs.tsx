@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { Copy, GitCompare, Pencil, X } from "lucide-react";
+import { useState } from "react";
 import { Scenario } from "./types";
 
 type ScenarioTabsProps = {
@@ -44,7 +44,7 @@ export default function ScenarioTabs({
   };
 
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2.5">
+    <div className="flex flex-wrap items-center gap-2.5">
       <ul className="flex flex-wrap items-center gap-1.5">
         {scenarios.map((scenario) => {
           const active = scenario.id === activeScenarioId;
@@ -52,7 +52,9 @@ export default function ScenarioTabs({
             <li
               key={scenario.id}
               className={`flex items-center gap-0.5 rounded-full py-1 pl-3 pr-1.5 text-xs ${
-                active ? "bg-indigo-500 text-white" : "bg-white/80 text-gray-600"
+                active
+                  ? "bg-indigo-500 text-white"
+                  : "bg-white/80 text-gray-600"
               }`}
             >
               {renamingId === scenario.id ? (

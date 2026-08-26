@@ -27,8 +27,8 @@
 ```js
 // 아이템마다 쓰기 → 읽기를 반복 → N번 reflow
 items.map((el) => {
-  el.style.height = "auto";  // write: 레이아웃 무효화
-  return el.scrollHeight;    // read: 강제 reflow 발생
+  el.style.height = "auto"; // write: 레이아웃 무효화
+  return el.scrollHeight; // read: 강제 reflow 발생
 });
 ```
 
@@ -47,7 +47,7 @@ API는 두 단계로 구성된다. 먼저 `prepare()`로 텍스트의 폰트 메
 
 ## Pretext가 왜 좋을까?
 
-Pretext의 성능을 기존 방식과 비교하고 측정할 수 있는 두 개의 예제를 마련했다. 구축한 테스트 환경을 배포해두었으니, 원한다면 [이 페이지](https://amaran-th-interactive-portfolio.vercel.app/pretext)에서 직접 테스트해볼 수도 있다.
+Pretext의 성능을 기존 방식과 비교하고 측정할 수 있는 두 개의 예제를 마련했다. 구축한 테스트 환경을 배포해두었으니, 원한다면 [이 페이지](https://amaranth-project.vercel.app/pretext)에서 직접 테스트해볼 수도 있다.
 
 ### Case 1. 동적 너비에 따른 텍스트 별 높이 재계산
 
@@ -87,7 +87,9 @@ refs.current.forEach((el) => {
 const heights = refs.current.map((el) => (el ? el.scrollHeight : 0));
 
 // 3. 위치 배치 (쓰기만, reflow 없음)
-refs.current.forEach((el, i) => { /* height, left, top 적용 */ });
+refs.current.forEach((el, i) => {
+  /* height, left, top 적용 */
+});
 containerRef.current.style.height = totalHeight + "px";
 ```
 
@@ -101,7 +103,7 @@ Batching이란 쓰기 연산을 한 번에 몰아서 처리한 뒤, 읽기 연�
 // 1단계: 텍스트가 바뀔 때만 — 폰트 메트릭 계산 (DOM 접근 없음)
 const preparedTexts = useMemo(
   () => texts.map((text) => prepare(text, FONT, { whiteSpace: "pre-wrap" })),
-  [texts]
+  [texts],
 );
 
 // 2단계: 너비가 바뀔 때만 — 줄바꿈 계산 (DOM 접근 없음)
@@ -161,7 +163,7 @@ el.scrollTop = offsets[jumpTarget.index];
 const virtualizer = useVirtualizer({
   count: texts.length,
   getScrollElement: () => parentRef.current,
-  estimateSize: () => ESTIMATED_ITEM_HEIGHT,         // 고정 추정값(50px)
+  estimateSize: () => ESTIMATED_ITEM_HEIGHT, // 고정 추정값(50px)
   measureElement: (element) => element.getBoundingClientRect().height,
   gap: ITEM_GAP,
 });
