@@ -185,17 +185,22 @@ export default function GroupDonutChart({
           />
         )}
         </div>
-        <ul className="flex flex-col gap-1 text-sm">
+        <ul className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
           {slices.map((slice) => (
-            <li key={slice.id} className="flex items-center gap-2">
+            <li
+              key={slice.id}
+              className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5"
+            >
               <span
-                className="h-2.5 w-2.5 rounded-full"
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: slice.color }}
               />
               {slice.isLiability && (
                 <TrendingDown className="h-3.5 w-3.5 shrink-0 text-rose-500" />
               )}
-              {slice.name} · {Math.round(slice.ratio * 100)}% ·{" "}
+              <span>
+                {slice.name} · {Math.round(slice.ratio * 100)}%
+              </span>
               <span className={slice.isLiability ? "text-rose-500" : ""}>
                 {formatKRW(slice.amount)}
               </span>

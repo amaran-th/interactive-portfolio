@@ -82,13 +82,16 @@ export default function HistoryPanel({
 }: HistoryPanelProps) {
   if (selectedMonth === 0 || snapshots.length === 0) {
     return (
-      <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
+      <div className="flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
           <History className="h-4 w-4" /> 누적 이력
         </h3>
-        <p className="mt-2 flex items-center gap-1.5 text-sm text-gray-400">
-          <Inbox className="h-4 w-4" /> 슬라이더를 옮기면 지금부터의 이력이 나타납니다
-        </p>
+        <div className="flex flex-1 items-center justify-center">
+          <p className="flex items-center gap-1.5 text-center text-sm text-gray-400">
+            <Inbox className="h-4 w-4 shrink-0" /> 슬라이더를 옮기면 지금부터의
+            이력이 나타납니다
+          </p>
+        </div>
       </div>
     );
   }
