@@ -1,6 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import AssetAreaChart from "./AssetAreaChart";
+import ComparisonBarChart from "./ComparisonBarChart";
+import FlowDiagram from "./FlowDiagram";
+import GroupDonutChart from "./GroupDonutChart";
+import HistoryPanel from "./HistoryPanel";
+import InputPanel from "./InputPanel";
+import ScenarioComparisonChart from "./ScenarioComparisonChart";
+import ScenarioTabs from "./ScenarioTabs";
+import Switch from "./Switch";
+import { findGoalAchievementMonth } from "./simulation";
 import {
   AssetClass,
   DEFAULT_HORIZON_YEARS,
@@ -20,15 +30,6 @@ import {
   toMonthInputValue,
 } from "./types";
 import { useSimulation } from "./useSimulation";
-import { findGoalAchievementMonth } from "./simulation";
-import InputPanel from "./InputPanel";
-import AssetAreaChart from "./AssetAreaChart";
-import GroupDonutChart from "./GroupDonutChart";
-import FlowDiagram from "./FlowDiagram";
-import ComparisonBarChart from "./ComparisonBarChart";
-import HistoryPanel from "./HistoryPanel";
-import ScenarioTabs from "./ScenarioTabs";
-import ScenarioComparisonChart from "./ScenarioComparisonChart";
 
 function withGuaranteedPrimary(assets: AssetClass[]): AssetClass[] {
   if (assets.some((a) => a.isPrimary && a.currency === "KRW")) {
@@ -234,9 +235,7 @@ export default function AssetSimulator() {
     setSelectedMonth((prev) => Math.min(prev, years * 12));
   };
 
-  const updateActiveScenario = (
-    updater: (scenario: Scenario) => Scenario,
-  ) => {
+  const updateActiveScenario = (updater: (scenario: Scenario) => Scenario) => {
     setIsDirty(true);
     setScenarios((prev) =>
       prev.map((s) => (s.id === activeScenarioId ? updater(s) : s)),
@@ -283,7 +282,10 @@ export default function AssetSimulator() {
     const id = newId();
     updateActiveScenario((s) => ({
       ...s,
-      groups: [...s.groups, { id, name, color: nextGroupColor(s.groups.length) }],
+      groups: [
+        ...s.groups,
+        { id, name, color: nextGroupColor(s.groups.length) },
+      ],
     }));
     return id;
   };
@@ -337,7 +339,11 @@ export default function AssetSimulator() {
         const to = nextAssetClasses.find((a) => a.id === r.toAssetId);
         return from && to && from.currency === to.currency;
       });
-      return { ...s, assetClasses: nextAssetClasses, transferRules: nextTransferRules };
+      return {
+        ...s,
+        assetClasses: nextAssetClasses,
+        transferRules: nextTransferRules,
+      };
     });
   };
   const handleChangeAssetColor = (id: string, color: string) => {
@@ -515,9 +521,9 @@ export default function AssetSimulator() {
   );
 
   return (
-    <div className="h-full w-full overflow-y-auto bg-gradient-to-br from-indigo-100 via-blue-50 to-purple-100 px-4 pb-4 text-gray-800">
-      <div className="mx-auto max-w-[1600px] @container">
-        <div className="sticky top-0 z-40 -mx-4 mb-4 bg-gradient-to-br from-indigo-100 via-blue-50 to-purple-100 px-4 pt-4 pb-3 shadow-[0_4px_10px_-6px_rgba(0,0,0,0.15)]">
+    <div className="h-full w-full overflow-y-auto bg-linear-to-br from-indigo-100 via-blue-50 to-purple-100 px-4 pb-4 text-gray-800">
+      <div className="mx-auto max-w-400 @container">
+        <div className="sticky top-0 z-40 -mx-4 mb-4 bg-linear-to-br from-indigo-100 via-blue-50 to-purple-100 px-4 pt-4 pb-3 shadow-[0_4px_10px_-6px_rgba(0,0,0,0.15)]">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-bold text-gray-800">자산 시뮬레이터</h2>
             <div className="flex flex-wrap items-center gap-3">
@@ -536,30 +542,33 @@ export default function AssetSimulator() {
                   className="w-24 rounded-full border border-white/60 bg-white/80 px-2 py-1 text-sm"
                 />
               </label>
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={activeScenario.inflationEnabled}
-                    onChange={handleToggleInflation}
-                  />
-                  물가상승률 반영
-                </label>
-                <div
-                  className={`flex items-center gap-1.5 ${
-                    activeScenario.inflationEnabled ? "" : "invisible"
+              <div className="flex items-center gap-2 rounded-full border border-white/60 bg-white/50 px-3 py-1.5 text-xs text-gray-600">
+                <Switch
+                  checked={activeScenario.inflationEnabled}
+                  onChange={handleToggleInflation}
+                  label="물가상승률 반영"
+                />
+                <div className="h-4 w-px bg-white/60" />
+                <input
+                  type="number"
+                  value={activeScenario.inflationRate}
+                  onChange={(e) =>
+                    handleSetInflationRate(Number(e.target.value) || 0)
+                  }
+                  disabled={!activeScenario.inflationEnabled}
+                  className={`w-12 rounded-full border px-2 py-1 text-xs outline-none ${
+                    activeScenario.inflationEnabled
+                      ? "border-white/60 bg-white/80 focus:border-gray-400"
+                      : "cursor-not-allowed border-transparent bg-white/30 text-gray-400"
                   }`}
+                />
+                <span
+                  className={
+                    activeScenario.inflationEnabled ? "" : "text-gray-400"
+                  }
                 >
-                  <input
-                    type="number"
-                    value={activeScenario.inflationRate}
-                    onChange={(e) =>
-                      handleSetInflationRate(Number(e.target.value) || 0)
-                    }
-                    className="w-14 rounded-full border border-white/60 bg-white/80 px-2 py-1 text-sm"
-                  />
-                  <span>% (연간)</span>
-                </div>
+                  % (연간)
+                </span>
               </div>
             </div>
           </div>
@@ -640,9 +649,7 @@ export default function AssetSimulator() {
             <div className="hidden @max-[500px]:flex items-center justify-center gap-3">
               <button
                 type="button"
-                onClick={() =>
-                  setActiveChartIndex((i) => Math.max(0, i - 1))
-                }
+                onClick={() => setActiveChartIndex((i) => Math.max(0, i - 1))}
                 disabled={activeChartIndex === 0}
                 className="text-gray-400 disabled:opacity-30"
                 aria-label="이전 차트"
@@ -697,9 +704,7 @@ export default function AssetSimulator() {
               </div>
               <div
                 className={`min-w-50 ${
-                  activeChartIndex === 0
-                    ? "block"
-                    : "block @max-[500px]:hidden"
+                  activeChartIndex === 0 ? "block" : "block @max-[500px]:hidden"
                 }`}
               >
                 <ComparisonBarChart
@@ -713,9 +718,7 @@ export default function AssetSimulator() {
               </div>
               <div
                 className={`min-w-50 ${
-                  activeChartIndex === 1
-                    ? "block"
-                    : "block @max-[500px]:hidden"
+                  activeChartIndex === 1 ? "block" : "block @max-[500px]:hidden"
                 }`}
               >
                 <GroupDonutChart
@@ -726,9 +729,7 @@ export default function AssetSimulator() {
               </div>
               <div
                 className={`min-w-50 @min-[500px]:col-span-2 ${
-                  activeChartIndex === 2
-                    ? "block"
-                    : "block @max-[500px]:hidden"
+                  activeChartIndex === 2 ? "block" : "block @max-[500px]:hidden"
                 }`}
               >
                 <FlowDiagram
