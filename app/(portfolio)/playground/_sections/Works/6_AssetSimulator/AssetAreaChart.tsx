@@ -77,6 +77,7 @@ export default function AssetAreaChart({
 }: AssetAreaChartProps) {
   const isEmpty = assetClasses.length === 0 || snapshots.length === 0;
   const [hoverMonth, setHoverMonth] = useState<number | null>(null);
+  const [hoverPercent, setHoverPercent] = useState({ x: 0, y: 0 });
 
   const assets = isEmpty ? [] : orderedAssets(assetClasses, groups);
   const maxTotal = isEmpty
@@ -164,8 +165,6 @@ export default function AssetAreaChart({
   const nearRightEdge = cursorX > WIDTH - PADDING - 60;
 
   const hoverSnapshot = hoverMonth !== null ? snapshots[hoverMonth] : null;
-  const hoverX = hoverMonth !== null ? PADDING + hoverMonth * stepX : 0;
-  const hoverY = hoverSnapshot ? scaleY(hoverSnapshot.totalBalance) : 0;
   const tooltipLines = hoverSnapshot
     ? [
         monthLabel(hoverMonth!, today),
@@ -179,9 +178,13 @@ export default function AssetAreaChart({
 
   const handlePointerMove = (e: React.PointerEvent<SVGRectElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = (e.clientX - rect.left) / rect.width;
-    const month = Math.round(ratio * (snapshots.length - 1));
+    const ratioX = (e.clientX - rect.left) / rect.width;
+    const month = Math.round(ratioX * (snapshots.length - 1));
     setHoverMonth(Math.max(0, Math.min(snapshots.length - 1, month)));
+    setHoverPercent({
+      x: ratioX * 100,
+      y: ((e.clientY - rect.top) / rect.height) * 100,
+    });
   };
 
   return (
@@ -226,7 +229,8 @@ export default function AssetAreaChart({
               )}
             </div>
           </div>
-          <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="mt-3 w-full">
+          <div className="relative mt-3 w-full">
+          <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
             <defs>
               <clipPath id={BELOW_ZERO_CLIP_ID} clipPathUnits="userSpaceOnUse">
                 <rect
@@ -307,16 +311,15 @@ export default function AssetAreaChart({
               onPointerMove={handlePointerMove}
               onPointerLeave={() => setHoverMonth(null)}
             />
-            {hoverSnapshot && (
-              <ChartTooltip
-                x={hoverX}
-                y={hoverY}
-                viewBoxWidth={WIDTH}
-                viewBoxHeight={HEIGHT}
-                lines={tooltipLines}
-              />
-            )}
           </svg>
+          {hoverSnapshot && (
+            <ChartTooltip
+              xPercent={hoverPercent.x}
+              yPercent={hoverPercent.y}
+              lines={tooltipLines}
+            />
+          )}
+          </div>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
             {assets.map((asset) => (
               <span key={asset.id} className="flex items-center gap-1">

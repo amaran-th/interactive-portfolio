@@ -20,6 +20,7 @@ export default function CashFlowChart({
   selectedMonth,
 }: CashFlowChartProps) {
   const [hoverMonth, setHoverMonth] = useState<number | null>(null);
+  const [hoverPercent, setHoverPercent] = useState({ x: 0, y: 0 });
 
   if (snapshots.length === 0) {
     return (
@@ -55,9 +56,13 @@ export default function CashFlowChart({
 
   const handlePointerMove = (e: React.PointerEvent<SVGRectElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = (e.clientX - rect.left) / rect.width;
-    const month = Math.round(ratio * (snapshots.length - 1));
+    const ratioX = (e.clientX - rect.left) / rect.width;
+    const month = Math.round(ratioX * (snapshots.length - 1));
     setHoverMonth(Math.max(0, Math.min(snapshots.length - 1, month)));
+    setHoverPercent({
+      x: ratioX * 100,
+      y: ((e.clientY - rect.top) / rect.height) * 100,
+    });
   };
 
   return (
@@ -69,6 +74,7 @@ export default function CashFlowChart({
         </span>
       </p>
       <div className="mt-2 flex flex-1 items-center justify-center">
+      <div className="relative w-full">
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
         <line
           x1={PADDING}
@@ -131,21 +137,20 @@ export default function CashFlowChart({
           onPointerMove={handlePointerMove}
           onPointerLeave={() => setHoverMonth(null)}
         />
-        {hoverSnapshot && hoverMonth !== null && (
-          <ChartTooltip
-            x={PADDING + hoverMonth * stepX}
-            y={BASELINE_Y}
-            viewBoxWidth={WIDTH}
-            viewBoxHeight={HEIGHT}
-            lines={[
-              hoverMonth === 0 ? "지금" : formatMonthsFromNow(hoverMonth),
-              `수입 ${formatKRW(hoverSnapshot.flow.incomeIn)}`,
-              `지출 ${formatKRW(hoverSnapshot.flow.expenseOut)}`,
-              `순수입 ${formatKRW(hoverSnapshot.flow.incomeIn - hoverSnapshot.flow.expenseOut)}`,
-            ]}
-          />
-        )}
       </svg>
+      {hoverSnapshot && hoverMonth !== null && (
+        <ChartTooltip
+          xPercent={hoverPercent.x}
+          yPercent={hoverPercent.y}
+          lines={[
+            hoverMonth === 0 ? "지금" : formatMonthsFromNow(hoverMonth),
+            `수입 ${formatKRW(hoverSnapshot.flow.incomeIn)}`,
+            `지출 ${formatKRW(hoverSnapshot.flow.expenseOut)}`,
+            `순수입 ${formatKRW(hoverSnapshot.flow.incomeIn - hoverSnapshot.flow.expenseOut)}`,
+          ]}
+        />
+      )}
+      </div>
       </div>
       <div className="mt-2 flex gap-4 text-xs text-gray-500">
         <span className="flex items-center gap-1">

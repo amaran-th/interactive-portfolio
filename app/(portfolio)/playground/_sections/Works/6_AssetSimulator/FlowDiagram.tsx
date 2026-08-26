@@ -70,7 +70,7 @@ function NodeBox({
   );
 }
 
-type HoverTooltip = { x: number; y: number; lines: string[] };
+type HoverTooltip = { xPercent: number; yPercent: number; lines: string[] };
 
 export default function FlowDiagram({
   snapshot,
@@ -138,6 +138,7 @@ export default function FlowDiagram({
         <Workflow className="h-4 w-4" /> 자금 흐름
       </p>
       <div className="mt-2 flex flex-1 items-center justify-center">
+      <div className="relative w-full">
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
         <defs>
           <marker
@@ -176,8 +177,8 @@ export default function FlowDiagram({
               pointerEvents="stroke"
               onPointerEnter={() =>
                 setHoverTooltip({
-                  x: (incomeX + NODE_WIDTH + primaryX - 6) / 2,
-                  y: CENTER_Y + NODE_HEIGHT / 2,
+                  xPercent: ((incomeX + NODE_WIDTH + primaryX - 6) / 2 / WIDTH) * 100,
+                  yPercent: ((CENTER_Y + NODE_HEIGHT / 2) / HEIGHT) * 100,
                   lines: [`수입 → ${primaryAsset.name}`, formatKRW(snapshot.flow.incomeIn)],
                 })
               }
@@ -223,8 +224,8 @@ export default function FlowDiagram({
                 pointerEvents="stroke"
                 onPointerEnter={() =>
                   setHoverTooltip({
-                    x: (primaryX + NODE_WIDTH + rightX - 6) / 2,
-                    y: (y1 + y2) / 2,
+                    xPercent: ((primaryX + NODE_WIDTH + rightX - 6) / 2 / WIDTH) * 100,
+                    yPercent: ((y1 + y2) / 2 / HEIGHT) * 100,
                     lines: [`${primaryAsset.name} → ${entry.label}`, formatKRW(entry.amount)],
                   })
                 }
@@ -265,8 +266,8 @@ export default function FlowDiagram({
             color={INCOME_COLOR}
             onHoverStart={() =>
               setHoverTooltip({
-                x: incomeX + NODE_WIDTH / 2,
-                y: CENTER_Y,
+                xPercent: ((incomeX + NODE_WIDTH / 2) / WIDTH) * 100,
+                yPercent: (CENTER_Y / HEIGHT) * 100,
                 lines: ["수입", formatKRW(snapshot.flow.incomeIn)],
               })
             }
@@ -281,8 +282,8 @@ export default function FlowDiagram({
           color={primaryColor}
           onHoverStart={() =>
             setHoverTooltip({
-              x: primaryX + NODE_WIDTH / 2,
-              y: CENTER_Y,
+              xPercent: ((primaryX + NODE_WIDTH / 2) / WIDTH) * 100,
+              yPercent: (CENTER_Y / HEIGHT) * 100,
               lines: [primaryAsset.name, formatKRW(primaryBalance)],
             })
           }
@@ -298,24 +299,23 @@ export default function FlowDiagram({
             color={OUTFLOW_COLOR}
             onHoverStart={() =>
               setHoverTooltip({
-                x: rightX + NODE_WIDTH / 2,
-                y: rightGap * (i + 1),
+                xPercent: ((rightX + NODE_WIDTH / 2) / WIDTH) * 100,
+                yPercent: ((rightGap * (i + 1)) / HEIGHT) * 100,
                 lines: [entry.label, formatKRW(entry.amount)],
               })
             }
             onHoverEnd={() => setHoverTooltip(null)}
           />
         ))}
-        {hoverTooltip && (
-          <ChartTooltip
-            x={hoverTooltip.x}
-            y={hoverTooltip.y}
-            viewBoxWidth={WIDTH}
-            viewBoxHeight={HEIGHT}
-            lines={hoverTooltip.lines}
-          />
-        )}
       </svg>
+      {hoverTooltip && (
+        <ChartTooltip
+          xPercent={hoverTooltip.xPercent}
+          yPercent={hoverTooltip.yPercent}
+          lines={hoverTooltip.lines}
+        />
+      )}
+      </div>
       </div>
     </div>
   );

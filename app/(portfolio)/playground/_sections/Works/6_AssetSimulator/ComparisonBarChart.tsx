@@ -48,7 +48,7 @@ type Segment = {
 type HoveredSegment = {
   barLabel: string;
   segment: Segment;
-  x: number;
+  xPercent: number;
 };
 
 function orderedAssets(
@@ -155,6 +155,7 @@ export default function ComparisonBarChart({
         <BarChart3 className="h-4 w-4" /> 자산 비교
       </p>
       <div className="flex flex-1 items-center justify-center">
+      <div className="relative w-full">
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
         <defs>
           <clipPath id={BELOW_ZERO_CLIP_ID} clipPathUnits="userSpaceOnUse">
@@ -197,7 +198,7 @@ export default function ComparisonBarChart({
               setHovered({
                 barLabel: "지금",
                 segment: seg,
-                x: nowX + BAR_WIDTH / 2,
+                xPercent: ((nowX + BAR_WIDTH / 2) / WIDTH) * 100,
               })
             }
             onPointerLeave={() => setHovered(null)}
@@ -234,7 +235,7 @@ export default function ComparisonBarChart({
                     ? "지금"
                     : formatMonthsFromNow(selectedMonth),
                 segment: seg,
-                x: futureX + BAR_WIDTH / 2,
+                xPercent: ((futureX + BAR_WIDTH / 2) / WIDTH) * 100,
               })
             }
             onPointerLeave={() => setHovered(null)}
@@ -277,20 +278,19 @@ export default function ComparisonBarChart({
         >
           {selectedMonth === 0 ? "지금" : formatMonthsFromNow(selectedMonth)}
         </text>
-        {hovered && (
-          <ChartTooltip
-            x={hovered.x}
-            y={hovered.segment.y}
-            viewBoxWidth={WIDTH}
-            viewBoxHeight={HEIGHT}
-            anchor="above"
-            lines={[
-              `${hovered.barLabel} · ${hovered.segment.name}`,
-              formatKRW(hovered.segment.amount),
-            ]}
-          />
-        )}
       </svg>
+      {hovered && (
+        <ChartTooltip
+          xPercent={hovered.xPercent}
+          yPercent={(hovered.segment.y / HEIGHT) * 100}
+          anchor="above"
+          lines={[
+            `${hovered.barLabel} · ${hovered.segment.name}`,
+            formatKRW(hovered.segment.amount),
+          ]}
+        />
+      )}
+      </div>
       </div>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
         {assets.map((asset) => (

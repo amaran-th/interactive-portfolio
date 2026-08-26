@@ -134,6 +134,7 @@ export default function GroupDonutChart({
         ))}
       </div>
       <div className="mt-3 flex flex-1 items-center gap-4">
+        <div className="relative shrink-0">
         <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
           <g transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}>
             {assetsInTab.length === 0 ? (
@@ -171,19 +172,18 @@ export default function GroupDonutChart({
               ))
             )}
           </g>
-          {hoveredSlice && (
-            <ChartTooltip
-              x={hoverPos.x}
-              y={hoverPos.y}
-              viewBoxWidth={SIZE}
-              viewBoxHeight={SIZE}
-              lines={[
-                hoveredSlice.name,
-                `${Math.round(hoveredSlice.ratio * 100)}% · ${formatKRW(hoveredSlice.amount)}`,
-              ]}
-            />
-          )}
         </svg>
+        {hoveredSlice && (
+          <ChartTooltip
+            xPercent={(hoverPos.x / SIZE) * 100}
+            yPercent={(hoverPos.y / SIZE) * 100}
+            lines={[
+              hoveredSlice.name,
+              `${Math.round(hoveredSlice.ratio * 100)}% · ${formatKRW(hoveredSlice.amount)}`,
+            ]}
+          />
+        )}
+        </div>
         <ul className="flex flex-col gap-1 text-sm">
           {slices.map((slice) => (
             <li key={slice.id} className="flex items-center gap-2">
