@@ -516,9 +516,9 @@ export default function AssetSimulator() {
   );
 
   return (
-    <div className="h-full w-full overflow-y-auto bg-gradient-to-br from-indigo-100 via-blue-50 to-purple-100 p-4 text-gray-800">
+    <div className="h-full w-full overflow-y-auto bg-gradient-to-br from-indigo-100 via-blue-50 to-purple-100 px-4 pb-4 text-gray-800">
       <div className="mx-auto max-w-[1600px] @container">
-        <div className="sticky top-0 z-40 -mx-4 bg-gradient-to-br from-indigo-100 via-blue-50 to-purple-100 px-4 pb-3 pt-1">
+        <div className="sticky top-0 z-40 -mx-4 bg-gradient-to-br from-indigo-100 via-blue-50 to-purple-100 px-4 pt-4 pb-4 shadow-[0_4px_10px_-6px_rgba(0,0,0,0.15)]">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-bold text-gray-800">자산 시뮬레이터</h2>
             <div className="flex flex-wrap items-center gap-3">
