@@ -67,9 +67,10 @@ type Segment = {
   amount: number;
 };
 
-type HoveredSegment = {
+type HoveredBar = {
   barLabel: string;
-  segment: Segment;
+  segments: Segment[];
+  totalBalance: number;
   xPercent: number;
   yPercent: number;
 };
@@ -131,7 +132,7 @@ export default function ComparisonBarChart({
   inflationEnabled,
   inflationRate,
 }: ComparisonBarChartProps) {
-  const [hovered, setHovered] = useState<HoveredSegment | null>(null);
+  const [hovered, setHovered] = useState<HoveredBar | null>(null);
 
   if (assetClasses.length === 0 || snapshots.length === 0) {
     return (
@@ -184,15 +185,17 @@ export default function ComparisonBarChart({
   const nowX = WIDTH / 2 - BAR_WIDTH - 16;
   const futureX = WIDTH / 2 + 16;
 
-  const handleSegmentPointerMove = (
+  const handleBarPointerMove = (
     e: React.PointerEvent<SVGGElement>,
     barLabel: string,
-    segment: Segment,
+    segments: Segment[],
+    totalBalance: number,
   ) => {
     const rect = e.currentTarget.ownerSVGElement!.getBoundingClientRect();
     setHovered({
       barLabel,
-      segment,
+      segments,
+      totalBalance,
       xPercent: ((e.clientX - rect.left) / rect.width) * 100,
       yPercent: ((e.clientY - rect.top) / rect.height) * 100,
     });
@@ -243,68 +246,73 @@ export default function ComparisonBarChart({
         >
           {formatKRW(futureSnapshot.totalBalance)}
         </text>
-        {nowSegments.map((seg) => (
-          <g
-            key={seg.id}
-            onPointerMove={(e) => handleSegmentPointerMove(e, "지금", seg)}
-            onPointerLeave={() => setHovered(null)}
-          >
-            <rect
-              x={nowX}
-              y={seg.y}
-              width={BAR_WIDTH}
-              height={seg.height}
-              fill={seg.fill}
-              fillOpacity={0.75}
-              stroke={seg.stroke}
-              strokeWidth={seg.stroke ? 2 : 0}
-            />
-            <rect
-              x={nowX}
-              y={seg.y}
-              width={BAR_WIDTH}
-              height={seg.height}
-              fill={DEFICIT_COLOR}
-              fillOpacity={0.75}
-              clipPath={`url(#${BELOW_ZERO_CLIP_ID})`}
-              pointerEvents="none"
-            />
-          </g>
-        ))}
-        {futureSegments.map((seg) => (
-          <g
-            key={seg.id}
-            onPointerMove={(e) =>
-              handleSegmentPointerMove(
-                e,
-                selectedMonth === 0 ? "지금" : formatMonthsFromNow(selectedMonth),
-                seg,
-              )
-            }
-            onPointerLeave={() => setHovered(null)}
-          >
-            <rect
-              x={futureX}
-              y={seg.y}
-              width={BAR_WIDTH}
-              height={seg.height}
-              fill={seg.fill}
-              fillOpacity={0.75}
-              stroke={seg.stroke}
-              strokeWidth={seg.stroke ? 2 : 0}
-            />
-            <rect
-              x={futureX}
-              y={seg.y}
-              width={BAR_WIDTH}
-              height={seg.height}
-              fill={DEFICIT_COLOR}
-              fillOpacity={0.75}
-              clipPath={`url(#${BELOW_ZERO_CLIP_ID})`}
-              pointerEvents="none"
-            />
-          </g>
-        ))}
+        <g
+          onPointerMove={(e) =>
+            handleBarPointerMove(e, "지금", nowSegments, nowSnapshot.totalBalance)
+          }
+          onPointerLeave={() => setHovered(null)}
+        >
+          {nowSegments.map((seg) => (
+            <g key={seg.id}>
+              <rect
+                x={nowX}
+                y={seg.y}
+                width={BAR_WIDTH}
+                height={seg.height}
+                fill={seg.fill}
+                fillOpacity={0.75}
+                stroke={seg.stroke}
+                strokeWidth={seg.stroke ? 2 : 0}
+              />
+              <rect
+                x={nowX}
+                y={seg.y}
+                width={BAR_WIDTH}
+                height={seg.height}
+                fill={DEFICIT_COLOR}
+                fillOpacity={0.75}
+                clipPath={`url(#${BELOW_ZERO_CLIP_ID})`}
+                pointerEvents="none"
+              />
+            </g>
+          ))}
+        </g>
+        <g
+          onPointerMove={(e) =>
+            handleBarPointerMove(
+              e,
+              selectedMonth === 0 ? "지금" : formatMonthsFromNow(selectedMonth),
+              futureSegments,
+              futureSnapshot.totalBalance,
+            )
+          }
+          onPointerLeave={() => setHovered(null)}
+        >
+          {futureSegments.map((seg) => (
+            <g key={seg.id}>
+              <rect
+                x={futureX}
+                y={seg.y}
+                width={BAR_WIDTH}
+                height={seg.height}
+                fill={seg.fill}
+                fillOpacity={0.75}
+                stroke={seg.stroke}
+                strokeWidth={seg.stroke ? 2 : 0}
+              />
+              <rect
+                x={futureX}
+                y={seg.y}
+                width={BAR_WIDTH}
+                height={seg.height}
+                fill={DEFICIT_COLOR}
+                fillOpacity={0.75}
+                clipPath={`url(#${BELOW_ZERO_CLIP_ID})`}
+                pointerEvents="none"
+              />
+            </g>
+          ))}
+        </g>
         <text
           x={nowX + BAR_WIDTH / 2}
           y={HEIGHT - 12}
@@ -327,10 +335,12 @@ export default function ComparisonBarChart({
           xPercent={hovered.xPercent}
           yPercent={hovered.yPercent}
           anchor="above"
-          accentColor={hovered.segment.fill}
           lines={[
-            `${hovered.barLabel} · ${hovered.segment.name}`,
-            formatKRW(hovered.segment.amount),
+            `${hovered.barLabel} · 총자산 ${formatKRW(hovered.totalBalance)}`,
+            ...hovered.segments.map((seg) => ({
+              text: `${seg.name} ${formatKRW(seg.amount)}`,
+              color: seg.fill,
+            })),
           ]}
         />
       )}
