@@ -114,12 +114,15 @@ export default function GoalCard({
       suppressBlurCommit.current = false;
       return;
     }
-    const targetAmount = Number(amount);
-    if (!targetAmount || targetAmount <= 0) {
+    const parsedAmount = Number(amount);
+    if (!parsedAmount || parsedAmount <= 0) {
       revertAmount();
       setIsEditing(false);
       return;
     }
+    // A goal below where you already are is meaningless — floor it at the
+    // current value instead of accepting it as-is.
+    const targetAmount = Math.max(parsedAmount, currentValue);
     let metric: GoalMetric;
     if (metricType === "total") {
       metric = { type: "total" };
@@ -221,6 +224,7 @@ export default function GoalCard({
               }}
               autoFocus
               type="number"
+              min={currentValue}
               placeholder="금액"
               className="w-28 rounded-full border border-gray-200 bg-white/80 px-2.5 py-1 text-lg font-bold outline-none focus:border-gray-400"
             />
