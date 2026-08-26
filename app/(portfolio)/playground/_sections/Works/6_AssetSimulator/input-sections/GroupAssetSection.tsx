@@ -8,6 +8,7 @@ import {
   GROUP_PALETTE,
   Group,
   NewAssetClassInput,
+  nextVisibleColor,
 } from "../types";
 import GroupPicker from "./GroupPicker";
 import FloatingFormPanel from "./FloatingFormPanel";
@@ -20,7 +21,7 @@ const CURRENCY_OPTIONS = [
 
 type GroupAssetSectionProps = {
   groups: Group[];
-  onAddGroup: (name: string) => string;
+  onAddGroup: (name: string, color: string) => string;
   onUpdateGroup: (id: string, input: { name: string; color: string }) => void;
   onRemoveGroup: (id: string) => void;
   assetClasses: AssetClass[];
@@ -58,6 +59,7 @@ export default function GroupAssetSection({
   const [returnRate, setReturnRate] = useState("0");
   const [makePrimary, setMakePrimary] = useState(false);
   const [isLiability, setIsLiability] = useState(false);
+  const [color, setColor] = useState(() => nextVisibleColor(groups, assetClasses));
   const [colorPickerId, setColorPickerId] = useState<string | null>(null);
   const isFormVisible = isFormOpen || Boolean(editingId);
 
@@ -72,6 +74,7 @@ export default function GroupAssetSection({
     setReturnRate("0");
     setMakePrimary(false);
     setIsLiability(false);
+    setColor(nextVisibleColor(groups, assetClasses));
   };
 
   const startEdit = (asset: AssetClass) => {
@@ -85,6 +88,7 @@ export default function GroupAssetSection({
     setMakePrimary(asset.isPrimary);
     setIsLiability(asset.initialBalance < 0);
     setShowAdvanced(asset.annualReturnRate !== 0);
+    setColor(asset.color);
   };
 
   const handleSubmit = () => {
@@ -99,6 +103,7 @@ export default function GroupAssetSection({
       initialBalance: (isLiability ? -1 : 1) * (Number(balance) || 0),
       annualReturnRate: Number(returnRate) || 0,
       isPrimary: currency === "KRW" && makePrimary && !isLiability,
+      color,
     };
     if (editingId) {
       onUpdateAssetClass(editingId, input);
@@ -270,8 +275,29 @@ export default function GroupAssetSection({
             onCreateGroup={onAddGroup}
             onUpdateGroup={onUpdateGroup}
             onRemoveGroup={onRemoveGroup}
+            defaultColor={nextVisibleColor(groups, assetClasses)}
           />
         </div>
+        {groupId ? (
+          <p className="pl-1 text-[11px] text-gray-400">
+            그룹에 속한 자산은 그룹 색상을 따라요
+          </p>
+        ) : (
+          <div className="flex flex-wrap items-center gap-1.5 pl-1">
+            {GROUP_PALETTE.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setColor(c)}
+                className={`h-5 w-5 rounded-full ring-1 ${
+                  color === c ? "ring-2 ring-indigo-500" : "ring-black/10"
+                }`}
+                style={{ backgroundColor: c }}
+                aria-label={`색상 ${c}로 설정`}
+              />
+            ))}
+          </div>
+        )}
         <div className="flex gap-2">
           <CustomSelect
             value={currency}

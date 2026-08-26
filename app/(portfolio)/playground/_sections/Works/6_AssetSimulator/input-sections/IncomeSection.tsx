@@ -18,9 +18,10 @@ import { useDragReorder } from "./useDragReorder";
 
 type IncomeSectionProps = {
   groups: Group[];
-  onAddGroup: (name: string) => string;
+  onAddGroup: (name: string, color: string) => string;
   onUpdateGroup: (id: string, input: { name: string; color: string }) => void;
   onRemoveGroup: (id: string) => void;
+  defaultGroupColor: string;
   incomes: IncomeItem[];
   onAddIncome: (input: NewIncomeItemInput) => void;
   onUpdateIncome: (id: string, input: NewIncomeItemInput) => void;
@@ -56,6 +57,7 @@ export default function IncomeSection({
   onAddGroup,
   onUpdateGroup,
   onRemoveGroup,
+  defaultGroupColor,
   incomes,
   onAddIncome,
   onUpdateIncome,
@@ -246,6 +248,7 @@ export default function IncomeSection({
             onCreateGroup={onAddGroup}
             onUpdateGroup={onUpdateGroup}
             onRemoveGroup={onRemoveGroup}
+            defaultColor={defaultGroupColor}
           />
         </div>
         <input

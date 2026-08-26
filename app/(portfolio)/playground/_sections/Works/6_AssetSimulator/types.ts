@@ -119,6 +119,7 @@ export type NewAssetClassInput = {
   initialBalance: number;
   annualReturnRate: number;
   isPrimary: boolean;
+  color: string;
 };
 
 export type NewIncomeItemInput = {
@@ -160,12 +161,19 @@ export const GROUP_PALETTE = [
 
 export const UNGROUPED_COLOR = "#9ca3af";
 
-export function nextGroupColor(existingCount: number): string {
-  return GROUP_PALETTE[existingCount % GROUP_PALETTE.length];
-}
-
-export function nextAssetColor(existingCount: number): string {
-  return GROUP_PALETTE[existingCount % GROUP_PALETTE.length];
+/**
+ * Groups and ungrouped assets each show as their own distinct color, so a
+ * newly created one should draw from a single shared sequence — otherwise a
+ * group and an ungrouped asset created independently can land on the same
+ * palette slot and become visually indistinguishable.
+ */
+export function nextVisibleColor(
+  groups: Group[],
+  assetClasses: AssetClass[],
+): string {
+  const usedCount =
+    groups.length + assetClasses.filter((a) => !a.groupId).length;
+  return GROUP_PALETTE[usedCount % GROUP_PALETTE.length];
 }
 
 /**

@@ -14,6 +14,7 @@ import { findGoalAchievementMonth } from "./simulation";
 import {
   AssetClass,
   DEFAULT_HORIZON_YEARS,
+  GROUP_PALETTE,
   Goal,
   HORIZON_PRESET_YEARS,
   NewAssetClassInput,
@@ -25,8 +26,6 @@ import {
   SimulationInput,
   addMonths,
   newId,
-  nextAssetColor,
-  nextGroupColor,
   toMonthInputValue,
 } from "./types";
 import { useSimulation } from "./useSimulation";
@@ -91,9 +90,12 @@ function seedScenario(name: string, today: Date): Scenario {
   return {
     id: newId(),
     name,
+    // 그룹 색과 미분류 자산 색은 같은 팔레트를 공유하는 하나의 시퀀스라
+    // 겹치지 않게 순서대로 배정한다 (0: 예적금, 1: 투자, 2: 파킹통장).
+    // 그룹에 속한 자산의 color는 화면에 쓰이지 않는 값이라 무의미하다.
     groups: [
-      { id: savingsGroupId, name: "예적금", color: nextGroupColor(0) },
-      { id: investGroupId, name: "투자", color: nextGroupColor(1) },
+      { id: savingsGroupId, name: "예적금", color: GROUP_PALETTE[0] },
+      { id: investGroupId, name: "투자", color: GROUP_PALETTE[1] },
     ],
     assetClasses: [
       {
@@ -103,7 +105,7 @@ function seedScenario(name: string, today: Date): Scenario {
         initialBalance: 1_000_000,
         annualReturnRate: 0,
         isPrimary: true,
-        color: nextAssetColor(0),
+        color: GROUP_PALETTE[2],
       },
       {
         id: savingsId,
@@ -113,7 +115,7 @@ function seedScenario(name: string, today: Date): Scenario {
         initialBalance: 0,
         annualReturnRate: 0,
         isPrimary: false,
-        color: nextAssetColor(1),
+        color: GROUP_PALETTE[3],
       },
       {
         id: spId,
@@ -123,7 +125,7 @@ function seedScenario(name: string, today: Date): Scenario {
         initialBalance: 0,
         annualReturnRate: 0,
         isPrimary: false,
-        color: nextAssetColor(2),
+        color: GROUP_PALETTE[4],
       },
       {
         id: samsungId,
@@ -133,14 +135,14 @@ function seedScenario(name: string, today: Date): Scenario {
         initialBalance: 0,
         annualReturnRate: 0,
         isPrimary: false,
-        color: nextAssetColor(3),
+        color: GROUP_PALETTE[5],
       },
     ],
     incomes: [
       {
         id: newId(),
         name: "아르바이트 월급",
-        amount: 1_400_000,
+        amount: 1_100_000,
         schedule: monthlyRecurring(nextMonth),
       },
       {
@@ -148,6 +150,12 @@ function seedScenario(name: string, today: Date): Scenario {
         name: "성적 장학금",
         amount: 500_000,
         schedule: { mode: "once", date: nextMonth },
+      },
+      {
+        id: newId(),
+        name: "청년미래적금 정부기여금+이자",
+        amount: 2_000_000,
+        schedule: { mode: "once", date: toMonthInputValue(addMonths(today, 36)) },
       },
     ],
     expenses: [
@@ -194,7 +202,22 @@ function seedScenario(name: string, today: Date): Scenario {
         toAssetId: savingsId,
         mode: "fixed",
         amount: 500_000,
-        schedule: monthlyRecurring(nextMonth),
+        // 3년 만기 적금 - 만기 시점까지만 납입
+        schedule: {
+          mode: "recurring",
+          startDate: nextMonth,
+          frequency: "monthly",
+          until: { type: "count", count: 36 },
+        },
+      },
+      {
+        id: newId(),
+        fromAssetId: savingsId,
+        toAssetId: primaryId,
+        mode: "percentOfSource",
+        amount: 100,
+        // 3년 뒤 만기 - 잔액 전액을 기본 자산으로 이체
+        schedule: { mode: "once", date: toMonthInputValue(addMonths(today, 36)) },
       },
       {
         id: newId(),
@@ -357,14 +380,11 @@ export default function AssetSimulator() {
     setActiveScenarioId(created.id);
   };
 
-  const handleAddGroup = (name: string): string => {
+  const handleAddGroup = (name: string, color: string): string => {
     const id = newId();
     updateActiveScenario((s) => ({
       ...s,
-      groups: [
-        ...s.groups,
-        { id, name, color: nextGroupColor(s.groups.length) },
-      ],
+      groups: [...s.groups, { id, name, color }],
     }));
     return id;
   };
@@ -400,7 +420,7 @@ export default function AssetSimulator() {
         ...(input.isPrimary
           ? s.assetClasses.map((a) => ({ ...a, isPrimary: false }))
           : s.assetClasses),
-        { id: newId(), ...input, color: nextAssetColor(s.assetClasses.length) },
+        { id: newId(), ...input },
       ];
       return { ...s, assetClasses: withGuaranteedPrimary(withNew) };
     });

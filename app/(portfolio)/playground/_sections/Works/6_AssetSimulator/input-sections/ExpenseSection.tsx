@@ -18,9 +18,10 @@ import { useDragReorder } from "./useDragReorder";
 
 type ExpenseSectionProps = {
   groups: Group[];
-  onAddGroup: (name: string) => string;
+  onAddGroup: (name: string, color: string) => string;
   onUpdateGroup: (id: string, input: { name: string; color: string }) => void;
   onRemoveGroup: (id: string) => void;
+  defaultGroupColor: string;
   expenses: ExpenseItem[];
   onAddExpense: (input: NewExpenseItemInput) => void;
   onUpdateExpense: (id: string, input: NewExpenseItemInput) => void;
@@ -56,6 +57,7 @@ export default function ExpenseSection({
   onAddGroup,
   onUpdateGroup,
   onRemoveGroup,
+  defaultGroupColor,
   expenses,
   onAddExpense,
   onUpdateExpense,
@@ -246,6 +248,7 @@ export default function ExpenseSection({
             onCreateGroup={onAddGroup}
             onUpdateGroup={onUpdateGroup}
             onRemoveGroup={onRemoveGroup}
+            defaultColor={defaultGroupColor}
           />
         </div>
         <input

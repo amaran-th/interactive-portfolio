@@ -9,9 +9,11 @@ type GroupPickerProps = {
   groups: Group[];
   value: string;
   onChange: (groupId: string) => void;
-  onCreateGroup: (name: string) => string;
+  onCreateGroup: (name: string, color: string) => string;
   onUpdateGroup: (id: string, input: { name: string; color: string }) => void;
   onRemoveGroup: (id: string) => void;
+  /** Suggested color for the next new group, pre-selected but overridable. */
+  defaultColor: string;
 };
 
 export default function GroupPicker({
@@ -21,10 +23,12 @@ export default function GroupPicker({
   onCreateGroup,
   onUpdateGroup,
   onRemoveGroup,
+  defaultColor,
 }: GroupPickerProps) {
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [draftName, setDraftName] = useState("");
+  const [draftColor, setDraftColor] = useState(defaultColor);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [colorPickerId, setColorPickerId] = useState<string | null>(null);
@@ -38,6 +42,11 @@ export default function GroupPicker({
     setDraftName("");
     setRenamingId(null);
     setColorPickerId(null);
+  };
+
+  const startCreating = () => {
+    setDraftColor(defaultColor);
+    setCreating(true);
   };
 
   useEffect(() => {
@@ -54,7 +63,7 @@ export default function GroupPicker({
   const commitNewGroup = () => {
     const name = draftName.trim();
     if (!name) return;
-    const id = onCreateGroup(name);
+    const id = onCreateGroup(name, draftColor);
     onChange(id);
     closePanel();
   };
@@ -196,36 +205,54 @@ export default function GroupPicker({
           </ul>
           <div className="mt-1 border-t border-gray-100 pt-1">
             {creating ? (
-              <div className="flex items-center gap-1">
-                <input
-                  autoFocus
-                  value={draftName}
-                  onChange={(e) => setDraftName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      commitNewGroup();
-                    }
-                    if (e.key === "Escape") {
-                      setCreating(false);
-                      setDraftName("");
-                    }
-                  }}
-                  placeholder="새 그룹 이름"
-                  className="min-w-0 flex-1 rounded border border-indigo-300 px-1 text-xs outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={commitNewGroup}
-                  className="shrink-0 text-xs text-indigo-600 hover:text-indigo-800"
-                >
-                  만들기
-                </button>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-1">
+                  <input
+                    autoFocus
+                    value={draftName}
+                    onChange={(e) => setDraftName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitNewGroup();
+                      }
+                      if (e.key === "Escape") {
+                        setCreating(false);
+                        setDraftName("");
+                      }
+                    }}
+                    placeholder="새 그룹 이름"
+                    className="min-w-0 flex-1 rounded border border-indigo-300 px-1 text-xs outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={commitNewGroup}
+                    className="shrink-0 text-xs text-indigo-600 hover:text-indigo-800"
+                  >
+                    만들기
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1 px-0.5">
+                  {GROUP_PALETTE.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setDraftColor(color)}
+                      className={`h-4 w-4 rounded-full ring-1 ${
+                        draftColor === color
+                          ? "ring-2 ring-indigo-500"
+                          : "ring-black/10"
+                      }`}
+                      style={{ backgroundColor: color }}
+                      aria-label={`색상 ${color}로 설정`}
+                    />
+                  ))}
+                </div>
               </div>
             ) : (
               <button
                 type="button"
-                onClick={() => setCreating(true)}
+                onClick={startCreating}
                 className="w-full rounded-lg px-2 py-1 text-left text-xs text-indigo-600 hover:bg-indigo-50"
               >
                 + 새 그룹 만들기
