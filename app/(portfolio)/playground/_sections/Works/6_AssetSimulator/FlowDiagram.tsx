@@ -31,6 +31,7 @@ function NodeBox({
   label,
   amount,
   color,
+  showAmount = true,
   onHoverMove,
   onHoverEnd,
 }: {
@@ -39,6 +40,8 @@ function NodeBox({
   label: string;
   amount: number;
   color: string;
+  /** Skip the amount line when it's already shown on this node's connecting arrow. */
+  showAmount?: boolean;
   onHoverMove: (e: React.PointerEvent<SVGRectElement>) => void;
   onHoverEnd: () => void;
 }) {
@@ -55,20 +58,22 @@ function NodeBox({
       />
       <text
         x={NODE_WIDTH / 2}
-        y={18}
+        y={showAmount ? 18 : NODE_HEIGHT / 2 + 4}
         textAnchor="middle"
         className="fill-white text-[11px] font-medium"
       >
         {label}
       </text>
-      <text
-        x={NODE_WIDTH / 2}
-        y={34}
-        textAnchor="middle"
-        className="fill-white text-[11px]"
-      >
-        {Math.round(amount).toLocaleString()}원
-      </text>
+      {showAmount && (
+        <text
+          x={NODE_WIDTH / 2}
+          y={34}
+          textAnchor="middle"
+          className="fill-white text-[11px]"
+        >
+          {Math.round(amount).toLocaleString()}원
+        </text>
+      )}
     </g>
   );
 }
@@ -292,6 +297,7 @@ export default function FlowDiagram({
             label="수입"
             amount={snapshot.flow.incomeIn}
             color={INCOME_COLOR}
+            showAmount={false}
             onHoverMove={(e) =>
               setHoverTooltip({
                 ...pointerPercent(e),
@@ -325,6 +331,7 @@ export default function FlowDiagram({
             label={entry.label}
             amount={entry.amount}
             color={entry.color}
+            showAmount={false}
             onHoverMove={(e) =>
               setHoverTooltip({
                 ...pointerPercent(e),
