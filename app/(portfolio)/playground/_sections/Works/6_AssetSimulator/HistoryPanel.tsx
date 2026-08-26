@@ -148,7 +148,7 @@ export default function HistoryPanel({
   const yearGroups = groupByYearAndMonth(entries, today);
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
+    <div className="flex h-full min-h-0 flex-col gap-3 rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
         <History className="h-4 w-4" /> 누적 이력 (지금 ~ {formatMonthLabel(selectedMonth, today)})
       </h3>
@@ -178,7 +178,7 @@ export default function HistoryPanel({
           </p>
         </div>
       </div>
-      <div className="flex max-h-100 flex-col gap-3 overflow-y-auto text-xs">
+      <div className="flex min-h-0 max-h-100 flex-1 flex-col gap-3 overflow-y-auto text-xs">
         {yearGroups.map((yearGroup) => (
           <div key={yearGroup.year} className="flex flex-col gap-2">
             <p className="text-[11px] font-semibold text-gray-500">
