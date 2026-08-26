@@ -15,12 +15,6 @@ import {
   formatMonthsFromNow,
 } from "./types";
 
-const METRIC_TYPE_OPTIONS = [
-  { value: "total", label: "총자산" },
-  { value: "asset", label: "특정 자산" },
-  { value: "group", label: "특정 그룹" },
-];
-
 type GoalCardProps = {
   goal: Goal | null;
   onSetGoal: (goal: Goal | null) => void;
@@ -37,6 +31,20 @@ function metricTargetIdOf(metric: GoalMetric): string {
   if (metric.type === "asset") return metric.assetId;
   if (metric.type === "group") return metric.groupId;
   return "";
+}
+
+/** Encodes {metricType, targetId} into the single combined select's value. */
+function encodeSelection(metricType: MetricType, targetId: string): string {
+  return metricType === "total" ? "total" : `${metricType}:${targetId}`;
+}
+
+function decodeSelection(selection: string): {
+  metricType: MetricType;
+  targetId: string;
+} {
+  if (selection === "total") return { metricType: "total", targetId: "" };
+  const [type, ...rest] = selection.split(":");
+  return { metricType: type as MetricType, targetId: rest.join(":") };
 }
 
 export default function GoalCard({
@@ -138,10 +146,23 @@ export default function GoalCard({
     onSetGoal(null);
   };
 
-  const targetOptions =
-    metricType === "asset"
-      ? assetClasses.map((asset) => ({ value: asset.id, label: asset.name }))
-      : groups.map((group) => ({ value: group.id, label: group.name }));
+  const selectionGroups = [
+    { options: [{ value: "total", label: "총자산" }] },
+    {
+      label: "자산",
+      options: assetClasses.map((asset) => ({
+        value: encodeSelection("asset", asset.id),
+        label: asset.name,
+      })),
+    },
+    {
+      label: "그룹",
+      options: groups.map((group) => ({
+        value: encodeSelection("group", group.id),
+        label: group.name,
+      })),
+    },
+  ];
 
   const needsTargetSelection =
     (metricType === "asset" || metricType === "group") && !targetId;
@@ -158,24 +179,17 @@ export default function GoalCard({
   return (
     <div className="flex w-full flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-white/60 pt-2 text-sm">
       <CustomSelect
-        value={metricType}
+        value={encodeSelection(metricType, targetId)}
         onChange={(v) => {
-          setMetricType(v as MetricType);
-          setTargetId("");
+          const decoded = decodeSelection(v);
+          setMetricType(decoded.metricType);
+          setTargetId(decoded.targetId);
           setIsEditing(true);
         }}
-        options={METRIC_TYPE_OPTIONS}
-        className="w-30 shrink-0"
+        groups={selectionGroups}
+        placeholder="지표 선택"
+        className="w-36 shrink-0"
       />
-      {(metricType === "asset" || metricType === "group") && (
-        <CustomSelect
-          value={targetId}
-          onChange={setTargetId}
-          options={targetOptions}
-          placeholder={metricType === "asset" ? "자산 선택" : "그룹 선택"}
-          className="w-30 shrink-0"
-        />
-      )}
       {needsTargetSelection ? (
         <p className="text-xs text-gray-400">
           {metricType === "asset" ? "자산을" : "그룹을"} 선택하면 목표를

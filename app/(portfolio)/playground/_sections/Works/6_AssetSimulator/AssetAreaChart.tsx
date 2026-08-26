@@ -28,8 +28,6 @@ type AssetAreaChartProps = {
   simulationInput: SimulationInput;
   inflationEnabled: boolean;
   inflationRate: number;
-  onToggleInflation: () => void;
-  onSetInflationRate: (rate: number) => void;
 };
 
 const WIDTH = 600;
@@ -72,8 +70,6 @@ export default function AssetAreaChart({
   simulationInput,
   inflationEnabled,
   inflationRate,
-  onToggleInflation,
-  onSetInflationRate,
 }: AssetAreaChartProps) {
   const isEmpty = assetClasses.length === 0 || snapshots.length === 0;
   const [hoverMonth, setHoverMonth] = useState<number | null>(null);
@@ -205,29 +201,6 @@ export default function AssetAreaChart({
               snapshots={snapshots}
               today={today}
             />
-            <div className="flex w-full items-center gap-1.5 text-xs text-gray-500">
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={inflationEnabled}
-                  onChange={onToggleInflation}
-                />
-                물가상승률 반영
-              </label>
-              {inflationEnabled && (
-                <>
-                  <input
-                    type="number"
-                    value={inflationRate}
-                    onChange={(e) =>
-                      onSetInflationRate(Number(e.target.value) || 0)
-                    }
-                    className="w-14 rounded-full border border-gray-200 bg-white/80 px-2 py-0.5 text-xs outline-none focus:border-gray-400"
-                  />
-                  <span>% (연간)</span>
-                </>
-              )}
-            </div>
           </div>
           <div className="relative mt-3 w-full">
           <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">

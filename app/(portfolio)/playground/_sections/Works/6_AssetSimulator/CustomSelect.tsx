@@ -8,10 +8,19 @@ type SelectOption = {
   label: string;
 };
 
+type SelectOptionGroup = {
+  /** Omit to render this group's options without a section header. */
+  label?: string;
+  options: SelectOption[];
+};
+
 type CustomSelectProps = {
   value: string;
   onChange: (value: string) => void;
-  options: SelectOption[];
+  /** Flat option list. Ignored when `groups` is provided. */
+  options?: SelectOption[];
+  /** Renders the dropdown as labeled sections instead of a flat list. */
+  groups?: SelectOptionGroup[];
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -22,6 +31,7 @@ export default function CustomSelect({
   value,
   onChange,
   options,
+  groups,
   placeholder = "선택",
   disabled = false,
   className = "",
@@ -41,7 +51,26 @@ export default function CustomSelect({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  const selected = options.find((o) => o.value === value);
+  const flatOptions = groups
+    ? groups.flatMap((group) => group.options)
+    : (options ?? []);
+  const selected = flatOptions.find((o) => o.value === value);
+
+  const renderOption = (option: SelectOption) => (
+    <button
+      key={option.value}
+      type="button"
+      onClick={() => {
+        onChange(option.value);
+        setOpen(false);
+      }}
+      className={`block w-full rounded-lg px-2 py-1.5 text-left text-sm whitespace-nowrap hover:bg-gray-100 ${
+        option.value === value ? "bg-gray-100 font-medium" : ""
+      }`}
+    >
+      {option.label}
+    </button>
+  );
 
   return (
     <div
@@ -68,27 +97,27 @@ export default function CustomSelect({
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-400" />
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-20 mt-1 max-h-48 w-max min-w-full overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 shadow-lg">
-          {options.length === 0 && (
+        <div className="absolute left-0 top-full z-20 mt-1 max-h-64 w-max min-w-full overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 shadow-lg">
+          {flatOptions.length === 0 && (
             <p className="px-2 py-1.5 text-xs whitespace-nowrap text-gray-400">
               {placeholder}
             </p>
           )}
-          {options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => {
-                onChange(option.value);
-                setOpen(false);
-              }}
-              className={`block w-full rounded-lg px-2 py-1.5 text-left text-sm whitespace-nowrap hover:bg-gray-100 ${
-                option.value === value ? "bg-gray-100 font-medium" : ""
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
+          {groups
+            ? groups.map(
+                (group, i) =>
+                  group.options.length > 0 && (
+                    <div key={group.label ?? i} className="mb-1 last:mb-0">
+                      {group.label && (
+                        <p className="px-2 pt-1.5 pb-1 text-[10px] font-semibold tracking-wide text-gray-400 uppercase">
+                          {group.label}
+                        </p>
+                      )}
+                      {group.options.map(renderOption)}
+                    </div>
+                  ),
+              )
+            : options?.map(renderOption)}
         </div>
       )}
     </div>

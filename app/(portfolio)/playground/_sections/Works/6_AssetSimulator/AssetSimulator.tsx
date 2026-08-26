@@ -537,6 +537,31 @@ export default function AssetSimulator() {
                   className="w-24 rounded-full border border-white/60 bg-white/80 px-2 py-1 text-sm"
                 />
               </label>
+              <div className="flex items-center gap-2 text-xs text-gray-600">
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={activeScenario.inflationEnabled}
+                    onChange={handleToggleInflation}
+                  />
+                  물가상승률 반영
+                </label>
+                <div
+                  className={`flex items-center gap-1.5 ${
+                    activeScenario.inflationEnabled ? "" : "invisible"
+                  }`}
+                >
+                  <input
+                    type="number"
+                    value={activeScenario.inflationRate}
+                    onChange={(e) =>
+                      handleSetInflationRate(Number(e.target.value) || 0)
+                    }
+                    className="w-14 rounded-full border border-white/60 bg-white/80 px-2 py-1 text-sm"
+                  />
+                  <span>% (연간)</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -669,8 +694,6 @@ export default function AssetSimulator() {
                   simulationInput={simulationInput}
                   inflationEnabled={activeScenario.inflationEnabled}
                   inflationRate={activeScenario.inflationRate}
-                  onToggleInflation={handleToggleInflation}
-                  onSetInflationRate={handleSetInflationRate}
                 />
               </div>
               <div
@@ -685,6 +708,8 @@ export default function AssetSimulator() {
                   groups={assetGroups}
                   assetClasses={activeScenario.assetClasses}
                   selectedMonth={selectedMonth}
+                  inflationEnabled={activeScenario.inflationEnabled}
+                  inflationRate={activeScenario.inflationRate}
                 />
               </div>
               <div
@@ -724,6 +749,8 @@ export default function AssetSimulator() {
                 <CashFlowChart
                   snapshots={snapshots}
                   selectedMonth={selectedMonth}
+                  inflationEnabled={activeScenario.inflationEnabled}
+                  inflationRate={activeScenario.inflationRate}
                 />
               </div>
             </div>

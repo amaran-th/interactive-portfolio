@@ -8,6 +8,7 @@ import {
   MonthSnapshot,
   formatKRW,
   formatMonthsFromNow,
+  toRealValue,
 } from "./types";
 import ChartTooltip from "./ChartTooltip";
 
@@ -16,7 +17,28 @@ type ComparisonBarChartProps = {
   groups: Group[];
   assetClasses: AssetClass[];
   selectedMonth: number;
+  inflationEnabled: boolean;
+  inflationRate: number;
 };
+
+function realValueSnapshot(
+  snapshot: MonthSnapshot,
+  month: number,
+  inflationEnabled: boolean,
+  inflationRate: number,
+): MonthSnapshot {
+  if (!inflationEnabled) return snapshot;
+  return {
+    ...snapshot,
+    totalBalance: toRealValue(snapshot.totalBalance, month, inflationRate),
+    assetBalancesKRW: Object.fromEntries(
+      Object.entries(snapshot.assetBalancesKRW).map(([id, value]) => [
+        id,
+        toRealValue(value, month, inflationRate),
+      ]),
+    ),
+  };
+}
 
 const WIDTH = 260;
 const HEIGHT = 220;
@@ -106,6 +128,8 @@ export default function ComparisonBarChart({
   groups,
   assetClasses,
   selectedMonth,
+  inflationEnabled,
+  inflationRate,
 }: ComparisonBarChartProps) {
   const [hovered, setHovered] = useState<HoveredSegment | null>(null);
 
@@ -117,8 +141,18 @@ export default function ComparisonBarChart({
     );
   }
 
-  const nowSnapshot = snapshots[0];
-  const futureSnapshot = snapshots[selectedMonth];
+  const nowSnapshot = realValueSnapshot(
+    snapshots[0],
+    0,
+    inflationEnabled,
+    inflationRate,
+  );
+  const futureSnapshot = realValueSnapshot(
+    snapshots[selectedMonth],
+    selectedMonth,
+    inflationEnabled,
+    inflationRate,
+  );
   const assets = orderedAssets(assetClasses, groups);
 
   const nowRaw = buildRawSegments(nowSnapshot, assets, groups);
@@ -168,6 +202,9 @@ export default function ComparisonBarChart({
     <div className="flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <p className="flex items-center gap-1.5 text-sm text-gray-500">
         <BarChart3 className="h-4 w-4" /> 자산 비교
+        {inflationEnabled && (
+          <span className="text-xs text-gray-400">(오늘 가치)</span>
+        )}
       </p>
       <div className="flex flex-1 items-center justify-center">
       <div className="relative w-full">

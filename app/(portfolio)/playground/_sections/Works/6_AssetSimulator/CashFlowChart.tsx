@@ -2,12 +2,19 @@
 
 import { Activity, Inbox } from "lucide-react";
 import { useState } from "react";
-import { MonthSnapshot, formatKRW, formatMonthsFromNow } from "./types";
+import {
+  MonthSnapshot,
+  formatKRW,
+  formatMonthsFromNow,
+  toRealValue,
+} from "./types";
 import ChartTooltip from "./ChartTooltip";
 
 type CashFlowChartProps = {
   snapshots: MonthSnapshot[];
   selectedMonth: number;
+  inflationEnabled: boolean;
+  inflationRate: number;
 };
 
 const WIDTH = 600;
@@ -18,6 +25,8 @@ const BASELINE_Y = HEIGHT / 2;
 export default function CashFlowChart({
   snapshots,
   selectedMonth,
+  inflationEnabled,
+  inflationRate,
 }: CashFlowChartProps) {
   const [hoverMonth, setHoverMonth] = useState<number | null>(null);
   const [hoverPercent, setHoverPercent] = useState({ x: 0, y: 0 });
@@ -30,29 +39,37 @@ export default function CashFlowChart({
     );
   }
 
+  const flows = snapshots.map((snapshot, i) => ({
+    incomeIn: inflationEnabled
+      ? toRealValue(snapshot.flow.incomeIn, i, inflationRate)
+      : snapshot.flow.incomeIn,
+    expenseOut: inflationEnabled
+      ? toRealValue(snapshot.flow.expenseOut, i, inflationRate)
+      : snapshot.flow.expenseOut,
+  }));
+
   const maxFlow = Math.max(
     1,
-    ...snapshots.map((s) => Math.max(s.flow.incomeIn, s.flow.expenseOut)),
+    ...flows.map((f) => Math.max(f.incomeIn, f.expenseOut)),
   );
   const stepX = (WIDTH - PADDING * 2) / (snapshots.length - 1);
   const halfHeight = HEIGHT / 2 - PADDING;
   const barWidth = Math.max(1, stepX * 0.7);
   const scaleFlow = (value: number) => (value / maxFlow) * halfHeight;
 
-  const netPoints = snapshots
-    .map((snapshot, i) => {
-      const net = snapshot.flow.incomeIn - snapshot.flow.expenseOut;
+  const netPoints = flows
+    .map((flow, i) => {
+      const net = flow.incomeIn - flow.expenseOut;
       const y = BASELINE_Y - scaleFlow(net);
       return `${PADDING + i * stepX},${y}`;
     })
     .join(" ");
 
   const cursorX = PADDING + selectedMonth * stepX;
-  const selected = snapshots[selectedMonth];
-  const netAmount =
-    (selected?.flow.incomeIn ?? 0) - (selected?.flow.expenseOut ?? 0);
+  const selected = flows[selectedMonth];
+  const netAmount = (selected?.incomeIn ?? 0) - (selected?.expenseOut ?? 0);
 
-  const hoverSnapshot = hoverMonth !== null ? snapshots[hoverMonth] : null;
+  const hoverFlow = hoverMonth !== null ? flows[hoverMonth] : null;
 
   const handlePointerMove = (e: React.PointerEvent<SVGRectElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -68,7 +85,10 @@ export default function CashFlowChart({
   return (
     <div className="flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <p className="flex items-center gap-1.5 text-sm text-gray-500">
-        <Activity className="h-4 w-4" /> 선택 시점 순수입{" "}
+        <Activity className="h-4 w-4" /> 선택 시점 순수입
+        {inflationEnabled && (
+          <span className="text-xs text-gray-400">(오늘 가치)</span>
+        )}{" "}
         <span className="text-lg font-semibold text-gray-800">
           {formatKRW(netAmount)}
         </span>
@@ -86,8 +106,8 @@ export default function CashFlowChart({
         />
         {snapshots.map((snapshot, i) => {
           const x = PADDING + i * stepX - barWidth / 2;
-          const incomeHeight = scaleFlow(snapshot.flow.incomeIn);
-          const expenseHeight = scaleFlow(snapshot.flow.expenseOut);
+          const incomeHeight = scaleFlow(flows[i].incomeIn);
+          const expenseHeight = scaleFlow(flows[i].expenseOut);
           return (
             <g key={snapshot.monthIndex}>
               <rect
@@ -138,15 +158,15 @@ export default function CashFlowChart({
           onPointerLeave={() => setHoverMonth(null)}
         />
       </svg>
-      {hoverSnapshot && hoverMonth !== null && (
+      {hoverFlow && hoverMonth !== null && (
         <ChartTooltip
           xPercent={hoverPercent.x}
           yPercent={hoverPercent.y}
           lines={[
             hoverMonth === 0 ? "지금" : formatMonthsFromNow(hoverMonth),
-            `수입 ${formatKRW(hoverSnapshot.flow.incomeIn)}`,
-            `지출 ${formatKRW(hoverSnapshot.flow.expenseOut)}`,
-            `순수입 ${formatKRW(hoverSnapshot.flow.incomeIn - hoverSnapshot.flow.expenseOut)}`,
+            `수입 ${formatKRW(hoverFlow.incomeIn)}`,
+            `지출 ${formatKRW(hoverFlow.expenseOut)}`,
+            `순수입 ${formatKRW(hoverFlow.incomeIn - hoverFlow.expenseOut)}`,
           ]}
         />
       )}
