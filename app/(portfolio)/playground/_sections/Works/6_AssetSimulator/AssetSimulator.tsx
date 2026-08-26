@@ -74,8 +74,12 @@ function emptyScenario(name: string): Scenario {
 // 아니므로 dirty 플래그와 무관하게, 어떤 핸들러도 거치지 않고 초기 state로
 // 직접 넣는다.
 function seedScenario(name: string, today: Date): Scenario {
-  const assetId = newId();
-  const savingsAssetId = newId();
+  const primaryId = newId();
+  const savingsId = newId();
+  const spId = newId();
+  const samsungId = newId();
+  const savingsGroupId = newId();
+  const investGroupId = newId();
   const monthlyRecurring = (startDate: string): RepeatSchedule => ({
     mode: "recurring",
     startDate,
@@ -87,11 +91,14 @@ function seedScenario(name: string, today: Date): Scenario {
   return {
     id: newId(),
     name,
-    groups: [],
+    groups: [
+      { id: savingsGroupId, name: "예적금", color: nextGroupColor(0) },
+      { id: investGroupId, name: "투자", color: nextGroupColor(1) },
+    ],
     assetClasses: [
       {
-        id: assetId,
-        name: "현금",
+        id: primaryId,
+        name: "파킹통장",
         currency: "KRW",
         initialBalance: 1_000_000,
         annualReturnRate: 0,
@@ -99,36 +106,108 @@ function seedScenario(name: string, today: Date): Scenario {
         color: nextAssetColor(0),
       },
       {
-        id: savingsAssetId,
-        name: "적금",
+        id: savingsId,
+        name: "청년미래적금",
+        groupId: savingsGroupId,
         currency: "KRW",
         initialBalance: 0,
         annualReturnRate: 0,
         isPrimary: false,
         color: nextAssetColor(1),
       },
+      {
+        id: spId,
+        name: "S&P500",
+        groupId: investGroupId,
+        currency: "KRW",
+        initialBalance: 0,
+        annualReturnRate: 0,
+        isPrimary: false,
+        color: nextAssetColor(2),
+      },
+      {
+        id: samsungId,
+        name: "삼성전자",
+        groupId: investGroupId,
+        currency: "KRW",
+        initialBalance: 0,
+        annualReturnRate: 0,
+        isPrimary: false,
+        color: nextAssetColor(3),
+      },
     ],
     incomes: [
       {
         id: newId(),
-        name: "월급",
-        amount: 700_000,
+        name: "아르바이트 월급",
+        amount: 1_400_000,
         schedule: monthlyRecurring(nextMonth),
+      },
+      {
+        id: newId(),
+        name: "성적 장학금",
+        amount: 500_000,
+        schedule: { mode: "once", date: nextMonth },
       },
     ],
     expenses: [
       {
         id: newId(),
         name: "생활비",
-        amount: 400_000,
+        amount: 200_000,
         schedule: monthlyRecurring(nextMonth),
+      },
+      {
+        id: newId(),
+        name: "식비",
+        amount: 100_000,
+        schedule: monthlyRecurring(nextMonth),
+      },
+      {
+        id: newId(),
+        name: "월세",
+        amount: 150_000,
+        schedule: monthlyRecurring(nextMonth),
+      },
+      {
+        id: newId(),
+        name: "휴대폰 할부",
+        amount: 150_000,
+        schedule: {
+          mode: "recurring",
+          startDate: nextMonth,
+          frequency: "monthly",
+          until: { type: "count", count: 3 },
+        },
+      },
+      {
+        id: newId(),
+        name: "일본여행",
+        amount: 500_000,
+        schedule: { mode: "once", date: toMonthInputValue(addMonths(today, 4)) },
       },
     ],
     transferRules: [
       {
         id: newId(),
-        fromAssetId: assetId,
-        toAssetId: savingsAssetId,
+        fromAssetId: primaryId,
+        toAssetId: savingsId,
+        mode: "fixed",
+        amount: 500_000,
+        schedule: monthlyRecurring(nextMonth),
+      },
+      {
+        id: newId(),
+        fromAssetId: primaryId,
+        toAssetId: spId,
+        mode: "fixed",
+        amount: 100_000,
+        schedule: monthlyRecurring(nextMonth),
+      },
+      {
+        id: newId(),
+        fromAssetId: primaryId,
+        toAssetId: samsungId,
         mode: "fixed",
         amount: 100_000,
         schedule: monthlyRecurring(nextMonth),
@@ -207,7 +286,7 @@ export default function AssetSimulator() {
   const today = useMemo(() => new Date(), []);
 
   const [scenarios, setScenarios] = useState<Scenario[]>(() => [
-    seedScenario("시나리오 1", today),
+    seedScenario("예시 시나리오", today),
   ]);
   const [activeScenarioId, setActiveScenarioId] = useState(
     () => scenarios[0].id,

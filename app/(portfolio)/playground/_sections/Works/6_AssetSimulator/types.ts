@@ -144,7 +144,7 @@ export type NewTransferRuleInput = {
 };
 
 export const HORIZON_PRESET_YEARS = [5, 10, 20, 30] as const;
-export const DEFAULT_HORIZON_YEARS = 10;
+export const DEFAULT_HORIZON_YEARS = 5;
 export const GOAL_SEARCH_CAP_MONTHS = 6000;
 
 export const GROUP_PALETTE = [
