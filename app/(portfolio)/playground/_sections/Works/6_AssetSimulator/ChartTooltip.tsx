@@ -6,6 +6,7 @@ type ChartTooltipProps = {
   /** Position within the nearest `position: relative` ancestor, 0-100. */
   xPercent: number;
   yPercent: number;
+  /** First line is the title; the rest render as detail rows below a divider. */
   lines: string[];
   /**
    * "point" (default) offsets sideways from (x, y), flipping to the left
@@ -15,6 +16,8 @@ type ChartTooltipProps = {
    * offset could overlap a neighboring element.
    */
   anchor?: "point" | "above";
+  /** Small color dot next to the title, tying the tooltip to a series/segment color. */
+  accentColor?: string;
 };
 
 export default function ChartTooltip({
@@ -22,33 +25,49 @@ export default function ChartTooltip({
   yPercent,
   lines,
   anchor = "point",
+  accentColor,
 }: ChartTooltipProps) {
   const style: CSSProperties =
     anchor === "above"
       ? {
           left: `${xPercent}%`,
           top: `${yPercent}%`,
-          transform: "translate(-50%, calc(-100% - 10px))",
+          transform: "translate(-50%, calc(-100% - 12px))",
         }
       : {
           left: `${xPercent}%`,
           top: `${yPercent}%`,
           transform:
             xPercent > 65
-              ? "translate(calc(-100% - 10px), -50%)"
-              : "translate(10px, -50%)",
+              ? "translate(calc(-100% - 14px), -50%)"
+              : "translate(14px, -50%)",
         };
+
+  const [title, ...details] = lines;
 
   return (
     <div
-      className="pointer-events-none absolute z-20 flex flex-col gap-0.5 whitespace-nowrap rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] leading-tight shadow-lg"
+      className="pointer-events-none absolute z-20 min-w-[128px] whitespace-nowrap rounded-xl border border-gray-100 bg-white/95 px-3 py-2 text-[11px] shadow-xl ring-1 ring-black/5 backdrop-blur-sm"
       style={style}
     >
-      {lines.map((line, i) => (
-        <p key={i} className={i === 0 ? "font-semibold text-gray-800" : "text-gray-500"}>
-          {line}
-        </p>
-      ))}
+      <div className="flex items-center gap-1.5">
+        {accentColor && (
+          <span
+            className="h-2 w-2 shrink-0 rounded-full ring-2 ring-white"
+            style={{ backgroundColor: accentColor }}
+          />
+        )}
+        <p className="font-semibold text-gray-900">{title}</p>
+      </div>
+      {details.length > 0 && (
+        <div className="mt-1.5 flex flex-col gap-0.5 border-t border-gray-100 pt-1.5">
+          {details.map((line, i) => (
+            <p key={i} className="text-gray-500">
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

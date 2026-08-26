@@ -28,7 +28,7 @@ function NodeBox({
   label,
   amount,
   color,
-  onHoverStart,
+  onHoverMove,
   onHoverEnd,
 }: {
   x: number;
@@ -36,7 +36,7 @@ function NodeBox({
   label: string;
   amount: number;
   color: string;
-  onHoverStart: () => void;
+  onHoverMove: (e: React.PointerEvent<SVGRectElement>) => void;
   onHoverEnd: () => void;
 }) {
   return (
@@ -47,7 +47,7 @@ function NodeBox({
         rx={12}
         fill={color}
         fillOpacity={0.85}
-        onPointerEnter={onHoverStart}
+        onPointerMove={onHoverMove}
         onPointerLeave={onHoverEnd}
       />
       <text
@@ -70,7 +70,12 @@ function NodeBox({
   );
 }
 
-type HoverTooltip = { xPercent: number; yPercent: number; lines: string[] };
+type HoverTooltip = {
+  xPercent: number;
+  yPercent: number;
+  lines: string[];
+  color: string;
+};
 
 export default function FlowDiagram({
   snapshot,
@@ -132,6 +137,16 @@ export default function FlowDiagram({
   const rightGap =
     rightEntries.length > 0 ? HEIGHT / (rightEntries.length + 1) : HEIGHT / 2;
 
+  const pointerPercent = (
+    e: React.PointerEvent<SVGRectElement | SVGLineElement>,
+  ) => {
+    const rect = e.currentTarget.ownerSVGElement!.getBoundingClientRect();
+    return {
+      xPercent: ((e.clientX - rect.left) / rect.width) * 100,
+      yPercent: ((e.clientY - rect.top) / rect.height) * 100,
+    };
+  };
+
   return (
     <div className="flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <p className="flex items-center gap-1.5 text-sm text-gray-500">
@@ -175,10 +190,10 @@ export default function FlowDiagram({
               strokeWidth={Math.max(24, strokeWidth(snapshot.flow.incomeIn))}
               strokeOpacity={0}
               pointerEvents="stroke"
-              onPointerEnter={() =>
+              onPointerMove={(e) =>
                 setHoverTooltip({
-                  xPercent: ((incomeX + NODE_WIDTH + primaryX - 6) / 2 / WIDTH) * 100,
-                  yPercent: ((CENTER_Y + NODE_HEIGHT / 2) / HEIGHT) * 100,
+                  ...pointerPercent(e),
+                  color: INCOME_COLOR,
                   lines: [`수입 → ${primaryAsset.name}`, formatKRW(snapshot.flow.incomeIn)],
                 })
               }
@@ -222,10 +237,10 @@ export default function FlowDiagram({
                 strokeWidth={Math.max(24, strokeWidth(entry.amount))}
                 strokeOpacity={0}
                 pointerEvents="stroke"
-                onPointerEnter={() =>
+                onPointerMove={(e) =>
                   setHoverTooltip({
-                    xPercent: ((primaryX + NODE_WIDTH + rightX - 6) / 2 / WIDTH) * 100,
-                    yPercent: ((y1 + y2) / 2 / HEIGHT) * 100,
+                    ...pointerPercent(e),
+                    color: OUTFLOW_COLOR,
                     lines: [`${primaryAsset.name} → ${entry.label}`, formatKRW(entry.amount)],
                   })
                 }
@@ -264,10 +279,10 @@ export default function FlowDiagram({
             label="수입"
             amount={snapshot.flow.incomeIn}
             color={INCOME_COLOR}
-            onHoverStart={() =>
+            onHoverMove={(e) =>
               setHoverTooltip({
-                xPercent: ((incomeX + NODE_WIDTH / 2) / WIDTH) * 100,
-                yPercent: (CENTER_Y / HEIGHT) * 100,
+                ...pointerPercent(e),
+                color: INCOME_COLOR,
                 lines: ["수입", formatKRW(snapshot.flow.incomeIn)],
               })
             }
@@ -280,10 +295,10 @@ export default function FlowDiagram({
           label={primaryAsset.name}
           amount={primaryBalance}
           color={primaryColor}
-          onHoverStart={() =>
+          onHoverMove={(e) =>
             setHoverTooltip({
-              xPercent: ((primaryX + NODE_WIDTH / 2) / WIDTH) * 100,
-              yPercent: (CENTER_Y / HEIGHT) * 100,
+              ...pointerPercent(e),
+              color: primaryColor,
               lines: [primaryAsset.name, formatKRW(primaryBalance)],
             })
           }
@@ -297,10 +312,10 @@ export default function FlowDiagram({
             label={entry.label}
             amount={entry.amount}
             color={OUTFLOW_COLOR}
-            onHoverStart={() =>
+            onHoverMove={(e) =>
               setHoverTooltip({
-                xPercent: ((rightX + NODE_WIDTH / 2) / WIDTH) * 100,
-                yPercent: ((rightGap * (i + 1)) / HEIGHT) * 100,
+                ...pointerPercent(e),
+                color: OUTFLOW_COLOR,
                 lines: [entry.label, formatKRW(entry.amount)],
               })
             }
@@ -312,6 +327,7 @@ export default function FlowDiagram({
         <ChartTooltip
           xPercent={hoverTooltip.xPercent}
           yPercent={hoverTooltip.yPercent}
+          accentColor={hoverTooltip.color}
           lines={hoverTooltip.lines}
         />
       )}

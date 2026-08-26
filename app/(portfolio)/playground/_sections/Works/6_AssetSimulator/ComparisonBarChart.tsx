@@ -49,6 +49,7 @@ type HoveredSegment = {
   barLabel: string;
   segment: Segment;
   xPercent: number;
+  yPercent: number;
 };
 
 function orderedAssets(
@@ -149,6 +150,20 @@ export default function ComparisonBarChart({
   const nowX = WIDTH / 2 - BAR_WIDTH - 16;
   const futureX = WIDTH / 2 + 16;
 
+  const handleSegmentPointerMove = (
+    e: React.PointerEvent<SVGGElement>,
+    barLabel: string,
+    segment: Segment,
+  ) => {
+    const rect = e.currentTarget.ownerSVGElement!.getBoundingClientRect();
+    setHovered({
+      barLabel,
+      segment,
+      xPercent: ((e.clientX - rect.left) / rect.width) * 100,
+      yPercent: ((e.clientY - rect.top) / rect.height) * 100,
+    });
+  };
+
   return (
     <div className="flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <p className="flex items-center gap-1.5 text-sm text-gray-500">
@@ -194,13 +209,7 @@ export default function ComparisonBarChart({
         {nowSegments.map((seg) => (
           <g
             key={seg.id}
-            onPointerEnter={() =>
-              setHovered({
-                barLabel: "지금",
-                segment: seg,
-                xPercent: ((nowX + BAR_WIDTH / 2) / WIDTH) * 100,
-              })
-            }
+            onPointerMove={(e) => handleSegmentPointerMove(e, "지금", seg)}
             onPointerLeave={() => setHovered(null)}
           >
             <rect
@@ -228,15 +237,12 @@ export default function ComparisonBarChart({
         {futureSegments.map((seg) => (
           <g
             key={seg.id}
-            onPointerEnter={() =>
-              setHovered({
-                barLabel:
-                  selectedMonth === 0
-                    ? "지금"
-                    : formatMonthsFromNow(selectedMonth),
-                segment: seg,
-                xPercent: ((futureX + BAR_WIDTH / 2) / WIDTH) * 100,
-              })
+            onPointerMove={(e) =>
+              handleSegmentPointerMove(
+                e,
+                selectedMonth === 0 ? "지금" : formatMonthsFromNow(selectedMonth),
+                seg,
+              )
             }
             onPointerLeave={() => setHovered(null)}
           >
@@ -282,8 +288,9 @@ export default function ComparisonBarChart({
       {hovered && (
         <ChartTooltip
           xPercent={hovered.xPercent}
-          yPercent={(hovered.segment.y / HEIGHT) * 100}
+          yPercent={hovered.yPercent}
           anchor="above"
+          accentColor={hovered.segment.fill}
           lines={[
             `${hovered.barLabel} · ${hovered.segment.name}`,
             formatKRW(hovered.segment.amount),

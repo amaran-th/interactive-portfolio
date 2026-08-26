@@ -177,6 +177,7 @@ export default function GroupDonutChart({
           <ChartTooltip
             xPercent={(hoverPos.x / SIZE) * 100}
             yPercent={(hoverPos.y / SIZE) * 100}
+            accentColor={hoveredSlice.color}
             lines={[
               hoveredSlice.name,
               `${Math.round(hoveredSlice.ratio * 100)}% · ${formatKRW(hoveredSlice.amount)}`,
