@@ -2,7 +2,9 @@
 
 import { CSSProperties } from "react";
 
-export type TooltipLine = string | { text: string; className?: string };
+export type TooltipLine =
+  | string
+  | { text: string; className?: string; color?: string };
 
 type ChartTooltipProps = {
   /** Position within the nearest `position: relative` ancestor, 0-100. */
@@ -67,16 +69,26 @@ export default function ChartTooltip({
         <p className="font-semibold text-gray-900">{titleText}</p>
       </div>
       {details.length > 0 && (
-        <div className="mt-1.5 flex flex-col gap-0.5 border-t border-gray-100 pt-1.5">
+        <div className="mt-1.5 flex flex-col gap-1 border-t border-gray-100 pt-1.5">
           {details.map((line, i) => {
             const text = typeof line === "string" ? line : line.text;
+            const color = typeof line === "string" ? undefined : line.color;
             const className =
               typeof line === "string"
                 ? "text-gray-500"
-                : (line.className ?? "text-gray-500");
+                : (line.className ?? (color ? undefined : "text-gray-500"));
             return (
-              <p key={i} className={className}>
-                {text}
+              <p
+                key={i}
+                className={`flex items-center gap-1.5 ${className ?? ""}`}
+              >
+                {color && (
+                  <span
+                    className="h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: color }}
+                  />
+                )}
+                <span style={color ? { color } : undefined}>{text}</span>
               </p>
             );
           })}
