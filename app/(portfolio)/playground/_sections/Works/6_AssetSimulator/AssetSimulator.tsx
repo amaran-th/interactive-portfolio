@@ -26,7 +26,6 @@ import AssetAreaChart from "./AssetAreaChart";
 import GroupDonutChart from "./GroupDonutChart";
 import FlowDiagram from "./FlowDiagram";
 import ComparisonBarChart from "./ComparisonBarChart";
-import CashFlowChart from "./CashFlowChart";
 import HistoryPanel from "./HistoryPanel";
 import ScenarioTabs from "./ScenarioTabs";
 import ScenarioComparisonChart from "./ScenarioComparisonChart";
@@ -40,7 +39,7 @@ function withGuaranteedPrimary(assets: AssetClass[]): AssetClass[] {
   return assets.map((a) => ({ ...a, isPrimary: a.id === candidate.id }));
 }
 
-const CHART_PANEL_COUNT_ARRAY = [0, 1, 2, 3] as const;
+const CHART_PANEL_COUNT_ARRAY = [0, 1, 2] as const;
 
 function goalReferences(
   goal: Goal | null,
@@ -726,7 +725,7 @@ export default function AssetSimulator() {
                 />
               </div>
               <div
-                className={`min-w-50 ${
+                className={`min-w-50 @min-[500px]:col-span-2 ${
                   activeChartIndex === 2
                     ? "block"
                     : "block @max-[500px]:hidden"
@@ -737,20 +736,6 @@ export default function AssetSimulator() {
                   primaryAsset={primaryAsset}
                   assetClasses={activeScenario.assetClasses}
                   exchangeRate={activeScenario.exchangeRate}
-                />
-              </div>
-              <div
-                className={`min-w-50 ${
-                  activeChartIndex === 3
-                    ? "block"
-                    : "block @max-[500px]:hidden"
-                }`}
-              >
-                <CashFlowChart
-                  snapshots={snapshots}
-                  selectedMonth={selectedMonth}
-                  inflationEnabled={activeScenario.inflationEnabled}
-                  inflationRate={activeScenario.inflationRate}
                 />
               </div>
             </div>
