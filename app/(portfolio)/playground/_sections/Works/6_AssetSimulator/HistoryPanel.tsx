@@ -94,9 +94,9 @@ export default function HistoryPanel({
           <History className="h-4 w-4" /> 누적 이력
         </h3>
         <div className="flex flex-1 items-center justify-center">
-          <p className="flex items-center gap-1.5 text-center text-sm text-gray-400">
-            <Inbox className="h-4 w-4 shrink-0" /> 슬라이더를 옮기면 지금부터의
-            이력이 나타납니다
+          <p className="flex flex-col items-center gap-1.5 text-center text-sm text-gray-400">
+            <Inbox className="h-4 w-4 shrink-0" />
+            슬라이더를 옮기면 지금부터의 이력이 나타납니다
           </p>
         </div>
       </div>
