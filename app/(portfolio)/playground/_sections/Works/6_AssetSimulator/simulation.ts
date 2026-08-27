@@ -151,6 +151,8 @@ export function runSimulation(
       incomeIn: 0,
       expenseOut: 0,
       transfers: [],
+      failedTransfers: [],
+      failedExpenses: [],
     }),
   ];
 
@@ -159,6 +161,8 @@ export function runSimulation(
       incomeIn: 0,
       expenseOut: 0,
       transfers: [],
+      failedTransfers: [],
+      failedExpenses: [],
     };
 
     if (primary) {
@@ -168,10 +172,22 @@ export function runSimulation(
       balances[primary.id] += incomeIn;
       flow.incomeIn = incomeIn;
 
-      const expenseOut = input.expenses
-        .filter((item) => fires(item.schedule, month, today))
-        .reduce((sum, item) => sum + item.amount, 0);
-      balances[primary.id] -= expenseOut;
+      // 지출도 이체와 마찬가지로, 잔액이 부족하면 마이너스로 밀어붙이는
+      // 대신 그 지출 항목만 이번 달에 중단시킨다.
+      let expenseOut = 0;
+      for (const item of input.expenses) {
+        if (!fires(item.schedule, month, today)) continue;
+        if (balances[primary.id] < item.amount) {
+          flow.failedExpenses.push({
+            itemId: item.id,
+            name: item.name,
+            amount: item.amount,
+          });
+          continue;
+        }
+        balances[primary.id] -= item.amount;
+        expenseOut += item.amount;
+      }
       flow.expenseOut = expenseOut;
     }
 
@@ -184,7 +200,23 @@ export function runSimulation(
         rule.mode === "fixed"
           ? rule.amount
           : sourceBalance * (rule.amount / 100);
-      let amount = Math.max(0, Math.min(requested, sourceBalance));
+
+      // 잔액이 부족하면 있는 만큼만 옮기는 대신 이체 자체를 건너뛴다 —
+      // 일부만 빠져나가는 건 사용자가 설정한 이체 금액과 다른 결과라
+      // 잔액 부족 상황을 그대로 드러내는 편이 낫다.
+      if (sourceBalance <= 0 || requested > sourceBalance) {
+        if (requested > 0) {
+          flow.failedTransfers.push({
+            ruleId: rule.id,
+            fromAssetId: rule.fromAssetId,
+            toAssetId: rule.toAssetId,
+            amount: requested,
+          });
+        }
+        continue;
+      }
+
+      let amount = requested;
       // 목적지가 부채(음수 잔액)면 남은 빚 이상 갚아 흑자로 넘어가지 않도록 clamp.
       if (destBalance < 0) {
         amount = Math.min(amount, -destBalance);

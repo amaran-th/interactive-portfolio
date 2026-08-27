@@ -100,6 +100,17 @@ export type MonthFlow = {
     toAssetId: string;
     amount: number;
   }[];
+  /** Transfers that couldn't run because the source asset didn't have
+   * enough balance to cover the requested amount. */
+  failedTransfers: {
+    ruleId: string;
+    fromAssetId: string;
+    toAssetId: string;
+    amount: number;
+  }[];
+  /** Expenses that couldn't run because the primary asset didn't have
+   * enough balance to cover them. */
+  failedExpenses: { itemId: string; name: string; amount: number }[];
 };
 
 export type MonthSnapshot = {

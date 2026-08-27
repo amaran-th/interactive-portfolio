@@ -120,8 +120,11 @@ export default function HistoryPanel({
         totalIncome += item.amount;
       }
     }
+    const failedExpenseIds = new Set(
+      snapshot.flow.failedExpenses.map((f) => f.itemId),
+    );
     for (const item of expenses) {
-      if (fires(item.schedule, month, today)) {
+      if (fires(item.schedule, month, today) && !failedExpenseIds.has(item.id)) {
         entries.push({
           key: `expense-${item.id}-${month}`,
           month,

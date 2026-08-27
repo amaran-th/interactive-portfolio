@@ -1,6 +1,6 @@
 "use client";
 
-import { Inbox, Workflow } from "lucide-react";
+import { Inbox, TriangleAlert, Workflow } from "lucide-react";
 import { useState } from "react";
 import { AssetClass, Group, MonthSnapshot, assetColor, formatKRW } from "./types";
 import ChartTooltip from "./ChartTooltip";
@@ -120,6 +120,21 @@ export default function FlowDiagram({
   const primaryColor = primaryBalance < 0 ? DEFICIT_COLOR : PRIMARY_COLOR;
   const hasExpense = snapshot.flow.expenseOut > 0;
 
+  const failedItems = [
+    ...snapshot.flow.failedTransfers
+      .filter((f) => f.fromAssetId === primaryAsset.id)
+      .map((f) => ({
+        id: f.ruleId,
+        label: assetClasses.find((a) => a.id === f.toAssetId)?.name ?? "?",
+        amount: f.amount,
+      })),
+    ...snapshot.flow.failedExpenses.map((f) => ({
+      id: f.itemId,
+      label: f.name,
+      amount: f.amount,
+    })),
+  ];
+
   // 이체 대상도 현금과 같은 실제 자산이라, 지출과 같은 열에 두지 않고
   // 기본 자산과 같은 열에 세로로 쌓는다. 박스에는 이번 달 이체액이 아니라
   // 그 자산의 실제 잔액을 보여준다 — 자산 목록·자산 비교와 같은 정보.
@@ -185,6 +200,13 @@ export default function FlowDiagram({
       <p className="flex items-center gap-1.5 text-sm text-gray-500">
         <Workflow className="h-4 w-4" /> 자금 흐름
       </p>
+      {failedItems.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-600">
+          <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
+          잔액 부족으로 중단됐어요:{" "}
+          {failedItems.map((f) => `${f.label} ${formatKRW(f.amount)}`).join(", ")}
+        </div>
+      )}
       <div className="mt-2 flex flex-1 items-center justify-center">
       <div className="relative w-full">
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
