@@ -32,6 +32,7 @@ export default function GroupPicker({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [colorPickerId, setColorPickerId] = useState<string | null>(null);
+  const [newGroupColorPickerOpen, setNewGroupColorPickerOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const selectedGroup = groups.find((g) => g.id === value);
@@ -42,6 +43,7 @@ export default function GroupPicker({
     setDraftName("");
     setRenamingId(null);
     setColorPickerId(null);
+    setNewGroupColorPickerOpen(false);
   };
 
   const startCreating = () => {
@@ -205,49 +207,61 @@ export default function GroupPicker({
           </ul>
           <div className="mt-1 border-t border-gray-100 pt-1">
             {creating ? (
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-1">
-                  <input
-                    autoFocus
-                    value={draftName}
-                    onChange={(e) => setDraftName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        commitNewGroup();
-                      }
-                      if (e.key === "Escape") {
-                        setCreating(false);
-                        setDraftName("");
-                      }
-                    }}
-                    placeholder="새 그룹 이름"
-                    className="min-w-0 flex-1 rounded border border-indigo-300 px-1 text-xs outline-none"
-                  />
+              <div className="flex items-center gap-1">
+                <div className="relative shrink-0">
                   <button
                     type="button"
-                    onClick={commitNewGroup}
-                    className="shrink-0 text-xs text-indigo-600 hover:text-indigo-800"
-                  >
-                    만들기
-                  </button>
+                    onClick={() => setNewGroupColorPickerOpen((prev) => !prev)}
+                    className="h-5 w-5 rounded-full ring-1 ring-black/10"
+                    style={{ backgroundColor: draftColor }}
+                    aria-label="그룹 색상 선택"
+                  />
+                  {newGroupColorPickerOpen && (
+                    <div className="absolute top-full left-0 z-20 mt-1 flex w-32 flex-wrap gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
+                      {GROUP_PALETTE.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => {
+                            setDraftColor(color);
+                            setNewGroupColorPickerOpen(false);
+                          }}
+                          className={`h-4 w-4 rounded-full ring-1 ${
+                            draftColor === color
+                              ? "ring-2 ring-indigo-500"
+                              : "ring-black/10"
+                          }`}
+                          style={{ backgroundColor: color }}
+                          aria-label={`색상 ${color}로 설정`}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="flex flex-wrap gap-1 px-0.5">
-                  {GROUP_PALETTE.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setDraftColor(color)}
-                      className={`h-4 w-4 rounded-full ring-1 ${
-                        draftColor === color
-                          ? "ring-2 ring-indigo-500"
-                          : "ring-black/10"
-                      }`}
-                      style={{ backgroundColor: color }}
-                      aria-label={`색상 ${color}로 설정`}
-                    />
-                  ))}
-                </div>
+                <input
+                  autoFocus
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitNewGroup();
+                    }
+                    if (e.key === "Escape") {
+                      setCreating(false);
+                      setDraftName("");
+                    }
+                  }}
+                  placeholder="새 그룹 이름"
+                  className="min-w-0 flex-1 rounded border border-indigo-300 px-1 text-xs outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={commitNewGroup}
+                  className="shrink-0 text-xs text-indigo-600 hover:text-indigo-800"
+                >
+                  만들기
+                </button>
               </div>
             ) : (
               <button

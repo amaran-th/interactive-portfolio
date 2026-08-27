@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Landmark, Plus, Settings, TrendingDown } from "lucide-react";
 import {
   AssetClass,
@@ -61,9 +61,25 @@ export default function GroupAssetSection({
   const [isLiability, setIsLiability] = useState(false);
   const [color, setColor] = useState(() => nextVisibleColor(groups, assetClasses));
   const [colorPickerId, setColorPickerId] = useState<string | null>(null);
+  const [formColorPickerOpen, setFormColorPickerOpen] = useState(false);
   const isFormVisible = isFormOpen || Boolean(editingId);
 
   const nameRef = useRef<HTMLInputElement>(null);
+  const formColorPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!formColorPickerOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        formColorPickerRef.current &&
+        !formColorPickerRef.current.contains(e.target as Node)
+      ) {
+        setFormColorPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [formColorPickerOpen]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -75,6 +91,7 @@ export default function GroupAssetSection({
     setMakePrimary(false);
     setIsLiability(false);
     setColor(nextVisibleColor(groups, assetClasses));
+    setFormColorPickerOpen(false);
   };
 
   const startEdit = (asset: AssetClass) => {
@@ -270,7 +287,40 @@ export default function GroupAssetSection({
         }}
         className="border-indigo-200"
       >
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <div ref={formColorPickerRef} className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setFormColorPickerOpen((prev) => !prev)}
+              disabled={Boolean(groupId)}
+              className="h-8 w-8 rounded-full ring-1 ring-black/10 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: groupId
+                  ? (groups.find((g) => g.id === groupId)?.color ?? color)
+                  : color,
+              }}
+              aria-label="자산 색상 선택"
+            />
+            {formColorPickerOpen && !groupId && (
+              <div className="absolute top-full left-0 z-10 mt-1 flex w-36 flex-wrap gap-1.5 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
+                {GROUP_PALETTE.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      setColor(c);
+                      setFormColorPickerOpen(false);
+                    }}
+                    className={`h-5 w-5 rounded-full ring-1 ${
+                      color === c ? "ring-2 ring-indigo-500" : "ring-black/10"
+                    }`}
+                    style={{ backgroundColor: c }}
+                    aria-label={`색상 ${c}로 설정`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
           <input
             ref={nameRef}
             value={name}
@@ -288,25 +338,10 @@ export default function GroupAssetSection({
             defaultColor={nextVisibleColor(groups, assetClasses)}
           />
         </div>
-        {groupId ? (
+        {groupId && (
           <p className="pl-1 text-[11px] text-gray-400">
             그룹에 속한 자산은 그룹 색상을 따라요
           </p>
-        ) : (
-          <div className="flex flex-wrap items-center gap-1.5 pl-1">
-            {GROUP_PALETTE.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                className={`h-5 w-5 rounded-full ring-1 ${
-                  color === c ? "ring-2 ring-indigo-500" : "ring-black/10"
-                }`}
-                style={{ backgroundColor: c }}
-                aria-label={`색상 ${c}로 설정`}
-              />
-            ))}
-          </div>
         )}
         <div className="flex gap-2">
           <CustomSelect
