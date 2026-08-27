@@ -76,9 +76,11 @@ export default function IncomeSection({
   );
   const [error, setError] = useState<string | null>(null);
   const isFormVisible = isFormOpen || Boolean(editingId);
+  const listRef = useRef<HTMLUListElement>(null);
   const { registerItemRef, startDrag, getItemStyle } = useDragReorder(
     incomes.length,
     onReorderIncome,
+    listRef,
   );
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -168,7 +170,10 @@ export default function IncomeSection({
           <Settings className="h-4 w-4" />
         </button>
       </div>
-      <ul className="mt-2 flex flex-col gap-2">
+      <ul
+        ref={listRef}
+        className="mt-2 flex max-h-80 flex-col gap-2 overflow-y-auto"
+      >
         {incomes.map((item, index) => {
           const category = categories.find((c) => c.id === item.categoryId);
           return (

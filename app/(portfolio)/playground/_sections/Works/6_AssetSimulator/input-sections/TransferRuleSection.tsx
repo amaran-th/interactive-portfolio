@@ -77,9 +77,11 @@ export default function TransferRuleSection({
   );
   const [error, setError] = useState<string | null>(null);
   const isFormVisible = isFormOpen || Boolean(editingId);
+  const listRef = useRef<HTMLUListElement>(null);
   const { registerItemRef, startDrag, getItemStyle } = useDragReorder(
     transferRules.length,
     onReorderTransferRule,
+    listRef,
   );
   const amountRef = useRef<HTMLInputElement>(null);
 
@@ -184,7 +186,10 @@ export default function TransferRuleSection({
           <Settings className="h-4 w-4" />
         </button>
       </div>
-      <ul className="mt-2 flex flex-col gap-2">
+      <ul
+        ref={listRef}
+        className="mt-2 flex max-h-80 flex-col gap-2 overflow-y-auto"
+      >
         {transferRules.map((rule, index) => (
           <li
             key={rule.id}

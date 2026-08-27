@@ -11,7 +11,12 @@ type DragState = {
   itemTops: number[];
   /** The dragged item's own height, including the list's row gap. */
   itemHeight: number;
+  /** How far the scroll container has scrolled since drag start (px, +down). */
+  scrollDelta: number;
 };
+
+const AUTO_SCROLL_EDGE = 48;
+const AUTO_SCROLL_MAX_SPEED = 14;
 
 /**
  * Pointer-based (not HTML5 native DnD) reorder for a vertical list: the
@@ -19,10 +24,19 @@ type DragState = {
  * instead of the browser's ghost-image drag with no in-between feedback.
  * Pointer events (not mouse events) also make this work on touch out of
  * the box.
+ *
+ * When `scrollContainerRef` is given (the list sits in a scrollable, capped-
+ * height container), the container auto-scrolls while the pointer is near
+ * its top/bottom edge, and both the slot-detection math and the dragged
+ * item's own transform are corrected for how far the container has
+ * scrolled since the drag started — otherwise the two drift apart, since
+ * the item's normal-flow position scrolls with the container but a plain
+ * pointer-delta transform doesn't.
  */
 export function useDragReorder(
   itemCount: number,
   onReorder: (from: number, to: number) => void,
+  scrollContainerRef?: React.RefObject<HTMLElement | null>,
 ) {
   const [drag, setDrag] = useState<DragState | null>(null);
   // Mirrors `drag` for synchronous reads from plain DOM listeners. Calling
@@ -33,9 +47,19 @@ export function useDragReorder(
   // ref here keeps onReorder as a single, plain top-level call.
   const dragRef = useRef<DragState | null>(null);
   const itemRefs = useRef<(HTMLElement | null)[]>([]);
+  const autoScrollSpeedRef = useRef(0);
+  const autoScrollFrameRef = useRef<number | null>(null);
 
   const registerItemRef = (index: number) => (el: HTMLElement | null) => {
     itemRefs.current[index] = el;
+  };
+
+  const stopAutoScroll = () => {
+    autoScrollSpeedRef.current = 0;
+    if (autoScrollFrameRef.current !== null) {
+      cancelAnimationFrame(autoScrollFrameRef.current);
+      autoScrollFrameRef.current = null;
+    }
   };
 
   const startDrag =
@@ -52,6 +76,8 @@ export function useDragReorder(
         nextTop !== undefined
           ? nextTop - itemTops[index]
           : draggedRect.height;
+      const scrollContainer = scrollContainerRef?.current ?? null;
+      const initialScrollTop = scrollContainer?.scrollTop ?? 0;
 
       const initial: DragState = {
         draggingIndex: index,
@@ -60,20 +86,24 @@ export function useDragReorder(
         pointerY: e.clientY,
         itemTops,
         itemHeight,
+        scrollDelta: 0,
       };
       dragRef.current = initial;
       setDrag(initial);
 
-      const handleMove = (ev: PointerEvent) => {
-        const prev = dragRef.current;
-        if (!prev) return;
-        const deltaY = ev.clientY - prev.pointerStartY;
+      const recomputeOverIndex = (
+        state: DragState,
+        deltaY: number,
+      ): number => {
         const draggedCenter =
-          prev.itemTops[prev.draggingIndex] + deltaY + prev.itemHeight / 2;
-        let nextOver = prev.draggingIndex;
+          state.itemTops[state.draggingIndex] +
+          deltaY +
+          state.scrollDelta +
+          state.itemHeight / 2;
+        let nextOver = state.draggingIndex;
         for (let i = 0; i < itemCount; i++) {
-          const slotTop = prev.itemTops[i];
-          const slotBottom = slotTop + prev.itemHeight;
+          const slotTop = state.itemTops[i];
+          const slotBottom = slotTop + state.itemHeight;
           if (draggedCenter >= slotTop && draggedCenter < slotBottom) {
             nextOver = i;
             break;
@@ -82,13 +112,64 @@ export function useDragReorder(
             nextOver = i;
           }
         }
-        const next = { ...prev, pointerY: ev.clientY, overIndex: nextOver };
+        return nextOver;
+      };
+
+      const runAutoScrollStep = () => {
+        const container = scrollContainerRef?.current;
+        const prev = dragRef.current;
+        if (!container || !prev || autoScrollSpeedRef.current === 0) {
+          autoScrollFrameRef.current = null;
+          return;
+        }
+        container.scrollTop += autoScrollSpeedRef.current;
+        const scrollDelta = container.scrollTop - initialScrollTop;
+        const deltaY = prev.pointerY - prev.pointerStartY;
+        const next: DragState = {
+          ...prev,
+          scrollDelta,
+          overIndex: recomputeOverIndex(
+            { ...prev, scrollDelta },
+            deltaY,
+          ),
+        };
+        dragRef.current = next;
+        setDrag(next);
+        autoScrollFrameRef.current = requestAnimationFrame(runAutoScrollStep);
+      };
+
+      const updateAutoScrollSpeed = (clientY: number) => {
+        if (!scrollContainer) return;
+        const rect = scrollContainer.getBoundingClientRect();
+        let speed = 0;
+        if (clientY < rect.top + AUTO_SCROLL_EDGE) {
+          const intensity = 1 - Math.max(0, clientY - rect.top) / AUTO_SCROLL_EDGE;
+          speed = -AUTO_SCROLL_MAX_SPEED * intensity;
+        } else if (clientY > rect.bottom - AUTO_SCROLL_EDGE) {
+          const intensity =
+            1 - Math.max(0, rect.bottom - clientY) / AUTO_SCROLL_EDGE;
+          speed = AUTO_SCROLL_MAX_SPEED * intensity;
+        }
+        autoScrollSpeedRef.current = speed;
+        if (speed !== 0 && autoScrollFrameRef.current === null) {
+          autoScrollFrameRef.current = requestAnimationFrame(runAutoScrollStep);
+        }
+      };
+
+      const handleMove = (ev: PointerEvent) => {
+        const prev = dragRef.current;
+        if (!prev) return;
+        updateAutoScrollSpeed(ev.clientY);
+        const deltaY = ev.clientY - prev.pointerStartY;
+        const nextOver = recomputeOverIndex(prev, deltaY);
+        const next: DragState = { ...prev, pointerY: ev.clientY, overIndex: nextOver };
         dragRef.current = next;
         setDrag(next);
       };
       const handleUp = () => {
         window.removeEventListener("pointermove", handleMove);
         window.removeEventListener("pointerup", handleUp);
+        stopAutoScroll();
         const finalState = dragRef.current;
         dragRef.current = null;
         setDrag(null);
@@ -102,11 +183,17 @@ export function useDragReorder(
 
   const getItemStyle = (index: number): React.CSSProperties => {
     if (!drag) return {};
-    const { draggingIndex, overIndex, pointerY, pointerStartY, itemHeight } =
-      drag;
+    const {
+      draggingIndex,
+      overIndex,
+      pointerY,
+      pointerStartY,
+      itemHeight,
+      scrollDelta,
+    } = drag;
     if (index === draggingIndex) {
       return {
-        transform: `translateY(${pointerY - pointerStartY}px)`,
+        transform: `translateY(${pointerY - pointerStartY + scrollDelta}px)`,
         zIndex: 50,
         position: "relative",
         boxShadow: "0 10px 24px rgba(0,0,0,0.18)",
