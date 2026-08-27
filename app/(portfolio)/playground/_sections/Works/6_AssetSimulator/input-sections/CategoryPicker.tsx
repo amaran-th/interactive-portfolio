@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { Category } from "../types";
 
 const NONE_VALUE = "";
@@ -86,9 +87,10 @@ export default function CategoryPicker({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="rounded-full border border-white/60 bg-white/80 px-2 py-1 text-xs text-gray-700"
+        className="flex items-center gap-1 rounded-full border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 shadow-sm hover:border-gray-400"
       >
         {selectedCategory ? selectedCategory.name : "카테고리 없음"}
+        <ChevronDown className="h-3 w-3 text-gray-400" />
       </button>
       {open && (
         <div className="absolute right-0 top-full z-10 mt-1 w-48 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">

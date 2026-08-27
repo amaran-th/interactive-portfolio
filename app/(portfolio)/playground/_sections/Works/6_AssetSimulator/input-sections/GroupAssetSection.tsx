@@ -413,7 +413,7 @@ export default function GroupAssetSection({
           수입은 기본 자산으로 들어오고, 지출은 기본 자산에서 나가요
         </p>
         <label className="flex items-center gap-2 text-xs text-gray-600">
-          {isLiability ? "연 이자율(%)" : "연 수익률(%)"}
+          {isLiability ? "연 이자율(%)" : "연 이율(%)"}
           <input
             value={returnRate}
             onChange={(e) => setReturnRate(e.target.value)}
