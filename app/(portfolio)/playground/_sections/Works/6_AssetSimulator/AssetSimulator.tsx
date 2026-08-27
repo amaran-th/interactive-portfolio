@@ -58,6 +58,7 @@ function emptyScenario(name: string): Scenario {
     id: newId(),
     name,
     groups: [],
+    categories: [],
     assetClasses: [],
     incomes: [],
     expenses: [],
@@ -97,6 +98,7 @@ function seedScenario(name: string, today: Date): Scenario {
       { id: savingsGroupId, name: "예적금", color: GROUP_PALETTE[0] },
       { id: investGroupId, name: "투자", color: GROUP_PALETTE[1] },
     ],
+    categories: [],
     assetClasses: [
       {
         id: primaryId,
@@ -245,11 +247,18 @@ function seedScenario(name: string, today: Date): Scenario {
 
 function duplicateScenario(scenario: Scenario): Scenario {
   const groupIdMap = new Map(scenario.groups.map((g) => [g.id, newId()]));
+  const categoryIdMap = new Map(
+    scenario.categories.map((c) => [c.id, newId()]),
+  );
   const assetIdMap = new Map(scenario.assetClasses.map((a) => [a.id, newId()]));
 
   const groups = scenario.groups.map((g) => ({
     ...g,
     id: groupIdMap.get(g.id)!,
+  }));
+  const categories = scenario.categories.map((c) => ({
+    ...c,
+    id: categoryIdMap.get(c.id)!,
   }));
   const assetClasses = scenario.assetClasses.map((a) => ({
     ...a,
@@ -259,12 +268,12 @@ function duplicateScenario(scenario: Scenario): Scenario {
   const incomes = scenario.incomes.map((i) => ({
     ...i,
     id: newId(),
-    groupId: i.groupId ? groupIdMap.get(i.groupId) : undefined,
+    categoryId: i.categoryId ? categoryIdMap.get(i.categoryId) : undefined,
   }));
   const expenses = scenario.expenses.map((e) => ({
     ...e,
     id: newId(),
-    groupId: e.groupId ? groupIdMap.get(e.groupId) : undefined,
+    categoryId: e.categoryId ? categoryIdMap.get(e.categoryId) : undefined,
   }));
   const transferRules = scenario.transferRules.map((r) => ({
     ...r,
@@ -294,6 +303,7 @@ function duplicateScenario(scenario: Scenario): Scenario {
     id: newId(),
     name: `${scenario.name} 복사본`,
     groups,
+    categories,
     assetClasses,
     incomes,
     expenses,
@@ -422,13 +432,35 @@ export default function AssetSimulator() {
       assetClasses: s.assetClasses.map((a) =>
         a.groupId === id ? { ...a, groupId: undefined } : a,
       ),
+      goal: goalReferences(s.goal, "group", id) ? null : s.goal,
+    }));
+  };
+
+  // 수입/지출 카테고리는 자산 그룹과 달리 색이 없는 별도의 분류 체계다.
+  const handleAddCategory = (name: string): string => {
+    const id = newId();
+    updateActiveScenario((s) => ({
+      ...s,
+      categories: [...s.categories, { id, name }],
+    }));
+    return id;
+  };
+  const handleUpdateCategory = (id: string, name: string) => {
+    updateActiveScenario((s) => ({
+      ...s,
+      categories: s.categories.map((c) => (c.id === id ? { ...c, name } : c)),
+    }));
+  };
+  const handleRemoveCategory = (id: string) => {
+    updateActiveScenario((s) => ({
+      ...s,
+      categories: s.categories.filter((c) => c.id !== id),
       incomes: s.incomes.map((i) =>
-        i.groupId === id ? { ...i, groupId: undefined } : i,
+        i.categoryId === id ? { ...i, categoryId: undefined } : i,
       ),
       expenses: s.expenses.map((e) =>
-        e.groupId === id ? { ...e, groupId: undefined } : e,
+        e.categoryId === id ? { ...e, categoryId: undefined } : e,
       ),
-      goal: goalReferences(s.goal, "group", id) ? null : s.goal,
     }));
   };
 
@@ -719,6 +751,10 @@ export default function AssetSimulator() {
             onAddGroup={handleAddGroup}
             onUpdateGroup={handleUpdateGroup}
             onRemoveGroup={handleRemoveGroup}
+            categories={activeScenario.categories}
+            onAddCategory={handleAddCategory}
+            onUpdateCategory={handleUpdateCategory}
+            onRemoveCategory={handleRemoveCategory}
             assetClasses={activeScenario.assetClasses}
             onAddAssetClass={handleAddAssetClass}
             onUpdateAssetClass={handleUpdateAssetClass}

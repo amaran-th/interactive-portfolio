@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   AssetClass,
+  Category,
   ExpenseItem,
   Group,
   IncomeItem,
@@ -11,7 +12,6 @@ import {
   NewIncomeItemInput,
   NewTransferRuleInput,
   TransferRule,
-  nextVisibleColor,
 } from "./types";
 import GroupAssetSection from "./input-sections/GroupAssetSection";
 import IncomeSection from "./input-sections/IncomeSection";
@@ -23,6 +23,10 @@ type InputPanelProps = {
   onAddGroup: (name: string, color: string) => string;
   onUpdateGroup: (id: string, input: { name: string; color: string }) => void;
   onRemoveGroup: (id: string) => void;
+  categories: Category[];
+  onAddCategory: (name: string) => string;
+  onUpdateCategory: (id: string, name: string) => void;
+  onRemoveCategory: (id: string) => void;
   assetClasses: AssetClass[];
   onAddAssetClass: (input: NewAssetClassInput) => void;
   onUpdateAssetClass: (id: string, input: NewAssetClassInput) => void;
@@ -52,10 +56,6 @@ type OpenSection = "asset" | "income" | "expense" | "transfer" | null;
 
 export default function InputPanel(props: InputPanelProps) {
   const [openSection, setOpenSection] = useState<OpenSection>(null);
-  const nextGroupColorSuggestion = nextVisibleColor(
-    props.groups,
-    props.assetClasses,
-  );
 
   return (
     <div className="flex flex-wrap gap-4">
@@ -75,11 +75,10 @@ export default function InputPanel(props: InputPanelProps) {
         onCloseForm={() => setOpenSection(null)}
       />
       <IncomeSection
-        groups={props.groups}
-        onAddGroup={props.onAddGroup}
-        onUpdateGroup={props.onUpdateGroup}
-        onRemoveGroup={props.onRemoveGroup}
-        defaultGroupColor={nextGroupColorSuggestion}
+        categories={props.categories}
+        onAddCategory={props.onAddCategory}
+        onUpdateCategory={props.onUpdateCategory}
+        onRemoveCategory={props.onRemoveCategory}
         incomes={props.incomes}
         onAddIncome={props.onAddIncome}
         onUpdateIncome={props.onUpdateIncome}
@@ -92,11 +91,10 @@ export default function InputPanel(props: InputPanelProps) {
         horizonMonths={props.horizonMonths}
       />
       <ExpenseSection
-        groups={props.groups}
-        onAddGroup={props.onAddGroup}
-        onUpdateGroup={props.onUpdateGroup}
-        onRemoveGroup={props.onRemoveGroup}
-        defaultGroupColor={nextGroupColorSuggestion}
+        categories={props.categories}
+        onAddCategory={props.onAddCategory}
+        onUpdateCategory={props.onUpdateCategory}
+        onRemoveCategory={props.onRemoveCategory}
         expenses={props.expenses}
         onAddExpense={props.onAddExpense}
         onUpdateExpense={props.onUpdateExpense}

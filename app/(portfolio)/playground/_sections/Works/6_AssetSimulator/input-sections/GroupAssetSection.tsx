@@ -293,7 +293,7 @@ export default function GroupAssetSection({
               type="button"
               onClick={() => setFormColorPickerOpen((prev) => !prev)}
               disabled={Boolean(groupId)}
-              className="h-8 w-8 rounded-full ring-1 ring-black/10 disabled:cursor-not-allowed"
+              className="h-5 w-5 rounded-full ring-1 ring-black/10 disabled:cursor-not-allowed"
               style={{
                 backgroundColor: groupId
                   ? (groups.find((g) => g.id === groupId)?.color ?? color)

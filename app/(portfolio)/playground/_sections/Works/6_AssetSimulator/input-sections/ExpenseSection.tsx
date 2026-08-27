@@ -3,25 +3,24 @@
 import { useRef, useState } from "react";
 import { GripVertical, Plus, Settings, TrendingDown } from "lucide-react";
 import {
+  Category,
   ExpenseItem,
-  Group,
   NewExpenseItemInput,
   RepeatSchedule,
   addMonths,
   toMonthInputValue,
 } from "../types";
 import { validateSchedule } from "../simulation";
-import GroupPicker from "./GroupPicker";
+import CategoryPicker from "./CategoryPicker";
 import ScheduleEditor from "./ScheduleEditor";
 import FloatingFormPanel from "./FloatingFormPanel";
 import { useDragReorder } from "./useDragReorder";
 
 type ExpenseSectionProps = {
-  groups: Group[];
-  onAddGroup: (name: string, color: string) => string;
-  onUpdateGroup: (id: string, input: { name: string; color: string }) => void;
-  onRemoveGroup: (id: string) => void;
-  defaultGroupColor: string;
+  categories: Category[];
+  onAddCategory: (name: string) => string;
+  onUpdateCategory: (id: string, name: string) => void;
+  onRemoveCategory: (id: string) => void;
   expenses: ExpenseItem[];
   onAddExpense: (input: NewExpenseItemInput) => void;
   onUpdateExpense: (id: string, input: NewExpenseItemInput) => void;
@@ -53,11 +52,10 @@ function scheduleSummary(schedule: RepeatSchedule): string {
 }
 
 export default function ExpenseSection({
-  groups,
-  onAddGroup,
-  onUpdateGroup,
-  onRemoveGroup,
-  defaultGroupColor,
+  categories,
+  onAddCategory,
+  onUpdateCategory,
+  onRemoveCategory,
   expenses,
   onAddExpense,
   onUpdateExpense,
@@ -72,7 +70,7 @@ export default function ExpenseSection({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
-  const [groupId, setGroupId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [schedule, setSchedule] = useState<RepeatSchedule>(
     defaultSchedule(today),
   );
@@ -89,7 +87,7 @@ export default function ExpenseSection({
     setEditingId(null);
     setName("");
     setAmount("");
-    setGroupId("");
+    setCategoryId("");
     setSchedule(defaultSchedule(today));
     setError(null);
   };
@@ -99,7 +97,7 @@ export default function ExpenseSection({
     setEditingId(item.id);
     setName(item.name);
     setAmount(String(item.amount));
-    setGroupId(item.groupId ?? "");
+    setCategoryId(item.categoryId ?? "");
     setSchedule(item.schedule);
     setError(null);
   };
@@ -122,7 +120,7 @@ export default function ExpenseSection({
     const input: NewExpenseItemInput = {
       name: name.trim(),
       amount: Number(amount),
-      groupId: groupId || undefined,
+      categoryId: categoryId || undefined,
       schedule,
     };
     if (editingId) {
@@ -172,7 +170,7 @@ export default function ExpenseSection({
       </div>
       <ul className="mt-2 flex flex-col gap-2">
         {expenses.map((item, index) => {
-          const group = groups.find((g) => g.id === item.groupId);
+          const category = categories.find((c) => c.id === item.categoryId);
           return (
             <li
               key={item.id}
@@ -194,15 +192,14 @@ export default function ExpenseSection({
                 >
                   <GripVertical className="h-4 w-4" />
                 </span>
-                {group && (
-                  <span
-                    className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: group.color }}
-                  />
-                )}
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-gray-800">
-                    {item.name}
+                  <p className="flex min-w-0 items-center gap-1.5 text-gray-800">
+                    <span className="truncate font-medium">{item.name}</span>
+                    {category && (
+                      <span className="shrink-0 text-xs font-normal text-gray-400">
+                        {category.name}
+                      </span>
+                    )}
                   </p>
                   <p className="text-xs text-gray-400">
                     {scheduleSummary(item.schedule)}
@@ -245,14 +242,13 @@ export default function ExpenseSection({
             placeholder="예: 월세, 여행"
             className="flex-1 rounded-full border border-rose-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-rose-400"
           />
-          <GroupPicker
-            groups={groups}
-            value={groupId}
-            onChange={setGroupId}
-            onCreateGroup={onAddGroup}
-            onUpdateGroup={onUpdateGroup}
-            onRemoveGroup={onRemoveGroup}
-            defaultColor={defaultGroupColor}
+          <CategoryPicker
+            categories={categories}
+            value={categoryId}
+            onChange={setCategoryId}
+            onCreateCategory={onAddCategory}
+            onUpdateCategory={onUpdateCategory}
+            onRemoveCategory={onRemoveCategory}
           />
         </div>
         <input

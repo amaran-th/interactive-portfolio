@@ -6,6 +6,13 @@ export type Group = {
   color: string;
 };
 
+/** Income/expense category — organizational only, unlike asset Group it
+ * has no color (color has no real use for income/expense items). */
+export type Category = {
+  id: string;
+  name: string;
+};
+
 export type AssetClass = {
   id: string;
   name: string;
@@ -35,7 +42,7 @@ export type IncomeItem = {
   id: string;
   name: string;
   amount: number;
-  groupId?: string;
+  categoryId?: string;
   schedule: RepeatSchedule;
 };
 
@@ -43,7 +50,7 @@ export type ExpenseItem = {
   id: string;
   name: string;
   amount: number;
-  groupId?: string;
+  categoryId?: string;
   schedule: RepeatSchedule;
 };
 
@@ -72,6 +79,7 @@ export type Scenario = {
   id: string;
   name: string;
   groups: Group[];
+  categories: Category[];
   assetClasses: AssetClass[];
   incomes: IncomeItem[];
   expenses: ExpenseItem[];
@@ -136,14 +144,14 @@ export type NewAssetClassInput = {
 export type NewIncomeItemInput = {
   name: string;
   amount: number;
-  groupId?: string;
+  categoryId?: string;
   schedule: RepeatSchedule;
 };
 
 export type NewExpenseItemInput = {
   name: string;
   amount: number;
-  groupId?: string;
+  categoryId?: string;
   schedule: RepeatSchedule;
 };
 
