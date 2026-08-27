@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import AssetAreaChart from "./AssetAreaChart";
 import ComparisonBarChart from "./ComparisonBarChart";
 import FlowDiagram from "./FlowDiagram";
+import FlowRatioChart from "./FlowRatioChart";
 import GroupDonutChart from "./GroupDonutChart";
 import HistoryPanel from "./HistoryPanel";
 import InputPanel from "./InputPanel";
@@ -39,7 +40,7 @@ function withGuaranteedPrimary(assets: AssetClass[]): AssetClass[] {
   return assets.map((a) => ({ ...a, isPrimary: a.id === candidate.id }));
 }
 
-const CHART_PANEL_COUNT_ARRAY = [0, 1, 2] as const;
+const CHART_PANEL_COUNT_ARRAY = [0, 1, 2, 3] as const;
 
 function goalReferences(
   goal: Goal | null,
@@ -891,6 +892,19 @@ export default function AssetSimulator() {
                   assetClasses={activeScenario.assetClasses}
                   groups={activeScenario.groups}
                   exchangeRate={activeScenario.exchangeRate}
+                />
+              </div>
+              <div
+                className={`min-w-50 @min-[500px]:col-span-2 @min-[900px]:col-span-3 ${
+                  activeChartIndex === 3 ? "block" : "block @max-[500px]:hidden"
+                }`}
+              >
+                <FlowRatioChart
+                  snapshot={selectedSnapshot}
+                  incomes={activeScenario.incomes}
+                  expenses={activeScenario.expenses}
+                  categories={activeScenario.categories}
+                  today={today}
                 />
               </div>
             </div>

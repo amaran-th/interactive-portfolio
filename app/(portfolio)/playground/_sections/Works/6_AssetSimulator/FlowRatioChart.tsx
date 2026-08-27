@@ -1,0 +1,292 @@
+"use client";
+
+import { useState } from "react";
+import { Inbox, PieChart as PieChartIcon } from "lucide-react";
+import {
+  Category,
+  ExpenseItem,
+  GROUP_PALETTE,
+  IncomeItem,
+  MonthSnapshot,
+  formatKRW,
+} from "./types";
+import { fires } from "./simulation";
+import ChartTooltip from "./ChartTooltip";
+
+type FlowRatioChartProps = {
+  snapshot: MonthSnapshot;
+  incomes: IncomeItem[];
+  expenses: ExpenseItem[];
+  categories: Category[];
+  today: Date;
+};
+
+type FlowItem = { id: string; name: string; categoryId?: string; amount: number };
+
+type Slice = {
+  id: string;
+  name: string;
+  amount: number;
+  ratio: number;
+  color: string;
+  dashArray: string;
+  dashOffset: number;
+};
+
+const SIZE = 120;
+const STROKE = 20;
+const RADIUS = (SIZE - STROKE) / 2;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+function buildSlices(
+  items: FlowItem[],
+  categories: Category[],
+  viewMode: "item" | "category",
+): Slice[] {
+  // 카테고리별: 카테고리가 있는 항목은 카테고리 하나로 합치고, 카테고리
+  // 없는 항목은 그 자체로 단일 카테고리이니 개별 표시를 유지한다 —
+  // 자산 그룹/미분류 자산과 같은 구조.
+  const grouped: { id: string; name: string; amount: number }[] =
+    viewMode === "item"
+      ? items.map((it) => ({ id: it.id, name: it.name, amount: it.amount }))
+      : (() => {
+          const categoryTotals = new Map<string, number>();
+          const uncategorized: { id: string; name: string; amount: number }[] =
+            [];
+          for (const item of items) {
+            if (item.categoryId) {
+              categoryTotals.set(
+                item.categoryId,
+                (categoryTotals.get(item.categoryId) ?? 0) + item.amount,
+              );
+            } else {
+              uncategorized.push({
+                id: item.id,
+                name: item.name,
+                amount: item.amount,
+              });
+            }
+          }
+          const categoryItems = Array.from(categoryTotals.entries()).map(
+            ([categoryId, amount]) => ({
+              id: categoryId,
+              name: categories.find((c) => c.id === categoryId)?.name ?? "?",
+              amount,
+            }),
+          );
+          return [...categoryItems, ...uncategorized];
+        })();
+
+  const total = grouped.reduce((sum, g) => sum + g.amount, 0);
+
+  return grouped.reduce<{ offset: number; slices: Slice[] }>(
+    (acc, item, i) => {
+      const ratio = total > 0 ? item.amount / total : 0;
+      const dash = ratio * CIRCUMFERENCE;
+      const slice: Slice = {
+        id: item.id,
+        name: item.name,
+        amount: item.amount,
+        ratio,
+        color: GROUP_PALETTE[i % GROUP_PALETTE.length],
+        dashArray: `${dash} ${CIRCUMFERENCE - dash}`,
+        dashOffset: -acc.offset,
+      };
+      return { offset: acc.offset + dash, slices: [...acc.slices, slice] };
+    },
+    { offset: 0, slices: [] },
+  ).slices;
+}
+
+function FlowSideDonut({
+  title,
+  accentClassName,
+  items,
+  categories,
+}: {
+  title: string;
+  accentClassName: string;
+  items: FlowItem[];
+  categories: Category[];
+}) {
+  const [viewMode, setViewMode] = useState<"item" | "category">("item");
+  const [hoveredSlice, setHoveredSlice] = useState<Slice | null>(null);
+  const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
+
+  const hasCategorizable = categories.length > 0;
+  const effectiveViewMode = hasCategorizable ? viewMode : "item";
+  const slices = buildSlices(items, categories, effectiveViewMode);
+  const total = items.reduce((sum, it) => sum + it.amount, 0);
+
+  return (
+    <div className="min-w-0 flex-1">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className={`text-sm font-medium ${accentClassName}`}>{title}</p>
+        {hasCategorizable && items.length > 0 && (
+          <div className="flex items-center gap-1 rounded-full bg-gray-100 p-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setViewMode("item")}
+              className={`rounded-full px-2 py-0.5 ${
+                effectiveViewMode === "item"
+                  ? "bg-white font-medium text-gray-800 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              항목별
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("category")}
+              className={`rounded-full px-2 py-0.5 ${
+                effectiveViewMode === "category"
+                  ? "bg-white font-medium text-gray-800 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              카테고리별
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="mt-2 flex items-center gap-3">
+        <div className="relative shrink-0">
+          <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
+            <g transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}>
+              {total === 0 ? (
+                <circle
+                  cx={SIZE / 2}
+                  cy={SIZE / 2}
+                  r={RADIUS}
+                  fill="none"
+                  stroke="#e5e7eb"
+                  strokeWidth={STROKE}
+                />
+              ) : (
+                slices.map((slice) => (
+                  <circle
+                    key={slice.id}
+                    cx={SIZE / 2}
+                    cy={SIZE / 2}
+                    r={RADIUS}
+                    fill="none"
+                    stroke={slice.color}
+                    strokeWidth={STROKE}
+                    strokeDasharray={slice.dashArray}
+                    strokeDashoffset={slice.dashOffset}
+                    onPointerMove={(e) => {
+                      const rect = e.currentTarget
+                        .ownerSVGElement!.getBoundingClientRect();
+                      setHoverPos({
+                        x: e.clientX - rect.left,
+                        y: e.clientY - rect.top,
+                      });
+                      setHoveredSlice(slice);
+                    }}
+                    onPointerLeave={() => setHoveredSlice(null)}
+                  />
+                ))
+              )}
+            </g>
+          </svg>
+          {total === 0 && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-[10px] text-gray-400">
+              표시할 데이터가 없어요
+            </div>
+          )}
+          {hoveredSlice && (
+            <ChartTooltip
+              xPercent={(hoverPos.x / SIZE) * 100}
+              yPercent={(hoverPos.y / SIZE) * 100}
+              accentColor={hoveredSlice.color}
+              lines={[
+                hoveredSlice.name,
+                `${Math.round(hoveredSlice.ratio * 100)}% · ${formatKRW(hoveredSlice.amount)}`,
+              ]}
+            />
+          )}
+        </div>
+        <ul className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-gray-600">
+          {slices.map((slice) => (
+            <li
+              key={slice.id}
+              className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5"
+            >
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: slice.color }}
+              />
+              <span>{slice.name}</span>
+              <span className="text-gray-400">
+                {Math.round(slice.ratio * 100)}%
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+export default function FlowRatioChart({
+  snapshot,
+  incomes,
+  expenses,
+  categories,
+  today,
+}: FlowRatioChartProps) {
+  const failedExpenseIds = new Set(
+    snapshot.flow.failedExpenses.map((f) => f.itemId),
+  );
+  const incomeItems: FlowItem[] = incomes
+    .filter((item) => fires(item.schedule, snapshot.monthIndex, today))
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      categoryId: item.categoryId,
+      amount: item.amount,
+    }));
+  const expenseItems: FlowItem[] = expenses
+    .filter(
+      (item) =>
+        fires(item.schedule, snapshot.monthIndex, today) &&
+        !failedExpenseIds.has(item.id),
+    )
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      categoryId: item.categoryId,
+      amount: item.amount,
+    }));
+
+  if (incomes.length === 0 && expenses.length === 0) {
+    return (
+      <div className="flex h-[180px] items-center justify-center gap-1.5 rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
+        <Inbox className="h-4 w-4" /> 수입/지출을 추가하면 구성 비율이
+        나타납니다
+      </div>
+    );
+  }
+
+  return (
+    <div className="@container rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
+      <p className="flex items-center gap-1.5 text-sm text-gray-500">
+        <PieChartIcon className="h-4 w-4" /> 이번 달 수입/지출 구성
+      </p>
+      <div className="mt-3 flex flex-col gap-6 @min-[420px]:flex-row">
+        <FlowSideDonut
+          title="수입"
+          accentClassName="text-emerald-600"
+          items={incomeItems}
+          categories={categories}
+        />
+        <FlowSideDonut
+          title="지출"
+          accentClassName="text-rose-600"
+          items={expenseItems}
+          categories={categories}
+        />
+      </div>
+    </div>
+  );
+}
