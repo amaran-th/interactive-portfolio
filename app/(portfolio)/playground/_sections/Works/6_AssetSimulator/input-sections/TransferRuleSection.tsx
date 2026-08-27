@@ -191,7 +191,11 @@ export default function TransferRuleSection({
             ref={registerItemRef(index)}
             onClick={() => startEdit(rule)}
             style={getItemStyle(index)}
-            className="flex cursor-pointer items-center justify-between gap-2 rounded-xl border border-amber-100 bg-white/80 px-3 py-2 text-sm hover:border-amber-300"
+            className={`flex cursor-pointer items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm ${
+              editingId === rule.id
+                ? "border-amber-400 bg-amber-50 ring-1 ring-amber-200"
+                : "border-amber-100 bg-white/80 hover:border-amber-300"
+            }`}
           >
             <div className="flex min-w-0 items-center gap-2">
               <span

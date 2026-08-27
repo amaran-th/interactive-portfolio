@@ -156,7 +156,11 @@ export default function GroupAssetSection({
           return (
             <li
               key={asset.id}
-              className="flex flex-col gap-1.5 rounded-xl border border-indigo-100 bg-white/80 px-3 py-2 text-sm hover:border-indigo-300"
+              className={`flex flex-col gap-1.5 rounded-xl border px-3 py-2 text-sm ${
+                editingId === asset.id
+                  ? "border-indigo-400 bg-indigo-50 ring-1 ring-indigo-200"
+                  : "border-indigo-100 bg-white/80 hover:border-indigo-300"
+              }`}
             >
               <div
                 onClick={() => startEdit(asset)}

@@ -179,7 +179,11 @@ export default function IncomeSection({
               ref={registerItemRef(index)}
               onClick={() => startEdit(item)}
               style={getItemStyle(index)}
-              className="flex cursor-pointer items-center justify-between gap-2 rounded-xl border border-emerald-100 bg-white/80 px-3 py-2 text-sm hover:border-emerald-300"
+              className={`flex cursor-pointer items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm ${
+                editingId === item.id
+                  ? "border-emerald-400 bg-emerald-50 ring-1 ring-emerald-200"
+                  : "border-emerald-100 bg-white/80 hover:border-emerald-300"
+              }`}
             >
               <div className="flex min-w-0 items-center gap-2">
                 <span
