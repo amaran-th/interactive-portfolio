@@ -94,6 +94,7 @@ export default function FlowDiagram({
   exchangeRate,
 }: FlowDiagramProps) {
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltip | null>(null);
+  const [viewMode, setViewMode] = useState<"asset" | "group">("asset");
 
   if (!primaryAsset) {
     return (
@@ -138,22 +139,66 @@ export default function FlowDiagram({
   // 이체 대상도 현금과 같은 실제 자산이라, 지출과 같은 열에 두지 않고
   // 기본 자산과 같은 열에 세로로 쌓는다. 박스에는 이번 달 이체액이 아니라
   // 그 자산의 실제 잔액을 보여준다 — 자산 목록·자산 비교와 같은 정보.
-  const transferEntries: {
+  const canGroupByGroup = groups.length > 0;
+  const effectiveViewMode = canGroupByGroup ? viewMode : "asset";
+
+  type TransferEntry = {
     id: string;
     label: string;
     amount: number;
     balance: number;
     color: string;
-  }[] = [];
-  for (const [assetId, amount] of destinationTotals) {
-    const asset = assetClasses.find((a) => a.id === assetId);
-    if (asset && amount > 0) {
+  };
+
+  const transferEntries: TransferEntry[] = [];
+  if (effectiveViewMode === "asset") {
+    for (const [assetId, amount] of destinationTotals) {
+      const asset = assetClasses.find((a) => a.id === assetId);
+      if (asset && amount > 0) {
+        transferEntries.push({
+          id: assetId,
+          label: asset.name,
+          amount,
+          balance: snapshot.assetBalancesKRW[assetId] ?? 0,
+          color: assetColor(asset, groups),
+        });
+      }
+    }
+  } else {
+    // 그룹별: 같은 그룹으로 가는 이체를 하나로 합치고, 미분류 자산은
+    // 그 자체로 단일 그룹이니 개별 표시를 유지한다.
+    const groupAmounts = new Map<string, number>();
+    for (const [assetId, amount] of destinationTotals) {
+      if (amount <= 0) continue;
+      const asset = assetClasses.find((a) => a.id === assetId);
+      if (!asset) continue;
+      if (asset.groupId) {
+        groupAmounts.set(
+          asset.groupId,
+          (groupAmounts.get(asset.groupId) ?? 0) + amount,
+        );
+      } else {
+        transferEntries.push({
+          id: asset.id,
+          label: asset.name,
+          amount,
+          balance: snapshot.assetBalancesKRW[asset.id] ?? 0,
+          color: assetColor(asset, groups),
+        });
+      }
+    }
+    for (const [groupId, amount] of groupAmounts) {
+      const group = groups.find((g) => g.id === groupId);
+      if (!group) continue;
+      const balance = assetClasses
+        .filter((a) => a.groupId === groupId)
+        .reduce((sum, a) => sum + (snapshot.assetBalancesKRW[a.id] ?? 0), 0);
       transferEntries.push({
-        id: assetId,
-        label: asset.name,
+        id: groupId,
+        label: group.name,
         amount,
-        balance: snapshot.assetBalancesKRW[assetId] ?? 0,
-        color: assetColor(asset, groups),
+        balance,
+        color: group.color,
       });
     }
   }
@@ -197,9 +242,37 @@ export default function FlowDiagram({
 
   return (
     <div className="flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-      <p className="flex items-center gap-1.5 text-sm text-gray-500">
-        <Workflow className="h-4 w-4" /> 자금 흐름
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-sm text-gray-500">
+          <Workflow className="h-4 w-4" /> 자금 흐름
+        </p>
+        {canGroupByGroup && (
+          <div className="flex items-center gap-1 rounded-full bg-gray-100 p-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setViewMode("asset")}
+              className={`rounded-full px-2.5 py-1 ${
+                effectiveViewMode === "asset"
+                  ? "bg-white font-medium text-gray-800 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              항목별
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("group")}
+              className={`rounded-full px-2.5 py-1 ${
+                effectiveViewMode === "group"
+                  ? "bg-white font-medium text-gray-800 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              그룹별
+            </button>
+          </div>
+        )}
+      </div>
       {failedItems.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-600">
           <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
