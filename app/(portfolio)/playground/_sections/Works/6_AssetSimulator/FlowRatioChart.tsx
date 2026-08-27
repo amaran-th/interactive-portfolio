@@ -33,10 +33,26 @@ type Slice = {
   dashOffset: number;
 };
 
-const SIZE = 120;
-const STROKE = 20;
+const SIZE = 136;
+const STROKE = 22;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+/** Extra room reserved around the ring for outside labels, and how far
+ * past the ring's outer edge each label's anchor point sits. */
+const LABEL_MARGIN = 66;
+const LABEL_GAP = 8;
+const TEXT_GAP = LABEL_GAP + 10;
+const LABEL_TEXT_WIDTH = 64;
+const CONTAINER_SIZE = SIZE + LABEL_MARGIN * 2;
+
+/** Angle to a slice's arc midpoint (the dash math runs inside a
+ * `rotate(-90)` group, so this reproduces that rotation manually for
+ * label placement outside that group). */
+function sliceAngleRad(slice: Slice): number {
+  const midOffset = -slice.dashOffset + (slice.ratio * CIRCUMFERENCE) / 2;
+  return ((-90 + (midOffset / CIRCUMFERENCE) * 360) * Math.PI) / 180;
+}
 
 function buildSlices(
   items: FlowItem[],
@@ -149,9 +165,18 @@ function FlowSideDonut({
           </div>
         )}
       </div>
-      <div className="mt-2 flex items-center gap-3">
-        <div className="relative shrink-0">
-          <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
+      <div className="mt-2 flex items-center justify-center">
+        <div
+          className="relative shrink-0"
+          style={{ width: CONTAINER_SIZE, height: CONTAINER_SIZE }}
+        >
+          <svg
+            width={SIZE}
+            height={SIZE}
+            viewBox={`0 0 ${SIZE} ${SIZE}`}
+            className="absolute"
+            style={{ left: LABEL_MARGIN, top: LABEL_MARGIN }}
+          >
             <g transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}>
               {total === 0 ? (
                 <circle
@@ -190,39 +215,84 @@ function FlowSideDonut({
             </g>
           </svg>
           {total === 0 && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-[10px] text-gray-400">
+            <div
+              className="pointer-events-none absolute flex items-center justify-center break-keep px-4 text-center text-[10px] text-gray-400"
+              style={{
+                left: LABEL_MARGIN,
+                top: LABEL_MARGIN,
+                width: SIZE,
+                height: SIZE,
+              }}
+            >
               표시할 데이터가 없어요
             </div>
           )}
           {hoveredSlice && (
-            <ChartTooltip
-              xPercent={(hoverPos.x / SIZE) * 100}
-              yPercent={(hoverPos.y / SIZE) * 100}
-              accentColor={hoveredSlice.color}
-              lines={[
-                hoveredSlice.name,
-                `${Math.round(hoveredSlice.ratio * 100)}% · ${formatKRW(hoveredSlice.amount)}`,
-              ]}
-            />
-          )}
-        </div>
-        <ul className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-gray-600">
-          {slices.map((slice) => (
-            <li
-              key={slice.id}
-              className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5"
+            <div
+              className="pointer-events-none absolute"
+              style={{ left: LABEL_MARGIN, top: LABEL_MARGIN, width: SIZE, height: SIZE }}
             >
-              <span
-                className="h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: slice.color }}
+              <ChartTooltip
+                xPercent={(hoverPos.x / SIZE) * 100}
+                yPercent={(hoverPos.y / SIZE) * 100}
+                accentColor={hoveredSlice.color}
+                lines={[
+                  hoveredSlice.name,
+                  `${Math.round(hoveredSlice.ratio * 100)}% · ${formatKRW(hoveredSlice.amount)}`,
+                ]}
               />
-              <span>{slice.name}</span>
-              <span className="text-gray-400">
-                {Math.round(slice.ratio * 100)}%
-              </span>
-            </li>
-          ))}
-        </ul>
+            </div>
+          )}
+          <svg
+            width={CONTAINER_SIZE}
+            height={CONTAINER_SIZE}
+            viewBox={`0 0 ${CONTAINER_SIZE} ${CONTAINER_SIZE}`}
+            className="pointer-events-none absolute inset-0"
+          >
+            {slices.map((slice) => {
+              if (Math.round(slice.ratio * 100) === 0) return null;
+              const angle = sliceAngleRad(slice);
+              const cx = CONTAINER_SIZE / 2;
+              const cy = CONTAINER_SIZE / 2;
+              return (
+                <line
+                  key={slice.id}
+                  x1={cx + (SIZE / 2) * Math.cos(angle)}
+                  y1={cy + (SIZE / 2) * Math.sin(angle)}
+                  x2={cx + (SIZE / 2 + LABEL_GAP) * Math.cos(angle)}
+                  y2={cy + (SIZE / 2 + LABEL_GAP) * Math.sin(angle)}
+                  stroke={slice.color}
+                  strokeWidth={1.5}
+                />
+              );
+            })}
+          </svg>
+          {slices.map((slice) => {
+            if (Math.round(slice.ratio * 100) === 0) return null;
+            const angle = sliceAngleRad(slice);
+            const onRight = Math.cos(angle) >= 0;
+            const x =
+              CONTAINER_SIZE / 2 + (SIZE / 2 + TEXT_GAP) * Math.cos(angle);
+            const y =
+              CONTAINER_SIZE / 2 + (SIZE / 2 + TEXT_GAP) * Math.sin(angle);
+            return (
+              <div
+                key={slice.id}
+                className={`pointer-events-none absolute break-keep leading-tight text-[10px] text-gray-600 ${
+                  onRight ? "text-left" : "text-right"
+                }`}
+                style={{
+                  left: x,
+                  top: y,
+                  width: LABEL_TEXT_WIDTH,
+                  transform: `translate(${onRight ? "0" : "-100%"}, -50%)`,
+                }}
+              >
+                {slice.name} {Math.round(slice.ratio * 100)}%
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -261,9 +331,9 @@ export default function FlowRatioChart({
 
   if (incomes.length === 0 && expenses.length === 0) {
     return (
-      <div className="flex h-[180px] items-center justify-center gap-1.5 rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
-        <Inbox className="h-4 w-4" /> 수입/지출을 추가하면 구성 비율이
-        나타납니다
+      <div className="flex h-[180px] items-center justify-center gap-1.5 break-keep rounded-2xl border border-white/40 bg-white/70 text-center text-sm text-gray-400 backdrop-blur">
+        <Inbox className="h-4 w-4 shrink-0" /> 수입/지출을 추가하면 구성
+        비율이 나타납니다
       </div>
     );
   }
