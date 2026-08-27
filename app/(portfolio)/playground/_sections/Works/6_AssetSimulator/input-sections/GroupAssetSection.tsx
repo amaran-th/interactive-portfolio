@@ -173,10 +173,16 @@ export default function GroupAssetSection({
                   />
                   {group ? (
                     // 그룹에 속한 자산은 개별 색상이 없다 — 그룹 색을 그대로 쓴다.
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10"
-                      style={{ backgroundColor: group.color }}
-                    />
+                    // 색은 그룹의 것이므로 그룹명을 색 옆에 붙여서 보여준다.
+                    <span className="flex shrink-0 items-center gap-1">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10"
+                        style={{ backgroundColor: group.color }}
+                      />
+                      <span className="text-xs text-gray-400">
+                        {group.name}
+                      </span>
+                    </span>
                   ) : (
                     <button
                       type="button"
@@ -195,9 +201,6 @@ export default function GroupAssetSection({
                     <TrendingDown className="h-3.5 w-3.5 shrink-0 text-rose-500" />
                   )}
                   <span>{asset.name}</span>
-                  {group && (
-                    <span className="text-xs text-gray-400">{group.name}</span>
-                  )}
                   <span
                     className={
                       asset.initialBalance < 0
