@@ -13,6 +13,9 @@ import {
 
 type FlowDiagramProps = {
   snapshot: MonthSnapshot;
+  /** Previous month's snapshot, used to show the primary asset's
+   * month-over-month change. `undefined` at month 0 (there is no "previous"). */
+  previousSnapshot: MonthSnapshot | undefined;
   primaryAsset: AssetClass | undefined;
   assetClasses: AssetClass[];
   groups: Group[];
@@ -39,6 +42,7 @@ function NodeBox({
   amount,
   color,
   showAmount = true,
+  delta,
   onHoverMove,
   onHoverEnd,
 }: {
@@ -49,9 +53,13 @@ function NodeBox({
   color: string;
   /** Skip the amount line when it's already shown on this node's connecting arrow. */
   showAmount?: boolean;
+  /** Month-over-month change, shown as a 3rd line between the name and the
+   * amount (only the primary asset's box passes this). */
+  delta?: number;
   onHoverMove: (e: React.PointerEvent<SVGRectElement>) => void;
   onHoverEnd: () => void;
 }) {
+  const hasDelta = delta !== undefined;
   return (
     <g transform={`translate(${x}, ${y})`}>
       <rect
@@ -65,16 +73,32 @@ function NodeBox({
       />
       <text
         x={NODE_WIDTH / 2}
-        y={showAmount ? 18 : NODE_HEIGHT / 2 + 4}
+        y={hasDelta ? 12 : showAmount ? 18 : NODE_HEIGHT / 2 + 4}
         textAnchor="middle"
         className="fill-white text-[11px] font-medium"
       >
         {label}
       </text>
+      {hasDelta && (
+        <text
+          x={NODE_WIDTH / 2}
+          y={23}
+          textAnchor="middle"
+          className={`text-[9px] font-medium ${
+            delta > 0
+              ? "fill-emerald-300"
+              : delta < 0
+                ? "fill-rose-300"
+                : "fill-white/70"
+          }`}
+        >
+          {`(${delta > 0 ? "+" : ""}${Math.round(delta).toLocaleString()}원)`}
+        </text>
+      )}
       {showAmount && (
         <text
           x={NODE_WIDTH / 2}
-          y={34}
+          y={hasDelta ? 35 : 34}
           textAnchor="middle"
           className="fill-white text-[11px]"
         >
@@ -94,6 +118,7 @@ type HoverTooltip = {
 
 export default function FlowDiagram({
   snapshot,
+  previousSnapshot,
   primaryAsset,
   assetClasses,
   groups,
@@ -104,8 +129,9 @@ export default function FlowDiagram({
 
   if (!primaryAsset) {
     return (
-      <div className="flex h-[220px] items-center justify-center gap-1.5 rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
-        <Inbox className="h-4 w-4" /> 기본 자산을 지정하면 흐름도가 나타납니다
+      <div className="flex h-[220px] items-center justify-center gap-1.5 break-keep rounded-2xl border border-white/40 bg-white/70 text-center text-sm text-gray-400 backdrop-blur">
+        <Inbox className="h-4 w-4 shrink-0" /> 기본 자산을 지정하면 흐름도가
+        나타납니다
       </div>
     );
   }
@@ -126,6 +152,13 @@ export default function FlowDiagram({
   const primaryBalance = snapshot.assetBalances[primaryAsset.id] ?? 0;
   const primaryColor = primaryBalance < 0 ? DEFICIT_COLOR : PRIMARY_COLOR;
   const hasExpense = snapshot.flow.expenseOut > 0;
+  const previousPrimaryBalance = previousSnapshot
+    ? (previousSnapshot.assetBalances[primaryAsset.id] ?? 0)
+    : undefined;
+  const primaryDelta =
+    previousPrimaryBalance !== undefined
+      ? primaryBalance - previousPrimaryBalance
+      : undefined;
 
   const failedItems = [
     ...snapshot.flow.failedTransfers
@@ -250,7 +283,7 @@ export default function FlowDiagram({
     <div className="flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-sm text-gray-500">
-          <Workflow className="h-4 w-4" /> 자금 흐름
+          <Workflow className="h-4 w-4" /> 이번 달 자금 흐름
         </p>
         {canGroupByGroup && (
           <div className="flex items-center gap-1 rounded-full bg-gray-100 p-0.5 text-xs">
@@ -494,6 +527,7 @@ export default function FlowDiagram({
               label={primaryAsset.name}
               amount={primaryBalance}
               color={primaryColor}
+              delta={primaryDelta}
               onHoverMove={(e) =>
                 setHoverTooltip({
                   ...pointerPercent(e),
