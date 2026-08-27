@@ -46,15 +46,19 @@ const PADDING = 12;
 const BELOW_ZERO_CLIP_ID = "asset-area-below-zero-clip";
 const DEFICIT_COLOR = "#f43f5e";
 
+/** The primary asset stacks at the bottom of the chart (drawn first), since
+ * income lands in it and expenses leave from it. */
 function orderedAssets(
   assetClasses: AssetClass[],
   groups: Group[],
 ): AssetClass[] {
+  const primary = assetClasses.find((a) => a.isPrimary);
+  const rest = assetClasses.filter((a) => a !== primary);
   const grouped = groups.flatMap((g) =>
-    assetClasses.filter((a) => a.groupId === g.id),
+    rest.filter((a) => a.groupId === g.id),
   );
-  const ungrouped = assetClasses.filter((a) => !a.groupId);
-  return [...grouped, ...ungrouped];
+  const ungrouped = rest.filter((a) => !a.groupId);
+  return primary ? [primary, ...grouped, ...ungrouped] : [...grouped, ...ungrouped];
 }
 
 function monthLabel(monthIndex: number, today: Date): string {
@@ -251,8 +255,8 @@ export default function AssetAreaChart({
   return (
     <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       {isEmpty ? (
-        <div className="flex h-[180px] items-center justify-center gap-1.5 text-sm text-gray-400">
-          <Inbox className="h-4 w-4" /> 자산을 추가하면 그래프가 나타납니다
+        <div className="flex h-[180px] items-center justify-center gap-1.5 break-keep text-center text-sm text-gray-400">
+          <Inbox className="h-4 w-4 shrink-0" /> 자산을 추가하면 그래프가 나타납니다
         </div>
       ) : (
         <>

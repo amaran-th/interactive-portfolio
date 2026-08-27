@@ -41,7 +41,7 @@ function realValueSnapshot(
 }
 
 const WIDTH = 260;
-const HEIGHT = 220;
+const HEIGHT = 236;
 const BAR_WIDTH = 64;
 const BASE_Y = HEIGHT - 30;
 const MAX_BAR_HEIGHT = 160;
@@ -117,7 +117,19 @@ function buildRawSegments(
       value: snapshot.assetBalancesKRW[a.id] ?? 0,
     }));
 
-  const result = [...groupItems, ...ungroupedItems].reduce<{
+  // The segment holding the primary asset stacks at the bottom (drawn
+  // first), matching AssetAreaChart.
+  const primary = assetClasses.find((a) => a.isPrimary);
+  const primarySegmentId = primary ? (primary.groupId ?? primary.id) : undefined;
+  const allItems = [...groupItems, ...ungroupedItems];
+  const orderedItems = primarySegmentId
+    ? [
+        ...allItems.filter((item) => item.id === primarySegmentId),
+        ...allItems.filter((item) => item.id !== primarySegmentId),
+      ]
+    : allItems;
+
+  const result = orderedItems.reduce<{
     cursor: number;
     min: number;
     max: number;
@@ -153,8 +165,9 @@ export default function ComparisonBarChart({
 
   if (assetClasses.length === 0 || snapshots.length === 0) {
     return (
-      <div className="flex h-[220px] items-center justify-center gap-1.5 rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
-        <Inbox className="h-4 w-4" /> 자산을 추가하면 비교 그래프가 나타납니다
+      <div className="flex h-[220px] items-center justify-center gap-1.5 break-keep rounded-2xl border border-white/40 bg-white/70 text-center text-sm text-gray-400 backdrop-blur">
+        <Inbox className="h-4 w-4 shrink-0" /> 자산을 추가하면 비교 그래프가
+        나타납니다
       </div>
     );
   }
@@ -199,6 +212,11 @@ export default function ComparisonBarChart({
   const futureSegments = toSegments(futureRaw.segments);
   const nowX = WIDTH / 2 - BAR_WIDTH - 16;
   const futureX = WIDTH / 2 + 16;
+
+  const delta = futureSnapshot.totalBalance - nowSnapshot.totalBalance;
+  const deltaColor =
+    delta > 0 ? "fill-emerald-600" : delta < 0 ? "fill-rose-600" : "fill-gray-400";
+  const deltaLabel = `(${delta > 0 ? "+" : ""}${formatKRW(delta)})`;
 
   const handleBarPointerMove = (
     e: React.PointerEvent<SVGGElement>,
@@ -247,15 +265,25 @@ export default function ComparisonBarChart({
         />
         <text
           x={nowX + BAR_WIDTH / 2}
-          y={16}
+          y={30}
           textAnchor="middle"
           className="fill-gray-600 text-[11px]"
         >
           {formatKRW(nowSnapshot.totalBalance)}
         </text>
+        {selectedMonth !== 0 && (
+          <text
+            x={futureX + BAR_WIDTH / 2}
+            y={14}
+            textAnchor="middle"
+            className={`text-[10px] font-medium ${deltaColor}`}
+          >
+            {deltaLabel}
+          </text>
+        )}
         <text
           x={futureX + BAR_WIDTH / 2}
-          y={16}
+          y={30}
           textAnchor="middle"
           className="fill-gray-600 text-[11px]"
         >
