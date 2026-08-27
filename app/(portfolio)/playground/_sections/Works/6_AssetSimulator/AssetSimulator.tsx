@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AssetAreaChart from "./AssetAreaChart";
 import ComparisonBarChart from "./ComparisonBarChart";
 import FlowDiagram from "./FlowDiagram";
@@ -319,8 +319,26 @@ export default function AssetSimulator() {
   const [isDirty, setIsDirty] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [activeChartIndex, setActiveChartIndex] = useState(0);
+  const chartsColumnRef = useRef<HTMLDivElement>(null);
+  const [chartsColumnHeight, setChartsColumnHeight] = useState<number | null>(
+    null,
+  );
 
   const horizonMonths = horizonYears * 12;
+
+  // 누적 이력 패널이 왼쪽 차트 열과 같은 높이만큼만 차지하고 그 안에서
+  // 스크롤되도록, 실제 렌더링된 차트 열 높이를 측정해 넘겨준다. CSS
+  // grid만으로는 "내 콘텐츠 크기와 무관하게 형제 크기를 따라간다"를
+  // 표현할 수 없어(둘 중 더 큰 쪽에 행 높이가 맞춰짐) 직접 측정한다.
+  useEffect(() => {
+    const el = chartsColumnRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setChartsColumnHeight(entry.contentRect.height);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -728,7 +746,7 @@ export default function AssetSimulator() {
         </div>
 
         <div className="grid gap-4 @min-[650px]:grid-cols-[minmax(280px,1fr)_minmax(180px,320px)]">
-          <div className="flex flex-col gap-4">
+          <div ref={chartsColumnRef} className="flex flex-col gap-4">
             <div className="flex items-center gap-1">
               {HORIZON_PRESET_YEARS.map((years) => (
                 <button
@@ -848,6 +866,7 @@ export default function AssetSimulator() {
             assetClasses={activeScenario.assetClasses}
             today={today}
             selectedMonth={selectedMonth}
+            maxHeight={chartsColumnHeight}
           />
         </div>
       </div>

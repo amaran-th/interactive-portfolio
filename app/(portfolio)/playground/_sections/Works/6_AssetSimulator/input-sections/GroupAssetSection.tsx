@@ -195,6 +195,9 @@ export default function GroupAssetSection({
                     <TrendingDown className="h-3.5 w-3.5 shrink-0 text-rose-500" />
                   )}
                   <span>{asset.name}</span>
+                  {group && (
+                    <span className="text-xs text-gray-400">{group.name}</span>
+                  )}
                   <span
                     className={
                       asset.initialBalance < 0

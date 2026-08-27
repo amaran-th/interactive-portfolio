@@ -11,6 +11,10 @@ type HistoryPanelProps = {
   assetClasses: AssetClass[];
   today: Date;
   selectedMonth: number;
+  /** Measured height of the sibling charts column, so this panel matches it
+   * exactly instead of growing to fit its own (potentially very long)
+   * history list — the list scrolls internally within that budget. */
+  maxHeight: number | null;
 };
 
 type HistoryEntry = {
@@ -19,6 +23,8 @@ type HistoryEntry = {
   kind: "income" | "expense" | "transfer";
   label: string;
   amount: number;
+  /** True when this occurrence didn't actually happen (insufficient balance). */
+  failed?: boolean;
 };
 
 type MonthGroup = {
@@ -79,6 +85,7 @@ export default function HistoryPanel({
   assetClasses,
   today,
   selectedMonth,
+  maxHeight,
 }: HistoryPanelProps) {
   if (selectedMonth === 0 || snapshots.length === 0) {
     return (
@@ -124,16 +131,17 @@ export default function HistoryPanel({
       snapshot.flow.failedExpenses.map((f) => f.itemId),
     );
     for (const item of expenses) {
-      if (fires(item.schedule, month, today) && !failedExpenseIds.has(item.id)) {
-        entries.push({
-          key: `expense-${item.id}-${month}`,
-          month,
-          kind: "expense",
-          label: item.name,
-          amount: item.amount,
-        });
-        totalExpense += item.amount;
-      }
+      if (!fires(item.schedule, month, today)) continue;
+      const failed = failedExpenseIds.has(item.id);
+      entries.push({
+        key: `expense-${item.id}-${month}`,
+        month,
+        kind: "expense",
+        label: item.name,
+        amount: item.amount,
+        failed,
+      });
+      if (!failed) totalExpense += item.amount;
     }
     for (const transfer of snapshot.flow.transfers) {
       entries.push({
@@ -145,13 +153,26 @@ export default function HistoryPanel({
       });
       totalTransfer += transfer.amount;
     }
+    for (const transfer of snapshot.flow.failedTransfers) {
+      entries.push({
+        key: `transfer-failed-${transfer.ruleId}-${month}`,
+        month,
+        kind: "transfer",
+        label: `${nameOf(transfer.fromAssetId)} → ${nameOf(transfer.toAssetId)}`,
+        amount: transfer.amount,
+        failed: true,
+      });
+    }
   }
 
   const netIncome = totalIncome - totalExpense;
   const yearGroups = groupByYearAndMonth(entries, today);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
+    <div
+      className="flex h-full min-h-0 max-h-150 flex-col gap-3 rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur"
+      style={maxHeight != null ? { maxHeight } : undefined}
+    >
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
         <History className="h-4 w-4" /> 누적 이력 (지금 ~ {formatMonthLabel(selectedMonth, today)})
       </h3>
@@ -181,7 +202,7 @@ export default function HistoryPanel({
           </p>
         </div>
       </div>
-      <div className="flex min-h-0 max-h-100 flex-1 flex-col gap-3 overflow-y-auto text-xs">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto text-xs">
         {yearGroups.map((yearGroup) => (
           <div key={yearGroup.year} className="flex flex-col gap-2">
             <p className="text-[11px] font-semibold text-gray-500">
@@ -196,16 +217,27 @@ export default function HistoryPanel({
                   {monthGroup.entries.map((entry) => (
                     <li
                       key={entry.key}
-                      className="flex items-center justify-between rounded-lg bg-white/80 px-2 py-1.5"
+                      className={`flex items-center justify-between rounded-lg px-2 py-1.5 ${
+                        entry.failed ? "bg-gray-100/80" : "bg-white/80"
+                      }`}
                     >
-                      <span className="text-gray-500">{entry.label}</span>
+                      <span className={entry.failed ? "text-gray-400" : "text-gray-500"}>
+                        {entry.label}
+                        {entry.failed && (
+                          <span className="ml-1 text-[10px] text-gray-400">
+                            (잔액 부족으로 중단)
+                          </span>
+                        )}
+                      </span>
                       <span
                         className={
-                          entry.kind === "income"
-                            ? "text-emerald-600"
-                            : entry.kind === "expense"
-                              ? "text-rose-500"
-                              : "text-amber-600"
+                          entry.failed
+                            ? "text-gray-400 line-through"
+                            : entry.kind === "income"
+                              ? "text-emerald-600"
+                              : entry.kind === "expense"
+                                ? "text-rose-500"
+                                : "text-amber-600"
                         }
                       >
                         {entry.kind === "expense"
