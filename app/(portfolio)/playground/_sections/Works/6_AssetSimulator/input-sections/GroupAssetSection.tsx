@@ -9,6 +9,7 @@ import {
   Group,
   NewAssetClassInput,
   nextVisibleColor,
+  usedColors,
 } from "../types";
 import GroupPicker from "./GroupPicker";
 import FloatingFormPanel from "./FloatingFormPanel";
@@ -55,7 +56,6 @@ export default function GroupAssetSection({
   const [groupId, setGroupId] = useState("");
   const [currency, setCurrency] = useState<Currency>("KRW");
   const [balance, setBalance] = useState("");
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [returnRate, setReturnRate] = useState("0");
   const [makePrimary, setMakePrimary] = useState(false);
   const [isLiability, setIsLiability] = useState(false);
@@ -104,7 +104,6 @@ export default function GroupAssetSection({
     setReturnRate(String(asset.annualReturnRate));
     setMakePrimary(asset.isPrimary);
     setIsLiability(asset.initialBalance < 0);
-    setShowAdvanced(asset.annualReturnRate !== 0);
     setColor(asset.color);
   };
 
@@ -129,6 +128,11 @@ export default function GroupAssetSection({
     }
     resetForm();
   };
+
+  const formUsedColors = usedColors(
+    groups,
+    assetClasses.filter((a) => a.id !== editingId),
+  );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -257,20 +261,33 @@ export default function GroupAssetSection({
               </div>
               {!group && colorPickerId === asset.id && (
                 <div className="flex flex-wrap gap-1.5 pl-6">
-                  {GROUP_PALETTE.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onChangeAssetColor(asset.id, color);
-                        setColorPickerId(null);
-                      }}
-                      className="h-5 w-5 rounded-full ring-1 ring-black/10"
-                      style={{ backgroundColor: color }}
-                      aria-label={`색상 ${color}로 변경`}
-                    />
-                  ))}
+                  {GROUP_PALETTE.map((color) => {
+                    const taken =
+                      color !== asset.color &&
+                      usedColors(
+                        groups,
+                        assetClasses.filter((a) => a.id !== asset.id),
+                      ).has(color);
+                    return (
+                      <button
+                        key={color}
+                        type="button"
+                        disabled={taken}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onChangeAssetColor(asset.id, color);
+                          setColorPickerId(null);
+                        }}
+                        className="h-5 w-5 rounded-full ring-1 ring-black/10 disabled:cursor-not-allowed disabled:opacity-25"
+                        style={{ backgroundColor: color }}
+                        aria-label={
+                          taken
+                            ? `색상 ${color}는 이미 사용 중`
+                            : `색상 ${color}로 변경`
+                        }
+                      />
+                    );
+                  })}
                 </div>
               )}
             </li>
@@ -303,21 +320,27 @@ export default function GroupAssetSection({
             />
             {formColorPickerOpen && !groupId && (
               <div className="absolute top-full left-0 z-10 mt-1 flex w-36 flex-wrap gap-1.5 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
-                {GROUP_PALETTE.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => {
-                      setColor(c);
-                      setFormColorPickerOpen(false);
-                    }}
-                    className={`h-5 w-5 rounded-full ring-1 ${
-                      color === c ? "ring-2 ring-indigo-500" : "ring-black/10"
-                    }`}
-                    style={{ backgroundColor: c }}
-                    aria-label={`색상 ${c}로 설정`}
-                  />
-                ))}
+                {GROUP_PALETTE.map((c) => {
+                  const taken = c !== color && formUsedColors.has(c);
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      disabled={taken}
+                      onClick={() => {
+                        setColor(c);
+                        setFormColorPickerOpen(false);
+                      }}
+                      className={`h-5 w-5 rounded-full ring-1 disabled:cursor-not-allowed disabled:opacity-25 ${
+                        color === c ? "ring-2 ring-indigo-500" : "ring-black/10"
+                      }`}
+                      style={{ backgroundColor: c }}
+                      aria-label={
+                        taken ? `색상 ${c}는 이미 사용 중` : `색상 ${c}로 설정`
+                      }
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
@@ -330,6 +353,7 @@ export default function GroupAssetSection({
           />
           <GroupPicker
             groups={groups}
+            assetClasses={assetClasses}
             value={groupId}
             onChange={setGroupId}
             onCreateGroup={onAddGroup}
@@ -388,24 +412,15 @@ export default function GroupAssetSection({
         <p className="pl-6 text-[11px] text-gray-400">
           수입은 기본 자산으로 들어오고, 지출은 기본 자산에서 나가요
         </p>
-        <button
-          type="button"
-          onClick={() => setShowAdvanced((prev) => !prev)}
-          className="self-start text-xs text-indigo-500 hover:text-indigo-700"
-        >
-          {showAdvanced ? "상세 옵션 숨기기" : "상세 옵션 보기"}
-        </button>
-        {showAdvanced && (
-          <label className="flex items-center gap-2 text-xs text-gray-600">
-            {isLiability ? "연 이자율(%)" : "연 수익률(%)"}
-            <input
-              value={returnRate}
-              onChange={(e) => setReturnRate(e.target.value)}
-              type="number"
-              className="w-20 rounded-full border border-indigo-200 bg-white/80 px-2 py-1"
-            />
-          </label>
-        )}
+        <label className="flex items-center gap-2 text-xs text-gray-600">
+          {isLiability ? "연 이자율(%)" : "연 수익률(%)"}
+          <input
+            value={returnRate}
+            onChange={(e) => setReturnRate(e.target.value)}
+            type="number"
+            className="w-20 rounded-full border border-indigo-200 bg-white/80 px-2 py-1"
+          />
+        </label>
         <div className="flex gap-2">
           <button
             type="button"

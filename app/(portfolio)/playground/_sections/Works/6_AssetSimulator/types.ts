@@ -196,6 +196,25 @@ export function nextVisibleColor(
 }
 
 /**
+ * Colors currently shown somewhere (every group's color, plus every
+ * ungrouped asset's own color) — used to disable already-taken swatches in
+ * color pickers so a newly picked color can't collide with one already in
+ * use. Pass the item being edited's own id lists pre-filtered out so its
+ * current color doesn't get disabled.
+ */
+export function usedColors(
+  groups: Group[],
+  assetClasses: AssetClass[],
+): Set<string> {
+  const colors = new Set<string>();
+  for (const g of groups) colors.add(g.color);
+  for (const a of assetClasses) {
+    if (!a.groupId) colors.add(a.color);
+  }
+  return colors;
+}
+
+/**
  * A grouped asset has no color of its own — it shares its group's color.
  * An asset with no group is, by itself, a single-member group, so it keeps
  * its own color.

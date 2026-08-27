@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GROUP_PALETTE, Group } from "../types";
+import { AssetClass, GROUP_PALETTE, Group, usedColors } from "../types";
 
 const NONE_VALUE = "";
 
 type GroupPickerProps = {
   groups: Group[];
+  assetClasses: AssetClass[];
   value: string;
   onChange: (groupId: string) => void;
   onCreateGroup: (name: string, color: string) => string;
@@ -18,6 +19,7 @@ type GroupPickerProps = {
 
 export default function GroupPicker({
   groups,
+  assetClasses,
   value,
   onChange,
   onCreateGroup,
@@ -184,22 +186,35 @@ export default function GroupPicker({
                 </div>
                 {colorPickerId === group.id && (
                   <div className="flex flex-wrap gap-1 px-1 pb-1">
-                    {GROUP_PALETTE.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => {
-                          onUpdateGroup(group.id, {
-                            name: group.name,
-                            color,
-                          });
-                          setColorPickerId(null);
-                        }}
-                        className="h-4 w-4 rounded-full ring-1 ring-black/10"
-                        style={{ backgroundColor: color }}
-                        aria-label={`색상 ${color}로 변경`}
-                      />
-                    ))}
+                    {GROUP_PALETTE.map((color) => {
+                      const taken =
+                        color !== group.color &&
+                        usedColors(
+                          groups.filter((g) => g.id !== group.id),
+                          assetClasses,
+                        ).has(color);
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          disabled={taken}
+                          onClick={() => {
+                            onUpdateGroup(group.id, {
+                              name: group.name,
+                              color,
+                            });
+                            setColorPickerId(null);
+                          }}
+                          className="h-4 w-4 rounded-full ring-1 ring-black/10 disabled:cursor-not-allowed disabled:opacity-25"
+                          style={{ backgroundColor: color }}
+                          aria-label={
+                            taken
+                              ? `색상 ${color}는 이미 사용 중`
+                              : `색상 ${color}로 변경`
+                          }
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </li>
@@ -218,23 +233,33 @@ export default function GroupPicker({
                   />
                   {newGroupColorPickerOpen && (
                     <div className="absolute top-full left-0 z-20 mt-1 flex w-32 flex-wrap gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
-                      {GROUP_PALETTE.map((color) => (
-                        <button
-                          key={color}
-                          type="button"
-                          onClick={() => {
-                            setDraftColor(color);
-                            setNewGroupColorPickerOpen(false);
-                          }}
-                          className={`h-4 w-4 rounded-full ring-1 ${
-                            draftColor === color
-                              ? "ring-2 ring-indigo-500"
-                              : "ring-black/10"
-                          }`}
-                          style={{ backgroundColor: color }}
-                          aria-label={`색상 ${color}로 설정`}
-                        />
-                      ))}
+                      {GROUP_PALETTE.map((color) => {
+                        const taken =
+                          color !== draftColor &&
+                          usedColors(groups, assetClasses).has(color);
+                        return (
+                          <button
+                            key={color}
+                            type="button"
+                            disabled={taken}
+                            onClick={() => {
+                              setDraftColor(color);
+                              setNewGroupColorPickerOpen(false);
+                            }}
+                            className={`h-4 w-4 rounded-full ring-1 disabled:cursor-not-allowed disabled:opacity-25 ${
+                              draftColor === color
+                                ? "ring-2 ring-indigo-500"
+                                : "ring-black/10"
+                            }`}
+                            style={{ backgroundColor: color }}
+                            aria-label={
+                              taken
+                                ? `색상 ${color}는 이미 사용 중`
+                                : `색상 ${color}로 설정`
+                            }
+                          />
+                        );
+                      })}
                     </div>
                   )}
                 </div>
