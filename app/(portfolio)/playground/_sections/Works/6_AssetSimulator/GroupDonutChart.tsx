@@ -55,6 +55,7 @@ export default function GroupDonutChart({
     (a) => (snapshot.assetBalancesKRW[a.id] ?? 0) < 0,
   );
   const [includeLiabilities, setIncludeLiabilities] = useState(false);
+  const [legendMode, setLegendMode] = useState<"ratio" | "amount">("ratio");
   const [hoveredSlice, setHoveredSlice] = useState<Slice | null>(null);
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
 
@@ -135,21 +136,47 @@ export default function GroupDonutChart({
   );
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
+    <div className="@container flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-sm text-gray-500">
           <PieChartIcon className="h-4 w-4" /> 자산 비율
         </p>
-        {hasLiabilities && (
-          <label className="flex items-center gap-1.5 text-xs text-gray-500">
-            <input
-              type="checkbox"
-              checked={includeLiabilities}
-              onChange={(e) => setIncludeLiabilities(e.target.checked)}
-            />
-            부채 포함
-          </label>
-        )}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded-full bg-gray-100 p-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setLegendMode("ratio")}
+              className={`rounded-full px-2 py-0.5 ${
+                legendMode === "ratio"
+                  ? "bg-white font-medium text-gray-800 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              비율
+            </button>
+            <button
+              type="button"
+              onClick={() => setLegendMode("amount")}
+              className={`rounded-full px-2 py-0.5 ${
+                legendMode === "amount"
+                  ? "bg-white font-medium text-gray-800 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              금액
+            </button>
+          </div>
+          {hasLiabilities && (
+            <label className="flex items-center gap-1.5 text-xs text-gray-500">
+              <input
+                type="checkbox"
+                checked={includeLiabilities}
+                onChange={(e) => setIncludeLiabilities(e.target.checked)}
+              />
+              부채 포함
+            </label>
+          )}
+        </div>
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
         {tabs.map((tab) => (
@@ -167,7 +194,7 @@ export default function GroupDonutChart({
           </button>
         ))}
       </div>
-      <div className="mt-3 flex flex-1 items-center gap-4">
+      <div className="mt-3 flex flex-1 flex-col items-center gap-4 @min-[360px]:flex-row">
         <div className="relative shrink-0">
         <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
           <g transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}>
@@ -224,7 +251,7 @@ export default function GroupDonutChart({
           />
         )}
         </div>
-        <ul className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+        <ul className="flex w-full min-w-0 flex-1 flex-col gap-1 text-sm">
           {slices.map((slice) => (
             <li
               key={slice.id}
@@ -237,11 +264,11 @@ export default function GroupDonutChart({
               {slice.isLiability && (
                 <TrendingDown className="h-3.5 w-3.5 shrink-0 text-rose-500" />
               )}
-              <span>
-                {slice.name} · {Math.round(slice.ratio * 100)}%
-              </span>
+              <span>{slice.name}</span>
               <span className={slice.isLiability ? "text-rose-500" : ""}>
-                {formatKRW(slice.amount)}
+                {legendMode === "ratio"
+                  ? `${Math.round(slice.ratio * 100)}%`
+                  : formatKRW(slice.amount)}
               </span>
             </li>
           ))}
