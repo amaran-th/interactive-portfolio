@@ -671,9 +671,9 @@ export default function AssetSimulator() {
   );
 
   return (
-    <div className="h-full w-full overflow-y-auto bg-linear-to-br from-indigo-100 via-blue-50 to-purple-100 px-4 pb-4 text-gray-800">
-      <div className="mx-auto max-w-400 @container">
-        <div className="sticky top-0 z-40 -mx-4 mb-4 bg-linear-to-br from-indigo-100 via-blue-50 to-purple-100 px-4 pt-4 pb-3 shadow-[0_4px_10px_-6px_rgba(0,0,0,0.15)]">
+    <div className="h-full w-full overflow-y-auto bg-linear-to-br from-indigo-100 via-blue-50 to-purple-100 text-gray-800">
+      <div className="sticky top-0 z-40 bg-linear-to-br from-indigo-100 via-blue-50 to-purple-100 px-4 pt-4 pb-3 shadow-[0_4px_10px_-6px_rgba(0,0,0,0.15)]">
+        <div className="mx-auto max-w-400">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-bold text-gray-800">자산 시뮬레이터</h2>
             <div className="flex flex-wrap items-center gap-3">
@@ -735,7 +735,9 @@ export default function AssetSimulator() {
             onToggleComparison={() => setShowComparison((prev) => !prev)}
           />
         </div>
+      </div>
 
+      <div className="mx-auto max-w-400 @container px-4 pt-4 pb-4">
         {showComparison && (
           <ScenarioComparisonChart
             scenarios={scenarios}
@@ -782,8 +784,8 @@ export default function AssetSimulator() {
           />
         </div>
 
-        <div className="grid gap-4 @min-[650px]:grid-cols-[minmax(280px,1fr)_minmax(180px,320px)]">
-          <div ref={chartsColumnRef} className="flex flex-col gap-4">
+        <div className="grid gap-4 @min-[1400px]:grid-cols-[minmax(280px,1fr)_minmax(180px,320px)]">
+          <div ref={chartsColumnRef} className="@container flex flex-col gap-4">
             <div className="flex items-center gap-1">
               {HORIZON_PRESET_YEARS.map((years) => (
                 <button
@@ -799,6 +801,90 @@ export default function AssetSimulator() {
                   {years}년
                 </button>
               ))}
+            </div>
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-1 gap-4 @min-[900px]:grid-cols-2">
+                <div className="min-w-80">
+                  <AssetAreaChart
+                    snapshots={snapshots}
+                    groups={assetGroups}
+                    assetClasses={activeScenario.assetClasses}
+                    selectedMonth={selectedMonth}
+                    onChangeMonth={setSelectedMonth}
+                    today={today}
+                    horizonMonths={horizonMonths}
+                    goal={activeScenario.goal}
+                    onSetGoal={handleSetGoal}
+                    simulationInput={simulationInput}
+                    inflationEnabled={activeScenario.inflationEnabled}
+                    inflationRate={activeScenario.inflationRate}
+                  />
+                </div>
+                <div
+                  className={`min-w-80 ${
+                    activeChartIndex === 2
+                      ? "block"
+                      : "block @max-[500px]:hidden"
+                  }`}
+                >
+                  <FlowDiagram
+                    snapshot={selectedSnapshot}
+                    previousSnapshot={
+                      selectedMonth > 0 ? snapshots[selectedMonth - 1] : undefined
+                    }
+                    primaryAsset={primaryAsset}
+                    assetClasses={activeScenario.assetClasses}
+                    groups={activeScenario.groups}
+                    exchangeRate={activeScenario.exchangeRate}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 @min-[500px]:grid-cols-2 @min-[1000px]:grid-cols-4">
+                <div
+                  className={`min-w-50 ${
+                    activeChartIndex === 0
+                      ? "block"
+                      : "block @max-[500px]:hidden"
+                  }`}
+                >
+                  <ComparisonBarChart
+                    snapshots={snapshots}
+                    groups={assetGroups}
+                    assetClasses={activeScenario.assetClasses}
+                    selectedMonth={selectedMonth}
+                    inflationEnabled={activeScenario.inflationEnabled}
+                    inflationRate={activeScenario.inflationRate}
+                  />
+                </div>
+                <div
+                  className={`min-w-50 ${
+                    activeChartIndex === 1
+                      ? "block"
+                      : "block @max-[500px]:hidden"
+                  }`}
+                >
+                  <GroupDonutChart
+                    groups={assetGroups}
+                    assetClasses={activeScenario.assetClasses}
+                    snapshot={selectedSnapshot}
+                  />
+                </div>
+                <div
+                  className={`min-w-50 @min-[500px]:col-span-2 ${
+                    activeChartIndex === 3
+                      ? "block"
+                      : "block @max-[500px]:hidden"
+                  }`}
+                >
+                  <FlowRatioChart
+                    snapshot={selectedSnapshot}
+                    incomes={activeScenario.incomes}
+                    expenses={activeScenario.expenses}
+                    categories={activeScenario.categories}
+                    today={today}
+                  />
+                </div>
+              </div>
             </div>
             <div className="hidden @max-[500px]:flex items-center justify-center gap-3">
               <button
@@ -839,85 +925,18 @@ export default function AssetSimulator() {
                 ›
               </button>
             </div>
-            <div className="grid grid-cols-1 gap-4 @min-[500px]:grid-cols-2 @min-[900px]:grid-cols-3">
-              <div className="min-w-80 @min-[500px]:col-span-2">
-                <AssetAreaChart
-                  snapshots={snapshots}
-                  groups={assetGroups}
-                  assetClasses={activeScenario.assetClasses}
-                  selectedMonth={selectedMonth}
-                  onChangeMonth={setSelectedMonth}
-                  today={today}
-                  horizonMonths={horizonMonths}
-                  goal={activeScenario.goal}
-                  onSetGoal={handleSetGoal}
-                  simulationInput={simulationInput}
-                  inflationEnabled={activeScenario.inflationEnabled}
-                  inflationRate={activeScenario.inflationRate}
-                />
-              </div>
-              <div
-                className={`min-w-50 ${
-                  activeChartIndex === 0 ? "block" : "block @max-[500px]:hidden"
-                }`}
-              >
-                <ComparisonBarChart
-                  snapshots={snapshots}
-                  groups={assetGroups}
-                  assetClasses={activeScenario.assetClasses}
-                  selectedMonth={selectedMonth}
-                  inflationEnabled={activeScenario.inflationEnabled}
-                  inflationRate={activeScenario.inflationRate}
-                />
-              </div>
-              <div
-                className={`min-w-50 ${
-                  activeChartIndex === 1 ? "block" : "block @max-[500px]:hidden"
-                }`}
-              >
-                <GroupDonutChart
-                  groups={assetGroups}
-                  assetClasses={activeScenario.assetClasses}
-                  snapshot={selectedSnapshot}
-                />
-              </div>
-              <div
-                className={`min-w-50 @min-[500px]:col-span-2 ${
-                  activeChartIndex === 2 ? "block" : "block @max-[500px]:hidden"
-                }`}
-              >
-                <FlowDiagram
-                  snapshot={selectedSnapshot}
-                  primaryAsset={primaryAsset}
-                  assetClasses={activeScenario.assetClasses}
-                  groups={activeScenario.groups}
-                  exchangeRate={activeScenario.exchangeRate}
-                />
-              </div>
-              <div
-                className={`min-w-50 @min-[500px]:col-span-2 @min-[900px]:col-span-3 ${
-                  activeChartIndex === 3 ? "block" : "block @max-[500px]:hidden"
-                }`}
-              >
-                <FlowRatioChart
-                  snapshot={selectedSnapshot}
-                  incomes={activeScenario.incomes}
-                  expenses={activeScenario.expenses}
-                  categories={activeScenario.categories}
-                  today={today}
-                />
-              </div>
-            </div>
           </div>
-          <HistoryPanel
-            snapshots={snapshots}
-            incomes={activeScenario.incomes}
-            expenses={activeScenario.expenses}
-            assetClasses={activeScenario.assetClasses}
-            today={today}
-            selectedMonth={selectedMonth}
-            maxHeight={chartsColumnHeight}
-          />
+          <div className="@max-[1400px]:hidden">
+            <HistoryPanel
+              snapshots={snapshots}
+              incomes={activeScenario.incomes}
+              expenses={activeScenario.expenses}
+              assetClasses={activeScenario.assetClasses}
+              today={today}
+              selectedMonth={selectedMonth}
+              maxHeight={chartsColumnHeight}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -20,10 +20,8 @@ export const metadata: Metadata = {
 
 export default function AssetSimulatorPage() {
   return (
-    <main className="flex h-dvh justify-center overflow-hidden text-gray-800">
-      <div className="h-full w-full max-w-[1600px]">
-        <AssetSimulator />
-      </div>
+    <main className="h-dvh overflow-hidden bg-linear-to-br from-indigo-100 via-blue-50 to-purple-100 text-gray-800">
+      <AssetSimulator />
     </main>
   );
 }

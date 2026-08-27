@@ -59,8 +59,9 @@ export default function ScenarioComparisonChart({
 
   if (series.length === 0 || series[0].snapshots.length === 0) {
     return (
-      <div className="mb-4 flex h-[200px] items-center justify-center gap-1.5 rounded-2xl border border-white/40 bg-white/70 text-sm text-gray-400 backdrop-blur">
-        <Inbox className="h-4 w-4" /> 시나리오를 만들면 비교 그래프가 나타납니다
+      <div className="mb-4 flex h-[200px] items-center justify-center gap-1.5 break-keep rounded-2xl border border-white/40 bg-white/70 text-center text-sm text-gray-400 backdrop-blur">
+        <Inbox className="h-4 w-4 shrink-0" /> 시나리오를 만들면 비교 그래프가
+        나타납니다
       </div>
     );
   }
