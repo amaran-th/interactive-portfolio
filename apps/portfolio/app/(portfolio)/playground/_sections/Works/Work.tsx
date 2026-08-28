@@ -11,7 +11,7 @@ export interface WorkItem {
   platforms?: { type: "mobile" | "pc"; specialized?: boolean }[];
   skills?: { icon: string | null; name: string }[];
   thumbnail?: string;
-  content: React.ReactNode;
+  embedPath: string;
   path?: string;
 }
 

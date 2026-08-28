@@ -7,6 +7,9 @@ import { WorkItem } from "./Work";
 
 const WORK_MODAL_THEME = "from-[#2a2c32] via-[#3a3d45] to-[#575b66]";
 
+const SERVICES_ORIGIN =
+  process.env.NEXT_PUBLIC_SERVICES_ORIGIN ?? "https://amaranth-project.vercel.app";
+
 interface WorkModalProps {
   works: WorkItem[];
   selectedIndex: number;
@@ -107,7 +110,7 @@ export default function WorkModal({
               </h4>
               {selected.path && (
                 <Link
-                  href={selected.path}
+                  href={`${SERVICES_ORIGIN}${selected.path}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -145,11 +148,33 @@ export default function WorkModal({
           </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto text-gray-300 md:flex-row md:divide-x md:divide-gray-800">
             <div
-              className={`min-h-[40dvh] h-full shrink-0 border-b border-gray-800 md:min-h-0 md:w-[calc(80vh-64px)] md:border-b-0 ${
-                mobileView === "content" ? "block" : "hidden md:block"
+              className={`min-h-[40dvh] h-full shrink-0 flex-col border-b border-gray-800 md:min-h-0 md:w-[calc(80vh-64px)] md:border-b-0 ${
+                mobileView === "content" ? "flex" : "hidden md:flex"
               }`}
             >
-              {selected.content}
+              <div className="min-h-0 flex-1">
+                {isOpen ? (
+                  <iframe
+                    key={selected.id}
+                    src={`${SERVICES_ORIGIN}${selected.embedPath}`}
+                    title={selected.title}
+                    loading="lazy"
+                    className="h-full w-full border-0"
+                  />
+                ) : null}
+              </div>
+              {selected.path && (
+                <div className="shrink-0 border-t border-white/10 bg-black/20 px-4 py-2 text-center">
+                  <a
+                    href={`${SERVICES_ORIGIN}${selected.path}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
+                  >
+                    새 탭에서 열기 <ExternalLink size={13} />
+                  </a>
+                </div>
+              )}
             </div>
             <div
               className={`flex-1 overflow-y-auto px-5 py-4 ${

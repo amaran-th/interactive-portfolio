@@ -1,9 +1,3 @@
-import KnitMuffler from "./1_KnitMuffler/KnitMuffler";
-import VisualNovelStudio from "./2_VisualNovelStudio/VisualNovelStudio";
-import StellarForge from "./3_StellarForge/StellarForge";
-import YearlyReceipt from "./4_YearlyReceipt/YearlyReceipt";
-import PixelArtMaker from "./5_PixelArtMaker/PixelArtMaker";
-import AssetSimulator from "./6_AssetSimulator/AssetSimulator";
 import { WorkItem } from "./Work";
 
 export const works: WorkItem[] = [
@@ -29,7 +23,7 @@ export const works: WorkItem[] = [
       { type: "pc", specialized: true },
       { type: "mobile", specialized: true },
     ],
-    content: <KnitMuffler />,
+    embedPath: "/knit-muffler",
     thumbnail: "/playground/knit-muffler.png",
     path: "/knit-muffler",
   },
@@ -45,7 +39,7 @@ export const works: WorkItem[] = [
   ▶️ 재생 모드: 완성된 비주얼 노벨을 순서대로 감상합니다. 클릭 또는 키보드로 컷을 넘길 수 있습니다.`,
     period: "2026.04.20 - 07.24",
     platforms: [{ type: "pc", specialized: true }, { type: "mobile" }],
-    content: <VisualNovelStudio />,
+    embedPath: "/visual-novel-studio",
     thumbnail: "/playground/visual-novel-studio.png",
     path: "/visual-novel-studio",
   },
@@ -68,7 +62,7 @@ export const works: WorkItem[] = [
   - 캔버스 기반 우주 배경과 실시간으로 진화하는 별 연출을 담았습니다.`,
     period: "2026.06.27 - ",
     platforms: [{ type: "pc" }, { type: "mobile" }],
-    content: <StellarForge />,
+    embedPath: "/stellar-forge",
     thumbnail: "/playground/stellar-forge.png",
     path: "/stellar-forge",
   },
@@ -87,7 +81,7 @@ export const works: WorkItem[] = [
   - 입력한 목표는 자동 저장되어 새로고침 후에도 유지됩니다.`,
     period: "2026.07.05 - 07.10",
     platforms: [{ type: "mobile", specialized: true }, { type: "pc" }],
-    content: <YearlyReceipt />,
+    embedPath: "/yearly-receipt",
     thumbnail: "/playground/yearly-receipt.png",
     path: "/yearly-receipt",
   },
@@ -105,7 +99,7 @@ export const works: WorkItem[] = [
   💾 내보내기: PNG·SVG·JSON·JPG로 내보낼 수 있고, 저장한 작품은 비주얼 노벨 스튜디오 등 다른 Work에서 그대로 재사용됩니다.`,
     period: "2026.07.10 - 08.05",
     platforms: [{ type: "pc", specialized: true }, { type: "mobile" }],
-    content: <PixelArtMaker />,
+    embedPath: "/nemo-nemo-beam",
     thumbnail: "/playground/nemo-beam.png",
     path: "/nemo-nemo-beam",
   },
@@ -121,7 +115,7 @@ export const works: WorkItem[] = [
   🔀 이체 규칙: 자산군 간 자금 흐름을 정기 또는 일시로 설정할 수 있어 예적금 만기, 전세보증금 반환 같은 일회성 변동도 반영하고, 흐름도에서 그 달의 이체 내역을 확인할 수 있습니다.`,
     period: "2026.08.18 - 08.28",
     platforms: [{ type: "pc" }, { type: "mobile" }],
-    content: <AssetSimulator />,
+    embedPath: "/asset-simulator",
     path: "/asset-simulator",
   },
 ];
