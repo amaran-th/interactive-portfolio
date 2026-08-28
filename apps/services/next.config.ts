@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const PORTFOLIO_ORIGINS = [
   "https://amaranth-portfolio.vercel.app",
   "http://localhost:3000",
+  ...(process.env.EXTRA_FRAME_ANCESTORS?.split(/\s+/).filter(Boolean) ?? []),
 ];
 
 const nextConfig: NextConfig = {

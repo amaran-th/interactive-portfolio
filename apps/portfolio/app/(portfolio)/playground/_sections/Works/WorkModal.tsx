@@ -153,15 +153,14 @@ export default function WorkModal({
               }`}
             >
               <div className="min-h-0 flex-1">
-                {isOpen ? (
-                  <iframe
-                    key={selected.id}
-                    src={`${SERVICES_ORIGIN}${selected.embedPath}`}
-                    title={selected.title}
-                    loading="lazy"
-                    className="h-full w-full border-0"
-                  />
-                ) : null}
+                <iframe
+                  key={selected.id}
+                  src={`${SERVICES_ORIGIN}${selected.embedPath}`}
+                  title={selected.title}
+                  allow="clipboard-read; clipboard-write"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  className="h-full w-full border-0"
+                />
               </div>
               {selected.path && (
                 <div className="shrink-0 border-t border-white/10 bg-black/20 px-4 py-2 text-center">
