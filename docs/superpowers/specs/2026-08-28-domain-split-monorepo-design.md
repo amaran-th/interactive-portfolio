@@ -89,7 +89,16 @@ interactive-portfolio/                       레포 루트 (이름 유지)
   - 로컬: `http://localhost:3100`
   - 프로덕션: `https://amaranth-project.vercel.app`
 - iframe 크기는 모달이 정한 뷰포트(예: 90vw × 90vh)에 iframe 100%. 스크롤·반응형은 서비스 페이지가 담당한다. `postMessage` 로 높이를 주고받는 것은 이후 최적화 과제이며 이번 범위 밖.
-- 모바일 등 iframe 상호작용이 불편한 환경을 위해 "새 탭에서 열기" 링크(`https://amaranth-project.vercel.app{embedPath}`)를 모달에 함께 둔다.
+- **"새 탭에서 열기"를 눈에 띄게 둔다.** 모달 헤더에 아이콘 링크(기존 `ExternalLink`)를 유지하되, iframe 하단(또는 헤더 옆)에 "새 탭에서 열기" 텍스트 버튼을 함께 배치한다. 링크 대상은 `${SERVICES_ORIGIN}${path}` (퍼스트파티 서비스 페이지).
+
+### 저장소(localStorage) 동작 — 명시적 비목표
+
+포트폴리오 모달의 서비스는 **"체험" 경험**이며, 모달에서 만든 데이터가 실제 서비스 도메인 직접 방문과 **공유되지 않는다**. 이는 알려진 제약이자 수용된 트레이드오프다.
+
+- 이유: `amaranth-portfolio.vercel.app`(포트폴리오)과 `amaranth-project.vercel.app`(서비스)은 서로 다른 origin이고, localStorage는 origin에 묶인다. iframe 안 서비스는 브라우저의 서드파티 storage 파티셔닝으로 `(portfolio / services)` 별도 칸을 쓴다. 직접 방문의 `(services / services)` 칸과 겹치지 않는다. 서버 없이는 이 둘을 합칠 수 없다(같은 origin이거나 Storage Access API여야 하는데, 후자는 사전 퍼스트파티 방문을 요구해 "모달 먼저" 시나리오를 만족 못 함).
+- 파티션된 storage는 Chrome/Firefox에서 정상 동작하며 지속된다. Safari는 최상위 사이트 미상호작용 시 약 7일 후 정리할 수 있으나 "체험" 데이터 수명으로 충분하다.
+- postMessage 브리지·Storage Access API·서버 백엔드는 모두 이번 범위 밖. 진짜 작업이 필요한 사용자는 "새 탭에서 열기"로 퍼스트파티 서비스 페이지에서 작업한다.
+- 서비스 도메인 직접 방문자의 기존 저장 데이터는 도메인이 그대로이므로 **전혀 영향받지 않는다**.
 
 ### 서비스 쪽 (`apps/services`)
 
@@ -175,6 +184,7 @@ git push origin main
 
 - `amaranth-project.vercel.app/` 정식 서비스 목록 랜딩 (이번엔 임시)
 - iframe `postMessage` 높이 동기화 등 임베드 UX 최적화
+- 모달 "체험" 데이터와 실제 서비스 저장소 공유 (서버 백엔드 또는 Multi-Zones 단일 origin 필요 — 이번엔 명시적 비목표)
 - 실험 페이지 색인 유지 여부 재검토
 - 커스텀 도메인 연결 (지금은 `.vercel.app` 서브도메인)
 - Turborepo 도입 (빌드 캐시가 필요해지면)

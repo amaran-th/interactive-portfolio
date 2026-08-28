@@ -620,6 +620,23 @@ const SERVICES_ORIGIN =
 )}
 ```
 
+추가로, iframe 패널 하단(또는 헤더 타이틀 옆)에 **눈에 띄는 텍스트 링크**를 둔다 — 헤더의 작은 아이콘만으로는 부족하다:
+
+```tsx
+{selected.path && (
+  <a
+    href={`${SERVICES_ORIGIN}${selected.path}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
+  >
+    새 탭에서 열기 <ExternalLink size={13} />
+  </a>
+)}
+```
+
+배치 위치(iframe 위/아래 얇은 바 등)는 구현자 재량. 모달의 서비스는 "체험"이고 저장 데이터가 실제 서비스 페이지와 공유되지 않으므로(스펙 "저장소 동작" 참고), 진짜 작업하려는 사용자가 퍼스트파티 페이지로 쉽게 넘어갈 수 있어야 한다.
+
 모바일 탭 토글("설명"/"결과물")에서 "결과물" 쪽도 이 iframe이 보이도록 기존 조건부 클래스는 유지한다 (`mobileView === "content"`).
 
 - [ ] **Step 4: 포트폴리오 Work 컴포넌트 복사본 삭제**
