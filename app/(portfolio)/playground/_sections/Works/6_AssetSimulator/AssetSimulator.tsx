@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, Settings, X } from "lucide-react";
+import Image from "next/image";
 import AssetAreaChart from "./AssetAreaChart";
 import ComparisonBarChart from "./ComparisonBarChart";
+import CustomSelect from "./CustomSelect";
 import FlowDiagram from "./FlowDiagram";
 import FlowRatioChart from "./FlowRatioChart";
 import GroupDonutChart from "./GroupDonutChart";
@@ -41,6 +44,54 @@ function withGuaranteedPrimary(assets: AssetClass[]): AssetClass[] {
 }
 
 const CHART_PANEL_COUNT_ARRAY = [0, 1, 2, 3] as const;
+
+const ONBOARDING_IMAGE_BASE = "/playground/asset-simulator/onboarding";
+
+type OnboardingSlide = {
+  label: string;
+  description: string;
+  desktopImage: string;
+  mobileImage: string;
+};
+
+const ONBOARDING_SLIDES: OnboardingSlide[] = [
+  {
+    label: "입력 패널",
+    description:
+      "보유 자산과 수입·지출, 자산 간 이체 규칙을 등록하면 시뮬레이션에 바로 반영됩니다. 매달 반복되는 항목과 1회성 항목을 구분해서 넣을 수 있어요.",
+    desktopImage: `${ONBOARDING_IMAGE_BASE}/input-panel-desktop.png`,
+    mobileImage: `${ONBOARDING_IMAGE_BASE}/input-panel-mobile.png`,
+  },
+  {
+    label: "자산 추이 · 자금 흐름",
+    description:
+      "슬라이더로 시점을 옮기면 자산 변화 그래프와 그 달의 수입·지출 흐름이 함께 바뀝니다.",
+    desktopImage: `${ONBOARDING_IMAGE_BASE}/asset-flow-desktop.png`,
+    mobileImage: `${ONBOARDING_IMAGE_BASE}/asset-flow-mobile.png`,
+  },
+  {
+    label: "비교 · 비율 · 구성",
+    description:
+      "지금과 미래 시점의 자산을 막대로 비교하고, 자산 구성과 수입·지출 비율은 도넛 차트로 한눈에 볼 수 있어요.",
+    desktopImage: `${ONBOARDING_IMAGE_BASE}/compare-ratio-desktop.png`,
+    mobileImage: `${ONBOARDING_IMAGE_BASE}/compare-ratio-mobile.png`,
+  },
+  {
+    label: "누적 이력",
+    description:
+      "슬라이더로 옮긴 시점까지의 수입·지출·이체 내역을 월별로 모아 보여줍니다. PC 화면에서만 제공돼요.",
+    // PC 화면 폭에서만 제공되는 기능이라 모바일 전용 이미지는 없다.
+    desktopImage: `${ONBOARDING_IMAGE_BASE}/history-desktop.png`,
+    mobileImage: `${ONBOARDING_IMAGE_BASE}/history-desktop.png`,
+  },
+  {
+    label: "시나리오",
+    description:
+      "여러 시나리오를 만들어 나란히 비교할 수 있어요. 막막하다면 예시 시나리오부터 살펴보세요.",
+    desktopImage: `${ONBOARDING_IMAGE_BASE}/scenario-desktop.png`,
+    mobileImage: `${ONBOARDING_IMAGE_BASE}/scenario-mobile.png`,
+  },
+];
 
 function goalReferences(
   goal: Goal | null,
@@ -330,6 +381,104 @@ export default function AssetSimulator() {
   const [isDirty, setIsDirty] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [activeChartIndex, setActiveChartIndex] = useState(0);
+  const carouselScrollRef = useRef<HTMLDivElement>(null);
+
+  // The dots/arrows drive the scroll position directly; a native scroll-snap
+  // strip (see the mobile carousel markup) handles the swipe gesture itself,
+  // and this listener keeps `activeChartIndex` (for the dots) in sync with
+  // wherever the user's swipe actually lands.
+  const handleCarouselScroll = () => {
+    const el = carouselScrollRef.current;
+    if (!el || el.clientWidth === 0) return;
+    const index = Math.round(el.scrollLeft / el.clientWidth);
+    const clamped = Math.max(
+      0,
+      Math.min(CHART_PANEL_COUNT_ARRAY.length - 1, index),
+    );
+    setActiveChartIndex((prev) => (prev === clamped ? prev : clamped));
+  };
+  const scrollToChartIndex = (index: number) => {
+    const el = carouselScrollRef.current;
+    if (el) {
+      el.scrollTo({ left: index * el.clientWidth, behavior: "smooth" });
+    }
+    setActiveChartIndex(index);
+  };
+  const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
+  const [inputPanelCollapsed, setInputPanelCollapsed] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [onboardingSlide, setOnboardingSlide] = useState(0);
+  const onboardingScrollRef = useRef<HTMLDivElement>(null);
+  const onboardingScrollSettleRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  // Debounced rather than updated on every scroll event, so the label/
+  // description switch once after the (smooth-scroll or drag) motion
+  // actually settles instead of flickering through intermediate slides
+  // while it's still animating.
+  const handleOnboardingScroll = () => {
+    const el = onboardingScrollRef.current;
+    if (!el || el.clientWidth === 0) return;
+    if (onboardingScrollSettleRef.current) {
+      clearTimeout(onboardingScrollSettleRef.current);
+    }
+    onboardingScrollSettleRef.current = setTimeout(() => {
+      const index = Math.round(el.scrollLeft / el.clientWidth);
+      const clamped = Math.max(
+        0,
+        Math.min(ONBOARDING_SLIDES.length - 1, index),
+      );
+      setOnboardingSlide((prev) => (prev === clamped ? prev : clamped));
+    }, 120);
+  };
+  const scrollToOnboardingSlide = (index: number) => {
+    const el = onboardingScrollRef.current;
+    if (el) {
+      el.scrollTo({ left: index * el.clientWidth, behavior: "smooth" });
+    }
+  };
+  // The strip's native overflow-x-auto + scroll-snap already handles touch
+  // swipe. Mouse click-drag doesn't scroll a div natively, so it's wired up
+  // by hand here for desktop.
+  const handleOnboardingMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = onboardingScrollRef.current;
+    if (!el) return;
+    const startX = e.clientX;
+    const startScrollLeft = el.scrollLeft;
+    let dragged = false;
+    // CSS scroll-snap otherwise fights the manual scrollLeft writes below,
+    // yanking the strip to the nearest slide mid-drag instead of following
+    // the cursor. Suspend it for the duration of the gesture.
+    el.style.scrollSnapType = "none";
+
+    const handleMove = (moveEvent: MouseEvent) => {
+      dragged = true;
+      el.scrollLeft = startScrollLeft - (moveEvent.clientX - startX);
+    };
+    const handleUp = () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+      el.style.scrollSnapType = "";
+      if (!dragged || el.clientWidth === 0) return;
+      const index = Math.round(el.scrollLeft / el.clientWidth);
+      scrollToOnboardingSlide(
+        Math.max(0, Math.min(ONBOARDING_SLIDES.length - 1, index)),
+      );
+    };
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const seen = window.localStorage.getItem("asset-simulator-onboarding-seen");
+    if (!seen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOnboardingOpen(true);
+      setOnboardingSlide(0);
+      window.localStorage.setItem("asset-simulator-onboarding-seen", "1");
+    }
+  }, []);
   const chartsColumnRef = useRef<HTMLDivElement>(null);
   const [chartsColumnHeight, setChartsColumnHeight] = useState<number | null>(
     null,
@@ -673,10 +822,23 @@ export default function AssetSimulator() {
   return (
     <div className="h-full w-full overflow-y-auto bg-linear-to-br from-indigo-100 via-blue-50 to-purple-100 text-gray-800">
       <div className="sticky top-0 z-40 bg-linear-to-br from-indigo-100 via-blue-50 to-purple-100 px-4 pt-4 pb-3 shadow-[0_4px_10px_-6px_rgba(0,0,0,0.15)]">
-        <div className="mx-auto max-w-400">
+        <div className="mx-auto max-w-400 @container">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-bold text-gray-800">자산 시뮬레이터</h2>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-lg font-bold text-gray-800">자산 시뮬레이터</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setOnboardingOpen(true);
+                  setOnboardingSlide(0);
+                }}
+                className="flex h-5 w-5 items-center justify-center rounded-full bg-white/60 text-xs font-semibold text-gray-500 hover:bg-white hover:text-gray-700"
+                aria-label="사용법 보기"
+              >
+                ?
+              </button>
+            </div>
+            <div className="hidden items-center gap-3 @min-[500px]:flex">
               <label className="flex items-center gap-2 text-xs text-gray-600">
                 환율(1달러 = 원)
                 <input
@@ -721,6 +883,13 @@ export default function AssetSimulator() {
                 </span>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setMobileSettingsOpen(true)}
+              className="flex items-center gap-1.5 rounded-full border border-white/60 bg-white/50 px-3 py-1.5 text-xs text-gray-600 @min-[500px]:hidden"
+            >
+              <Settings className="h-3.5 w-3.5" /> 상세 설정
+            </button>
           </div>
 
           <ScenarioTabs
@@ -737,6 +906,193 @@ export default function AssetSimulator() {
         </div>
       </div>
 
+      {mobileSettingsOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+          onClick={() => setMobileSettingsOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-800">상세 설정</h3>
+              <button
+                type="button"
+                onClick={() => setMobileSettingsOpen(false)}
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                aria-label="닫기"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              <label className="flex items-center justify-between gap-2 text-sm text-gray-600">
+                환율(1달러 = 원)
+                <input
+                  type="number"
+                  min={1}
+                  value={activeScenario.exchangeRate}
+                  onChange={(e) =>
+                    updateActiveScenario((s) => ({
+                      ...s,
+                      exchangeRate: Math.max(1, Number(e.target.value) || 1),
+                    }))
+                  }
+                  className="w-28 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm"
+                />
+              </label>
+              <div className="flex flex-col gap-2 text-sm text-gray-600">
+                <div className="flex items-center justify-between gap-2">
+                  <span>물가상승률 반영</span>
+                  <Switch
+                    checked={activeScenario.inflationEnabled}
+                    onChange={handleToggleInflation}
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    value={activeScenario.inflationRate}
+                    onChange={(e) =>
+                      handleSetInflationRate(Number(e.target.value) || 0)
+                    }
+                    disabled={!activeScenario.inflationEnabled}
+                    className={`w-14 rounded-full border px-2 py-1 text-sm outline-none ${
+                      activeScenario.inflationEnabled
+                        ? "border-gray-200 bg-white focus:border-gray-400"
+                        : "cursor-not-allowed border-transparent bg-gray-100 text-gray-400"
+                    }`}
+                  />
+                  <span
+                    className={
+                      activeScenario.inflationEnabled ? "" : "text-gray-400"
+                    }
+                  >
+                    % (연간)
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {onboardingOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+          onClick={() => setOnboardingOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-gray-800">
+                자산 시뮬레이터 사용법
+              </h3>
+              <button
+                type="button"
+                onClick={() => setOnboardingOpen(false)}
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                aria-label="닫기"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="relative">
+              <div
+                ref={onboardingScrollRef}
+                onScroll={handleOnboardingScroll}
+                onMouseDown={handleOnboardingMouseDown}
+                onDragStart={(e) => e.preventDefault()}
+                className="flex cursor-grab snap-x snap-mandatory overflow-x-auto overscroll-x-contain select-none active:cursor-grabbing"
+                style={{ scrollbarWidth: "none" }}
+              >
+                {ONBOARDING_SLIDES.map((slide) => (
+                  <div
+                    key={slide.label}
+                    className="w-full shrink-0 snap-start px-0.5"
+                  >
+                    <div className="relative h-48 w-full overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                      <Image
+                        src={slide.desktopImage}
+                        alt={slide.label}
+                        fill
+                        className="hidden object-contain object-center min-[500px]:block"
+                      />
+                      <Image
+                        src={slide.mobileImage}
+                        alt={slide.label}
+                        fill
+                        className="block object-contain object-center min-[500px]:hidden"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <span className="pointer-events-none absolute top-2 left-2 rounded-full bg-black/50 px-2 py-0.5 text-xs font-medium text-white">
+                {onboardingSlide + 1}/{ONBOARDING_SLIDES.length}
+              </span>
+            </div>
+            <div className="mt-3">
+              <p className="text-sm font-medium text-gray-800">
+                {ONBOARDING_SLIDES[onboardingSlide].label}
+              </p>
+              <p className="mt-0.5 text-sm text-gray-600">
+                {ONBOARDING_SLIDES[onboardingSlide].description}
+              </p>
+            </div>
+            <div className="mt-3 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  scrollToOnboardingSlide(Math.max(0, onboardingSlide - 1))
+                }
+                disabled={onboardingSlide === 0}
+                className="text-gray-400 disabled:opacity-30"
+                aria-label="이전"
+              >
+                ‹
+              </button>
+              <div className="flex gap-1.5">
+                {ONBOARDING_SLIDES.map((slide, i) => (
+                  <button
+                    key={slide.label}
+                    type="button"
+                    onClick={() => scrollToOnboardingSlide(i)}
+                    aria-label={`${i + 1}번째로 이동`}
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      i === onboardingSlide ? "bg-indigo-500" : "bg-gray-300"
+                    }`}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  scrollToOnboardingSlide(
+                    Math.min(ONBOARDING_SLIDES.length - 1, onboardingSlide + 1),
+                  )
+                }
+                disabled={onboardingSlide === ONBOARDING_SLIDES.length - 1}
+                className="text-gray-400 disabled:opacity-30"
+                aria-label="다음"
+              >
+                ›
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setOnboardingOpen(false)}
+              className="mt-4 w-full rounded-full bg-indigo-500 py-2 text-sm font-medium text-white hover:bg-indigo-600"
+            >
+              시작하기
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto max-w-400 @container px-4 pt-4 pb-4">
         {showComparison && (
           <ScenarioComparisonChart
@@ -747,7 +1103,29 @@ export default function AssetSimulator() {
           />
         )}
 
-        <div className="mb-4">
+        <div
+          className={`transition-[margin] duration-300 ${
+            inputPanelCollapsed ? "mb-0 @min-[500px]:mb-4" : "mb-4"
+          }`}
+        >
+          <button
+            type="button"
+            onClick={() => setInputPanelCollapsed((prev) => !prev)}
+            className="mb-2 hidden w-full items-center justify-end gap-1 px-1 text-xs text-gray-500 @max-[500px]:flex"
+          >
+            입력패널 {inputPanelCollapsed ? "펼치기" : "접기"}
+            <ChevronDown
+              className={`h-3.5 w-3.5 text-gray-400 transition-transform ${
+                inputPanelCollapsed ? "" : "rotate-180"
+              }`}
+            />
+          </button>
+          <div
+            className={`grid transition-[grid-template-rows] duration-300 ease-in-out @min-[500px]:grid-rows-[1fr] ${
+              inputPanelCollapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"
+            }`}
+          >
+          <div className="overflow-hidden">
           <InputPanel
             key={activeScenarioId}
             groups={activeScenario.groups}
@@ -782,11 +1160,13 @@ export default function AssetSimulator() {
             today={today}
             horizonMonths={horizonMonths}
           />
+          </div>
+          </div>
         </div>
 
         <div className="grid gap-4 @min-[1400px]:grid-cols-[minmax(280px,1fr)_minmax(180px,320px)]">
           <div ref={chartsColumnRef} className="@container flex flex-col gap-4">
-            <div className="flex items-center gap-1">
+            <div className="hidden items-center gap-1 @min-[500px]:flex">
               {HORIZON_PRESET_YEARS.map((years) => (
                 <button
                   key={years}
@@ -818,15 +1198,24 @@ export default function AssetSimulator() {
                     simulationInput={simulationInput}
                     inflationEnabled={activeScenario.inflationEnabled}
                     inflationRate={activeScenario.inflationRate}
+                    horizonSelector={
+                      <div className="@min-[500px]:hidden">
+                        <CustomSelect
+                          compact
+                          value={String(horizonYears)}
+                          onChange={(v) => handleChangeHorizon(Number(v))}
+                          options={HORIZON_PRESET_YEARS.map((years) => ({
+                            value: String(years),
+                            label: `${years}년`,
+                          }))}
+                        />
+                      </div>
+                    }
                   />
                 </div>
-                <div
-                  className={`min-w-80 ${
-                    activeChartIndex === 2
-                      ? "block"
-                      : "block @max-[500px]:hidden"
-                  }`}
-                >
+                {/* Desktop/tablet only — below 500px this same chart moves
+                into the swipeable strip further down instead. */}
+                <div className="hidden min-w-80 @min-[500px]:block">
                   <FlowDiagram
                     snapshot={selectedSnapshot}
                     previousSnapshot={
@@ -839,14 +1228,10 @@ export default function AssetSimulator() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-1 gap-4 @min-[500px]:grid-cols-2 @min-[1000px]:grid-cols-4">
-                <div
-                  className={`min-w-50 ${
-                    activeChartIndex === 0
-                      ? "block"
-                      : "block @max-[500px]:hidden"
-                  }`}
-                >
+              {/* Desktop/tablet only — the mobile carousel strip below
+              covers this same set of panels under 500px. */}
+              <div className="hidden @min-[500px]:grid grid-cols-2 gap-4 @min-[1000px]:grid-cols-4">
+                <div className="min-w-50">
                   <ComparisonBarChart
                     snapshots={snapshots}
                     groups={assetGroups}
@@ -856,26 +1241,14 @@ export default function AssetSimulator() {
                     inflationRate={activeScenario.inflationRate}
                   />
                 </div>
-                <div
-                  className={`min-w-50 ${
-                    activeChartIndex === 1
-                      ? "block"
-                      : "block @max-[500px]:hidden"
-                  }`}
-                >
+                <div className="min-w-50">
                   <GroupDonutChart
                     groups={assetGroups}
                     assetClasses={activeScenario.assetClasses}
                     snapshot={selectedSnapshot}
                   />
                 </div>
-                <div
-                  className={`min-w-50 @min-[500px]:col-span-2 ${
-                    activeChartIndex === 3
-                      ? "block"
-                      : "block @max-[500px]:hidden"
-                  }`}
-                >
+                <div className="min-w-50 col-span-2">
                   <FlowRatioChart
                     snapshot={selectedSnapshot}
                     incomes={activeScenario.incomes}
@@ -885,11 +1258,65 @@ export default function AssetSimulator() {
                   />
                 </div>
               </div>
+              {/* Mobile only — a native horizontal scroll-snap strip so the
+              swipe gesture and its momentum/snap feel come from the
+              browser itself, not a hand-rolled touch handler. */}
+              <div className="@min-[500px]:hidden">
+                <div
+                  ref={carouselScrollRef}
+                  onScroll={handleCarouselScroll}
+                  className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain"
+                  style={{ scrollbarWidth: "none" }}
+                >
+                  <div className="h-86 w-full shrink-0 snap-start overflow-y-auto px-2">
+                    <ComparisonBarChart
+                      snapshots={snapshots}
+                      groups={assetGroups}
+                      assetClasses={activeScenario.assetClasses}
+                      selectedMonth={selectedMonth}
+                      inflationEnabled={activeScenario.inflationEnabled}
+                      inflationRate={activeScenario.inflationRate}
+                    />
+                  </div>
+                  <div className="h-86 w-full shrink-0 snap-start overflow-y-auto px-2">
+                    <GroupDonutChart
+                      groups={assetGroups}
+                      assetClasses={activeScenario.assetClasses}
+                      snapshot={selectedSnapshot}
+                    />
+                  </div>
+                  <div className="h-86 w-full shrink-0 snap-start overflow-y-auto px-2">
+                    <FlowDiagram
+                      snapshot={selectedSnapshot}
+                      previousSnapshot={
+                        selectedMonth > 0
+                          ? snapshots[selectedMonth - 1]
+                          : undefined
+                      }
+                      primaryAsset={primaryAsset}
+                      assetClasses={activeScenario.assetClasses}
+                      groups={activeScenario.groups}
+                      exchangeRate={activeScenario.exchangeRate}
+                    />
+                  </div>
+                  <div className="h-86 w-full shrink-0 snap-start overflow-y-auto px-2">
+                    <FlowRatioChart
+                      snapshot={selectedSnapshot}
+                      incomes={activeScenario.incomes}
+                      expenses={activeScenario.expenses}
+                      categories={activeScenario.categories}
+                      today={today}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="hidden @max-[500px]:flex items-center justify-center gap-3">
               <button
                 type="button"
-                onClick={() => setActiveChartIndex((i) => Math.max(0, i - 1))}
+                onClick={() =>
+                  scrollToChartIndex(Math.max(0, activeChartIndex - 1))
+                }
                 disabled={activeChartIndex === 0}
                 className="text-gray-400 disabled:opacity-30"
                 aria-label="이전 차트"
@@ -901,7 +1328,7 @@ export default function AssetSimulator() {
                   <button
                     key={i}
                     type="button"
-                    onClick={() => setActiveChartIndex(i)}
+                    onClick={() => scrollToChartIndex(i)}
                     aria-label={`${i + 1}번째 차트로 이동`}
                     className={`h-1.5 w-1.5 rounded-full ${
                       i === activeChartIndex ? "bg-indigo-500" : "bg-gray-300"
@@ -912,8 +1339,11 @@ export default function AssetSimulator() {
               <button
                 type="button"
                 onClick={() =>
-                  setActiveChartIndex((i) =>
-                    Math.min(CHART_PANEL_COUNT_ARRAY.length - 1, i + 1),
+                  scrollToChartIndex(
+                    Math.min(
+                      CHART_PANEL_COUNT_ARRAY.length - 1,
+                      activeChartIndex + 1,
+                    ),
                   )
                 }
                 disabled={

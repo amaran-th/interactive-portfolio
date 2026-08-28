@@ -33,14 +33,14 @@ type Slice = {
   dashOffset: number;
 };
 
-const SIZE = 136;
-const STROKE = 22;
+const SIZE = 116;
+const STROKE = 20;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 /** Extra room reserved around the ring for outside labels, and how far
  * past the ring's outer edge each label's anchor point sits. */
-const LABEL_MARGIN = 66;
+const LABEL_MARGIN = 58;
 const LABEL_GAP = 8;
 const TEXT_GAP = LABEL_GAP + 10;
 const LABEL_TEXT_WIDTH = 64;
@@ -305,6 +305,7 @@ export default function FlowRatioChart({
   categories,
   today,
 }: FlowRatioChartProps) {
+  const [mobileTab, setMobileTab] = useState<"income" | "expense">("income");
   const failedExpenseIds = new Set(
     snapshot.flow.failedExpenses.map((f) => f.itemId),
   );
@@ -339,23 +340,61 @@ export default function FlowRatioChart({
   }
 
   return (
-    <div className="@container rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-      <p className="flex items-center gap-1.5 text-sm text-gray-500">
-        <PieChartIcon className="h-4 w-4" /> 이번 달 수입/지출 구성
-      </p>
-      <div className="mt-3 flex flex-col gap-6 @min-[420px]:flex-row">
-        <FlowSideDonut
-          title="수입"
-          accentClassName="text-emerald-600"
-          items={incomeItems}
-          categories={categories}
-        />
-        <FlowSideDonut
-          title="지출"
-          accentClassName="text-rose-600"
-          items={expenseItems}
-          categories={categories}
-        />
+    <div className="@container flex h-full flex-col rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-sm text-gray-500">
+          <PieChartIcon className="h-4 w-4" /> 이번 달 수입/지출 구성
+        </p>
+        <div className="flex items-center gap-1 rounded-full bg-gray-100 p-0.5 text-xs @min-[500px]:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileTab("income")}
+            className={`rounded-full px-2.5 py-1 ${
+              mobileTab === "income"
+                ? "bg-white font-medium text-emerald-600 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            수입
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab("expense")}
+            className={`rounded-full px-2.5 py-1 ${
+              mobileTab === "expense"
+                ? "bg-white font-medium text-rose-600 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            지출
+          </button>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-1 flex-col items-center justify-center gap-6 @min-[420px]:flex-row">
+        <div
+          className={
+            mobileTab === "income" ? "block" : "hidden @min-[500px]:block"
+          }
+        >
+          <FlowSideDonut
+            title="수입"
+            accentClassName="text-emerald-600"
+            items={incomeItems}
+            categories={categories}
+          />
+        </div>
+        <div
+          className={
+            mobileTab === "expense" ? "block" : "hidden @min-[500px]:block"
+          }
+        >
+          <FlowSideDonut
+            title="지출"
+            accentClassName="text-rose-600"
+            items={expenseItems}
+            categories={categories}
+          />
+        </div>
       </div>
     </div>
   );

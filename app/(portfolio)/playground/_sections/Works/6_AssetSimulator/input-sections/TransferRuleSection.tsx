@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeftRight, GripVertical, Plus, Settings } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CustomSelect from "../CustomSelect";
 import { validateSchedule } from "../simulation";
 import {
@@ -84,6 +84,17 @@ export default function TransferRuleSection({
     listRef,
   );
   const amountRef = useRef<HTMLInputElement>(null);
+  const prevCountRef = useRef(transferRules.length);
+
+  useEffect(() => {
+    if (transferRules.length > prevCountRef.current && listRef.current) {
+      listRef.current.scrollTo({
+        top: listRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+    prevCountRef.current = transferRules.length;
+  }, [transferRules.length]);
 
   const nameOf = (id: string) =>
     assetClasses.find((a) => a.id === id)?.name ?? "?";
@@ -188,7 +199,7 @@ export default function TransferRuleSection({
       </div>
       <ul
         ref={listRef}
-        className="mt-2 flex max-h-80 flex-col gap-2 overflow-y-auto"
+        className="mt-2 flex max-h-40 flex-col gap-2 overflow-y-auto @min-[500px]:max-h-80"
       >
         {transferRules.map((rule, index) => (
           <li

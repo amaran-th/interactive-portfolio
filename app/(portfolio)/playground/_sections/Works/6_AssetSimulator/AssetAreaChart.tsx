@@ -35,6 +35,8 @@ type AssetAreaChartProps = {
   simulationInput: SimulationInput;
   inflationEnabled: boolean;
   inflationRate: number;
+  /** Rendered on the opposite end of the timeline slider's "지금" label. */
+  horizonSelector?: React.ReactNode;
 };
 
 type ChartMode = "asset" | "flow";
@@ -80,6 +82,7 @@ export default function AssetAreaChart({
   simulationInput,
   inflationEnabled,
   inflationRate,
+  horizonSelector,
 }: AssetAreaChartProps) {
   const isEmpty = assetClasses.length === 0 || snapshots.length === 0;
   const [mode, setMode] = useState<ChartMode>("asset");
@@ -253,7 +256,7 @@ export default function AssetAreaChart({
   };
 
   return (
-    <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
+    <div className="relative z-20 rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       {isEmpty ? (
         <div className="flex h-[180px] items-center justify-center gap-1.5 break-keep text-center text-sm text-gray-400">
           <Inbox className="h-4 w-4 shrink-0" /> 자산을 추가하면 그래프가 나타납니다
@@ -564,6 +567,7 @@ export default function AssetAreaChart({
           onChange={onChangeMonth}
           today={today}
           horizonMonths={horizonMonths}
+          rightSlot={horizonSelector}
         />
       </div>
     </div>

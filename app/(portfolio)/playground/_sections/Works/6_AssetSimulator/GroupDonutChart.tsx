@@ -30,8 +30,8 @@ type Slice = {
   isLiability: boolean;
 };
 
-const SIZE = 120;
-const STROKE = 20;
+const SIZE = 108;
+const STROKE = 18;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
@@ -40,7 +40,7 @@ const ALL_TAB_ID = "__all__";
 /** Extra room reserved around the ring for outside labels, and how far
  * past the ring's outer edge each label's anchor point sits. Sized to fit
  * this panel's narrower column share (see AssetSimulator's row2 grid). */
-const LABEL_MARGIN = 66;
+const LABEL_MARGIN = 60;
 const LABEL_GAP = 12;
 const TEXT_GAP = LABEL_GAP + 8;
 const LABEL_TEXT_WIDTH = 64;

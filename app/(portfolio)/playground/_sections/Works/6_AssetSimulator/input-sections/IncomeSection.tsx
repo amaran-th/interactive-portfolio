@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GripVertical, Plus, Settings, TrendingUp } from "lucide-react";
 import {
   Category,
@@ -84,6 +84,17 @@ export default function IncomeSection({
   );
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
+  const prevCountRef = useRef(incomes.length);
+
+  useEffect(() => {
+    if (incomes.length > prevCountRef.current && listRef.current) {
+      listRef.current.scrollTo({
+        top: listRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+    prevCountRef.current = incomes.length;
+  }, [incomes.length]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -172,7 +183,7 @@ export default function IncomeSection({
       </div>
       <ul
         ref={listRef}
-        className="mt-2 flex max-h-80 flex-col gap-2 overflow-y-auto"
+        className="mt-2 flex max-h-40 flex-col gap-2 overflow-y-auto @min-[500px]:max-h-80"
       >
         {incomes.map((item, index) => {
           const category = categories.find((c) => c.id === item.categoryId);

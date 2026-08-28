@@ -8,6 +8,8 @@ type TimelineSliderProps = {
   onChange: (month: number) => void;
   today: Date;
   horizonMonths: number;
+  /** Rendered on the opposite end of the "지금" label, same row. */
+  rightSlot?: React.ReactNode;
 };
 
 function formatMonthLabel(monthIndex: number, today: Date): string {
@@ -24,9 +26,13 @@ export default function TimelineSlider({
   onChange,
   today,
   horizonMonths,
+  rightSlot,
 }: TimelineSliderProps) {
+  const isDense = horizonMonths > 120;
+  const minorStep = isDense ? 60 : 12;
+  const majorStep = isDense ? 120 : 60;
   const yearMarks: number[] = [];
-  for (let month = 0; month <= horizonMonths; month += 12) {
+  for (let month = 0; month <= horizonMonths; month += minorStep) {
     yearMarks.push(month);
   }
   const progressPct =
@@ -38,11 +44,14 @@ export default function TimelineSlider({
 
   return (
     <div>
-      <span className="text-sm text-gray-500">
-        {selectedMonth === 0
-          ? "지금"
-          : `${formatMonthsFromNow(selectedMonth)} · ${formatMonthLabel(selectedMonth, today)}`}
-      </span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm text-gray-500">
+          {selectedMonth === 0
+            ? "지금"
+            : `${formatMonthsFromNow(selectedMonth)} · ${formatMonthLabel(selectedMonth, today)}`}
+        </span>
+        {rightSlot}
+      </div>
       <div className="mt-4 flex items-center gap-1.5">
         <button
           type="button"
@@ -53,14 +62,14 @@ export default function TimelineSlider({
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <div className="relative h-5 flex-1">
+        <div className="relative z-0 h-5 flex-1">
           <div className="absolute top-1/2 h-1.5 w-full -translate-y-1/2 rounded-full bg-gray-200" />
           <div
             className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-indigo-400"
             style={{ width: `${progressPct}%` }}
           />
           {yearMarks.map((month) => {
-            const isMajor = month % 60 === 0;
+            const isMajor = month % majorStep === 0;
             const isPast = month <= selectedMonth;
             return (
               <span

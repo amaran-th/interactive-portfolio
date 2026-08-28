@@ -119,7 +119,7 @@ export const works: WorkItem[] = [
   💸 유연한 현금흐름: 수입·지출 항목마다 반복(무기한·기한·횟수) 또는 일시 발생을 선택할 수 있고, 지출에도 그룹을 지정할 수 있습니다.
 
   🔀 이체 규칙: 자산군 간 자금 흐름을 정기 또는 일시로 설정할 수 있어 예적금 만기, 전세보증금 반환 같은 일회성 변동도 반영하고, 흐름도에서 그 달의 이체 내역을 확인할 수 있습니다.`,
-    period: "2026.08.18 - ",
+    period: "2026.08.18 - 08.28",
     platforms: [{ type: "pc" }, { type: "mobile" }],
     content: <AssetSimulator />,
     path: "/asset-simulator",

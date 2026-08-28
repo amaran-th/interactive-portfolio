@@ -41,12 +41,11 @@ function realValueSnapshot(
 }
 
 const WIDTH = 260;
-const HEIGHT = 236;
+const HEIGHT = 228;
 const BAR_WIDTH = 64;
 const BASE_Y = HEIGHT - 30;
 const MAX_BAR_HEIGHT = 160;
 const DEFICIT_COLOR = "#f43f5e";
-const BELOW_ZERO_CLIP_ID = "comparison-bar-below-zero-clip";
 
 type RawSegment = {
   id: string;
@@ -63,6 +62,11 @@ type Segment = {
   y: number;
   height: number;
   amount: number;
+  /** The portion of this segment below the zero line, if any — computed
+   * directly (rather than via an SVG clipPath, which some browsers render
+   * inconsistently against a scaled viewBox) so it never bleeds into a
+   * fully positive segment. */
+  deficit: { y: number; height: number } | null;
 };
 
 type HoveredBar = {
@@ -198,13 +202,19 @@ export default function ComparisonBarChart({
     raw.map((seg) => {
       const yBottom = scaleY(seg.bottom);
       const yTop = scaleY(seg.top);
+      const y = Math.min(yTop, yBottom);
+      const height = Math.abs(yBottom - yTop);
+      const deficitTop = Math.max(y, zeroY);
+      const deficitHeight = y + height - deficitTop;
       return {
         id: seg.id,
         name: seg.name,
         fill: seg.fill,
-        y: Math.min(yTop, yBottom),
-        height: Math.abs(yBottom - yTop),
+        y,
+        height,
         amount: seg.top - seg.bottom,
+        deficit:
+          deficitHeight > 0 ? { y: deficitTop, height: deficitHeight } : null,
       };
     });
 
@@ -245,16 +255,6 @@ export default function ComparisonBarChart({
       <div className="flex flex-1 items-center justify-center">
       <div className="relative w-full">
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
-        <defs>
-          <clipPath id={BELOW_ZERO_CLIP_ID} clipPathUnits="userSpaceOnUse">
-            <rect
-              x={0}
-              y={zeroY}
-              width={WIDTH}
-              height={Math.max(0, HEIGHT - zeroY)}
-            />
-          </clipPath>
-        </defs>
         <line
           x1={0}
           y1={zeroY}
@@ -305,16 +305,17 @@ export default function ComparisonBarChart({
                 fill={seg.fill}
                 fillOpacity={0.75}
               />
-              <rect
-                x={nowX}
-                y={seg.y}
-                width={BAR_WIDTH}
-                height={seg.height}
-                fill={DEFICIT_COLOR}
-                fillOpacity={0.75}
-                clipPath={`url(#${BELOW_ZERO_CLIP_ID})`}
-                pointerEvents="none"
-              />
+              {seg.deficit && (
+                <rect
+                  x={nowX}
+                  y={seg.deficit.y}
+                  width={BAR_WIDTH}
+                  height={seg.deficit.height}
+                  fill={DEFICIT_COLOR}
+                  fillOpacity={0.75}
+                  pointerEvents="none"
+                />
+              )}
             </g>
           ))}
         </g>
@@ -339,16 +340,17 @@ export default function ComparisonBarChart({
                 fill={seg.fill}
                 fillOpacity={0.75}
               />
-              <rect
-                x={futureX}
-                y={seg.y}
-                width={BAR_WIDTH}
-                height={seg.height}
-                fill={DEFICIT_COLOR}
-                fillOpacity={0.75}
-                clipPath={`url(#${BELOW_ZERO_CLIP_ID})`}
-                pointerEvents="none"
-              />
+              {seg.deficit && (
+                <rect
+                  x={futureX}
+                  y={seg.deficit.y}
+                  width={BAR_WIDTH}
+                  height={seg.deficit.height}
+                  fill={DEFICIT_COLOR}
+                  fillOpacity={0.75}
+                  pointerEvents="none"
+                />
+              )}
             </g>
           ))}
         </g>
