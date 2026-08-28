@@ -117,7 +117,7 @@ interactive-portfolio/                       레포 루트 (이름 유지)
 | 환경변수 | `NEXT_PUBLIC_SERVICES_ORIGIN=https://amaranth-project.vercel.app`, `SITE_URL=https://amaranth-portfolio.vercel.app` | `SITE_URL=https://amaranth-project.vercel.app` |
 
 - 서비스 도메인 `amaranth-project.vercel.app` 은 현재 `next-sitemap.config.js` 의 기본 `siteUrl` 과 동일하다 → 기존에 색인된 서비스 URL이 그대로 유지된다.
-- 현재 프로덕션 도메인이 이와 다르면(예: `amaran-th-interactive-portfolio.vercel.app`) 옛 도메인 → 서비스 도메인 리다이렉트를 설정한다.
+- 현재 프로덕션 도메인이 `amaranth-project.vercel.app` 임을 확인함 → 서비스 앱이 그대로 승계하므로 리다이렉트 불필요.
 
 ### push 할 때 배포 흐름 (`main` 기준)
 
