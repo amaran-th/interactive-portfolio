@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | amaranth",
+    template: "%s",
     default: "amaranth",
   },
   description: "amaranth 서비스 모음",
