@@ -9,6 +9,7 @@ import {
   MonthSnapshot,
   assetColor,
   formatKRW,
+  realValueSnapshot,
 } from "./types";
 
 type FlowDiagramProps = {
@@ -20,6 +21,9 @@ type FlowDiagramProps = {
   assetClasses: AssetClass[];
   groups: Group[];
   exchangeRate: number;
+  inflationEnabled: boolean;
+  inflationRate: number;
+  exportMode?: boolean;
 };
 
 const WIDTH = 600;
@@ -60,6 +64,33 @@ function NodeBox({
   onHoverEnd: () => void;
 }) {
   const hasDelta = delta !== undefined;
+  const deltaText = hasDelta
+    ? `(${delta > 0 ? "+" : ""}${Math.round(delta).toLocaleString()}원)`
+    : "";
+  const deltaColor = hasDelta
+    ? delta > 0
+      ? "#6ee7b7"
+      : delta < 0
+        ? "#fda4af"
+        : "rgba(255,255,255,0.7)"
+    : "#ffffff";
+  // Mirrors the flex stack's own centering math (label + delta + amount,
+  // each lineHeight 1.2, gap 2px) so this overlay's baseline lines up with
+  // the placeholder <p> it's drawn over instead of the label above it.
+  const LABEL_LINE_H = 11 * 1.2;
+  const DELTA_LINE_H = 9 * 1.2;
+  const AMOUNT_LINE_H = 11 * 1.2;
+  const STACK_GAP = 2;
+  const stackTotalH =
+    LABEL_LINE_H +
+    (hasDelta ? STACK_GAP + DELTA_LINE_H : 0) +
+    (showAmount ? STACK_GAP + AMOUNT_LINE_H : 0);
+  const stackTopY = (NODE_HEIGHT - stackTotalH) / 2;
+  const deltaLineTopY = stackTopY + LABEL_LINE_H + STACK_GAP;
+  // Baseline sits below the line-box top by half the leading plus the
+  // font's ascent (~0.8em for this font, tuned against the live render).
+  const deltaBaselineY = deltaLineTopY + (DELTA_LINE_H - 9) / 2 + 9 * 0.8;
+
   return (
     <g transform={`translate(${x}, ${y})`}>
       <rect
@@ -71,38 +102,71 @@ function NodeBox({
         onPointerMove={onHoverMove}
         onPointerLeave={onHoverEnd}
       />
-      <text
-        x={NODE_WIDTH / 2}
-        y={hasDelta ? 12 : showAmount ? 18 : NODE_HEIGHT / 2 + 4}
-        textAnchor="middle"
-        className="fill-white text-[11px] font-medium"
+      {/* Plain HTML inside a foreignObject rather than SVG <text>/<tspan> —
+          multi-line SVG text (whether via separate <text> siblings or
+          dy/y-positioned tspans) reliably collapses onto a single baseline
+          when html-to-image rasterizes it for PNG export, but regular HTML
+          block layout is its core strength and renders correctly. Inline
+          styles rather than Tailwind classes — html-to-image's style
+          inlining doesn't seem to traverse into foreignObject content, so
+          classes there silently fall back to browser defaults. */}
+      <foreignObject
+        x={0}
+        y={0}
+        width={NODE_WIDTH}
+        height={NODE_HEIGHT}
+        style={{ pointerEvents: "none", overflow: "visible" }}
       >
-        {label}
-      </text>
+        <div
+          style={{
+            width: NODE_WIDTH,
+            height: NODE_HEIGHT,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 2,
+            textAlign: "center",
+            lineHeight: 1.2,
+            fontFamily: "inherit",
+          }}
+        >
+          <p style={{ fontSize: 11, fontWeight: 500, color: "#ffffff", margin: 0 }}>
+            {label}
+          </p>
+          {hasDelta && (
+            /* Invisible placeholder reserving the same layout slot the
+               real delta text used to occupy — html-to-image renders this
+               line's `color` as plain white regardless of the intended
+               green/red (confirmed via pixel sampling of the exported
+               PNG), even though every other inline style here (size,
+               weight, the label/amount colors) captures correctly. The
+               visible text is drawn as a native SVG <text> below instead,
+               whose `fill` attribute IS captured reliably. */
+            <p
+              aria-hidden="true"
+              style={{ fontSize: 9, fontWeight: 500, margin: 0, visibility: "hidden" }}
+            >
+              {deltaText}
+            </p>
+          )}
+          {showAmount && (
+            <p style={{ fontSize: 11, color: "#ffffff", margin: 0 }}>
+              {Math.round(amount).toLocaleString()}원
+            </p>
+          )}
+        </div>
+      </foreignObject>
       {hasDelta && (
         <text
           x={NODE_WIDTH / 2}
-          y={23}
+          y={deltaBaselineY}
           textAnchor="middle"
-          className={`text-[9px] font-medium ${
-            delta > 0
-              ? "fill-emerald-300"
-              : delta < 0
-                ? "fill-rose-300"
-                : "fill-white/70"
-          }`}
+          fill={deltaColor}
+          fontSize={9}
+          fontWeight={500}
         >
-          {`(${delta > 0 ? "+" : ""}${Math.round(delta).toLocaleString()}원)`}
-        </text>
-      )}
-      {showAmount && (
-        <text
-          x={NODE_WIDTH / 2}
-          y={hasDelta ? 35 : 34}
-          textAnchor="middle"
-          className="fill-white text-[11px]"
-        >
-          {Math.round(amount).toLocaleString()}원
+          {deltaText}
         </text>
       )}
     </g>
@@ -117,15 +181,22 @@ type HoverTooltip = {
 };
 
 export default function FlowDiagram({
-  snapshot,
-  previousSnapshot,
+  snapshot: rawSnapshot,
+  previousSnapshot: rawPreviousSnapshot,
   primaryAsset,
   assetClasses,
   groups,
   exchangeRate,
+  inflationEnabled,
+  inflationRate,
+  exportMode = false,
 }: FlowDiagramProps) {
   const [hoverTooltip, setHoverTooltip] = useState<HoverTooltip | null>(null);
   const [viewMode, setViewMode] = useState<"asset" | "group">("asset");
+  const snapshot = realValueSnapshot(rawSnapshot, inflationEnabled, inflationRate);
+  const previousSnapshot = rawPreviousSnapshot
+    ? realValueSnapshot(rawPreviousSnapshot, inflationEnabled, inflationRate)
+    : undefined;
 
   if (!primaryAsset) {
     return (
@@ -285,32 +356,37 @@ export default function FlowDiagram({
         <p className="flex items-center gap-1.5 text-sm text-gray-500">
           <Workflow className="h-4 w-4" /> 이번 달 자금 흐름
         </p>
-        {canGroupByGroup && (
-          <div className="flex items-center gap-1 rounded-full bg-gray-100 p-0.5 text-xs">
-            <button
-              type="button"
-              onClick={() => setViewMode("asset")}
-              className={`rounded-full px-2.5 py-1 ${
-                effectiveViewMode === "asset"
-                  ? "bg-white font-medium text-gray-800 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              항목별
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("group")}
-              className={`rounded-full px-2.5 py-1 ${
-                effectiveViewMode === "group"
-                  ? "bg-white font-medium text-gray-800 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              그룹별
-            </button>
-          </div>
-        )}
+        {canGroupByGroup &&
+          (exportMode ? (
+            <span className="text-xs text-gray-500">
+              {effectiveViewMode === "asset" ? "항목별" : "그룹별"}
+            </span>
+          ) : (
+            <div className="flex items-center gap-1 rounded-full bg-gray-100 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setViewMode("asset")}
+                className={`rounded-full px-2.5 py-1 ${
+                  effectiveViewMode === "asset"
+                    ? "bg-white font-medium text-gray-800 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                항목별
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("group")}
+                className={`rounded-full px-2.5 py-1 ${
+                  effectiveViewMode === "group"
+                    ? "bg-white font-medium text-gray-800 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                그룹별
+              </button>
+            </div>
+          ))}
       </div>
       {failedItems.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-600">
@@ -323,7 +399,11 @@ export default function FlowDiagram({
       )}
       <div className="mt-2 flex flex-1 items-center justify-center">
         <div className="relative w-full">
-          <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
+          <svg
+            viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+            className={exportMode ? "mx-auto block" : "w-full"}
+            style={exportMode ? { maxWidth: WIDTH } : undefined}
+          >
             <defs>
               <marker
                 id="flow-arrow"
@@ -380,9 +460,12 @@ export default function FlowDiagram({
                   y={primaryRowCenter - 8}
                   textAnchor="middle"
                   stroke="white"
-                  strokeWidth={3}
+                  strokeWidth={2}
+                  strokeLinejoin="round"
                   paintOrder="stroke"
-                  className="fill-gray-700 text-[10px] font-medium"
+                  fill="#374151"
+                  fontSize={10}
+                  fontWeight={500}
                 >
                   {Math.round(snapshot.flow.incomeIn).toLocaleString()}원
                 </text>
@@ -427,9 +510,12 @@ export default function FlowDiagram({
                   y={primaryRowCenter - 8}
                   textAnchor="middle"
                   stroke="white"
-                  strokeWidth={3}
+                  strokeWidth={2}
+                  strokeLinejoin="round"
                   paintOrder="stroke"
-                  className="fill-gray-700 text-[10px] font-medium"
+                  fill="#374151"
+                  fontSize={10}
+                  fontWeight={500}
                 >
                   {Math.round(snapshot.flow.expenseOut).toLocaleString()}원
                 </text>
@@ -473,9 +559,12 @@ export default function FlowDiagram({
                     y={rowCenterY - 6}
                     textAnchor="start"
                     stroke="white"
-                    strokeWidth={3}
+                    strokeWidth={2}
+                    strokeLinejoin="round"
                     paintOrder="stroke"
-                    className="fill-gray-700 text-[10px] font-medium"
+                    fill="#374151"
+                    fontSize={10}
+                    fontWeight={500}
                   >
                     {Math.round(entry.amount).toLocaleString()}원
                   </text>

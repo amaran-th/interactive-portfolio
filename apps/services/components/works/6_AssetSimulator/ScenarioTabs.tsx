@@ -1,6 +1,13 @@
 "use client";
 
-import { ChevronDown, Copy, GitCompare, Pencil, Plus, X } from "lucide-react";
+import {
+  ChevronDown,
+  Copy,
+  GitCompare,
+  Pencil,
+  Plus,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Scenario } from "./types";
 

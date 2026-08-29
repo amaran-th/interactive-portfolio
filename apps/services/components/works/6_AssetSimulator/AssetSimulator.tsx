@@ -2,21 +2,29 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Settings, X } from "lucide-react";
+import { toPng } from "html-to-image";
 import Image from "next/image";
 import AssetAreaChart from "./AssetAreaChart";
 import ComparisonBarChart from "./ComparisonBarChart";
 import CustomSelect from "./CustomSelect";
+import ExportMenu from "./ExportMenu";
 import FlowDiagram from "./FlowDiagram";
 import FlowRatioChart from "./FlowRatioChart";
 import GroupDonutChart from "./GroupDonutChart";
 import HistoryPanel from "./HistoryPanel";
+import ImportScenarioButton from "./ImportScenarioButton";
 import InputPanel from "./InputPanel";
 import ScenarioComparisonChart from "./ScenarioComparisonChart";
 import ScenarioTabs from "./ScenarioTabs";
 import Switch from "./Switch";
+import {
+  exportScenarioJson,
+  exportSnapshotsCsv,
+  parseScenarioJson,
+  todayStamp,
+} from "./exportUtils";
 import { findGoalAchievementMonth } from "./simulation";
 import {
-  AssetClass,
   DEFAULT_HORIZON_YEARS,
   GROUP_PALETTE,
   Goal,
@@ -34,16 +42,10 @@ import {
 } from "./types";
 import { useSimulation } from "./useSimulation";
 
-function withGuaranteedPrimary(assets: AssetClass[]): AssetClass[] {
-  if (assets.some((a) => a.isPrimary && a.currency === "KRW")) {
-    return assets;
-  }
-  const candidate = assets.find((a) => a.currency === "KRW");
-  if (!candidate) return assets;
-  return assets.map((a) => ({ ...a, isPrimary: a.id === candidate.id }));
-}
-
 const CHART_PANEL_COUNT_ARRAY = [0, 1, 2, 3] as const;
+/** Wide enough to push every chart breakpoint (@min-[900px]/[1000px]) past
+ * its threshold, so PNG export always captures the desktop grid layout. */
+const CHART_EXPORT_WIDTH = 1400;
 
 const ONBOARDING_IMAGE_BASE = "/playground/asset-simulator/onboarding";
 
@@ -111,7 +113,21 @@ function emptyScenario(name: string): Scenario {
     name,
     groups: [],
     categories: [],
-    assetClasses: [],
+    // Every scenario needs exactly one primary asset — income flows into
+    // it and expenses flow out of it — so one is seeded here rather than
+    // left for the user to designate later (that manual step was removed;
+    // see AssetSimulator's asset handlers).
+    assetClasses: [
+      {
+        id: newId(),
+        name: "기본 자산",
+        currency: "KRW",
+        initialBalance: 0,
+        annualReturnRate: 0,
+        isPrimary: true,
+        color: GROUP_PALETTE[0],
+      },
+    ],
     incomes: [],
     expenses: [],
     transferRules: [],
@@ -406,6 +422,7 @@ export default function AssetSimulator() {
   };
   const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
   const [inputPanelCollapsed, setInputPanelCollapsed] = useState(false);
+  const [isExportingImage, setIsExportingImage] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [onboardingSlide, setOnboardingSlide] = useState(0);
   const onboardingScrollRef = useRef<HTMLDivElement>(null);
@@ -473,13 +490,13 @@ export default function AssetSimulator() {
     if (typeof window === "undefined") return;
     const seen = window.localStorage.getItem("asset-simulator-onboarding-seen");
     if (!seen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOnboardingOpen(true);
       setOnboardingSlide(0);
       window.localStorage.setItem("asset-simulator-onboarding-seen", "1");
     }
   }, []);
   const chartsColumnRef = useRef<HTMLDivElement>(null);
+  const pageScrollRef = useRef<HTMLDivElement>(null);
   const [chartsColumnHeight, setChartsColumnHeight] = useState<number | null>(
     null,
   );
@@ -551,11 +568,109 @@ export default function AssetSimulator() {
   const handleCreateScenario = () => {
     setIsDirty(true);
     const existingNames = new Set(scenarios.map((s) => s.name));
-    let n = scenarios.length + 1;
+    let n = 1;
     while (existingNames.has(`시나리오 ${n}`)) n++;
     const created = emptyScenario(`시나리오 ${n}`);
     setScenarios((prev) => [...prev, created]);
     setActiveScenarioId(created.id);
+  };
+
+  const handleExportScenarioJson = () => {
+    exportScenarioJson(activeScenario);
+  };
+
+  const handleImportScenarioJson = async (file: File) => {
+    const text = await file.text();
+    const imported = parseScenarioJson(text);
+    if (!imported) {
+      window.alert("시나리오 파일을 읽을 수 없습니다. 올바른 JSON 파일인지 확인해주세요.");
+      return;
+    }
+    setIsDirty(true);
+    setScenarios((prev) => [...prev, imported]);
+    setActiveScenarioId(imported.id);
+  };
+
+  const handleExportCsv = () => {
+    exportSnapshotsCsv(
+      snapshots,
+      activeScenario.assetClasses,
+      today,
+      activeScenario.name,
+    );
+  };
+
+  const handleExportChartImage = async () => {
+    if (typeof window === "undefined" || isExportingImage) return;
+    const el = chartsColumnRef.current;
+    if (!el) return;
+    // Swapping to (and back from) export mode changes each chart's content
+    // height (sliders/toggles disappear and reappear), which shifts this
+    // scroll position as a side effect. Pin it back afterward.
+    const scrollEl = pageScrollRef.current;
+    const savedScrollTop = scrollEl?.scrollTop ?? 0;
+    setIsExportingImage(true);
+    // Everything below can throw (cloning, toPng, image decoding) — keep it
+    // all inside try/finally so a mid-export failure can never leave
+    // isExportingImage stuck true (which would permanently hide sliders/
+    // toggles and force the chart grids into their export-only flex layout).
+    let clone: HTMLElement | null = null;
+    try {
+      // setIsExportingImage triggers the export-mode (static text) re-render
+      // in every chart, but React commits that update asynchronously — wait
+      // two frames so it's actually painted before toPng clones the DOM.
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      );
+      // Clone and resize the CLONE (not the live element) to the desktop
+      // export width. toPng's own width/style overrides only resize the
+      // output canvas, not the actual grid — the container-query grid never
+      // relayouts to the wider width, leaving blank space on the right where
+      // content should be. Cloning forces a real browser relayout at the new
+      // width without touching the live page. Positioned on-screen but
+      // hidden behind the app's own opaque background via a very low z-index
+      // — NOT via opacity/visibility, which html-to-image faithfully
+      // reproduces in the capture too (an invisible clone captures as a
+      // blank image), and NOT parked far off-screen either, which some
+      // browsers skip properly rasterizing.
+      clone = el.cloneNode(true) as HTMLElement;
+      clone.style.position = "fixed";
+      clone.style.top = "0";
+      clone.style.left = "0";
+      clone.style.width = `${CHART_EXPORT_WIDTH}px`;
+      clone.style.pointerEvents = "none";
+      clone.style.zIndex = "-9999";
+      clone.style.background =
+        "linear-gradient(to bottom right, #e0e7ff, #eff6ff, #f3e8ff)";
+      clone.style.padding = "24px";
+      document.body.appendChild(clone);
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      );
+      const cloneRect = clone.getBoundingClientRect();
+      const dataUrl = await toPng(clone, {
+        cacheBust: true,
+        pixelRatio: 2,
+        width: cloneRect.width,
+        height: cloneRect.height,
+      });
+      const link = document.createElement("a");
+      link.download = `자산시뮬레이터_그래프_${activeScenario.name}_${todayStamp()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } finally {
+      if (clone) document.body.removeChild(clone);
+      setIsExportingImage(false);
+      // Same double-rAF wait as on entry — a single frame isn't enough for
+      // the revert-to-interactive re-render (content growing back to full
+      // height) to actually paint, so scrollTo would get silently clamped
+      // by the still-short scrollHeight and never reach savedScrollTop.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          scrollEl?.scrollTo({ top: savedScrollTop });
+        });
+      });
+    }
   };
 
   const handleAddGroup = (name: string, color: string): string => {
@@ -615,24 +730,26 @@ export default function AssetSimulator() {
   };
 
   const handleAddAssetClass = (input: NewAssetClassInput) => {
-    updateActiveScenario((s) => {
-      const withNew = [
-        ...(input.isPrimary
-          ? s.assetClasses.map((a) => ({ ...a, isPrimary: false }))
-          : s.assetClasses),
-        { id: newId(), ...input },
-      ];
-      return { ...s, assetClasses: withGuaranteedPrimary(withNew) };
-    });
+    updateActiveScenario((s) => ({
+      ...s,
+      // Newly added assets are never primary — the primary asset is fixed
+      // at scenario creation.
+      assetClasses: [...s.assetClasses, { id: newId(), ...input, isPrimary: false }],
+    }));
   };
   const handleUpdateAssetClass = (id: string, input: NewAssetClassInput) => {
     updateActiveScenario((s) => {
-      const updated = s.assetClasses.map((a) => {
-        if (a.id === id) return { ...a, ...input };
-        if (input.isPrimary) return { ...a, isPrimary: false };
-        return a;
+      const nextAssetClasses = s.assetClasses.map((a) => {
+        if (a.id !== id) return a;
+        // The primary asset can't become a liability — income/expense
+        // flow through it, which assumes a non-negative balance. The form
+        // already disables the liability checkbox while editing it; this
+        // is the backing guard against a stale negative value slipping in.
+        const initialBalance = a.isPrimary
+          ? Math.abs(input.initialBalance)
+          : input.initialBalance;
+        return { ...a, ...input, initialBalance };
       });
-      const nextAssetClasses = withGuaranteedPrimary(updated);
       const nextTransferRules = s.transferRules.filter((r) => {
         const from = nextAssetClasses.find((a) => a.id === r.fromAssetId);
         const to = nextAssetClasses.find((a) => a.id === r.toAssetId);
@@ -656,33 +773,18 @@ export default function AssetSimulator() {
   const handleRemoveAssetClass = (id: string) => {
     updateActiveScenario((s) => {
       const removed = s.assetClasses.find((a) => a.id === id);
-      let rest = s.assetClasses.filter((a) => a.id !== id);
-      if (removed?.isPrimary) {
-        const nextPrimary = rest.find((a) => a.currency === "KRW");
-        if (nextPrimary) {
-          rest = rest.map((a) =>
-            a.id === nextPrimary.id ? { ...a, isPrimary: true } : a,
-          );
-        }
-      }
+      // The primary asset can't be removed — every scenario always needs
+      // exactly one (income flows into it, expenses flow out of it).
+      if (removed?.isPrimary) return s;
       return {
         ...s,
-        assetClasses: rest,
+        assetClasses: s.assetClasses.filter((a) => a.id !== id),
         transferRules: s.transferRules.filter(
           (r) => r.fromAssetId !== id && r.toAssetId !== id,
         ),
         goal: goalReferences(s.goal, "asset", id) ? null : s.goal,
       };
     });
-  };
-  const handleSetPrimaryAsset = (id: string) => {
-    updateActiveScenario((s) => ({
-      ...s,
-      assetClasses: s.assetClasses.map((a) => ({
-        ...a,
-        isPrimary: a.id === id,
-      })),
-    }));
   };
 
   const reorderArray = <T,>(list: T[], from: number, to: number): T[] => {
@@ -820,7 +922,10 @@ export default function AssetSimulator() {
   );
 
   return (
-    <div className="h-full w-full overflow-y-auto bg-linear-to-br from-indigo-100 via-blue-50 to-purple-100 text-gray-800">
+    <div
+      ref={pageScrollRef}
+      className="h-full w-full overflow-y-auto bg-linear-to-br from-indigo-100 via-blue-50 to-purple-100 text-gray-800"
+    >
       <div className="sticky top-0 z-40 bg-linear-to-br from-indigo-100 via-blue-50 to-purple-100 px-4 pt-4 pb-3 shadow-[0_4px_10px_-6px_rgba(0,0,0,0.15)]">
         <div className="mx-auto max-w-400 @container">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -1094,6 +1199,16 @@ export default function AssetSimulator() {
       )}
 
       <div className="mx-auto max-w-400 @container px-4 pt-4 pb-4">
+        <div className="relative z-30 mb-3 flex items-center justify-end gap-1.5">
+          <ImportScenarioButton onImportJson={handleImportScenarioJson} />
+          <ExportMenu
+            onExportJson={handleExportScenarioJson}
+            onExportCsv={handleExportCsv}
+            onExportImage={handleExportChartImage}
+            isExportingImage={isExportingImage}
+          />
+        </div>
+
         {showComparison && (
           <ScenarioComparisonChart
             scenarios={scenarios}
@@ -1125,7 +1240,7 @@ export default function AssetSimulator() {
               inputPanelCollapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"
             }`}
           >
-          <div className="overflow-hidden">
+          <div className="overflow-hidden @min-[500px]:overflow-visible">
           <InputPanel
             key={activeScenarioId}
             groups={activeScenario.groups}
@@ -1140,7 +1255,6 @@ export default function AssetSimulator() {
             onAddAssetClass={handleAddAssetClass}
             onUpdateAssetClass={handleUpdateAssetClass}
             onRemoveAssetClass={handleRemoveAssetClass}
-            onSetPrimaryAsset={handleSetPrimaryAsset}
             onChangeAssetColor={handleChangeAssetColor}
             incomes={activeScenario.incomes}
             onAddIncome={handleAddIncome}
@@ -1166,7 +1280,13 @@ export default function AssetSimulator() {
 
         <div className="grid gap-4 @min-[1400px]:grid-cols-[minmax(280px,1fr)_minmax(180px,320px)]">
           <div ref={chartsColumnRef} className="@container flex flex-col gap-4">
-            <div className="hidden items-center gap-1 @min-[500px]:flex">
+            <div
+              className={
+                isExportingImage
+                  ? "hidden"
+                  : "hidden items-center gap-1 @min-[500px]:flex"
+              }
+            >
               {HORIZON_PRESET_YEARS.map((years) => (
                 <button
                   key={years}
@@ -1183,8 +1303,14 @@ export default function AssetSimulator() {
               ))}
             </div>
             <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-1 gap-4 @min-[900px]:grid-cols-2">
-                <div className="min-w-80">
+              <div
+                className={
+                  isExportingImage
+                    ? "flex gap-4"
+                    : "grid grid-cols-1 gap-4 @min-[900px]:grid-cols-2"
+                }
+              >
+                <div className={isExportingImage ? "min-w-80 flex-1" : "min-w-80"}>
                   <AssetAreaChart
                     snapshots={snapshots}
                     groups={assetGroups}
@@ -1211,11 +1337,18 @@ export default function AssetSimulator() {
                         />
                       </div>
                     }
+                    exportMode={isExportingImage}
                   />
                 </div>
                 {/* Desktop/tablet only — below 500px this same chart moves
                 into the swipeable strip further down instead. */}
-                <div className="hidden min-w-80 @min-[500px]:block">
+                <div
+                  className={
+                    isExportingImage
+                      ? "min-w-80 flex-1"
+                      : "hidden min-w-80 @min-[500px]:block"
+                  }
+                >
                   <FlowDiagram
                     snapshot={selectedSnapshot}
                     previousSnapshot={
@@ -1225,13 +1358,22 @@ export default function AssetSimulator() {
                     assetClasses={activeScenario.assetClasses}
                     groups={activeScenario.groups}
                     exchangeRate={activeScenario.exchangeRate}
+                    inflationEnabled={activeScenario.inflationEnabled}
+                    inflationRate={activeScenario.inflationRate}
+                    exportMode={isExportingImage}
                   />
                 </div>
               </div>
               {/* Desktop/tablet only — the mobile carousel strip below
               covers this same set of panels under 500px. */}
-              <div className="hidden @min-[500px]:grid grid-cols-2 gap-4 @min-[1000px]:grid-cols-4">
-                <div className="min-w-50">
+              <div
+                className={
+                  isExportingImage
+                    ? "flex gap-4"
+                    : "hidden @min-[500px]:grid grid-cols-2 gap-4 @min-[1000px]:grid-cols-4"
+                }
+              >
+                <div className={isExportingImage ? "min-w-50 flex-1" : "min-w-50"}>
                   <ComparisonBarChart
                     snapshots={snapshots}
                     groups={assetGroups}
@@ -1239,22 +1381,35 @@ export default function AssetSimulator() {
                     selectedMonth={selectedMonth}
                     inflationEnabled={activeScenario.inflationEnabled}
                     inflationRate={activeScenario.inflationRate}
+                    exportMode={isExportingImage}
                   />
                 </div>
-                <div className="min-w-50">
+                <div className={isExportingImage ? "min-w-50 flex-1" : "min-w-50"}>
                   <GroupDonutChart
                     groups={assetGroups}
                     assetClasses={activeScenario.assetClasses}
                     snapshot={selectedSnapshot}
+                    inflationEnabled={activeScenario.inflationEnabled}
+                    inflationRate={activeScenario.inflationRate}
+                    exportMode={isExportingImage}
                   />
                 </div>
-                <div className="min-w-50 col-span-2">
+                <div
+                  className={
+                    isExportingImage
+                      ? "min-w-50 flex-2"
+                      : "min-w-50 col-span-2"
+                  }
+                >
                   <FlowRatioChart
                     snapshot={selectedSnapshot}
                     incomes={activeScenario.incomes}
                     expenses={activeScenario.expenses}
                     categories={activeScenario.categories}
                     today={today}
+                    inflationEnabled={activeScenario.inflationEnabled}
+                    inflationRate={activeScenario.inflationRate}
+                    exportMode={isExportingImage}
                   />
                 </div>
               </div>
@@ -1276,6 +1431,7 @@ export default function AssetSimulator() {
                       selectedMonth={selectedMonth}
                       inflationEnabled={activeScenario.inflationEnabled}
                       inflationRate={activeScenario.inflationRate}
+                      compact
                     />
                   </div>
                   <div className="h-86 w-full shrink-0 snap-start overflow-y-auto px-2">
@@ -1283,6 +1439,8 @@ export default function AssetSimulator() {
                       groups={assetGroups}
                       assetClasses={activeScenario.assetClasses}
                       snapshot={selectedSnapshot}
+                      inflationEnabled={activeScenario.inflationEnabled}
+                      inflationRate={activeScenario.inflationRate}
                     />
                   </div>
                   <div className="h-86 w-full shrink-0 snap-start overflow-y-auto px-2">
@@ -1297,6 +1455,8 @@ export default function AssetSimulator() {
                       assetClasses={activeScenario.assetClasses}
                       groups={activeScenario.groups}
                       exchangeRate={activeScenario.exchangeRate}
+                      inflationEnabled={activeScenario.inflationEnabled}
+                      inflationRate={activeScenario.inflationRate}
                     />
                   </div>
                   <div className="h-86 w-full shrink-0 snap-start overflow-y-auto px-2">
@@ -1306,6 +1466,8 @@ export default function AssetSimulator() {
                       expenses={activeScenario.expenses}
                       categories={activeScenario.categories}
                       today={today}
+                      inflationEnabled={activeScenario.inflationEnabled}
+                      inflationRate={activeScenario.inflationRate}
                     />
                   </div>
                 </div>

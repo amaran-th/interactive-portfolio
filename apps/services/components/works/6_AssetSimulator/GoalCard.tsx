@@ -23,6 +23,7 @@ type GoalCardProps = {
   simulationInput: SimulationInput;
   snapshots: MonthSnapshot[];
   today: Date;
+  exportMode?: boolean;
 };
 
 type MetricType = GoalMetric["type"];
@@ -55,6 +56,7 @@ export default function GoalCard({
   simulationInput,
   snapshots,
   today,
+  exportMode = false,
 }: GoalCardProps) {
   const [metricType, setMetricType] = useState<MetricType>("total");
   const [targetId, setTargetId] = useState("");
@@ -178,6 +180,45 @@ export default function GoalCard({
           ? "달성"
           : formatMonthsFromNow(achievementMonth)
       : null;
+
+  const metricLabel =
+    metricType === "total"
+      ? "총자산 기준"
+      : (metricType === "asset"
+          ? assetClasses.find((a) => a.id === targetId)?.name
+          : groups.find((g) => g.id === targetId)?.name) ?? "지표 미선택";
+
+  if (exportMode) {
+    return (
+      <div className="flex w-full flex-col gap-1 border-t border-white/60 pt-2">
+        <p className="text-xs text-gray-500">{metricLabel}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-gray-400">현재</span>
+          <span className="text-lg font-bold text-gray-900">
+            {formatKRW(currentValue)}
+          </span>
+          <ArrowRight className="h-4 w-4 shrink-0 text-gray-300" />
+          {goal ? (
+            <>
+              <span className="text-xs text-gray-400">목표</span>
+              <span className="text-lg font-bold text-gray-900">
+                {formatKRW(goal.targetAmount)}
+              </span>
+              {achievementLabel && (
+                <span className="text-xs text-gray-400">
+                  · {achievementLabel} 예상
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-xs text-gray-400">
+              목표 금액 설정하지 않음
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex w-full flex-col gap-1 border-t border-white/60 pt-2">

@@ -8,7 +8,7 @@ import {
   MonthSnapshot,
   formatKRW,
   formatMonthsFromNow,
-  toRealValue,
+  realValueSnapshot,
 } from "./types";
 import ChartTooltip from "./ChartTooltip";
 
@@ -19,33 +19,28 @@ type ComparisonBarChartProps = {
   selectedMonth: number;
   inflationEnabled: boolean;
   inflationRate: number;
+  /** Caps the SVG at its own design width during PNG export instead of
+   * stretching to fill the (wider, export-forced) card — otherwise the
+   * fixed-viewBox chart scales up and its text looks oversized. */
+  exportMode?: boolean;
+  /** Same width cap as exportMode, for the mobile carousel slide — that
+   * card has a fixed height (h-86), and this chart's taller-than-square
+   * aspect ratio overflows it if the SVG is left to stretch to the full
+   * (much wider) card width. */
+  compact?: boolean;
 };
-
-function realValueSnapshot(
-  snapshot: MonthSnapshot,
-  month: number,
-  inflationEnabled: boolean,
-  inflationRate: number,
-): MonthSnapshot {
-  if (!inflationEnabled) return snapshot;
-  return {
-    ...snapshot,
-    totalBalance: toRealValue(snapshot.totalBalance, month, inflationRate),
-    assetBalancesKRW: Object.fromEntries(
-      Object.entries(snapshot.assetBalancesKRW).map(([id, value]) => [
-        id,
-        toRealValue(value, month, inflationRate),
-      ]),
-    ),
-  };
-}
 
 const WIDTH = 260;
 const HEIGHT = 228;
 const BAR_WIDTH = 64;
-const BASE_Y = HEIGHT - 30;
+// Base bottom margin (just the "지금"/"N개월 후" axis label). When a bar
+// actually has debt, BASE_Y below reserves more room for the debt-total
+// label too — computed per render rather than as a fixed constant, so the
+// common no-debt case keeps the full bar height instead of permanently
+// sacrificing space for a label that isn't always there.
+const BOTTOM_MARGIN = 30;
+const BOTTOM_MARGIN_WITH_DEBT = 38;
 const MAX_BAR_HEIGHT = 160;
-const DEFICIT_COLOR = "#f43f5e";
 
 type RawSegment = {
   id: string;
@@ -62,11 +57,6 @@ type Segment = {
   y: number;
   height: number;
   amount: number;
-  /** The portion of this segment below the zero line, if any — computed
-   * directly (rather than via an SVG clipPath, which some browsers render
-   * inconsistently against a scaled viewBox) so it never bleeds into a
-   * fully positive segment. */
-  deficit: { y: number; height: number } | null;
 };
 
 type HoveredBar = {
@@ -121,8 +111,8 @@ function buildRawSegments(
       value: snapshot.assetBalancesKRW[a.id] ?? 0,
     }));
 
-  // The segment holding the primary asset stacks at the bottom (drawn
-  // first), matching AssetAreaChart.
+  // The segment holding the primary asset stacks at the bottom of the
+  // positive stack (drawn first), matching AssetAreaChart.
   const primary = assetClasses.find((a) => a.isPrimary);
   const primarySegmentId = primary ? (primary.groupId ?? primary.id) : undefined;
   const allItems = [...groupItems, ...ungroupedItems];
@@ -133,28 +123,29 @@ function buildRawSegments(
       ]
     : allItems;
 
-  const result = orderedItems.reduce<{
-    cursor: number;
-    min: number;
-    max: number;
-    segments: RawSegment[];
-  }>(
-    (acc, item) => {
-      const bottom = acc.cursor;
-      const top = acc.cursor + item.value;
-      return {
-        cursor: top,
-        min: Math.min(acc.min, bottom, top),
-        max: Math.max(acc.max, bottom, top),
-        segments: [
-          ...acc.segments,
-          { id: item.id, name: item.name, fill: item.fill, bottom, top },
-        ],
-      };
-    },
-    { cursor: 0, min: 0, max: 0, segments: [] },
-  );
-  return { segments: result.segments, min: result.min, max: result.max };
+  // Positive (asset) items stack upward from 0, negative (liability) items
+  // stack downward from 0 — kept fully separate so a liability never eats
+  // into the asset stack's shape (a single running cursor would offset
+  // everything stacked after it).
+  let posCursor = 0;
+  let negCursor = 0;
+  const segments: RawSegment[] = [];
+  for (const item of orderedItems) {
+    if (item.value >= 0) {
+      const bottom = posCursor;
+      posCursor += item.value;
+      segments.push({ id: item.id, name: item.name, fill: item.fill, bottom, top: posCursor });
+    } else {
+      const top = negCursor;
+      negCursor += item.value;
+      segments.push({ id: item.id, name: item.name, fill: item.fill, bottom: negCursor, top });
+    }
+  }
+  return {
+    segments,
+    min: Math.min(0, negCursor),
+    max: Math.max(0, posCursor),
+  };
 }
 
 export default function ComparisonBarChart({
@@ -164,8 +155,11 @@ export default function ComparisonBarChart({
   selectedMonth,
   inflationEnabled,
   inflationRate,
+  exportMode = false,
+  compact = false,
 }: ComparisonBarChartProps) {
   const [hovered, setHovered] = useState<HoveredBar | null>(null);
+  const capWidth = exportMode || compact;
 
   if (assetClasses.length === 0 || snapshots.length === 0) {
     return (
@@ -176,21 +170,24 @@ export default function ComparisonBarChart({
     );
   }
 
-  const nowSnapshot = realValueSnapshot(
-    snapshots[0],
-    0,
-    inflationEnabled,
-    inflationRate,
-  );
+  const nowSnapshot = realValueSnapshot(snapshots[0], inflationEnabled, inflationRate);
   const futureSnapshot = realValueSnapshot(
     snapshots[selectedMonth],
-    selectedMonth,
     inflationEnabled,
     inflationRate,
   );
 
   const nowRaw = buildRawSegments(nowSnapshot, groups, assetClasses);
   const futureRaw = buildRawSegments(futureSnapshot, groups, assetClasses);
+  // The net-worth band only adds information when a bar has both an asset
+  // stack and a liability stack — otherwise the bar's own top edge already
+  // is the net worth, and the band would just redundantly trace it.
+  const nowHasBoth = nowRaw.min < 0 && nowRaw.max > 0;
+  const futureHasBoth = futureRaw.min < 0 && futureRaw.max > 0;
+  // Only reserve the wider bottom margin when a debt-total label will
+  // actually render — otherwise the far more common no-debt case would
+  // permanently lose bar height to a label that's never there.
+  const BASE_Y = HEIGHT - (nowHasBoth || futureHasBoth ? BOTTOM_MARGIN_WITH_DEBT : BOTTOM_MARGIN);
   const domainMin = Math.min(0, nowRaw.min, futureRaw.min);
   const domainMax = Math.max(1, nowRaw.max, futureRaw.max);
   const domainRange = domainMax - domainMin || 1;
@@ -202,19 +199,13 @@ export default function ComparisonBarChart({
     raw.map((seg) => {
       const yBottom = scaleY(seg.bottom);
       const yTop = scaleY(seg.top);
-      const y = Math.min(yTop, yBottom);
-      const height = Math.abs(yBottom - yTop);
-      const deficitTop = Math.max(y, zeroY);
-      const deficitHeight = y + height - deficitTop;
       return {
         id: seg.id,
         name: seg.name,
         fill: seg.fill,
-        y,
-        height,
+        y: Math.min(yTop, yBottom),
+        height: Math.abs(yBottom - yTop),
         amount: seg.top - seg.bottom,
-        deficit:
-          deficitHeight > 0 ? { y: deficitTop, height: deficitHeight } : null,
       };
     });
 
@@ -224,8 +215,10 @@ export default function ComparisonBarChart({
   const futureX = WIDTH / 2 + 16;
 
   const delta = futureSnapshot.totalBalance - nowSnapshot.totalBalance;
-  const deltaColor =
-    delta > 0 ? "fill-emerald-600" : delta < 0 ? "fill-rose-600" : "fill-gray-400";
+  // Plain fill attributes rather than Tailwind fill-* classes — PNG export
+  // (html-to-image) doesn't reliably inline color-bearing classes onto SVG
+  // <text>, silently falling back to black text.
+  const deltaColor = delta > 0 ? "#059669" : delta < 0 ? "#e11d48" : "#9ca3af";
   const deltaLabel = `(${delta > 0 ? "+" : ""}${formatKRW(delta)})`;
 
   const handleBarPointerMove = (
@@ -254,7 +247,11 @@ export default function ComparisonBarChart({
       </p>
       <div className="flex flex-1 items-center justify-center">
       <div className="relative w-full">
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full">
+      <svg
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        className={capWidth ? "mx-auto block" : "w-full"}
+        style={capWidth ? { maxWidth: WIDTH } : undefined}
+      >
         <line
           x1={0}
           y1={zeroY}
@@ -263,32 +260,60 @@ export default function ComparisonBarChart({
           stroke="#e5e7eb"
           strokeWidth={1}
         />
-        <text
-          x={nowX + BAR_WIDTH / 2}
-          y={30}
-          textAnchor="middle"
-          className="fill-gray-600 text-[11px]"
-        >
-          {formatKRW(nowSnapshot.totalBalance)}
-        </text>
+        {nowHasBoth ? (
+          <text
+            x={nowX + BAR_WIDTH / 2}
+            y={scaleY(nowRaw.max) - 6}
+            textAnchor="middle"
+            fill="#4b5563"
+            fontSize={11}
+          >
+            {formatKRW(nowRaw.max)}
+          </text>
+        ) : (
+          <text
+            x={nowX + BAR_WIDTH / 2}
+            y={30}
+            textAnchor="middle"
+            fill="#4b5563"
+            fontSize={11}
+          >
+            {formatKRW(nowSnapshot.totalBalance)}
+          </text>
+        )}
         {selectedMonth !== 0 && (
           <text
             x={futureX + BAR_WIDTH / 2}
             y={14}
             textAnchor="middle"
-            className={`text-[10px] font-medium ${deltaColor}`}
+            fill={deltaColor}
+            fontSize={10}
+            fontWeight={500}
           >
             {deltaLabel}
           </text>
         )}
-        <text
-          x={futureX + BAR_WIDTH / 2}
-          y={30}
-          textAnchor="middle"
-          className="fill-gray-600 text-[11px]"
-        >
-          {formatKRW(futureSnapshot.totalBalance)}
-        </text>
+        {futureHasBoth ? (
+          <text
+            x={futureX + BAR_WIDTH / 2}
+            y={scaleY(futureRaw.max) - 6}
+            textAnchor="middle"
+            fill="#4b5563"
+            fontSize={11}
+          >
+            {formatKRW(futureRaw.max)}
+          </text>
+        ) : (
+          <text
+            x={futureX + BAR_WIDTH / 2}
+            y={30}
+            textAnchor="middle"
+            fill="#4b5563"
+            fontSize={11}
+          >
+            {formatKRW(futureSnapshot.totalBalance)}
+          </text>
+        )}
         <g
           onPointerMove={(e) =>
             handleBarPointerMove(e, "지금", nowSegments, nowSnapshot.totalBalance)
@@ -296,28 +321,49 @@ export default function ComparisonBarChart({
           onPointerLeave={() => setHovered(null)}
         >
           {nowSegments.map((seg) => (
-            <g key={seg.id}>
+            <rect
+              key={seg.id}
+              x={nowX}
+              y={seg.y}
+              width={BAR_WIDTH}
+              height={seg.height}
+              fill={seg.fill}
+              fillOpacity={0.75}
+            />
+          ))}
+          {nowHasBoth && (
+            <>
               <rect
                 x={nowX}
-                y={seg.y}
+                y={scaleY(nowSnapshot.totalBalance) - 1.5}
                 width={BAR_WIDTH}
-                height={seg.height}
-                fill={seg.fill}
-                fillOpacity={0.75}
+                height={3}
+                fill="#1f2937"
+                pointerEvents="none"
               />
-              {seg.deficit && (
-                <rect
-                  x={nowX}
-                  y={seg.deficit.y}
-                  width={BAR_WIDTH}
-                  height={seg.deficit.height}
-                  fill={DEFICIT_COLOR}
-                  fillOpacity={0.75}
-                  pointerEvents="none"
-                />
-              )}
-            </g>
-          ))}
+              <text
+                x={nowX - 4}
+                y={scaleY(nowSnapshot.totalBalance) + 3}
+                textAnchor="end"
+                fill="#1f2937"
+                fontSize={9}
+                fontWeight={500}
+                pointerEvents="none"
+              >
+                {formatKRW(nowSnapshot.totalBalance)}
+              </text>
+              <text
+                x={nowX + BAR_WIDTH / 2}
+                y={scaleY(nowRaw.min) + 8}
+                textAnchor="middle"
+                fill="#e11d48"
+                fontSize={11}
+                pointerEvents="none"
+              >
+                {formatKRW(nowRaw.min)}
+              </text>
+            </>
+          )}
         </g>
         <g
           onPointerMove={(e) =>
@@ -331,34 +377,56 @@ export default function ComparisonBarChart({
           onPointerLeave={() => setHovered(null)}
         >
           {futureSegments.map((seg) => (
-            <g key={seg.id}>
+            <rect
+              key={seg.id}
+              x={futureX}
+              y={seg.y}
+              width={BAR_WIDTH}
+              height={seg.height}
+              fill={seg.fill}
+              fillOpacity={0.75}
+            />
+          ))}
+          {futureHasBoth && (
+            <>
               <rect
                 x={futureX}
-                y={seg.y}
+                y={scaleY(futureSnapshot.totalBalance) - 1.5}
                 width={BAR_WIDTH}
-                height={seg.height}
-                fill={seg.fill}
-                fillOpacity={0.75}
+                height={3}
+                fill="#1f2937"
+                pointerEvents="none"
               />
-              {seg.deficit && (
-                <rect
-                  x={futureX}
-                  y={seg.deficit.y}
-                  width={BAR_WIDTH}
-                  height={seg.deficit.height}
-                  fill={DEFICIT_COLOR}
-                  fillOpacity={0.75}
-                  pointerEvents="none"
-                />
-              )}
-            </g>
-          ))}
+              <text
+                x={futureX + BAR_WIDTH + 4}
+                y={scaleY(futureSnapshot.totalBalance) + 3}
+                textAnchor="start"
+                fill="#1f2937"
+                fontSize={9}
+                fontWeight={500}
+                pointerEvents="none"
+              >
+                {formatKRW(futureSnapshot.totalBalance)}
+              </text>
+              <text
+                x={futureX + BAR_WIDTH / 2}
+                y={scaleY(futureRaw.min) + 8}
+                textAnchor="middle"
+                fill="#e11d48"
+                fontSize={11}
+                pointerEvents="none"
+              >
+                {formatKRW(futureRaw.min)}
+              </text>
+            </>
+          )}
         </g>
         <text
           x={nowX + BAR_WIDTH / 2}
           y={HEIGHT - 12}
           textAnchor="middle"
-          className="fill-gray-500 text-[11px]"
+          fill="#6b7280"
+          fontSize={11}
         >
           지금
         </text>
@@ -366,7 +434,8 @@ export default function ComparisonBarChart({
           x={futureX + BAR_WIDTH / 2}
           y={HEIGHT - 12}
           textAnchor="middle"
-          className="fill-gray-500 text-[11px]"
+          fill="#6b7280"
+          fontSize={11}
         >
           {selectedMonth === 0 ? "지금" : formatMonthsFromNow(selectedMonth)}
         </text>

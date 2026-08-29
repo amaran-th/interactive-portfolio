@@ -10,6 +10,9 @@ type TimelineSliderProps = {
   horizonMonths: number;
   /** Rendered on the opposite end of the "지금" label, same row. */
   rightSlot?: React.ReactNode;
+  /** Keeps the date label but hides the interactive track/handle/buttons,
+   * for PNG export capture. */
+  exportMode?: boolean;
 };
 
 function formatMonthLabel(monthIndex: number, today: Date): string {
@@ -27,6 +30,7 @@ export default function TimelineSlider({
   today,
   horizonMonths,
   rightSlot,
+  exportMode = false,
 }: TimelineSliderProps) {
   const isDense = horizonMonths > 120;
   const minorStep = isDense ? 60 : 12;
@@ -52,6 +56,7 @@ export default function TimelineSlider({
         </span>
         {rightSlot}
       </div>
+      {!exportMode && (
       <div className="mt-4 flex items-center gap-1.5">
         <button
           type="button"
@@ -105,6 +110,7 @@ export default function TimelineSlider({
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
+      )}
     </div>
   );
 }

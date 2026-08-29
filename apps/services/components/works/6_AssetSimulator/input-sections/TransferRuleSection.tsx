@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, GripVertical, Plus, Settings } from "lucide-react";
+import { ArrowLeftRight, GripVertical, Inbox, Plus, Settings } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import CustomSelect from "../CustomSelect";
 import { validateSchedule } from "../simulation";
@@ -197,6 +197,12 @@ export default function TransferRuleSection({
           <Settings className="h-4 w-4" />
         </button>
       </div>
+      {transferRules.length === 0 ? (
+        <div className="mt-2 flex flex-col items-center gap-1.5 px-3 py-6 text-center text-xs text-gray-400">
+          <Inbox className="h-4 w-4" />
+          예정된 자산군 간의 이체 정보를 추가해주세요
+        </div>
+      ) : (
       <ul
         ref={listRef}
         className="mt-2 flex max-h-40 flex-col gap-2 overflow-y-auto @min-[500px]:max-h-80"
@@ -251,6 +257,7 @@ export default function TransferRuleSection({
           </li>
         ))}
       </ul>
+      )}
 
       {isFormVisible && (
         <FloatingFormPanel

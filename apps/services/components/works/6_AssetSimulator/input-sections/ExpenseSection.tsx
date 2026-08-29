@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GripVertical, Plus, Settings, TrendingDown } from "lucide-react";
+import { GripVertical, Inbox, Plus, Settings, TrendingDown } from "lucide-react";
 import {
   Category,
   ExpenseItem,
@@ -181,6 +181,12 @@ export default function ExpenseSection({
           <Settings className="h-4 w-4" />
         </button>
       </div>
+      {expenses.length === 0 ? (
+        <div className="mt-2 flex flex-col items-center gap-1.5 px-3 py-6 text-center text-xs text-gray-400">
+          <Inbox className="h-4 w-4" />
+          예정된 지출 정보를 추가해주세요
+        </div>
+      ) : (
       <ul
         ref={listRef}
         className="mt-2 flex max-h-40 flex-col gap-2 overflow-y-auto @min-[500px]:max-h-80"
@@ -241,6 +247,7 @@ export default function ExpenseSection({
           );
         })}
       </ul>
+      )}
       {isFormVisible && (
       <FloatingFormPanel
         onKeyDown={handleKeyDown}

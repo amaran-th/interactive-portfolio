@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Inbox, PieChart as PieChartIcon, TrendingDown } from "lucide-react";
+import { Inbox, PieChart as PieChartIcon } from "lucide-react";
 import {
   AssetClass,
   GROUP_PALETTE,
   Group,
   MonthSnapshot,
   formatKRW,
+  realValueSnapshot,
 } from "./types";
 import ChartTooltip from "./ChartTooltip";
 
@@ -15,6 +16,9 @@ type GroupDonutChartProps = {
   groups: Group[];
   assetClasses: AssetClass[];
   snapshot: MonthSnapshot;
+  inflationEnabled: boolean;
+  inflationRate: number;
+  exportMode?: boolean;
 };
 
 type Item = { id: string; name: string; amount: number; color: string };
@@ -57,8 +61,12 @@ function sliceAngleRad(slice: Slice): number {
 export default function GroupDonutChart({
   groups,
   assetClasses,
-  snapshot,
+  snapshot: rawSnapshot,
+  inflationEnabled,
+  inflationRate,
+  exportMode = false,
 }: GroupDonutChartProps) {
+  const snapshot = realValueSnapshot(rawSnapshot, inflationEnabled, inflationRate);
   const tabs = [
     { id: ALL_TAB_ID, name: "전체" },
     ...groups.map((g) => ({ id: g.id, name: g.name })),
@@ -158,58 +166,72 @@ export default function GroupDonutChart({
         <p className="flex items-center gap-1.5 text-sm text-gray-500">
           <PieChartIcon className="h-4 w-4" /> 자산 비율
         </p>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 rounded-full bg-gray-100 p-0.5 text-xs">
-            <button
-              type="button"
-              onClick={() => setLegendMode("ratio")}
-              className={`rounded-full px-2 py-0.5 ${
-                legendMode === "ratio"
-                  ? "bg-white font-medium text-gray-800 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              비율
-            </button>
-            <button
-              type="button"
-              onClick={() => setLegendMode("amount")}
-              className={`rounded-full px-2 py-0.5 ${
-                legendMode === "amount"
-                  ? "bg-white font-medium text-gray-800 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              금액
-            </button>
+        {exportMode ? (
+          <p className="text-xs text-gray-500">
+            {legendMode === "ratio" ? "비율" : "금액"}
+            {hasLiabilities &&
+              (includeLiabilities ? " · 부채 포함" : " · 부채 미포함")}
+          </p>
+        ) : (
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 rounded-full bg-gray-100 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setLegendMode("ratio")}
+                className={`rounded-full px-2 py-0.5 ${
+                  legendMode === "ratio"
+                    ? "bg-white font-medium text-gray-800 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                비율
+              </button>
+              <button
+                type="button"
+                onClick={() => setLegendMode("amount")}
+                className={`rounded-full px-2 py-0.5 ${
+                  legendMode === "amount"
+                    ? "bg-white font-medium text-gray-800 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                금액
+              </button>
+            </div>
+            {hasLiabilities && (
+              <label className="flex items-center gap-1.5 text-xs text-gray-500">
+                <input
+                  type="checkbox"
+                  checked={includeLiabilities}
+                  onChange={(e) => setIncludeLiabilities(e.target.checked)}
+                />
+                부채 포함
+              </label>
+            )}
           </div>
-          {hasLiabilities && (
-            <label className="flex items-center gap-1.5 text-xs text-gray-500">
-              <input
-                type="checkbox"
-                checked={includeLiabilities}
-                onChange={(e) => setIncludeLiabilities(e.target.checked)}
-              />
-              부채 포함
-            </label>
-          )}
-        </div>
+        )}
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setSelectedTabId(tab.id)}
-            className={`rounded-full px-3 py-1 text-xs ${
-              tab.id === activeTabId
-                ? "bg-indigo-500 text-white"
-                : "bg-white/80 text-gray-600"
-            }`}
-          >
-            {tab.name}
-          </button>
-        ))}
+        {exportMode ? (
+          <span className="rounded-full bg-indigo-500 px-3 py-1 text-xs text-white">
+            {tabs.find((tab) => tab.id === activeTabId)?.name}
+          </span>
+        ) : (
+          tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setSelectedTabId(tab.id)}
+              className={`rounded-full px-3 py-1 text-xs ${
+                tab.id === activeTabId
+                  ? "bg-indigo-500 text-white"
+                  : "bg-white/80 text-gray-600"
+              }`}
+            >
+              {tab.name}
+            </button>
+          ))
+        )}
       </div>
       <div className="mt-3 flex flex-1 items-center justify-center">
         <div
@@ -335,9 +357,6 @@ export default function GroupDonutChart({
                   transform: `translate(${onRight ? "0" : "-100%"}, -50%)`,
                 }}
               >
-                {slice.isLiability && (
-                  <TrendingDown className="mt-0.5 h-3 w-3 shrink-0 text-rose-500" />
-                )}
                 <span
                   className={`break-keep leading-tight ${onRight ? "text-left" : "text-right"} ${
                     slice.isLiability ? "text-rose-500" : "text-gray-600"

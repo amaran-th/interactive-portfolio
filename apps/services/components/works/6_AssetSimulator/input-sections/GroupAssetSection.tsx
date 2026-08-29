@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Landmark, Plus, Settings, TrendingDown } from "lucide-react";
+import { HelpCircle, Inbox, Landmark, Plus, Settings, X } from "lucide-react";
 import {
   AssetClass,
   Currency,
@@ -29,7 +29,6 @@ type GroupAssetSectionProps = {
   onAddAssetClass: (input: NewAssetClassInput) => void;
   onUpdateAssetClass: (id: string, input: NewAssetClassInput) => void;
   onRemoveAssetClass: (id: string) => void;
-  onSetPrimaryAsset: (id: string) => void;
   onChangeAssetColor: (id: string, color: string) => void;
   isFormOpen: boolean;
   onOpenForm: () => void;
@@ -45,7 +44,6 @@ export default function GroupAssetSection({
   onAddAssetClass,
   onUpdateAssetClass,
   onRemoveAssetClass,
-  onSetPrimaryAsset,
   onChangeAssetColor,
   isFormOpen,
   onOpenForm,
@@ -57,15 +55,21 @@ export default function GroupAssetSection({
   const [currency, setCurrency] = useState<Currency>("KRW");
   const [balance, setBalance] = useState("");
   const [returnRate, setReturnRate] = useState("0");
-  const [makePrimary, setMakePrimary] = useState(false);
   const [isLiability, setIsLiability] = useState(false);
   const [color, setColor] = useState(() => nextVisibleColor(groups, assetClasses));
   const [colorPickerId, setColorPickerId] = useState<string | null>(null);
   const [formColorPickerOpen, setFormColorPickerOpen] = useState(false);
+  const [primaryHelpOpen, setPrimaryHelpOpen] = useState(false);
   const isFormVisible = isFormOpen || Boolean(editingId);
+  // Income/expense assume the primary asset's balance is non-negative, so
+  // it can't be turned into a liability.
+  const isEditingPrimary = Boolean(
+    editingId && assetClasses.find((a) => a.id === editingId)?.isPrimary,
+  );
 
   const nameRef = useRef<HTMLInputElement>(null);
   const formColorPickerRef = useRef<HTMLDivElement>(null);
+  const primaryHelpRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     if (!formColorPickerOpen) return;
@@ -81,6 +85,22 @@ export default function GroupAssetSection({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [formColorPickerOpen]);
 
+  // Tap-to-toggle on mobile needs an outside-click close since there's no
+  // hover/mouseleave there to dismiss it.
+  useEffect(() => {
+    if (!primaryHelpOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        primaryHelpRef.current &&
+        !primaryHelpRef.current.contains(e.target as Node)
+      ) {
+        setPrimaryHelpOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [primaryHelpOpen]);
+
   const resetForm = () => {
     setEditingId(null);
     setName("");
@@ -88,7 +108,6 @@ export default function GroupAssetSection({
     setCurrency("KRW");
     setBalance("");
     setReturnRate("0");
-    setMakePrimary(false);
     setIsLiability(false);
     setColor(nextVisibleColor(groups, assetClasses));
     setFormColorPickerOpen(false);
@@ -102,7 +121,6 @@ export default function GroupAssetSection({
     setCurrency(asset.currency);
     setBalance(String(Math.abs(asset.initialBalance)));
     setReturnRate(String(asset.annualReturnRate));
-    setMakePrimary(asset.isPrimary);
     setIsLiability(asset.initialBalance < 0);
     setColor(asset.color);
   };
@@ -118,7 +136,6 @@ export default function GroupAssetSection({
       currency,
       initialBalance: (isLiability ? -1 : 1) * (Number(balance) || 0),
       annualReturnRate: Number(returnRate) || 0,
-      isPrimary: currency === "KRW" && makePrimary && !isLiability,
       color,
     };
     if (editingId) {
@@ -171,6 +188,12 @@ export default function GroupAssetSection({
           <Settings className="h-4 w-4" />
         </button>
       </div>
+      {assetClasses.length === 0 ? (
+        <div className="mt-2 flex flex-col items-center gap-1.5 px-3 py-6 text-center text-xs text-gray-400">
+          <Inbox className="h-4 w-4" />
+          현재 보유한 자산 정보를 추가해주세요
+        </div>
+      ) : (
       <ul className="mt-2 flex flex-col gap-2">
         {assetClasses.map((asset) => {
           const group = groups.find((g) => g.id === asset.groupId);
@@ -188,14 +211,6 @@ export default function GroupAssetSection({
                 className="flex cursor-pointer items-center justify-between"
               >
                 <span className="flex flex-1 items-center gap-2">
-                  <input
-                    type="radio"
-                    name="primary-asset"
-                    checked={asset.isPrimary}
-                    disabled={asset.currency === "USD"}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={() => onSetPrimaryAsset(asset.id)}
-                  />
                   {group ? (
                     // 그룹에 속한 자산은 개별 색상이 없다 — 그룹 색을 그대로 쓴다.
                     // 색은 그룹의 것이므로 그룹명을 색 옆에 붙여서 보여준다.
@@ -222,9 +237,6 @@ export default function GroupAssetSection({
                       aria-label="자산 색상 변경"
                     />
                   )}
-                  {asset.initialBalance < 0 && (
-                    <TrendingDown className="h-3.5 w-3.5 shrink-0 text-rose-500" />
-                  )}
                   <span>{asset.name}</span>
                   <span
                     className={
@@ -238,26 +250,48 @@ export default function GroupAssetSection({
                       : `${asset.initialBalance.toLocaleString()}원`}
                   </span>
                   {asset.isPrimary && (
-                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-600">
+                    <span
+                      ref={primaryHelpRef}
+                      className="relative inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-600"
+                    >
                       기본 자산
-                    </span>
-                  )}
-                  {asset.initialBalance < 0 && (
-                    <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-600">
-                      부채
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPrimaryHelpOpen((prev) => !prev);
+                        }}
+                        onMouseEnter={() => setPrimaryHelpOpen(true)}
+                        onMouseLeave={() => setPrimaryHelpOpen(false)}
+                        className="text-indigo-400 hover:text-indigo-600"
+                        aria-label="기본 자산 설명 보기"
+                      >
+                        <HelpCircle className="h-3 w-3" />
+                      </button>
+                      {primaryHelpOpen && (
+                        <span
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute top-full left-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white p-2 text-[11px] font-normal text-gray-600 shadow-lg"
+                        >
+                          모든 수입과 지출은 기본자산을 통해 들어오고
+                          나갑니다.
+                        </span>
+                      )}
                     </span>
                   )}
                 </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemoveAssetClass(asset.id);
-                  }}
-                  className="text-gray-400 hover:text-gray-700"
-                >
-                  ✕
-                </button>
+                {!asset.isPrimary && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveAssetClass(asset.id);
+                    }}
+                    className="text-gray-400 hover:text-gray-700"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
               {!group && colorPickerId === asset.id && (
                 <div className="flex flex-wrap gap-1.5 pl-6">
@@ -278,14 +312,23 @@ export default function GroupAssetSection({
                           onChangeAssetColor(asset.id, color);
                           setColorPickerId(null);
                         }}
-                        className="h-5 w-5 rounded-full ring-1 ring-black/10 disabled:cursor-not-allowed disabled:opacity-25"
+                        className="relative h-5 w-5 rounded-full ring-1 ring-black/10 disabled:cursor-not-allowed"
                         style={{ backgroundColor: color }}
                         aria-label={
                           taken
                             ? `색상 ${color}는 이미 사용 중`
                             : `색상 ${color}로 변경`
                         }
-                      />
+                      >
+                        {taken && (
+                          <span className="absolute inset-0 flex items-center justify-center">
+                            <X
+                              className="h-3 w-3 text-white drop-shadow-[0_0_1.5px_rgba(0,0,0,0.9)]"
+                              strokeWidth={3}
+                            />
+                          </span>
+                        )}
+                      </button>
                     );
                   })}
                 </div>
@@ -294,6 +337,7 @@ export default function GroupAssetSection({
           );
         })}
       </ul>
+      )}
 
       {isFormVisible && (
       <FloatingFormPanel
@@ -331,14 +375,20 @@ export default function GroupAssetSection({
                         setColor(c);
                         setFormColorPickerOpen(false);
                       }}
-                      className={`h-5 w-5 rounded-full ring-1 disabled:cursor-not-allowed disabled:opacity-25 ${
+                      className={`relative h-5 w-5 rounded-full ring-1 disabled:cursor-not-allowed ${
                         color === c ? "ring-2 ring-indigo-500" : "ring-black/10"
                       }`}
                       style={{ backgroundColor: c }}
                       aria-label={
                         taken ? `색상 ${c}는 이미 사용 중` : `색상 ${c}로 설정`
                       }
-                    />
+                    >
+                      {taken && (
+                        <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/30">
+                          <X className="h-3 w-3 text-white" strokeWidth={3} />
+                        </span>
+                      )}
+                    </button>
                   );
                 })}
               </div>
@@ -370,11 +420,7 @@ export default function GroupAssetSection({
         <div className="flex gap-2">
           <CustomSelect
             value={currency}
-            onChange={(v) => {
-              const next = v as Currency;
-              setCurrency(next);
-              if (next === "USD") setMakePrimary(false);
-            }}
+            onChange={(v) => setCurrency(v as Currency)}
             options={CURRENCY_OPTIONS}
             borderClassName="border-indigo-200"
             className="w-32 shrink-0"
@@ -387,31 +433,20 @@ export default function GroupAssetSection({
             className="flex-1 rounded-full border border-indigo-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-indigo-400"
           />
         </div>
-        <label className="flex items-center gap-2 text-xs text-gray-600">
+        <label
+          className={`flex items-center gap-2 text-xs ${
+            isEditingPrimary ? "text-gray-300" : "text-gray-600"
+          }`}
+        >
           <input
             type="checkbox"
             checked={isLiability}
-            onChange={(e) => {
-              setIsLiability(e.target.checked);
-              if (e.target.checked) setMakePrimary(false);
-            }}
+            disabled={isEditingPrimary}
+            onChange={(e) => setIsLiability(e.target.checked)}
           />
           부채로 추가(대출 등)
+          {isEditingPrimary && " (기본 자산은 부채로 설정할 수 없어요)"}
         </label>
-        <label className="flex items-center gap-2 text-xs text-gray-600">
-          <input
-            type="checkbox"
-            checked={makePrimary}
-            disabled={currency === "USD" || isLiability}
-            onChange={(e) => setMakePrimary(e.target.checked)}
-          />
-          기본 자산으로 지정
-          {currency === "USD" && " (KRW 자산만 가능)"}
-          {isLiability && " (부채는 지정 불가)"}
-        </label>
-        <p className="pl-6 text-[11px] text-gray-400">
-          수입은 기본 자산으로 들어오고, 지출은 기본 자산에서 나가요
-        </p>
         <label className="flex items-center gap-2 text-xs text-gray-600">
           {isLiability ? "연 이자율(%)" : "연 이율(%)"}
           <input

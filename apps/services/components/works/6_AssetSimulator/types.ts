@@ -131,13 +131,14 @@ export type MonthSnapshot = {
   flow: MonthFlow;
 };
 
+/** Never carries isPrimary — the primary asset is fixed at scenario
+ * creation and can't be reassigned or removed through this form. */
 export type NewAssetClassInput = {
   name: string;
   groupId?: string;
   currency: Currency;
   initialBalance: number;
   annualReturnRate: number;
-  isPrimary: boolean;
   color: string;
 };
 
@@ -234,6 +235,48 @@ export function toRealValue(
   annualRatePercent: number,
 ): number {
   return nominal / Math.pow(1 + annualRatePercent / 100, months / 12);
+}
+
+/** Discounts every KRW money value in a snapshot to today's purchasing
+ * power (using the snapshot's own monthIndex), so chart panels can show
+ * consistent real values instead of raw future-nominal simulation output
+ * when 물가상승률 반영 is on. A no-op (returns the same snapshot) when
+ * inflation is disabled. */
+export function realValueSnapshot(
+  snapshot: MonthSnapshot,
+  inflationEnabled: boolean,
+  inflationRate: number,
+): MonthSnapshot {
+  if (!inflationEnabled) return snapshot;
+  const at = (v: number) => toRealValue(v, snapshot.monthIndex, inflationRate);
+  return {
+    ...snapshot,
+    assetBalances: Object.fromEntries(
+      Object.entries(snapshot.assetBalances).map(([id, v]) => [id, at(v)]),
+    ),
+    assetBalancesKRW: Object.fromEntries(
+      Object.entries(snapshot.assetBalancesKRW).map(([id, v]) => [id, at(v)]),
+    ),
+    groupTotals: Object.fromEntries(
+      Object.entries(snapshot.groupTotals).map(([id, v]) => [id, at(v)]),
+    ),
+    ungroupedTotalKRW: at(snapshot.ungroupedTotalKRW),
+    totalBalance: at(snapshot.totalBalance),
+    flow: {
+      ...snapshot.flow,
+      incomeIn: at(snapshot.flow.incomeIn),
+      expenseOut: at(snapshot.flow.expenseOut),
+      transfers: snapshot.flow.transfers.map((t) => ({ ...t, amount: at(t.amount) })),
+      failedTransfers: snapshot.flow.failedTransfers.map((t) => ({
+        ...t,
+        amount: at(t.amount),
+      })),
+      failedExpenses: snapshot.flow.failedExpenses.map((e) => ({
+        ...e,
+        amount: at(e.amount),
+      })),
+    },
+  };
 }
 
 export function formatKRW(amount: number): string {

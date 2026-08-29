@@ -37,6 +37,9 @@ type AssetAreaChartProps = {
   inflationRate: number;
   /** Rendered on the opposite end of the timeline slider's "지금" label. */
   horizonSelector?: React.ReactNode;
+  /** Swaps interactive toggles/selects for static text and hides the
+   * slider, for PNG export capture. */
+  exportMode?: boolean;
 };
 
 type ChartMode = "asset" | "flow";
@@ -45,8 +48,6 @@ const WIDTH = 600;
 const ASSET_HEIGHT = 150;
 const FLOW_HEIGHT = 220;
 const PADDING = 12;
-const BELOW_ZERO_CLIP_ID = "asset-area-below-zero-clip";
-const DEFICIT_COLOR = "#f43f5e";
 
 /** The primary asset stacks at the bottom of the chart (drawn first), since
  * income lands in it and expenses leave from it. */
@@ -83,6 +84,7 @@ export default function AssetAreaChart({
   inflationEnabled,
   inflationRate,
   horizonSelector,
+  exportMode = false,
 }: AssetAreaChartProps) {
   const isEmpty = assetClasses.length === 0 || snapshots.length === 0;
   const [mode, setMode] = useState<ChartMode>("asset");
@@ -104,51 +106,46 @@ export default function AssetAreaChart({
     : Math.max(1, ...snapshots.map((s) => s.totalBalance));
   const stepX = isEmpty ? 1 : (WIDTH - PADDING * 2) / (snapshots.length - 1);
 
-  const {
-    bands: rawBands,
-    minValue,
-    maxValue,
-  } = assets.reduce<{
-    prevTop: number[];
-    bands: {
-      id: string;
-      name: string;
-      fill: string;
-      bottom: number[];
-      top: number[];
-    }[];
-    minValue: number;
-    maxValue: number;
-  }>(
-    (acc, asset) => {
-      const bottom = acc.prevTop;
-      const top = snapshots.map(
-        (snapshot, i) => bottom[i] + (snapshot.assetBalancesKRW[asset.id] ?? 0),
-      );
+  // Assets and liabilities stack separately within each month — assets
+  // upward from 0, liabilities downward from 0 — evaluated independently
+  // per month since an asset's own sign can drift over time (e.g. the
+  // primary asset going negative if projected spending outruns income).
+  // A single running cursor here would let a liability "eat into" the
+  // asset stack's shape instead of sitting cleanly below it.
+  const perMonthCursors = snapshots.map((snapshot) => {
+    let posCursor = 0;
+    let negCursor = 0;
+    const byAsset = new Map<string, { bottom: number; top: number }>();
+    for (const asset of assets) {
+      const value = snapshot.assetBalancesKRW[asset.id] ?? 0;
+      if (value >= 0) {
+        const bottom = posCursor;
+        posCursor += value;
+        byAsset.set(asset.id, { bottom, top: posCursor });
+      } else {
+        const top = negCursor;
+        negCursor += value;
+        byAsset.set(asset.id, { bottom: negCursor, top });
+      }
+    }
+    return { byAsset, posCursor, negCursor };
+  });
 
-      return {
-        prevTop: top,
-        minValue: Math.min(acc.minValue, ...bottom, ...top),
-        maxValue: Math.max(acc.maxValue, ...bottom, ...top),
-        bands: [
-          ...acc.bands,
-          {
-            id: asset.id,
-            name: asset.name,
-            fill: assetColor(asset, groups),
-            bottom,
-            top,
-          },
-        ],
-      };
-    },
-    {
-      prevTop: snapshots.map(() => 0),
-      bands: [],
-      minValue: 0,
-      maxValue: 0,
-    },
-  );
+  const rawBands = assets.map((asset) => ({
+    id: asset.id,
+    name: asset.name,
+    fill: assetColor(asset, groups),
+    bottom: perMonthCursors.map((m) => m.byAsset.get(asset.id)!.bottom),
+    top: perMonthCursors.map((m) => m.byAsset.get(asset.id)!.top),
+  }));
+
+  const minValue = Math.min(0, ...perMonthCursors.map((m) => m.negCursor));
+  const maxValue = Math.max(0, ...perMonthCursors.map((m) => m.posCursor));
+  // The net-worth overlay line is only useful (non-redundant with the
+  // stack's own top edge) once the scenario has a liability somewhere in
+  // its horizon — shown for the whole timeline rather than fading in/out
+  // per month, so it never breaks mid-line.
+  const hasAnyLiability = minValue < 0;
 
   const domainMin = Math.min(0, minValue);
   const domainMax = Math.max(1, maxTotal, maxValue);
@@ -158,6 +155,9 @@ export default function AssetAreaChart({
     PADDING -
     ((value - domainMin) / domainRange) * (ASSET_HEIGHT - PADDING * 2);
   const zeroY = scaleY(0);
+  const netWorthPoints = snapshots
+    .map((s, i) => `${PADDING + i * stepX},${scaleY(s.totalBalance)}`)
+    .join(" ");
 
   const bands = rawBands.map((band) => {
     const topPoints = band.top.map(
@@ -182,6 +182,24 @@ export default function AssetAreaChart({
     : totalBalance;
   const cursorY = scaleY(totalBalance);
   const nearRightEdge = cursorX > WIDTH - PADDING - 60;
+
+  // Breakdown for the selected month, shown only when it has both an
+  // asset stack and a liability stack — otherwise the single net-worth
+  // figure above already is the full picture.
+  const selectedCursors = perMonthCursors[selectedMonth];
+  const selectedHasBoth = Boolean(
+    selectedCursors && selectedCursors.posCursor > 0 && selectedCursors.negCursor < 0,
+  );
+  const selectedAssetTotal = selectedCursors
+    ? inflationEnabled
+      ? toRealValue(selectedCursors.posCursor, selectedMonth, inflationRate)
+      : selectedCursors.posCursor
+    : 0;
+  const selectedDebtTotal = selectedCursors
+    ? inflationEnabled
+      ? toRealValue(selectedCursors.negCursor, selectedMonth, inflationRate)
+      : selectedCursors.negCursor
+    : 0;
 
   const flows = isEmpty
     ? []
@@ -256,37 +274,48 @@ export default function AssetAreaChart({
   };
 
   return (
-    <div className="relative z-20 rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
+    <div className="relative z-20 h-full rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
       {isEmpty ? (
         <div className="flex h-[180px] items-center justify-center gap-1.5 break-keep text-center text-sm text-gray-400">
           <Inbox className="h-4 w-4 shrink-0" /> 자산을 추가하면 그래프가 나타납니다
         </div>
       ) : (
         <>
-          <div className="flex items-center gap-1 self-start rounded-full bg-gray-100 p-0.5 text-xs">
-            <button
-              type="button"
-              onClick={() => setMode("asset")}
-              className={`flex items-center gap-1 rounded-full px-2.5 py-1 ${
-                mode === "asset"
-                  ? "bg-white font-medium text-gray-800 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <LineChartIcon className="h-3.5 w-3.5" /> 자산
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("flow")}
-              className={`flex items-center gap-1 rounded-full px-2.5 py-1 ${
-                mode === "flow"
-                  ? "bg-white font-medium text-gray-800 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <Activity className="h-3.5 w-3.5" /> 수입/지출
-            </button>
-          </div>
+          {exportMode ? (
+            <p className="flex items-center gap-1 text-xs font-medium text-gray-700">
+              {mode === "asset" ? (
+                <LineChartIcon className="h-3.5 w-3.5" />
+              ) : (
+                <Activity className="h-3.5 w-3.5" />
+              )}
+              {mode === "asset" ? "자산 그래프" : "수입/지출 그래프"}
+            </p>
+          ) : (
+            <div className="flex items-center gap-1 self-start rounded-full bg-gray-100 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setMode("asset")}
+                className={`flex items-center gap-1 rounded-full px-2.5 py-1 ${
+                  mode === "asset"
+                    ? "bg-white font-medium text-gray-800 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <LineChartIcon className="h-3.5 w-3.5" /> 자산
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("flow")}
+                className={`flex items-center gap-1 rounded-full px-2.5 py-1 ${
+                  mode === "flow"
+                    ? "bg-white font-medium text-gray-800 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <Activity className="h-3.5 w-3.5" /> 수입/지출
+              </button>
+            </div>
+          )}
           {mode === "asset" ? (
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-500">
               <GoalCard
@@ -297,6 +326,7 @@ export default function AssetAreaChart({
                 simulationInput={simulationInput}
                 snapshots={snapshots}
                 today={today}
+                exportMode={exportMode}
               />
             </div>
           ) : (
@@ -313,39 +343,18 @@ export default function AssetAreaChart({
           <div className="relative mt-3 w-full">
             {mode === "asset" ? (
               <svg viewBox={`0 0 ${WIDTH} ${ASSET_HEIGHT}`} className="w-full">
-                <defs>
-                  <clipPath
-                    id={BELOW_ZERO_CLIP_ID}
-                    clipPathUnits="userSpaceOnUse"
-                  >
-                    <rect
-                      x={0}
-                      y={zeroY}
-                      width={WIDTH}
-                      height={Math.max(0, ASSET_HEIGHT - zeroY)}
-                    />
-                  </clipPath>
-                </defs>
                 {bands.map((band) => (
-                  <g key={band.id}>
-                    <polygon
-                      points={band.points}
-                      fill={band.fill}
-                      fillOpacity={0.55}
-                      stroke="white"
-                      strokeWidth={1}
-                      strokeOpacity={0.6}
-                    >
-                      <title>{band.name}</title>
-                    </polygon>
-                    <polygon
-                      points={band.points}
-                      fill={DEFICIT_COLOR}
-                      fillOpacity={0.55}
-                      clipPath={`url(#${BELOW_ZERO_CLIP_ID})`}
-                      pointerEvents="none"
-                    />
-                  </g>
+                  <polygon
+                    key={band.id}
+                    points={band.points}
+                    fill={band.fill}
+                    fillOpacity={0.55}
+                    stroke="white"
+                    strokeWidth={1}
+                    strokeOpacity={0.6}
+                  >
+                    <title>{band.name}</title>
+                  </polygon>
                 ))}
                 <line
                   x1={PADDING}
@@ -356,10 +365,20 @@ export default function AssetAreaChart({
                   strokeWidth={1}
                   strokeDasharray="2 2"
                 />
+                {hasAnyLiability && (
+                  <polyline
+                    points={netWorthPoints}
+                    fill="none"
+                    stroke="#1f2937"
+                    strokeWidth={1.5}
+                    pointerEvents="none"
+                  />
+                )}
                 <text
                   x={PADDING}
                   y={Math.min(ASSET_HEIGHT - PADDING - 3, zeroY - 3)}
-                  className="fill-gray-400 text-[9px]"
+                  fill="#9ca3af"
+                  fontSize={9}
                 >
                   0
                 </text>
@@ -384,10 +403,53 @@ export default function AssetAreaChart({
                   x={nearRightEdge ? cursorX - 8 : cursorX + 8}
                   y={Math.max(10, cursorY - 6)}
                   textAnchor={nearRightEdge ? "end" : "start"}
-                  className="fill-gray-700 text-[10px] font-medium"
+                  fill="#374151"
+                  fontSize={10}
+                  fontWeight={500}
                 >
                   {formatKRW(displayBalance)}
                 </text>
+                {selectedHasBoth && selectedCursors && (
+                  <>
+                    <circle
+                      cx={cursorX}
+                      cy={scaleY(selectedCursors.posCursor)}
+                      r={3}
+                      fill="#374151"
+                      stroke="white"
+                      strokeWidth={1.2}
+                    />
+                    <text
+                      x={nearRightEdge ? cursorX - 8 : cursorX + 8}
+                      y={Math.max(10, scaleY(selectedCursors.posCursor) - 4)}
+                      textAnchor={nearRightEdge ? "end" : "start"}
+                      fill="#374151"
+                      fontSize={9}
+                    >
+                      {formatKRW(selectedAssetTotal)}
+                    </text>
+                    <circle
+                      cx={cursorX}
+                      cy={scaleY(selectedCursors.negCursor)}
+                      r={3}
+                      fill="#e11d48"
+                      stroke="white"
+                      strokeWidth={1.2}
+                    />
+                    <text
+                      x={nearRightEdge ? cursorX - 8 : cursorX + 8}
+                      y={Math.min(
+                        ASSET_HEIGHT - PADDING - 2,
+                        scaleY(selectedCursors.negCursor) + 11,
+                      )}
+                      textAnchor={nearRightEdge ? "end" : "start"}
+                      fill="#e11d48"
+                      fontSize={9}
+                    >
+                      {formatKRW(selectedDebtTotal)}
+                    </text>
+                  </>
+                )}
                 {hoverX !== null && (
                   <>
                     <line
@@ -533,15 +595,23 @@ export default function AssetAreaChart({
           </div>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
             {mode === "asset" ? (
-              assets.map((asset) => (
-                <span key={asset.id} className="flex items-center gap-1">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: assetColor(asset, groups) }}
-                  />
-                  {asset.name}
-                </span>
-              ))
+              <>
+                {assets.map((asset) => (
+                  <span key={asset.id} className="flex items-center gap-1">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: assetColor(asset, groups) }}
+                    />
+                    {asset.name}
+                  </span>
+                ))}
+                {hasAnyLiability && (
+                  <span className="flex items-center gap-1">
+                    <span className="h-0.5 w-2.5 rounded-full bg-gray-800" />
+                    순자산
+                  </span>
+                )}
+              </>
             ) : (
               <>
                 <span className="flex items-center gap-1">
@@ -568,6 +638,7 @@ export default function AssetAreaChart({
           today={today}
           horizonMonths={horizonMonths}
           rightSlot={horizonSelector}
+          exportMode={exportMode}
         />
       </div>
     </div>

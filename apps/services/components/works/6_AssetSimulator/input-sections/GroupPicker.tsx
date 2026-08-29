@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { AssetClass, GROUP_PALETTE, Group, usedColors } from "../types";
 
 const NONE_VALUE = "";
@@ -207,14 +207,23 @@ export default function GroupPicker({
                             });
                             setColorPickerId(null);
                           }}
-                          className="h-4 w-4 rounded-full ring-1 ring-black/10 disabled:cursor-not-allowed disabled:opacity-25"
+                          className="relative h-4 w-4 rounded-full ring-1 ring-black/10 disabled:cursor-not-allowed"
                           style={{ backgroundColor: color }}
                           aria-label={
                             taken
                               ? `색상 ${color}는 이미 사용 중`
                               : `색상 ${color}로 변경`
                           }
-                        />
+                        >
+                          {taken && (
+                            <span className="absolute inset-0 flex items-center justify-center">
+                              <X
+                                className="h-2.5 w-2.5 text-white drop-shadow-[0_0_1.5px_rgba(0,0,0,0.9)]"
+                                strokeWidth={3}
+                              />
+                            </span>
+                          )}
+                        </button>
                       );
                     })}
                   </div>
@@ -248,7 +257,7 @@ export default function GroupPicker({
                               setDraftColor(color);
                               setNewGroupColorPickerOpen(false);
                             }}
-                            className={`h-4 w-4 rounded-full ring-1 disabled:cursor-not-allowed disabled:opacity-25 ${
+                            className={`relative h-4 w-4 rounded-full ring-1 disabled:cursor-not-allowed ${
                               draftColor === color
                                 ? "ring-2 ring-indigo-500"
                                 : "ring-black/10"
@@ -259,7 +268,13 @@ export default function GroupPicker({
                                 ? `색상 ${color}는 이미 사용 중`
                                 : `색상 ${color}로 설정`
                             }
-                          />
+                          >
+                            {taken && (
+                              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/30">
+                                <X className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+                              </span>
+                            )}
+                          </button>
                         );
                       })}
                     </div>

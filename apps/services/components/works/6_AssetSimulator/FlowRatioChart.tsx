@@ -9,6 +9,7 @@ import {
   IncomeItem,
   MonthSnapshot,
   formatKRW,
+  toRealValue,
 } from "./types";
 import { fires } from "./simulation";
 import ChartTooltip from "./ChartTooltip";
@@ -19,6 +20,9 @@ type FlowRatioChartProps = {
   expenses: ExpenseItem[];
   categories: Category[];
   today: Date;
+  inflationEnabled: boolean;
+  inflationRate: number;
+  exportMode?: boolean;
 };
 
 type FlowItem = { id: string; name: string; categoryId?: string; amount: number };
@@ -119,11 +123,13 @@ function FlowSideDonut({
   accentClassName,
   items,
   categories,
+  exportMode = false,
 }: {
   title: string;
   accentClassName: string;
   items: FlowItem[];
   categories: Category[];
+  exportMode?: boolean;
 }) {
   const [viewMode, setViewMode] = useState<"item" | "category">("item");
   const [hoveredSlice, setHoveredSlice] = useState<Slice | null>(null);
@@ -137,33 +143,43 @@ function FlowSideDonut({
   return (
     <div className="min-w-0 flex-1">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className={`text-sm font-medium ${accentClassName}`}>{title}</p>
-        {hasCategorizable && items.length > 0 && (
-          <div className="flex items-center gap-1 rounded-full bg-gray-100 p-0.5 text-xs">
-            <button
-              type="button"
-              onClick={() => setViewMode("item")}
-              className={`rounded-full px-2 py-0.5 ${
-                effectiveViewMode === "item"
-                  ? "bg-white font-medium text-gray-800 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              항목별
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("category")}
-              className={`rounded-full px-2 py-0.5 ${
-                effectiveViewMode === "category"
-                  ? "bg-white font-medium text-gray-800 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              카테고리별
-            </button>
-          </div>
-        )}
+        {/* Redundant on mobile — the 수입/지출 toggle above already says
+        which one is showing. */}
+        <p className={`hidden text-sm font-medium @min-[500px]:block ${accentClassName}`}>
+          {title}
+        </p>
+        {hasCategorizable &&
+          items.length > 0 &&
+          (exportMode ? (
+            <span className="text-xs text-gray-500">
+              {effectiveViewMode === "item" ? "항목별" : "카테고리별"}
+            </span>
+          ) : (
+            <div className="flex items-center gap-1 rounded-full bg-gray-100 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setViewMode("item")}
+                className={`rounded-full px-2 py-0.5 ${
+                  effectiveViewMode === "item"
+                    ? "bg-white font-medium text-gray-800 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                항목별
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("category")}
+                className={`rounded-full px-2 py-0.5 ${
+                  effectiveViewMode === "category"
+                    ? "bg-white font-medium text-gray-800 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                카테고리별
+              </button>
+            </div>
+          ))}
       </div>
       <div className="mt-2 flex items-center justify-center">
         <div
@@ -304,18 +320,25 @@ export default function FlowRatioChart({
   expenses,
   categories,
   today,
+  inflationEnabled,
+  inflationRate,
+  exportMode = false,
 }: FlowRatioChartProps) {
   const [mobileTab, setMobileTab] = useState<"income" | "expense">("income");
   const failedExpenseIds = new Set(
     snapshot.flow.failedExpenses.map((f) => f.itemId),
   );
+  const realAmount = (amount: number) =>
+    inflationEnabled
+      ? toRealValue(amount, snapshot.monthIndex, inflationRate)
+      : amount;
   const incomeItems: FlowItem[] = incomes
     .filter((item) => fires(item.schedule, snapshot.monthIndex, today))
     .map((item) => ({
       id: item.id,
       name: item.name,
       categoryId: item.categoryId,
-      amount: item.amount,
+      amount: realAmount(item.amount),
     }));
   const expenseItems: FlowItem[] = expenses
     .filter(
@@ -327,7 +350,7 @@ export default function FlowRatioChart({
       id: item.id,
       name: item.name,
       categoryId: item.categoryId,
-      amount: item.amount,
+      amount: realAmount(item.amount),
     }));
 
   if (incomes.length === 0 && expenses.length === 0) {
@@ -381,6 +404,7 @@ export default function FlowRatioChart({
             accentClassName="text-emerald-600"
             items={incomeItems}
             categories={categories}
+            exportMode={exportMode}
           />
         </div>
         <div
@@ -393,6 +417,7 @@ export default function FlowRatioChart({
             accentClassName="text-rose-600"
             items={expenseItems}
             categories={categories}
+            exportMode={exportMode}
           />
         </div>
       </div>

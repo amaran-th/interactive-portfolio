@@ -31,7 +31,6 @@ type InputPanelProps = {
   onAddAssetClass: (input: NewAssetClassInput) => void;
   onUpdateAssetClass: (id: string, input: NewAssetClassInput) => void;
   onRemoveAssetClass: (id: string) => void;
-  onSetPrimaryAsset: (id: string) => void;
   onChangeAssetColor: (id: string, color: string) => void;
   incomes: IncomeItem[];
   onAddIncome: (input: NewIncomeItemInput) => void;
@@ -68,7 +67,6 @@ export default function InputPanel(props: InputPanelProps) {
         onAddAssetClass={props.onAddAssetClass}
         onUpdateAssetClass={props.onUpdateAssetClass}
         onRemoveAssetClass={props.onRemoveAssetClass}
-        onSetPrimaryAsset={props.onSetPrimaryAsset}
         onChangeAssetColor={props.onChangeAssetColor}
         isFormOpen={openSection === "asset"}
         onOpenForm={() => setOpenSection("asset")}
