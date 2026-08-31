@@ -2694,7 +2694,9 @@ export default function Editor({
               생기는 셈이었다). 대신 각 사이드바가 필요할 때만 자기 안에서만
               스크롤되게 한다. */}
           <div
-            className={`flex flex-1 overflow-hidden ${narrow ? "gap-2 p-2" : "gap-4 p-4"}`}
+            className={`flex flex-1 overflow-hidden ${
+              narrow ? "gap-2 px-2 pb-2 pt-1" : "gap-4 px-4 pb-4 pt-2"
+            }`}
             style={{ backgroundColor: canvasBgColor }}
           >
             <div
@@ -2731,9 +2733,16 @@ export default function Editor({
                   // 닿을 수 있게 한다(들어갈 때는 그대로 가운데 정렬 유지).
                   className="flex flex-1 overflow-auto [align-items:safe_center] [justify-content:safe_center]"
                 >
-                  <PixelCanvas
-                    width={doc.width}
-                    height={doc.height}
+                  {/* 캔버스 사방에 넉넉한 여백을 둬서, 확대하지 않아도
+                      스페이스+드래그로 캔버스를 어느 방향으로든 자유롭게 밀
+                      수 있다(Figma식 패닝) — 하단 중앙에 뜨는 도구 옵션 바에
+                      작업물이 가리면 캔버스를 밀어 빼내면 된다. 기본 시야는
+                      PixelCanvas가 스크롤을 가운데로 되돌려 캔버스를 중앙에
+                      오게 한다. */}
+                  <div className="p-[320px]">
+                    <PixelCanvas
+                      width={doc.width}
+                      height={doc.height}
                     pixels={history.present}
                     belowComposite={belowComposite}
                     aboveLayers={aboveLayers}
@@ -2807,6 +2816,7 @@ export default function Editor({
                     onActiveTracingChange={handleActiveReferenceGeometryChange}
                     onActiveTracingDeselect={handleReferenceDeselect}
                   />
+                  </div>
                 </div>
                 {/* 캔버스를 스크롤하는 safe-center flex 컨테이너 밖(이 바깥 relative
                     래퍼)에 둔다 — 그 안에 있으면 확대되어 스크롤이 생길 때
@@ -2834,12 +2844,12 @@ export default function Editor({
                     <Plus className="h-3 w-3" />
                   </button>
                 </div>
-                {/* DrawToolbar가 그리기/선택 도구의 하위 옵션을 포털로 그려 넣는
-                    자리 — 캔버스 하단 중앙에 둬서 좌우 사이드바를 가리지 않는다.
-                    전체 너비를 차지하는 빈 상자라 내용이 없는 양옆(배율 컨트롤
-                    쪽 포함)까지 클릭을 가로챘다 — pointer-events-none으로 이
-                    상자 자체는 클릭을 그대로 통과시키고, 실제로 그려 넣는
-                    내용(DrawToolbar·PixelCanvas 쪽)에서만 pointer-events-auto로
+                {/* DrawToolbar가 도구별 하위 옵션을, PixelCanvas가 텍스트 도구의
+                    임시 입력 컨트롤을 포털로 그려 넣는 자리 — 캔버스 하단 중앙에
+                    둬서 좌우 사이드바를 가리지 않는다. 전체 너비를 차지하는 빈
+                    상자라 내용이 없는 양옆(배율 컨트롤 쪽 포함)까지 클릭을
+                    가로챘다 — pointer-events-none으로 이 상자 자체는 클릭을 그대로
+                    통과시키고, 실제로 그려 넣는 내용 쪽에서만 pointer-events-auto로
                     되돌린다. */}
                 <div
                   ref={setSecondaryToolbarPortal}
@@ -2855,12 +2865,6 @@ export default function Editor({
                   isPlaying={isPlaying}
                   onSelect={handleSelectLayer}
                   onAdd={handleAddLayer}
-                  onDuplicate={handleDuplicateLayer}
-                  onDelete={handleDeleteLayer}
-                  onMoveLeft={(id) => handleMoveLayer(id, -1)}
-                  onMoveRight={(id) => handleMoveLayer(id, 1)}
-                  onToggleVisible={handleToggleLayerVisible}
-                  onDurationChange={handleFrameDurationChange}
                 />
               )}
             </div>
@@ -2946,6 +2950,7 @@ export default function Editor({
                       onOnionSkinOpacityChange={handleOnionSkinOpacityChange}
                       onionSkinRange={onionSkinRange}
                       onOnionSkinRangeChange={handleOnionSkinRangeChange}
+                      onFrameDurationChange={handleFrameDurationChange}
                     />
                     <Accordion title="이미지 불러오기" defaultOpen={false}>
                       {importPanel}
@@ -3006,6 +3011,7 @@ export default function Editor({
                   onOnionSkinOpacityChange={handleOnionSkinOpacityChange}
                   onionSkinRange={onionSkinRange}
                   onOnionSkinRangeChange={handleOnionSkinRangeChange}
+                  onFrameDurationChange={handleFrameDurationChange}
                 />
               );
               return (

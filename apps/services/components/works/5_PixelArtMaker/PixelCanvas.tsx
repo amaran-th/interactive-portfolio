@@ -456,6 +456,21 @@ export default function PixelCanvas({
   // 텍스트 도구의 인라인 입력을 캔버스 좌표계에 절대 위치시키는 데도 쓰인다.
   const scale = fitScale * zoom;
 
+  // 캔버스 사방에 뷰포트만큼의 여백(Editor의 p-[38vmin] 래퍼)이 있어 스크롤로
+  // 캔버스를 자유롭게 밀 수 있는데, 그만큼 기본 상태에서는 스크롤이 0(좌상단)에
+  // 놓여 캔버스가 화면 밖으로 밀려 보인다 — 캔버스 크기·뷰포트 크기·배율이
+  // 바뀔 때마다 스크롤을 가운데로 되돌려 캔버스가 뷰포트 중앙에 오게 한다.
+  // (그 사이 사용자가 직접 밀어 둔 위치는, 다음에 이 값들이 바뀔 때 초기화된다.)
+  useEffect(() => {
+    const container = viewportRef.current;
+    if (!container) return;
+    const id = requestAnimationFrame(() => {
+      container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
+      container.scrollTop = (container.scrollHeight - container.clientHeight) / 2;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [viewportRef, width, height, fitScale, zoom]);
+
   useEffect(() => {
     workingRef.current = pixels;
   }, [pixels]);
@@ -1441,9 +1456,11 @@ export default function PixelCanvas({
   // React의 onWheel은 리스너를 passive로 등록해 e.preventDefault()가 조용히
   // 무시된다 — Ctrl/Cmd+스크롤로 캔버스만 확대하려 해도 브라우저의 페이지 확대가
   // 함께 발동했다. addEventListener를 { passive: false }로 직접 붙여야 막힌다.
+  // 캔버스 자체가 아니라 스크롤 뷰포트(캔버스 + 사방 여백)에 붙인다 — 여백
+  // 위에서 Ctrl+휠을 해도 세로 스크롤이 아니라 확대/축소가 되도록.
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
     const WHEEL_ZOOM_THRESHOLD = 50;
     const handler = (e: WheelEvent) => {
       // macOS는 Cmd(metaKey), 다른 플랫폼은 Ctrl(ctrlKey) — 트랙패드 핀치 제스처는
@@ -1456,9 +1473,9 @@ export default function PixelCanvas({
       wheelDeltaRef.current = 0;
       onZoomChange(nextZoomStep(zoom, direction));
     };
-    canvas.addEventListener("wheel", handler, { passive: false });
-    return () => canvas.removeEventListener("wheel", handler);
-  }, [zoom, onZoomChange]);
+    viewport.addEventListener("wheel", handler, { passive: false });
+    return () => viewport.removeEventListener("wheel", handler);
+  }, [zoom, onZoomChange, viewportRef]);
 
   // 스타일러스 호버 취소, 시스템 제스처 등으로 pointerup 없이 스트로크가 끊길 때 안전하게 커밋한다.
   // handlePointerUp과 도구별 분기가 완전히 같아야 하고, 위쪽의 drawingRef 가드 덕분에 pointerup

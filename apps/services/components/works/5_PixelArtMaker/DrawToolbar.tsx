@@ -220,11 +220,9 @@ export default function DrawToolbar({
   onFlipHorizontal: () => void;
   onFlipVertical: () => void;
   onRotate90: (direction: 1 | -1) => void;
-  // 브러시 크기 외의 하위 옵션(채우기·그라데이션·선택 모드·반전/회전)을 띄울
-  // 자리 — 캔버스 영역 하단 중앙에 있는 DOM 노드를 Editor.tsx가 내려준다.
-  // 이 컴포넌트 자신은 캔버스 옆이 아니라 상단 바 자리에 렌더링되므로,
-  // 포털로 그 노드 안에 직접 그려야 캔버스 위쪽이 아니라 캔버스 하단
-  // 중앙에 뜬다.
+  // 도구별 하위 옵션(브러시 크기·채우기·그라데이션·선택 모드)을 그릴 자리 —
+  // 캔버스 영역 하단 중앙에 떠 있는 DOM 노드를 Editor.tsx가 내려준다. 이
+  // 컴포넌트 자신은 상단 바에 렌더링되므로 포털로 그 노드에 그린다.
   secondaryPortalTarget: HTMLDivElement | null;
   // 편집기(rootRef) 너비가 NARROW_BREAKPOINT보다 좁은지 — 이미지 불러오기/
   // 내보내기 사이드바와 같은 기준을 쓰도록 Editor.tsx가 한 번만 측정해
@@ -270,14 +268,29 @@ export default function DrawToolbar({
                 <button
                   key={size}
                   onClick={() => onBrushSizeChange(size)}
-                  title={`${size}px 브러시`}
-                  className={`h-7 w-6 text-[10px] ${
+                  title={`${size}×${size}px 브러시`}
+                  className={`flex h-8 w-8 flex-col items-center justify-center gap-0.5 ${
                     brushSize === size
                       ? "bg-violet-500 text-white"
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
-                  {size}
+                  {/* 실제로 찍히는 도트 크기(size×size)를 그대로 정사각형으로 보여준다
+                      — 숫자만으로는 굵기가 한눈에 안 들어온다는 피드백. 정사각형은
+                      가장 큰 크기(16px) 높이의 고정 칸 안에 넣어, 크기가 달라져도
+                      아래 숫자의 세로 위치가 네 버튼에서 일정하게 맞도록 한다. */}
+                  <span className="flex h-4 items-center justify-center">
+                    <span
+                      style={{
+                        width: size * 4,
+                        height: size * 4,
+                        backgroundColor: "currentColor",
+                      }}
+                    />
+                  </span>
+                  <span className="text-[8px] leading-none tabular-nums opacity-70">
+                    {size}
+                  </span>
                 </button>
               ))}
             </div>
@@ -364,7 +377,7 @@ export default function DrawToolbar({
               disabled={!hasSelection}
               onClick={onClearSelection}
               title="선택 영역 해제 (Esc)"
-              className="h-9 px-2 text-[10px] bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+              className="h-8 px-2 text-[10px] bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
             >
               선택 해제
             </button>
@@ -372,7 +385,7 @@ export default function DrawToolbar({
               disabled={!hasSelection}
               onClick={onFillSelection}
               title="선택 영역을 활성 색상으로 한 번에 칠하기(색상 일괄 수정)"
-              className="h-9 px-2 text-[10px] bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+              className="h-8 px-2 text-[10px] bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
             >
               선택 영역 채우기
             </button>
@@ -395,7 +408,7 @@ export default function DrawToolbar({
                 key={mode}
                 disabled={!isSelectLikeTool}
                 onClick={() => onSelectModeChange(mode)}
-                className={`h-9 px-2 text-[10px] disabled:opacity-30 ${
+                className={`h-8 px-2 text-[10px] disabled:opacity-30 ${
                   selectMode === mode
                     ? "bg-violet-500 text-white"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -409,7 +422,7 @@ export default function DrawToolbar({
             disabled={tool !== "wand"}
             onClick={onToggleWandGlobal}
             title="켜면 마법봉이 이어진 영역이 아니라 캔버스 전체에서 같은 색을 모두 선택한다"
-            className={`h-9 px-2 text-[10px] disabled:opacity-30 ${
+            className={`h-8 px-2 text-[10px] disabled:opacity-30 ${
               wandGlobal
                 ? "bg-violet-500 text-white"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -424,7 +437,9 @@ export default function DrawToolbar({
   return (
     <div className="relative" style={{ backgroundColor: canvasBgColor }}>
       <div
-        className={`flex w-full flex-wrap items-start ${narrow ? "gap-1.5 p-1.5" : "gap-3 p-3"}`}
+        className={`flex w-full flex-wrap items-start ${
+          narrow ? "gap-1.5 px-1.5 pt-1.5 pb-1" : "gap-3 px-3 pt-3 pb-1.5"
+        }`}
       >
         <div className="relative">
           <ToolCard title="그리기" narrow={narrow}>
@@ -500,10 +515,8 @@ export default function DrawToolbar({
 
 
         {/* 반전·회전(더보기)은 다른 하위 옵션들과 달리 캔버스 하단 중앙
-            포털로 보내지 않고, 이 카드 바로 아래에 로컬로 띄운다 — 그리기/
-            선택 하위 옵션은 캔버스 위에서 자주 조정하며 봐야 해서 사이드바를
-            가리지 않는 자리가 중요했지만, 반전·회전은 가끔 한 번 누르고 마는
-            조작이라 "더보기" 버튼 바로 아래 뜨는 편이 더 직관적이다. */}
+            포털로 보내지 않고, 이 카드 바로 아래에 로컬로 띄운다 — 가끔 한 번
+            누르고 마는 조작이라 "더보기" 버튼 바로 아래 뜨는 편이 더 직관적이다. */}
         <div className="relative">
           <ToolCard title="편집" narrow={narrow}>
             <div className="flex items-center gap-1.5">
@@ -591,10 +604,11 @@ export default function DrawToolbar({
         </div>
       </div>
 
-      {/* 이 툴바 바로 아래에 띄우면 왼쪽 사이드바(색상환)를 가렸다 — 이
-          컴포넌트가 있는 상단 바 자리가 아니라, 캔버스 하단 중앙(Editor.tsx가
-          내려준 secondaryPortalTarget)에 포털로 그려 두 사이드바 어느 쪽도
-          가리지 않게 한다. */}
+      {/* 도구별 하위 옵션은 상단 바가 아니라 캔버스 영역 하단 중앙에 떠 있는
+          자리(Editor의 secondaryPortalTarget)에 포털로 그린다 — 상단 바를
+          두껍게 만들지 않고, 좌우 사이드바도 안 가린다. 캔버스 일부를 잠깐
+          덮지만, 캔버스는 스페이스+드래그로 자유롭게 밀 수 있어(패딩 확보됨)
+          가려지면 작업물을 그 밑에서 빼내면 된다. */}
       {secondarySections.length > 0 &&
         secondaryPortalTarget &&
         createPortal(

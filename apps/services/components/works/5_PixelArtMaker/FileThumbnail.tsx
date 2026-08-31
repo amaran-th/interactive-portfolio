@@ -38,11 +38,21 @@ export default function FileThumbnail({
       for (let x = 0; x < width; x++) {
         const color = pixels[y * width + x];
         if (color === null) continue;
+        // 칸 배율이 정수가 아니면 x*cellW가 픽셀 경계에 안 떨어져 이웃 칸의
+        // fillRect 가장자리가 어긋나며 안티에일리어싱된 실선(격자무늬)이 생긴다
+        // — 각 변을 반올림해 이웃 칸끼리 정확히 맞닿게 한다(PixelCanvas와 동일).
+        const left = Math.round(x * cellW);
+        const top = Math.round(y * cellH);
         // PixelValue는 알파가 있으면 8자리(#rrggbbaa) hex이고, Canvas2D의
         // fillStyle이 이를 그대로 지원한다 — 그대로 그리면 이 카드의 실제
         // 배경(흰색)과 캔버스가 알아서 정확히 합성한다.
         ctx.fillStyle = color;
-        ctx.fillRect(x * cellW, y * cellH, cellW, cellH);
+        ctx.fillRect(
+          left,
+          top,
+          Math.round((x + 1) * cellW) - left,
+          Math.round((y + 1) * cellH) - top,
+        );
       }
     }
   }, [width, height, pixels, displayWidth, displayHeight]);

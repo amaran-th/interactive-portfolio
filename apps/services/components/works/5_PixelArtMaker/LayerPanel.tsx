@@ -2,6 +2,8 @@
 
 import {
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Copy,
   Droplet,
@@ -20,7 +22,12 @@ import {
 import { useState } from "react";
 import type { BlendMode, PixelLayer } from "../_shared/assetLibrary";
 import FileThumbnail from "./FileThumbnail";
-import { MAX_LAYERS } from "./types";
+import {
+  DEFAULT_FRAME_DURATION_MS,
+  MAX_FRAME_DURATION_MS,
+  MAX_LAYERS,
+  MIN_FRAME_DURATION_MS,
+} from "./types";
 
 type AdjustmentField =
   | "brightness"
@@ -38,6 +45,41 @@ const ADJUSTMENT_ROWS: { field: AdjustmentField; label: string }[] = [
   { field: "temperature", label: "색온도" },
   { field: "tint", label: "틴트" },
 ];
+
+// 0.10 → "0.1", 1.00 → "1" — 뒤따르는 0을 떼서 보여준다.
+function formatFrameSeconds(ms: number): string {
+  return String(parseFloat((ms / 1000).toFixed(2)));
+}
+
+// 켜고 끄는 상태(반복·어니언 스킨)를 위한 스위치 — ReferenceWindow의
+// 참고/트레이싱 토글과 같은 형태.
+function Switch({
+  checked,
+  onClick,
+  title,
+}: {
+  checked: boolean;
+  onClick: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onClick}
+      title={title}
+      className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${
+        checked ? "bg-violet-500" : "bg-gray-300"
+      }`}
+    >
+      <span
+        className="absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform"
+        style={{ transform: checked ? "translateX(12px)" : "translateX(0)" }}
+      />
+    </button>
+  );
+}
 
 export default function LayerPanel({
   layers,
@@ -76,6 +118,7 @@ export default function LayerPanel({
   onOnionSkinOpacityChange,
   onionSkinRange,
   onOnionSkinRangeChange,
+  onFrameDurationChange,
 }: {
   // 아래→위 순서(가장 아래가 0번)로 저장된 레이어 배열 — 데이터 모델과
   // Editor의 useCanvasHistory가 쓰는 순서를 그대로 따른다.
@@ -129,10 +172,16 @@ export default function LayerPanel({
   onOnionSkinOpacityChange: (opacity: number) => void;
   onionSkinRange: number;
   onOnionSkinRangeChange: (range: number) => void;
+  // 프레임 모드 "현재 프레임" 섹션에서 지속시간을 고칠 때 — 필름스트립이
+  // 아니라 이 패널이 지속시간 편집을 담당한다.
+  onFrameDurationChange: (id: string, ms: number) => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+  // 지속시간 입력은 키 입력마다 커밋(→되돌리기 스택)하지 않고, 이 버퍼에
+  // 담아 두었다가 blur·Enter에서 한 번만 커밋한다(이름 인라인 편집과 동형).
+  const [durationDraft, setDurationDraft] = useState<string | null>(null);
 
   const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
   const activeLayer = layers[activeIndex] ?? layers[layers.length - 1];
@@ -152,6 +201,19 @@ export default function LayerPanel({
     const trimmed = editingName.trim();
     if (trimmed) onRename(id, trimmed);
     setEditingId(null);
+  };
+
+  const commitFrameDuration = () => {
+    if (durationDraft === null) return;
+    const sec = Number(durationDraft);
+    if (Number.isFinite(sec)) {
+      const ms = Math.min(
+        MAX_FRAME_DURATION_MS,
+        Math.max(MIN_FRAME_DURATION_MS, Math.round(sec * 1000)),
+      );
+      onFrameDurationChange(activeLayer.id, ms);
+    }
+    setDurationDraft(null);
   };
 
   return (
@@ -427,7 +489,7 @@ export default function LayerPanel({
           </div>
         </>
       ) : (
-        <div className="flex flex-1 flex-col gap-2 p-3">
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
           <button
             onClick={onTogglePlay}
             className="flex items-center justify-center gap-1.5 bg-violet-500 py-1.5 text-xs font-semibold text-white hover:bg-violet-600"
@@ -444,32 +506,30 @@ export default function LayerPanel({
               </>
             )}
           </button>
-          <button
-            onClick={onToggleLoop}
-            className={`flex items-center justify-center gap-1.5 py-1.5 text-xs ${
-              loopPlayback
-                ? "bg-violet-50 text-violet-700"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            <Repeat className="h-3.5 w-3.5" />
-            반복
-          </button>
-          <button
-            onClick={onToggleOnionSkin}
-            className={`flex items-center justify-center gap-1.5 py-1.5 text-xs ${
-              onionSkin
-                ? "bg-violet-50 text-violet-700"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            어니언 스킨
-          </button>
+          <label className="flex items-center justify-between gap-2 py-0.5 text-xs text-gray-600">
+            <span className="flex items-center gap-1.5">
+              <Repeat className="h-3.5 w-3.5" />
+              반복
+            </span>
+            <Switch checked={loopPlayback} onClick={onToggleLoop} title="반복 재생" />
+          </label>
+          <label className="flex items-center justify-between gap-2 py-0.5 text-xs text-gray-600">
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" />
+              어니언 스킨
+            </span>
+            <Switch
+              checked={onionSkin}
+              onClick={onToggleOnionSkin}
+              title="앞뒤 프레임을 흐리게 겹쳐 보기"
+            />
+          </label>
           {onionSkin && (
-            <div className="flex flex-col gap-1 border-t border-gray-100 pt-2">
-              <label className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
-                투명도
+            // 어니언 스킨 토글의 하위 옵션임이 드러나도록 왼쪽으로 들여쓰고
+            // (라벨 텍스트 시작선에 맞춤) 연결선을 둔다.
+            <div className="-mt-0.5 ml-5 flex flex-col gap-1.5 border-l-2 border-violet-200 pl-3">
+              <label className="flex items-center gap-2 text-[10px] text-gray-500">
+                <span className="shrink-0">투명도</span>
                 <input
                   type="range"
                   min={0}
@@ -478,31 +538,125 @@ export default function LayerPanel({
                   onChange={(e) =>
                     onOnionSkinOpacityChange(Number(e.target.value) / 100)
                   }
-                  className="flex-1 accent-violet-500"
+                  className="min-w-0 flex-1 accent-violet-500"
                 />
                 <span className="w-8 shrink-0 text-right">
                   {Math.round(onionSkinOpacity * 100)}%
                 </span>
               </label>
               <label className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
-                범위(앞뒤)
-                <input
-                  type="range"
-                  min={1}
-                  max={5}
-                  step={1}
+                <span className="shrink-0">범위(앞뒤)</span>
+                <select
                   value={onionSkinRange}
                   onChange={(e) =>
                     onOnionSkinRangeChange(Number(e.target.value))
                   }
-                  className="flex-1 accent-violet-500"
-                />
-                <span className="w-8 shrink-0 text-right">
-                  {onionSkinRange}장
-                </span>
+                  className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600"
+                >
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={n}>
+                      {n}장
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
           )}
+
+          {/* 현재 프레임 편집 — 지속시간·표시·복제·순서이동·삭제. 하단
+              필름스트립은 타임라인(선택·추가)만 맡고, 프레임별 편집은 여기서 한다. */}
+          <div className="mt-1 flex shrink-0 flex-col gap-1.5 border-t border-gray-100 pt-2">
+            <div className="flex items-center justify-between text-[10px] font-semibold text-gray-500">
+              <span>현재 프레임</span>
+              <span className="tabular-nums text-gray-400">
+                {activeIndex + 1} / {layers.length}
+              </span>
+            </div>
+            <label className="flex items-center gap-2 text-[10px] text-gray-500">
+              <span className="shrink-0">지속시간</span>
+              <input
+                type="number"
+                min={MIN_FRAME_DURATION_MS / 1000}
+                max={MAX_FRAME_DURATION_MS / 1000}
+                step={0.01}
+                disabled={isPlaying}
+                value={
+                  durationDraft ??
+                  formatFrameSeconds(
+                    activeLayer.frameDurationMs ?? DEFAULT_FRAME_DURATION_MS,
+                  )
+                }
+                onFocus={() =>
+                  setDurationDraft(
+                    formatFrameSeconds(
+                      activeLayer.frameDurationMs ?? DEFAULT_FRAME_DURATION_MS,
+                    ),
+                  )
+                }
+                onChange={(e) => setDurationDraft(e.target.value)}
+                onBlur={commitFrameDuration}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter")
+                    (e.target as HTMLInputElement).blur();
+                  if (e.key === "Escape") setDurationDraft(null);
+                }}
+                className="w-14 border border-gray-200 px-1 py-0.5 text-center text-[10px] text-gray-700 outline-none disabled:opacity-50"
+              />
+              <span className="shrink-0 text-gray-400">초</span>
+            </label>
+            <div className="flex gap-1">
+              <button
+                onClick={() => onToggleVisible(activeLayer.id)}
+                disabled={isPlaying}
+                title={activeLayer.visible ? "이 프레임 숨기기" : "이 프레임 보이기"}
+                className={`flex h-7 flex-1 items-center justify-center ${
+                  activeLayer.visible
+                    ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    : "bg-violet-50 text-violet-700"
+                } disabled:opacity-30`}
+              >
+                {activeLayer.visible ? (
+                  <Eye className="h-3.5 w-3.5" />
+                ) : (
+                  <EyeOff className="h-3.5 w-3.5" />
+                )}
+              </button>
+              <button
+                onClick={() => onDuplicate(activeLayerId)}
+                disabled={isPlaying || layers.length >= MAX_LAYERS}
+                title="이 프레임 복제"
+                className="flex h-7 flex-1 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+              >
+                <Copy className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => onMoveDown(activeLayerId)}
+                disabled={isPlaying || activeIndex <= 0}
+                title="앞으로 이동"
+                className="flex h-7 flex-1 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => onMoveUp(activeLayerId)}
+                disabled={
+                  isPlaying || activeIndex < 0 || activeIndex >= layers.length - 1
+                }
+                title="뒤로 이동"
+                className="flex h-7 flex-1 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => onDelete(activeLayerId)}
+                disabled={isPlaying || layers.length <= 1}
+                title="이 프레임 삭제"
+                className="flex h-7 flex-1 items-center justify-center bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600 disabled:opacity-30"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
