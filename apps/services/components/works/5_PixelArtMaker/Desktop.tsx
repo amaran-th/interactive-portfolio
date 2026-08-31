@@ -33,13 +33,20 @@ import {
   setIconPosition,
   setIconPositions,
 } from "./useDesktopLayout";
+import {
+  getIconScale,
+  ICON_BOX,
+  ICON_GAP,
+  ICON_PADDING,
+} from "./iconMetrics";
 import { getWallpaper, resetWallpaper, WALLPAPER_ID } from "./wallpaper";
 
 type Menu = { x: number; y: number; items: ContextMenuItem[] } | null;
 
 // 아이콘/휴지통/포맷/배경화면/편집기의 대략적인 폭·높이(box-select 히트박스와 동일
-// 기준) — 창 크기가 줄어들 때 이 크기만큼의 여유를 두고 컨테이너 안쪽으로 위치를 당겨온다.
-const ICON_FOOTPRINT = 80;
+// 기준, 기준 배율 1.0). 창 크기가 줄어들 때 이 크기만큼의 여유를 두고 컨테이너
+// 안쪽으로 위치를 당겨온다.
+const ICON_FOOTPRINT = ICON_BOX;
 
 // 일반 픽셀아트 항목이 아닌 시스템 아이콘들 — 다중 선택·박스 선택·휴지통 삭제
 // 대상에서 제외되고, 저장된 위치가 없을 때는 그리드 기본값 대신 CSS 코너 배치를 쓴다.
@@ -140,14 +147,24 @@ export default function Desktop({
     return () => ro.disconnect();
   }, [wallpaper.width, wallpaper.height, onFittedSizeChange]);
 
+  // 데스크탑이 커진 만큼 아이콘·그리드·글자를 균일하게 확대하는 배율. 저장된
+  // positions는 기준(배율 1.0) 좌표이므로 화면에 그릴 때 이 값을 곱하고,
+  // 드래그·박스선택처럼 화면 좌표를 다시 저장 좌표로 되돌릴 때는 나눈다.
+  const scale = getIconScale(fittedSize?.width);
+
   const refresh = useCallback(() => {
     const list = listPixelArt();
     setItems(list);
     setWallpaper(getWallpaper());
-    const containerWidth = containerRef.current?.getBoundingClientRect().width;
+    // getIconPosition은 기준 좌표를 다루므로 화면 폭이 아니라 배율로 나눈
+    // 기준 폭을 넘긴다 — 그래야 배율과 무관하게 열 수가 일정하게 계산된다.
+    const measuredWidth = containerRef.current?.getBoundingClientRect().width;
+    const baseWidth = measuredWidth
+      ? measuredWidth / getIconScale(measuredWidth)
+      : undefined;
     const pos: Record<string, { x: number; y: number }> = {};
     list.forEach((art) => {
-      pos[art.id] = getIconPosition(art.id, containerWidth);
+      pos[art.id] = getIconPosition(art.id, baseWidth);
     });
     // 특수 아이콘은 아직 옮긴 적이 없으면(저장된 위치 없음) positions에 아예 넣지
     // 않는다 — 렌더링에서 이 경우 CSS 코너 클래스(bottom-4 right-4 등)로 기본
@@ -202,11 +219,15 @@ export default function Desktop({
         for (const art of items) {
           const p = positions[art.id];
           if (!p) continue;
+          // positions는 기준 좌표, box는 화면 좌표 — 비교 전에 배율을 맞춘다.
+          const px = p.x * scale;
+          const py = p.y * scale;
+          const footprint = ICON_FOOTPRINT * scale;
           if (
-            p.x + 80 >= minX &&
-            p.x <= maxX &&
-            p.y + 80 >= minY &&
-            p.y <= maxY
+            px + footprint >= minX &&
+            px <= maxX &&
+            py + footprint >= minY &&
+            py <= maxY
           )
             next.add(art.id);
         }
@@ -216,7 +237,7 @@ export default function Desktop({
       window.addEventListener("pointermove", move);
       window.addEventListener("pointerup", up);
     },
-    [items, positions],
+    [items, positions, scale],
   );
 
   // 일반 픽셀아트 아이콘과 트래시/포맷 같은 특수 아이콘이 모두 이 함수 하나로
@@ -255,12 +276,17 @@ export default function Desktop({
       const offsetY = containerRect?.top ?? 0;
       // 아직 저장된 위치가 없는 아이콘(트래시/포맷의 기본 코너 배치)은 지금 실제
       // 화면에 보이는 위치를 컨테이너 기준 좌표로 환산해 드래그 시작점으로 삼는다
-      // — 그래야 첫 드래그에서 위치가 갑자기 튀지 않는다.
+      // — 그래야 첫 드래그에서 위치가 갑자기 튀지 않는다. 화면 좌표는 배율로
+      // 나눠 기준 좌표로 되돌린다(startPositions는 기준 좌표 기준).
       const startPositions = group.map((gid) => {
         const existing = positions[gid];
         if (existing) return { id: gid, ...existing };
         const rect = e.currentTarget.getBoundingClientRect();
-        return { id: gid, x: rect.left - offsetX, y: rect.top - offsetY };
+        return {
+          id: gid,
+          x: (rect.left - offsetX) / scale,
+          y: (rect.top - offsetY) / scale,
+        };
       });
 
       const startX = e.clientX;
@@ -279,8 +305,9 @@ export default function Desktop({
         moved = true;
         setPositions((prev) => {
           const next = { ...prev };
+          // dx/dy는 화면 이동량 — 배율로 나눠 기준 좌표 이동량으로 저장한다.
           for (const sp of startPositions)
-            next[sp.id] = { x: sp.x + dx, y: sp.y + dy };
+            next[sp.id] = { x: sp.x + dx / scale, y: sp.y + dy / scale };
           return next;
         });
       };
@@ -305,7 +332,7 @@ export default function Desktop({
       // 계속 채워진 채로 남으므로 pointercancel도 같이 처리한다.
       window.addEventListener("pointercancel", up);
     },
-    [selected, positions],
+    [selected, positions, scale],
   );
 
   const handleTrashDrop = useCallback(() => {
@@ -330,8 +357,10 @@ export default function Desktop({
   // 그 뒤로 순차적으로 다음 빈 칸에 배치된다(cleanUpLayout 참고).
   const handleCleanUp = useCallback(() => {
     const rect = containerRef.current?.getBoundingClientRect();
-    const containerWidth = rect?.width ?? 0;
-    const containerHeight = rect?.height ?? 0;
+    // cleanUpLayout·defaultSpecialCorner는 기준 좌표로 계산하므로 화면
+    // 크기를 배율로 나눠 기준 크기로 넘긴다.
+    const containerWidth = (rect?.width ?? 0) / scale;
+    const containerHeight = (rect?.height ?? 0) / scale;
     const entries = [
       ...items.map((art) => ({
         id: art.id,
@@ -345,7 +374,7 @@ export default function Desktop({
     ];
     setIconPositions(cleanUpLayout(entries, containerWidth, containerHeight));
     refresh();
-  }, [items, positions, refresh]);
+  }, [items, positions, refresh, scale]);
 
   const confirmFormat = useCallback(() => {
     resetAllPixelArt();
@@ -362,6 +391,31 @@ export default function Desktop({
     { label: "이름 바꾸기", onClick: () => {}, disabled: true },
     { label: "삭제", onClick: () => {}, disabled: true },
   ];
+
+  // 특수 아이콘(휴지통/포맷/배경화면/편집기)도 일반 아이콘과 똑같이 배율만큼
+  // 확대한다 — SVG라 transform 스케일로 늘려도 뭉개지지 않는다. 저장된 위치가
+  // 없으면 defaultSpecialCorner와 같은 코너 자리를 화면 좌표로 환산해 쓴다.
+  const specialIconStyle = (id: string): React.CSSProperties => {
+    const stored = positions[id];
+    const base =
+      stored ??
+      (fittedSize
+        ? defaultSpecialCorner(
+            id,
+            fittedSize.width / scale,
+            fittedSize.height / scale,
+          )
+        : null);
+    return {
+      cursor: CURSOR_POINTING,
+      width: ICON_BOX,
+      padding: ICON_PADDING,
+      gap: ICON_GAP,
+      transform: `scale(${scale})`,
+      transformOrigin: "top left",
+      ...(base ? { left: base.x * scale, top: base.y * scale } : undefined),
+    };
+  };
 
   return (
     <div
@@ -400,6 +454,7 @@ export default function Desktop({
               art={art}
               x={p.x}
               y={p.y}
+              scale={scale}
               selected={selected.has(art.id)}
               editing={renamingId === art.id}
               onPointerDownIcon={(e) => startIconDrag(art.id, e)}
@@ -482,13 +537,8 @@ export default function Desktop({
             e.stopPropagation();
             setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
           }}
-          className={`absolute flex w-20 flex-col items-center gap-1 p-2 ${positions[TRASH_ID] ? "" : "bottom-4 right-4"}`}
-          style={{
-            cursor: CURSOR_POINTING,
-            ...(positions[TRASH_ID]
-              ? { left: positions[TRASH_ID].x, top: positions[TRASH_ID].y }
-              : undefined),
-          }}
+          className={`absolute flex flex-col items-center ${positions[TRASH_ID] ? "" : "bottom-4 right-4"}`}
+          style={specialIconStyle(TRASH_ID)}
           title="선택한 아이콘을 여기로 드래그해 삭제 · 드래그해서 위치 이동 가능"
         >
           <TrashIcon active={trashHover} />
@@ -505,13 +555,8 @@ export default function Desktop({
             e.stopPropagation();
             setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
           }}
-          className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-black/5 ${positions[FORMAT_ID] ? "" : "bottom-4 left-4"}`}
-          style={{
-            cursor: CURSOR_POINTING,
-            ...(positions[FORMAT_ID]
-              ? { left: positions[FORMAT_ID].x, top: positions[FORMAT_ID].y }
-              : undefined),
-          }}
+          className={`absolute flex flex-col items-center hover:bg-black/5 ${positions[FORMAT_ID] ? "" : "bottom-4 left-4"}`}
+          style={specialIconStyle(FORMAT_ID)}
           title="더블클릭하면 이 프로젝트의 저장된 모든 작품과 배치를 초기화합니다 · 드래그해서 위치 이동 가능"
         >
           <FormatIcon />
@@ -528,16 +573,8 @@ export default function Desktop({
             e.stopPropagation();
             setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
           }}
-          className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-black/5 ${positions[WALLPAPER_ID] ? "" : "top-4 right-4"}`}
-          style={{
-            cursor: CURSOR_POINTING,
-            ...(positions[WALLPAPER_ID]
-              ? {
-                  left: positions[WALLPAPER_ID].x,
-                  top: positions[WALLPAPER_ID].y,
-                }
-              : undefined),
-          }}
+          className={`absolute flex flex-col items-center hover:bg-black/5 ${positions[WALLPAPER_ID] ? "" : "top-4 right-4"}`}
+          style={specialIconStyle(WALLPAPER_ID)}
           title="더블클릭하면 배경화면을 편집합니다 · 드래그해서 위치 이동 가능"
         >
           <WallpaperIcon art={wallpaper} />
@@ -554,16 +591,8 @@ export default function Desktop({
             e.stopPropagation();
             setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
           }}
-          className={`absolute flex w-20 flex-col items-center gap-1 p-2 hover:bg-black/5 ${positions[LAUNCHER_ID] ? "" : "top-4 left-4"}`}
-          style={{
-            cursor: CURSOR_POINTING,
-            ...(positions[LAUNCHER_ID]
-              ? {
-                  left: positions[LAUNCHER_ID].x,
-                  top: positions[LAUNCHER_ID].y,
-                }
-              : undefined),
-          }}
+          className={`absolute flex flex-col items-center hover:bg-black/5 ${positions[LAUNCHER_ID] ? "" : "top-4 left-4"}`}
+          style={specialIconStyle(LAUNCHER_ID)}
           title="더블클릭하면 새로 만들기·기존 파일 열기·이미지 불러오기를 선택할 수 있습니다 · 드래그해서 위치 이동 가능"
         >
           <LauncherIcon />

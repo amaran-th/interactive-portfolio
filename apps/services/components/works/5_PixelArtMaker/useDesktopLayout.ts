@@ -1,4 +1,7 @@
 const LAYOUT_KEY = "pixel-art-desktop-layout";
+// 여기서 다루는 좌표는 전부 "기준(배율 1.0)" 좌표다 — 화면에 그릴 때 Desktop이
+// getIconScale로 구한 배율을 곱한다. 저장된 값도 기준 좌표이므로, 창 크기가
+// 달라져도(배율이 달라져도) 배치가 통째로 확대·축소될 뿐 서로 어긋나지 않는다.
 const GRID_STEP = 96;
 
 type Position = { x: number; y: number };
@@ -23,7 +26,8 @@ function cellKey(pos: Position): string {
   return `${Math.round((pos.x - 16) / GRID_STEP)},${Math.round((pos.y - 16) / GRID_STEP)}`;
 }
 
-// containerWidth를 넘기면 실제 데스크탑 폭에 맞춰 한 줄에 들어갈 열 수를 계산한다
+// containerWidth(기준 폭 — 화면 폭을 배율로 나눈 값)를 넘기면 한 줄에 들어갈
+// 열 수를 그에 맞춰 계산한다
 // — 배경화면 비율에 맞춰 데스크탑이 레터박스로 좁아질 수 있는데, 고정 6열 기준으로
 // 배치하면 좁아진 실제 폭을 넘어서는 아이콘들이 전부 같은 클램프 위치로 밀려나
 // 서로 겹쳐 보이는 문제가 있었다.

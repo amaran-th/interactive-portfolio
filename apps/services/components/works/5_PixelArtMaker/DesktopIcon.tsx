@@ -3,11 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { PixelArt } from "../_shared/assetLibrary";
 import { CURSOR_POINTING, CURSOR_TEXT } from "./cursors";
+import {
+  ICON_BOX,
+  ICON_CANVAS_PX,
+  ICON_GAP,
+  ICON_LABEL_PX,
+  ICON_PADDING,
+} from "./iconMetrics";
 
 export default function DesktopIcon({
   art,
   x,
   y,
+  scale,
   selected,
   editing,
   onPointerDownIcon,
@@ -17,8 +25,10 @@ export default function DesktopIcon({
   onRenameCancel,
 }: {
   art: PixelArt;
+  // x, y는 기준(배율 1.0) 좌표 — 여기서 scale을 곱해 화면 좌표로 그린다.
   x: number;
   y: number;
+  scale: number;
   selected: boolean;
   editing: boolean;
   onPointerDownIcon: (e: React.PointerEvent) => void;
@@ -46,26 +56,28 @@ export default function DesktopIcon({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const size = 48;
+    // 캔버스 내부 해상도도 배율만큼 키워 다시 그린다 — transform 스케일로
+    // 늘리면 픽셀아트가 뭉개지므로, 확대된 크기 기준으로 새로 렌더한다.
+    const size = Math.max(1, Math.round(ICON_CANVAS_PX * scale));
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
-    const scale = size / Math.max(art.width, art.height);
+    const block = size / Math.max(art.width, art.height);
     // 정사각형이 아닌 캔버스(예: 160x90)는 긴 축만 꽉 채우면 짧은 축 쪽에
     // 빈 공간이 남는다 — 그 여백을 가운데로 정렬한다.
-    const offsetX = (size - art.width * scale) / 2;
-    const offsetY = (size - art.height * scale) / 2;
+    const offsetX = (size - art.width * block) / 2;
+    const offsetY = (size - art.height * block) / 2;
     for (let py = 0; py < art.height; py++) {
       for (let px = 0; px < art.width; px++) {
         const color = art.pixels[py * art.width + px];
         if (color === null) continue;
         ctx.fillStyle = color;
-        ctx.fillRect(px * scale + offsetX, py * scale + offsetY, scale, scale);
+        ctx.fillRect(px * block + offsetX, py * block + offsetY, block, block);
       }
     }
-  }, [art]);
+  }, [art, scale]);
 
   const commitRename = () => {
     const trimmed = draftName.trim();
@@ -76,12 +88,15 @@ export default function DesktopIcon({
   return (
     <div
       style={{
-        left: x,
-        top: y,
+        left: x * scale,
+        top: y * scale,
         position: "absolute",
+        width: ICON_BOX * scale,
+        padding: ICON_PADDING * scale,
+        gap: ICON_GAP * scale,
         cursor: editing ? undefined : CURSOR_POINTING,
       }}
-      className={`flex w-20 flex-col items-center gap-1 p-2 ${selected ? "bg-violet-500/15" : "hover:bg-black/5"}`}
+      className={`flex flex-col items-center ${selected ? "bg-violet-500/15" : "hover:bg-black/5"}`}
       onPointerDown={editing ? undefined : onPointerDownIcon}
       onDoubleClick={editing ? undefined : onDoubleClick}
       onContextMenu={editing ? undefined : onContextMenu}
@@ -102,11 +117,14 @@ export default function DesktopIcon({
             if (e.key === "Enter") commitRename();
             else if (e.key === "Escape") onRenameCancel();
           }}
-          className="w-full bg-white text-center text-[10px] text-gray-900 shadow-[0_0_0_1px_#8b5cf6] outline-none"
-          style={{ cursor: CURSOR_TEXT }}
+          className="w-full bg-white text-center text-gray-900 shadow-[0_0_0_1px_#8b5cf6] outline-none"
+          style={{ cursor: CURSOR_TEXT, fontSize: ICON_LABEL_PX * scale }}
         />
       ) : (
-        <span className="w-full truncate text-center text-[10px] text-gray-600">
+        <span
+          className="w-full truncate text-center text-gray-600"
+          style={{ fontSize: ICON_LABEL_PX * scale }}
+        >
           {art.name}
         </span>
       )}
