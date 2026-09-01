@@ -14,6 +14,17 @@ export const CHECKER_STYLE = {
   backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0px",
 } as const;
 
+// 투명도가 있는 색을 보여주는 스와치 배경 — 색(8자리 hex면 알파 포함)을 체크무늬
+// 위에 얹어, 알파가 낮을수록 체크무늬가 비쳐 보인다. hex가 6자리(불투명)면
+// 체크무늬가 완전히 덮여 단색으로 보인다.
+export function transparencySwatchStyle(hex: string): React.CSSProperties {
+  return {
+    backgroundImage: `linear-gradient(${hex}, ${hex}), ${CHECKER_STYLE.backgroundImage}`,
+    backgroundSize: `100% 100%, 8px 8px, 8px 8px, 8px 8px, 8px 8px`,
+    backgroundPosition: `0 0, ${CHECKER_STYLE.backgroundPosition}`,
+  };
+}
+
 function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n));
 }

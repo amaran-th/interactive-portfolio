@@ -341,6 +341,32 @@ export function rotate90(
   return { pixels: out, width: outWidth, height: outHeight };
 }
 
+// 캔버스 크기를 바꾸지 않고 중심 기준으로 90도 회전한다 — 정사각형이면
+// 손실이 없고(rotate90과 결과가 같다), 정사각형이 아니면 회전 뒤 캔버스
+// 밖으로 나간 픽셀은 잘린다. 체크된 레이어만 회전할 때처럼 캔버스 경계를
+// 그대로 유지해야 하는 곳에서 쓴다.
+export function rotate90InPlace(
+  pixels: PixelValue[],
+  width: number,
+  height: number,
+  direction: 1 | -1,
+): PixelValue[] {
+  const out = new Array<PixelValue>(width * height).fill(null);
+  const cx = (width - 1) / 2;
+  const cy = (height - 1) / 2;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const value = pixels[y * width + x];
+      if (value == null) continue;
+      const nx = Math.round(direction === 1 ? cx - (y - cy) : cx + (y - cy));
+      const ny = Math.round(direction === 1 ? cy + (x - cx) : cy - (x - cx));
+      if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+      out[ny * width + nx] = value;
+    }
+  }
+  return out;
+}
+
 // 불러온 이미지 오버레이 등 0/90/180/270도 회전이 필요한 곳에서 쓴다 —
 // rotate90(시계/반시계 한 번)과 달리 원하는 각도를 한 번에 지정할 수 있다.
 export function rotatePixelValuesBy(
@@ -464,6 +490,34 @@ export function setPixel(
   const i = idx(width, x, y);
   next[i] = color === null ? null : compositePixel(next[i], color);
   return next;
+}
+
+// 선택 영역(mask) 안의 픽셀만 (dx,dy)만큼 평행이동한다 — 원래 자리는
+// 비우고, 옮긴 자리에는 알파 합성으로 얹는다. 이동 도구가 체크된 여러
+// 레이어의 선택 내용을 같은 양만큼 함께 옮길 때, 활성 레이어를 제외한
+// 나머지 레이어에 적용한다(활성 레이어는 캔버스 드래그가 이미 처리함).
+export function shiftMaskedContent(
+  pixels: PixelValue[],
+  width: number,
+  height: number,
+  mask: Set<number>,
+  dx: number,
+  dy: number,
+): PixelValue[] {
+  const out = pixels.slice();
+  const lifted: [number, PixelValue][] = [];
+  mask.forEach((i) => {
+    if (pixels[i] != null) lifted.push([i, pixels[i]]);
+    out[i] = null;
+  });
+  for (const [i, color] of lifted) {
+    const x = (i % width) + dx;
+    const y = Math.floor(i / width) + dy;
+    if (x < 0 || y < 0 || x >= width || y >= height) continue;
+    const j = y * width + x;
+    out[j] = color === null ? out[j] : compositePixel(out[j], color);
+  }
+  return out;
 }
 
 // Bresenham 직선 — 두 점 사이의 모든 격자 좌표를 반환

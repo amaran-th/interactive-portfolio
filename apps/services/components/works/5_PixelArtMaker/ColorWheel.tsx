@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import ColorPicker, { CHECKER_STYLE } from "./ColorPicker";
+import ColorPicker, { transparencySwatchStyle } from "./ColorPicker";
 import { PromptModal } from "./Dialogs";
 import {
   createPaletteSet,
@@ -314,11 +314,7 @@ export default function ColorWheel({
                   ? "ring-2 ring-violet-500"
                   : "ring-1 ring-black/15"
               }`}
-              style={
-                secondaryColorHex
-                  ? { backgroundColor: secondaryColorHex }
-                  : CHECKER_STYLE
-              }
+              style={transparencySwatchStyle(secondaryColorHex ?? "#00000000")}
             />
             <button
               onClick={() => setArmedTarget("primary")}
@@ -328,7 +324,7 @@ export default function ColorWheel({
                   ? "ring-2 ring-violet-500"
                   : "ring-1 ring-black/15"
               }`}
-              style={{ backgroundColor: activeColorHex }}
+              style={transparencySwatchStyle(activeColorHex)}
             />
           </div>
           <button

@@ -12,6 +12,9 @@ export type ContextMenuItem = {
   // 라벨만으로는 뜻이 분명하지 않은 항목(예: "JSON 불러오기"가 정확히 무엇을
   // 하는지)을 위한 툴팁 — 마우스를 올리면 브라우저 기본 title 툴팁으로 보여준다.
   title?: string;
+  // 이 항목에 대응하는 단축키 조합(예: "⌘Z", "Ctrl+S") — 항목 오른쪽 끝에
+  // 옅고 작게 표시한다.
+  shortcut?: string;
 };
 
 function itemClassName(item: ContextMenuItem) {
@@ -50,7 +53,7 @@ export default function ContextMenu({
     <div
       ref={ref}
       style={{ left: x, top: y }}
-      className="fixed z-50 w-40 bg-white py-1 shadow-xl"
+      className="fixed z-50 w-max min-w-40 max-w-64 bg-white py-1 shadow-xl"
     >
       {items.map((item) => (
         <div
@@ -73,9 +76,14 @@ export default function ContextMenu({
             }}
             className={itemClassName(item)}
           >
-            {item.label}
+            <span className="truncate">{item.label}</span>
+            {item.shortcut && !item.submenu && (
+              <span className="ml-auto shrink-0 pl-3 text-[10px] tracking-wide text-gray-400 tabular-nums">
+                {item.shortcut}
+              </span>
+            )}
             {item.submenu && (
-              <ChevronRight className="h-3 w-3 shrink-0 text-gray-300" />
+              <ChevronRight className="ml-auto h-3 w-3 shrink-0 text-gray-300" />
             )}
           </button>
           {item.submenu && openSubmenu === item.label && (

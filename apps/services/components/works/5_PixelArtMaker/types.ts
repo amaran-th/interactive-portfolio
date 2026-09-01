@@ -144,8 +144,24 @@ export function nextZoomStep(current: number, direction: 1 | -1): number {
 // 아니라 그 바깥 뷰포트를 칠한다. 항상 불투명 단색이다(투명·체크무늬 없음).
 export const DEFAULT_CANVAS_BG_COLOR = "#9ca3af";
 
-// 편집기(rootRef 기준 너비)가 이 폭보다 좁아지면 DrawToolbar의 도형·텍스트·
-// 그라데이션 도구, 이미지 불러오기/내보내기 사이드바가 모두 같은 기준으로
-// 접힌 UI(더보기/아이콘 트리거)로 바뀐다 — Editor.tsx가 한 번만 측정해
-// 여러 하위 컴포넌트에 내려주는 값이라 기준이 서로 어긋나지 않는다.
+// 편집기(rootRef 기준 너비)가 이 폭보다 좁아지면 이미지 불러오기/내보내기
+// 사이드바가 아이콘 트리거로, 오른쪽 레이어 패널이 얇은 아이콘 열로 접힌다 —
+// Editor.tsx가 한 번만 측정해 여러 하위 컴포넌트에 내려준다.
 export const NARROW_BREAKPOINT = 820;
+
+// 편집기 폭이 이 값보다 좁으면 DrawToolbar가 도형·텍스트·그라데이션 도구를
+// "더보기" 뒤로 접는다(그러지 않으면 도구 카드가 2줄로 넘어감). 레이아웃
+// 재구성으로 툴바가 오른쪽 패널 폭만큼 좁아진 것을 감안한 값 — NARROW_BREAKPOINT
+// 와 독립적이라, 이 구간에서도 레이어 패널은 계속 통짜로 보인다. 순수하게
+// rootRef.clientWidth만 보므로 창 폭이 그대로면 토글되지 않는다.
+export const TOOLBAR_COMPACT_WIDTH = 1140;
+
+// 편집기 폭이 이 값 이상일 때만 오른쪽 패널 맨 위에 미리보기 패널을 보여준다
+// — 그보다 좁으면 레이어 목록·아코디언에 세로 공간을 양보한다. 역시 순수하게
+// rootRef.clientWidth만 본다.
+export const PREVIEW_MIN_WIDTH = 1280;
+
+// 캔버스 사방 여백(px) — 확대하지 않아도 스페이스+드래그로 캔버스를 자유롭게
+// 밀 수 있게 스크롤 여유를 확보한다. 미리보기의 뷰파인더 사각형 계산도 이
+// 값을 기준으로 한다(캔버스 좌상단이 스크롤 콘텐츠에서 이만큼 안쪽에 있음).
+export const CANVAS_PAN_PADDING = 320;

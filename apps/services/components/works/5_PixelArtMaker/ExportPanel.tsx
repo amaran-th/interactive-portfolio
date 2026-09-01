@@ -4,10 +4,13 @@ import { Copy } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { PixelArt } from "../_shared/assetLibrary";
 import {
+  buildAnimatedSvgString,
   buildSvgString,
+  copyJpgToClipboard,
   copyPngToClipboard,
   copySpriteSheetToClipboard,
   copyTextToClipboard,
+  exportAsAnimatedSVG,
   exportAsGIF,
   exportAsJPG,
   exportAsJSON,
@@ -51,6 +54,11 @@ export default function ExportPanel({ doc }: { doc: PixelArt }) {
   // 표시·배율 상한 계산 둘 다 이 값이 필요하다.
   const visibleFrameCount = (doc.layers ?? []).filter((l) => l.visible).length;
   const [scale, setScale] = useState(8);
+  // 프레임 모드에서 SVG로 내보낼 때: 켜면 프레임을 순환 재생하는 애니메이션
+  // SVG, 끄면 지금 보고 있는 프레임 한 장만.
+  const [svgAnimated, setSvgAnimated] = useState(true);
+  const svgAsAnimation =
+    format === "svg" && doc.layerMode === "frames" && svgAnimated;
   const [status, setStatus] = useState<string | null>(null);
   const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -84,15 +92,16 @@ export default function ExportPanel({ doc }: { doc: PixelArt }) {
 
   const handleSave = useCallback(() => {
     if (format === "png") exportAsPNG(doc, scale);
-    else if (format === "svg") exportAsSVG(doc);
-    else if (format === "json") exportAsJSON(doc);
+    else if (format === "svg") {
+      if (svgAsAnimation) exportAsAnimatedSVG(doc);
+      else exportAsSVG(doc);
+    } else if (format === "json") exportAsJSON(doc);
     else if (format === "gif") void exportAsGIF(doc, scale);
     else if (format === "spritesheet") exportAsSpriteSheet(doc, scale);
     else exportAsJPG(doc, scale);
-  }, [format, doc, scale]);
+  }, [format, doc, scale, svgAsAnimation]);
 
-  // PNG는 이미지로, SVG·JSON은 코드(텍스트)로 클립보드에 복사한다. JPG는
-  // 대부분 브라우저의 ClipboardItem이 image/png만 신뢰성 있게 지원해 제외.
+  // PNG·JPG는 이미지로, SVG·JSON은 코드(텍스트)로 클립보드에 복사한다.
   const handleSecondary = useCallback(async () => {
     if (format === "png") {
       flash(
@@ -100,9 +109,17 @@ export default function ExportPanel({ doc }: { doc: PixelArt }) {
           ? "PNG를 클립보드에 복사했습니다"
           : "클립보드 복사 실패",
       );
+    } else if (format === "jpg") {
+      flash(
+        (await copyJpgToClipboard(doc, scale))
+          ? "JPG를 클립보드에 복사했습니다"
+          : "클립보드 복사 실패",
+      );
     } else if (format === "svg") {
       flash(
-        (await copyTextToClipboard(buildSvgString(doc)))
+        (await copyTextToClipboard(
+          svgAsAnimation ? buildAnimatedSvgString(doc) : buildSvgString(doc),
+        ))
           ? "SVG 코드를 복사했습니다"
           : "클립보드 복사 실패",
       );
@@ -119,13 +136,13 @@ export default function ExportPanel({ doc }: { doc: PixelArt }) {
           : "클립보드 복사 실패",
       );
     }
-  }, [format, doc, scale, flash]);
+  }, [format, doc, scale, flash, svgAsAnimation]);
 
-  const hasSecondary = format !== "jpg" && format !== "gif";
+  const hasSecondary = format !== "gif";
   const secondaryTitle =
-    format === "png" || format === "spritesheet"
-      ? "클립보드에 이미지로 복사"
-      : "코드 복사";
+    format === "svg" || format === "json"
+      ? "코드 복사"
+      : "클립보드에 이미지로 복사";
 
   return (
     <>
@@ -144,6 +161,35 @@ export default function ExportPanel({ doc }: { doc: PixelArt }) {
           </button>
         ))}
       </div>
+
+      {format === "svg" && doc.layerMode === "frames" && (
+        <label className="flex items-center justify-between text-xs text-gray-600">
+          <span>애니메이션</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={svgAnimated}
+            onClick={() => setSvgAnimated((v) => !v)}
+            title={
+              svgAnimated
+                ? "보이는 프레임을 순환 재생하는 SVG"
+                : "지금 보고 있는 프레임 한 장만 SVG로"
+            }
+            className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${
+              svgAnimated ? "bg-violet-500" : "bg-gray-300"
+            }`}
+          >
+            <span
+              className="absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform"
+              style={{
+                transform: svgAnimated
+                  ? "translateX(12px)"
+                  : "translateX(0)",
+              }}
+            />
+          </button>
+        </label>
+      )}
 
       {(format === "png" ||
         format === "jpg" ||

@@ -8,6 +8,8 @@ import {
   Eraser,
   FlipHorizontal2,
   FlipVertical2,
+  Focus,
+  Globe,
   Grid3x3,
   Lasso,
   Minus,
@@ -19,10 +21,13 @@ import {
   RotateCcw,
   RotateCw,
   Square,
+  SquareMinus,
+  SquarePlus,
   Loader,
   Type,
   Undo2,
   Wand2,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
@@ -94,18 +99,18 @@ const GRADIENT_SHAPE_TOOLS: Tool[] = ["line", "rect", "circle"];
 // 접근성 도구에서만 필요하다(aria-label로만 제공, 화면에는 그리지 않는다).
 function ToolCard({
   title,
-  narrow,
+  compact,
   children,
 }: {
   title: string;
-  narrow: boolean;
+  compact: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div
       role="group"
       aria-label={title}
-      className={`flex flex-col bg-white shadow-md ${narrow ? "gap-1 p-1.5" : "gap-1.5 p-2"}`}
+      className={`flex flex-col bg-white shadow-md ${compact ? "gap-1 p-1.5" : "gap-1.5 p-2"}`}
     >
       {children}
     </div>
@@ -178,8 +183,10 @@ export default function DrawToolbar({
   onFlipHorizontal,
   onFlipVertical,
   onRotate90,
+  onAlignContent,
+  canAlignContent,
   secondaryPortalTarget,
-  narrow,
+  compact,
 }: {
   tool: Tool;
   onToolChange: (tool: Tool) => void;
@@ -220,14 +227,18 @@ export default function DrawToolbar({
   onFlipHorizontal: () => void;
   onFlipVertical: () => void;
   onRotate90: (direction: 1 | -1) => void;
+  // 체크된 레이어의 그림을 캔버스 정중앙으로 옮긴다. 레이어 모드에서 체크된
+  // 레이어가 하나라도 있을 때만 켜진다(canAlignContent).
+  onAlignContent: () => void;
+  canAlignContent: boolean;
   // 도구별 하위 옵션(브러시 크기·채우기·그라데이션·선택 모드)을 그릴 자리 —
   // 캔버스 영역 하단 중앙에 떠 있는 DOM 노드를 Editor.tsx가 내려준다. 이
   // 컴포넌트 자신은 상단 바에 렌더링되므로 포털로 그 노드에 그린다.
   secondaryPortalTarget: HTMLDivElement | null;
-  // 편집기(rootRef) 너비가 NARROW_BREAKPOINT보다 좁은지 — 이미지 불러오기/
-  // 내보내기 사이드바와 같은 기준을 쓰도록 Editor.tsx가 한 번만 측정해
-  // 내려준다.
-  narrow: boolean;
+  // 편집기 폭이 TOOLBAR_COMPACT_WIDTH보다 좁은지 — true면 도형·텍스트·
+  // 그라데이션 도구와 반전·회전을 "더보기" 뒤로 접어 도구 카드가 한 줄에
+  // 유지되게 한다. Editor.tsx가 rootRef.clientWidth로 판정해 내려준다.
+  compact: boolean;
 }) {
   const showBrushSizeRow = BRUSH_SIZE_TOOLS.includes(tool);
   const showFillOptionsRow =
@@ -377,58 +388,60 @@ export default function DrawToolbar({
               disabled={!hasSelection}
               onClick={onClearSelection}
               title="선택 영역 해제 (Esc)"
-              className="h-8 px-2 text-[10px] bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+              className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
             >
-              선택 해제
+              <X className="h-3.5 w-3.5" />
             </button>
             <button
               disabled={!hasSelection}
               onClick={onFillSelection}
-              title="선택 영역을 활성 색상으로 한 번에 칠하기(색상 일괄 수정)"
-              className="h-8 px-2 text-[10px] bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+              title="선택 영역 채우기 — 선택 영역을 활성 색상으로 한 번에 칠하기(색상 일괄 수정)"
+              className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
             >
-              선택 영역 채우기
+              <PaintBucket className="h-3.5 w-3.5" />
             </button>
           </div>
           {/* 자주 안 쓰는 옵션이라고 "더보기" 뒤에 숨기지 않는다 — 구분선으로만
               나눠서, 필요할 때 한 번 더 누르지 않고 바로 보이게 한다. */}
           <div className="h-7 w-px bg-gray-200" />
-          <div
-            className="flex gap-1"
-            title="선택·올가미·자동 선택 도구로 새 영역을 고를 때 기존 선택과 합치는 방식(Shift=추가, Alt=제외와 동일)"
-          >
+          <div className="flex gap-1">
             {(
               [
-                { mode: "new", label: "새로" },
-                { mode: "add", label: "추가" },
-                { mode: "subtract", label: "제외" },
-              ] as { mode: SelectMode; label: string }[]
-            ).map(({ mode, label }) => (
+                { mode: "new", label: "새 선택", icon: Square },
+                { mode: "add", label: "선택 영역에 추가 (Shift)", icon: SquarePlus },
+                {
+                  mode: "subtract",
+                  label: "선택 영역에서 제외 (Alt)",
+                  icon: SquareMinus,
+                },
+              ] as { mode: SelectMode; label: string; icon: typeof Square }[]
+            ).map(({ mode, label, icon: Icon }) => (
               <button
                 key={mode}
                 disabled={!isSelectLikeTool}
                 onClick={() => onSelectModeChange(mode)}
-                className={`h-8 px-2 text-[10px] disabled:opacity-30 ${
+                title={label}
+                className={`flex h-8 w-8 items-center justify-center disabled:opacity-30 ${
                   selectMode === mode
                     ? "bg-violet-500 text-white"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
-                {label}
+                <Icon className="h-3.5 w-3.5" />
               </button>
             ))}
           </div>
           <button
             disabled={tool !== "wand"}
             onClick={onToggleWandGlobal}
-            title="켜면 마법봉이 이어진 영역이 아니라 캔버스 전체에서 같은 색을 모두 선택한다"
-            className={`h-8 px-2 text-[10px] disabled:opacity-30 ${
+            title="전역 동일색 — 켜면 마법봉이 이어진 영역이 아니라 캔버스 전체에서 같은 색을 모두 선택한다"
+            className={`flex h-8 w-8 items-center justify-center disabled:opacity-30 ${
               wandGlobal
                 ? "bg-violet-500 text-white"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
-            전역 동일색
+            <Globe className="h-3.5 w-3.5" />
           </button>
         </div>
       ),
@@ -438,11 +451,11 @@ export default function DrawToolbar({
     <div className="relative" style={{ backgroundColor: canvasBgColor }}>
       <div
         className={`flex w-full flex-wrap items-start ${
-          narrow ? "gap-1.5 px-1.5 pt-1.5 pb-1" : "gap-3 px-3 pt-3 pb-1.5"
+          compact ? "gap-1.5 px-1.5 pt-1.5 pb-1" : "gap-3 px-3 pt-3 pb-1.5"
         }`}
       >
         <div className="relative">
-          <ToolCard title="그리기" narrow={narrow}>
+          <ToolCard title="그리기" compact={compact}>
             <div className="flex items-center gap-1">
               {PRIMARY_DRAW_TOOLS.map(({ tool: t, icon, label, key }) => (
                 <ToolButton
@@ -453,7 +466,7 @@ export default function DrawToolbar({
                   icon={icon}
                 />
               ))}
-              {!narrow &&
+              {!compact &&
                 COLLAPSIBLE_DRAW_TOOLS.map(({ tool: t, icon, label, key }) => (
                   <ToolButton
                     key={t}
@@ -463,7 +476,7 @@ export default function DrawToolbar({
                     icon={icon}
                   />
                 ))}
-              {narrow && (
+              {compact && (
                 <button
                   onClick={() => setShowMoreDrawTools((v) => !v)}
                   title="도형·텍스트·그라데이션 도구 더보기"
@@ -481,7 +494,7 @@ export default function DrawToolbar({
               )}
             </div>
           </ToolCard>
-          {narrow && showMoreDrawTools && (
+          {compact && showMoreDrawTools && (
             <div className="absolute top-full left-0 z-30 mt-1 flex items-center gap-1 bg-white p-2 shadow-xl">
               {COLLAPSIBLE_DRAW_TOOLS.map(({ tool: t, icon, label, key }) => (
                 <ToolButton
@@ -499,7 +512,7 @@ export default function DrawToolbar({
           )}
         </div>
 
-        <ToolCard title="선택 · 조작" narrow={narrow}>
+        <ToolCard title="선택 · 조작" compact={compact}>
           <div className="flex gap-1">
             {SELECT_TOOLS.map(({ tool: t, icon, label, key }) => (
               <ToolButton
@@ -518,7 +531,7 @@ export default function DrawToolbar({
             포털로 보내지 않고, 이 카드 바로 아래에 로컬로 띄운다 — 가끔 한 번
             누르고 마는 조작이라 "더보기" 버튼 바로 아래 뜨는 편이 더 직관적이다. */}
         <div className="relative">
-          <ToolCard title="편집" narrow={narrow}>
+          <ToolCard title="편집" compact={compact}>
             <div className="flex items-center gap-1.5">
               <button
                 onClick={onUndo}
@@ -552,14 +565,14 @@ export default function DrawToolbar({
               </button>
               <button
                 onClick={onClearCanvas}
-                title="전체 지우기"
+                title="체크된 레이어 지우기"
                 className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-500"
               >
                 <Loader className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setShowMoreEdit((v) => !v)}
-                title="반전·회전 더보기"
+                title="반전·회전·정렬 더보기"
                 className="flex h-8 items-center gap-0.5 bg-gray-100 px-1.5 text-[10px] text-gray-600 hover:bg-gray-200"
               >
                 더보기
@@ -573,31 +586,40 @@ export default function DrawToolbar({
             <div className="absolute top-full right-0 z-30 mt-1 flex items-center gap-1.5 bg-white p-2 shadow-xl">
               <button
                 onClick={onFlipHorizontal}
-                title="좌우 반전"
+                title="좌우 반전 (체크된 레이어)"
                 className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200"
               >
                 <FlipHorizontal2 className="h-4 w-4" />
               </button>
               <button
                 onClick={onFlipVertical}
-                title="상하 반전"
+                title="상하 반전 (체크된 레이어)"
                 className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200"
               >
                 <FlipVertical2 className="h-4 w-4" />
               </button>
               <button
                 onClick={() => onRotate90(-1)}
-                title="90도 반시계 방향 회전"
+                title="90도 반시계 회전 (체크된 레이어)"
                 className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200"
               >
                 <RotateCcw className="h-4 w-4" />
               </button>
               <button
                 onClick={() => onRotate90(1)}
-                title="90도 시계 방향 회전"
+                title="90도 시계 회전 (체크된 레이어)"
                 className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200"
               >
                 <RotateCw className="h-4 w-4" />
+              </button>
+              <div className="mx-0.5 h-6 w-px shrink-0 bg-gray-200" />
+              <button
+                onClick={onAlignContent}
+                disabled={!canAlignContent}
+                title="체크된 레이어의 그림을 캔버스 정중앙으로"
+                className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+              >
+                <Focus className="h-4 w-4" />
               </button>
             </div>
           )}

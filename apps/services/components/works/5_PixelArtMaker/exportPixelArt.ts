@@ -35,13 +35,16 @@ export function exportAsJPG(doc: PixelArt, scale = 8): void {
   );
 }
 
-// 파일 다운로드와 "코드 복사"(클립보드에 텍스트로 복사) 양쪽에서 같은 SVG
-// 문자열을 재사용한다.
-export function buildSvgString(doc: PixelArt): string {
+// 한 장의 픽셀 배열을 <rect> 문자열로 만든다.
+function rectsFor(
+  pixels: (string | null)[],
+  width: number,
+  height: number,
+): string {
   const rects: string[] = [];
-  for (let y = 0; y < doc.height; y++) {
-    for (let x = 0; x < doc.width; x++) {
-      const color = doc.pixels[y * doc.width + x];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const color = pixels[y * width + x];
       if (color === null) continue;
       // SVG의 fill 속성은 8자리(#rrggbbaa) hex를 신뢰성 있게 지원하지 않는 뷰어가
       // 있어, 알파가 있으면 fill-opacity로 분리해 내보낸다.
@@ -52,12 +55,78 @@ export function buildSvgString(doc: PixelArt): string {
       );
     }
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${doc.width} ${doc.height}" shape-rendering="crispEdges">${rects.join("")}</svg>`;
+  return rects.join("");
+}
+
+function svgWrap(width: number, height: number, inner: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" shape-rendering="crispEdges">${inner}</svg>`;
+}
+
+// 파일 다운로드와 "코드 복사"(클립보드에 텍스트로 복사) 양쪽에서 같은 SVG
+// 문자열을 재사용한다.
+export function buildSvgString(doc: PixelArt): string {
+  return svgWrap(
+    doc.width,
+    doc.height,
+    rectsFor(doc.pixels, doc.width, doc.height),
+  );
+}
+
+// 프레임 모드 전용 — 보이는 프레임을 각 지속시간대로 순환 재생하는 SMIL
+// 애니메이션 SVG. 각 프레임 <g>의 opacity를 discrete calcMode로 자기 구간에서만
+// 1로, 나머지 구간은 0으로 두고 전체 길이만큼 무한 반복한다.
+export function buildAnimatedSvgString(doc: PixelArt): string {
+  const frames = visibleFrames(doc);
+  if (frames.length <= 1) {
+    return svgWrap(
+      doc.width,
+      doc.height,
+      rectsFor(
+        (frames[0] ?? { pixels: doc.pixels }).pixels,
+        doc.width,
+        doc.height,
+      ),
+    );
+  }
+  const durations = frames.map(
+    (f) => f.frameDurationMs ?? DEFAULT_FRAME_DURATION_MS,
+  );
+  const total = durations.reduce((a, b) => a + b, 0);
+  const totalSec = (total / 1000).toFixed(3);
+  let acc = 0;
+  const groups = frames.map((frame, i) => {
+    const start = acc / total;
+    acc += durations[i];
+    const end = acc / total;
+    const s = start.toFixed(4);
+    const e = end.toFixed(4);
+    let keyTimes: string;
+    let values: string;
+    if (i === 0) {
+      keyTimes = `0;${e};1`;
+      values = "1;0;0";
+    } else if (i === frames.length - 1) {
+      keyTimes = `0;${s};1`;
+      values = "0;1;1";
+    } else {
+      keyTimes = `0;${s};${e};1`;
+      values = "0;1;0;0";
+    }
+    return `<g opacity="${i === 0 ? 1 : 0}">${rectsFor(frame.pixels, doc.width, doc.height)}<animate attributeName="opacity" dur="${totalSec}s" repeatCount="indefinite" calcMode="discrete" keyTimes="${keyTimes}" values="${values}"/></g>`;
+  });
+  return svgWrap(doc.width, doc.height, groups.join(""));
 }
 
 export function exportAsSVG(doc: PixelArt): void {
   triggerDownload(
     new Blob([buildSvgString(doc)], { type: "image/svg+xml" }),
+    `${doc.name}.svg`,
+  );
+}
+
+export function exportAsAnimatedSVG(doc: PixelArt): void {
+  triggerDownload(
+    new Blob([buildAnimatedSvgString(doc)], { type: "image/svg+xml" }),
     `${doc.name}.svg`,
   );
 }
@@ -69,8 +138,8 @@ export function exportAsJSON(doc: PixelArt): void {
   );
 }
 
-// PNG만 클립보드 이미지로 신뢰성 있게 지원된다(대부분 브라우저의 ClipboardItem은
-// image/png만 받는다) — JPG는 파일 저장만 제공한다.
+// PNG를 클립보드에 이미지로 복사한다(모든 브라우저의 ClipboardItem이 안정적으로
+// 받는 형식). JPG는 copyJpgToClipboard가 별도로 처리한다.
 export async function copyPngToClipboard(
   doc: PixelArt,
   scale = 8,
@@ -83,6 +152,43 @@ export async function copyPngToClipboard(
     if (!blob) return false;
     await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
     return true;
+  } catch {
+    return false;
+  }
+}
+
+// JPG를 클립보드에 이미지로 복사한다. 최신 브라우저는 ClipboardItem에서
+// image/jpeg를 받지만(Chrome·Edge·Firefox), Safari 등 안 받는 환경에서는
+// 같은 화면(검은 배경·손실 압축)을 PNG로 다시 인코딩해 복사한다.
+export async function copyJpgToClipboard(
+  doc: PixelArt,
+  scale = 8,
+): Promise<boolean> {
+  try {
+    const canvas = renderToCanvas(doc, scale);
+    const ctx = canvas.getContext("2d")!;
+    ctx.globalCompositeOperation = "destination-over";
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const jpg = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.92),
+    );
+    if (!jpg) return false;
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({ "image/jpeg": jpg }),
+      ]);
+      return true;
+    } catch {
+      const png = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/png"),
+      );
+      if (!png) return false;
+      await navigator.clipboard.write([
+        new ClipboardItem({ "image/png": png }),
+      ]);
+      return true;
+    }
   } catch {
     return false;
   }

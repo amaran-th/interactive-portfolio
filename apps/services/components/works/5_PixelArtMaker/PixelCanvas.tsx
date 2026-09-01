@@ -1,6 +1,13 @@
 "use client";
 
-import { AlignCenter, AlignLeft, AlignRight, RotateCw } from "lucide-react";
+import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  Blend,
+  RotateCw,
+  Spline,
+} from "lucide-react";
 import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -161,6 +168,7 @@ export default function PixelCanvas({
   filledShapes,
   onSelectionChange,
   onStrokeEnd,
+  onLiveEdit,
   onPickColor,
   onTextToolClick,
   pendingText,
@@ -236,7 +244,15 @@ export default function PixelCanvas({
   onStrokeEnd: (
     next: PixelValue[],
     moveOriginalMask?: Set<number> | null,
+    // 이동 도구로 커밋할 때만 채워진다 — 체크된 다른 레이어에도 같은 양만큼
+    // 선택 내용을 옮기도록 Editor에 넘긴다.
+    moveDelta?: { dx: number; dy: number },
   ) => void;
+  // 그리는 중(커밋 전) 합성 결과를 rAF 주기로 올려준다 — 미리보기 패널이
+  // stroke 끝날 때까지 기다리지 않고 거의 실시간으로 반영하도록. stroke가
+  // 끝나면 null을 보내 미리보기가 다시 커밋된 픽셀을 쓰게 한다. 없으면
+  // (미리보기 숨김) 아예 호출하지 않는다.
+  onLiveEdit?: (pixels: PixelValue[] | null) => void;
   onPickColor: (color: string) => void;
   // 텍스트 도구로 캔버스를 클릭했을 때(그리드 좌표) — pendingText가 없으면 그
   // 자리에 새로 시작하고, 있으면(경계 밖 클릭) Editor가 먼저 커밋한 뒤 새로
@@ -338,6 +354,24 @@ export default function PixelCanvas({
   // 급격히 튀었다. deltaY를 누적해 일정 값을 넘을 때만 한 단계 바꾸도록 한다.
   const wheelDeltaRef = useRef(0);
   const workingRef = useRef<PixelValue[]>(pixels);
+  // onLiveEdit는 미리보기 표시 여부에 따라 켜졌다 꺼졌다 하므로, render의
+  // useCallback 의존성을 흔들지 않도록 ref로 읽는다. liveFlushRef는 rAF 한
+  // 프레임에 한 번만 콜백을 부르기 위한 스로틀.
+  const onLiveEditRef = useRef(onLiveEdit);
+  useEffect(() => {
+    onLiveEditRef.current = onLiveEdit;
+  }, [onLiveEdit]);
+  const liveFlushRef = useRef<{ raf: number; data: PixelValue[] | null }>({
+    raf: 0,
+    data: null,
+  });
+  useEffect(
+    () => () => {
+      if (liveFlushRef.current.raf)
+        cancelAnimationFrame(liveFlushRef.current.raf);
+    },
+    [],
+  );
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const shapeStartRef = useRef<{ x: number; y: number } | null>(null);
   // 사각형 선택 드래그를 시작하기 직전의 선택 영역 — Shift(추가)/Alt(제외)
@@ -364,6 +398,9 @@ export default function PixelCanvas({
     { x: number; y: number; color: PixelValue }[] | null
   >(null);
   const moveStartPointRef = useRef<{ x: number; y: number } | null>(null);
+  // 이동 드래그의 마지막 이동량 — 커밋 시 onStrokeEnd에 실어, 체크된 다른
+  // 레이어에도 같은 양만큼 선택 내용을 옮기도록 Editor에 넘긴다.
+  const moveDeltaRef = useRef<{ dx: number; dy: number } | null>(null);
   // 이동을 시작하기 직전(옮기기 전) 선택 영역 — 커밋 시 onStrokeEnd에 함께
   // 실어 보내면, 되돌리기가 픽셀뿐 아니라 선택 영역도 이동 전 자리로 같이
   // 되돌릴 수 있다(안 그러면 픽셀만 원래대로 돌아가고 선택 영역은 옮겨진
@@ -559,6 +596,18 @@ export default function PixelCanvas({
         aboveLayers && aboveLayers.length > 0
           ? compositeLayersOnto(visibleBase, aboveLayers)
           : visibleBase;
+      // 그리는 중이면 이 합성 결과를 미리보기로 rAF 한 번에 한 번씩 올려준다.
+      if (drawingRef.current && onLiveEditRef.current) {
+        liveFlushRef.current.data = visibleWithAbove;
+        if (!liveFlushRef.current.raf) {
+          liveFlushRef.current.raf = requestAnimationFrame(() => {
+            liveFlushRef.current.raf = 0;
+            const cb = onLiveEditRef.current;
+            const d = liveFlushRef.current.data;
+            if (cb && d) cb(d);
+          });
+        }
+      }
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
           const color = getPixel(visibleWithAbove, width, x, y);
@@ -1300,6 +1349,7 @@ export default function PixelCanvas({
         if (!point) return;
         const dx = point.x - moveStartPointRef.current.x;
         const dy = point.y - moveStartPointRef.current.y;
+        moveDeltaRef.current = { dx, dy };
         let next = moveBaseRef.current.slice();
         const nextMask = new Set<number>();
         for (const c of moveContentRef.current) {
@@ -1380,6 +1430,12 @@ export default function PixelCanvas({
     }
     if (!drawingRef.current) return;
     drawingRef.current = false;
+    // 커밋됐으니 미리보기는 다시 committed 픽셀을 쓰게 한다.
+    if (liveFlushRef.current.raf) {
+      cancelAnimationFrame(liveFlushRef.current.raf);
+      liveFlushRef.current.raf = 0;
+    }
+    onLiveEditRef.current?.(null);
 
     if (tool === "select") {
       shapeStartRef.current = null;
@@ -1432,11 +1488,17 @@ export default function PixelCanvas({
     }
     if (tool === "move") {
       const originalMask = moveOriginalMaskRef.current;
+      const delta = moveDeltaRef.current;
       moveBaseRef.current = null;
       moveContentRef.current = null;
       moveStartPointRef.current = null;
       moveOriginalMaskRef.current = null;
-      onStrokeEnd(workingRef.current, originalMask);
+      moveDeltaRef.current = null;
+      onStrokeEnd(
+        workingRef.current,
+        originalMask,
+        delta ?? undefined,
+      );
       return;
     }
     lastPointRef.current = null;
@@ -1896,25 +1958,25 @@ export default function PixelCanvas({
             <div className="flex items-center gap-1 bg-white p-2 shadow-xl">
               <button
                 onClick={onPendingTextToggleAA}
-                title="안티에일리어싱"
-                className={`flex h-7 items-center justify-center px-2 text-[10px] font-semibold ${
+                title="안티에일리어싱 — 글자 가장자리를 부드럽게(끄면 픽셀 그대로)"
+                className={`flex h-7 w-7 items-center justify-center ${
                   pendingText.antialias
                     ? "bg-violet-500 text-white"
                     : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                 }`}
               >
-                AA
+                <Spline className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={onPendingTextToggleGradient}
                 title="그라데이션 채우기"
-                className={`flex h-7 items-center justify-center px-2 text-[10px] font-semibold ${
+                className={`flex h-7 w-7 items-center justify-center ${
                   pendingText.gradientFill
                     ? "bg-violet-500 text-white"
                     : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                 }`}
               >
-                그라데이션
+                <Blend className="h-3.5 w-3.5" />
               </button>
               {pendingText.gradientFill && (
                 <div className="flex items-center gap-2 pl-1">

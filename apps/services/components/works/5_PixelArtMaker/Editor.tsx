@@ -1,13 +1,13 @@
 "use client";
 
 import {
-  Download,
   Image as ImageIcon,
   ImagePlus,
   Layers as LayersIcon,
   Minus,
   Plus,
   Save,
+  Share,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -49,6 +49,7 @@ import { mixHex } from "./hsv";
 import ImportPanel from "./ImportPanel";
 import LayerPanel from "./LayerPanel";
 import FrameFilmstrip from "./FrameFilmstrip";
+import PreviewPanel from "./PreviewPanel";
 import TracingListPanel from "./TracingListPanel";
 import NewCanvasDialog from "./NewCanvasDialog";
 import ReferenceWindow from "./ReferenceWindow";
@@ -72,10 +73,11 @@ import {
   PixelValue,
   resamplePixelValues,
   resizeGrid,
-  rotate90,
+  rotate90InPlace,
   rotatePixelValuesBy,
   setPixel,
   shapeToolPoints,
+  shiftMaskedContent,
   shiftPixels,
   unionBoundingBox,
 } from "./pixelGrid";
@@ -83,6 +85,7 @@ import { isMacPlatform } from "./platform";
 import ResizeCanvasDialog from "./ResizeCanvasDialog";
 import { rasterizeText, rotateAlphaBuffer, Rotation } from "./textStamp";
 import {
+  CANVAS_PAN_PADDING,
   CANVAS_PRESETS,
   DEFAULT_CANVAS_BG_COLOR,
   DEFAULT_FRAME_DURATION_MS,
@@ -93,10 +96,12 @@ import {
   NARROW_BREAKPOINT,
   nextZoomStep,
   ONION_SKIN_OPACITY,
+  PREVIEW_MIN_WIDTH,
   ReferenceItem,
   ReferenceMode,
   SELECT_TOOL_CATEGORY,
   SelectMode,
+  TOOLBAR_COMPACT_WIDTH,
   Tool,
   TracingImage,
   ZOOM_STEPS,
@@ -131,6 +136,14 @@ type DragCoalesceField =
 const AUTOSAVE_DELAY_MS = 3 * 60 * 1000;
 
 const DEFAULT_ACTIVE_COLOR = "#000000";
+
+// 창 메뉴(파일/편집) 항목 오른쪽에 표시할 단축키 문자열. mac은 기호(⌘⇧),
+// 그 외는 "Ctrl+Shift+" 식으로.
+function menuShortcut(key: string, shift = false): string {
+  return isMacPlatform()
+    ? `⌘${shift ? "⇧" : ""}${key}`
+    : `Ctrl+${shift ? "Shift+" : ""}${key}`;
+}
 
 // 클립보드(선택 영역을 복사한 결과)를 pendingImage가 다루는 사각형 격자로
 // 편다 — 복사 당시 선택되지 않았던 칸은 투명(null)으로 채운다.
@@ -646,7 +659,15 @@ export default function Editor({
   // 편집기 작업 영역(캔버스가 놓인 주변 여백)의 배경색 — 캔버스 자체가 아니라
   // 그 바깥을 칠한다. 탭이나 저장 데이터와는 무관한 순수 보기 설정이며, 항상
   // 불투명 단색이다.
-  const [canvasBgColor, setCanvasBgColor] = useState(DEFAULT_CANVAS_BG_COLOR);
+  const [canvasBgColorRaw, setCanvasBgColorRaw] = useState(
+    DEFAULT_CANVAS_BG_COLOR,
+  );
+  const canvasBgColor = canvasBgColorRaw;
+  // 작업 영역 배경색은 항상 불투명이어야 한다 — 색상환에서 8자리(#rrggbbaa)
+  // 값이 넘어와도 알파를 떼어 6자리로 저장한다(투명하게 조작해도 결국 불투명).
+  const setCanvasBgColor = useCallback((hex: string) => {
+    setCanvasBgColorRaw(hex.length > 7 ? hex.slice(0, 7) : hex);
+  }, []);
   // 마법봉이 이어진 영역만 고를지, 캔버스 전체에서 같은 색을 모두 고를지.
   const [wandGlobal, setWandGlobal] = useState(false);
   // select·wand 도구가 고르는 영역을 기존 선택과 어떻게 합칠지 — Shift/Alt를
@@ -662,15 +683,22 @@ export default function Editor({
   // 아니라 이 루트 기준 상대좌표로 계산해야 편집창이 letterbox로 작아지거나
   // 가운데 정렬돼도 메뉴가 버튼 바로 아래에 정확히 뜬다.
   const rootRef = useRef<HTMLDivElement>(null);
-  // 편집기 너비가 NARROW_BREAKPOINT보다 좁아지면 DrawToolbar의 도형·텍스트·
-  // 그라데이션 도구뿐 아니라 이미지 불러오기/내보내기 사이드바도 같은 기준
-  // 으로 접힌 UI(아이콘 트리거 + 플로팅 팝업)로 바뀐다. 여기서 한 번만
-  // 측정해 두 컴포넌트에 함께 내려줘야 기준이 서로 어긋나지 않는다.
+  // narrow: 이미지 불러오기/내보내기·오른쪽 레이어 패널이 아이콘으로 접힘.
+  // toolbarCompact: DrawToolbar가 도형·텍스트·그라데이션 도구를 "더보기"로
+  // 접음(도구 카드 2줄 방지). 레이아웃 재구성으로 툴바가 오른쪽 패널 폭만큼
+  // 좁아진 것을 감안해 narrow보다 큰 기준을 쓴다 — 둘 다 순수하게
+  // rootRef.clientWidth만 보므로 창 폭이 그대로면 토글되지 않는다.
   const [narrow, setNarrow] = useState(false);
+  const [toolbarCompact, setToolbarCompact] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
-    const update = () => setNarrow(el.clientWidth < NARROW_BREAKPOINT);
+    const update = () => {
+      setNarrow(el.clientWidth < NARROW_BREAKPOINT);
+      setToolbarCompact(el.clientWidth < TOOLBAR_COMPACT_WIDTH);
+      setShowPreview(el.clientWidth >= PREVIEW_MIN_WIDTH);
+    };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
@@ -683,6 +711,64 @@ export default function Editor({
   >(null);
   // 확대 상태에서 스페이스+드래그로 스크롤할 대상 — PixelCanvas에 그대로 내려준다.
   const canvasViewportRef = useRef<HTMLDivElement>(null);
+
+  // 그리는 중(stroke 커밋 전)의 라이브 픽셀 버퍼 — 미리보기가 stroke 끝날
+  // 때까지 기다리지 않고 거의 실시간으로 반영하도록 PixelCanvas가 rAF 주기로
+  // 올려준다. 미리보기가 보일 때만 추적한다(불필요한 리렌더 방지).
+  const [livePixels, setLivePixels] = useState<PixelValue[] | null>(null);
+
+  // 미리보기에 그릴 "지금 캔버스에서 보고 있는 영역"(도안 픽셀 좌표). 캔버스
+  // 전체가 보이면 null. 스크롤·리사이즈·배율 변화에 따라 갱신한다.
+  const [artViewRect, setArtViewRect] = useState<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  } | null>(null);
+  useEffect(() => {
+    // showPreview가 false면 미리보기 패널 자체가 렌더되지 않으므로 굳이
+    // artViewRect를 비우지 않아도 된다 — 여기서 setState 하지 않는다.
+    const vp = canvasViewportRef.current;
+    if (!vp || !showPreview) return;
+    const compute = () => {
+      const availW = vp.clientWidth;
+      const availH = vp.clientHeight;
+      if (!availW || !availH) return;
+      // PixelCanvas와 같은 방식으로 화면맞춤 배율을 구한다.
+      const fitScale = Math.min(availW / doc.width, availH / doc.height);
+      const scale = fitScale * canvasZoom;
+      // 스크롤 콘텐츠 안에서 캔버스 좌상단은 (PAD, PAD)에 있다.
+      const x0 = (vp.scrollLeft - CANVAS_PAN_PADDING) / scale;
+      const y0 = (vp.scrollTop - CANVAS_PAN_PADDING) / scale;
+      const x1 = x0 + availW / scale;
+      const y1 = y0 + availH / scale;
+      const cx0 = Math.max(0, x0);
+      const cy0 = Math.max(0, y0);
+      const cx1 = Math.min(doc.width, x1);
+      const cy1 = Math.min(doc.height, y1);
+      // 캔버스 전체(거의)가 다 보이면 사각형을 안 그린다.
+      const whole =
+        x0 <= 0.5 &&
+        y0 <= 0.5 &&
+        x1 >= doc.width - 0.5 &&
+        y1 >= doc.height - 0.5;
+      setArtViewRect(
+        whole || cx1 <= cx0 || cy1 <= cy0
+          ? null
+          : { x: cx0, y: cy0, w: cx1 - cx0, h: cy1 - cy0 },
+      );
+    };
+    // 초기 계산은 레이아웃이 안정된 다음 프레임에.
+    const raf = requestAnimationFrame(compute);
+    vp.addEventListener("scroll", compute, { passive: true });
+    const ro = new ResizeObserver(compute);
+    ro.observe(vp);
+    return () => {
+      cancelAnimationFrame(raf);
+      vp.removeEventListener("scroll", compute);
+      ro.disconnect();
+    };
+  }, [showPreview, doc.width, doc.height, canvasZoom]);
   // 그리기/선택 도구의 하위 옵션(브러시 크기·채우기·그라데이션·선택 모드 등)을
   // DrawToolbar가 포털로 그려 넣을 자리 — 캔버스 하단 중앙에 둬서 좌우
   // 사이드바(색상환·내보내기)를 가리지 않게 한다. 콜백 ref로 상태에 담아야
@@ -895,6 +981,10 @@ export default function Editor({
   const activeLayerInScope =
     layerMode === "frames" ? true : layerScope.has(history.activeLayerId);
 
+  // "정렬"(체크된 레이어 그림을 캔버스 정중앙으로)은 레이어 모드에서 체크된
+  // 레이어가 하나라도 있어야 의미가 있다 — 프레임 모드엔 scope 개념이 없다.
+  const canAlignContent = layerMode === "layers" && layerScope.size > 0;
+
   // 선택을 만들거나 다루는 도구 묶음(select·lasso·move·wand) 밖으로 나가면
   // 더 이상 쓸모가 없어진 선택 영역을 자동으로 지운다 — 그 묶음 안에서
   // 도구만 바꾸는 동안은(예: select로 고르고 move로 옮기기) 그대로 둔다.
@@ -964,12 +1054,18 @@ export default function Editor({
 
   // 캔버스 전체 변형(리사이즈·반전·회전)처럼 모든 레이어의 픽셀이 한꺼번에
   // 바뀌는 조작 전용 — pushHistory(활성 레이어만 교체)와 달리 레이어 배열
-  // 전체를 새로 받는다. moveSelectionUndoRef 관리는 pushHistory와 동일하게
-  // "이 되돌리기 단계는 선택 영역을 건드리지 않는다"(undefined)로 채운다.
+  // 전체를 새로 받는다. moveSelectionUndoRef는 pushHistory와 동일하게 관리하되,
+  // 기본은 "이 되돌리기 단계는 선택 영역을 건드리지 않는다"(undefined)다 —
+  // 여러 레이어 이동 커밋만 이동 전 선택 영역(moveOriginalMask)을 실어 보내
+  // 되돌리기가 선택 영역도 함께 되돌리게 한다.
   const pushHistoryAllLayers = useCallback(
-    (nextLayers: PixelLayer[], nextSize?: CanvasSize) => {
+    (
+      nextLayers: PixelLayer[],
+      nextSize?: CanvasSize,
+      moveOriginalMask?: Set<number> | null,
+    ) => {
       history.pushLayers(nextLayers, history.activeLayerId, nextSize);
-      moveSelectionUndoRef.current.push(undefined);
+      moveSelectionUndoRef.current.push(moveOriginalMask);
       if (moveSelectionUndoRef.current.length > 50) {
         moveSelectionUndoRef.current.shift();
       }
@@ -1306,17 +1402,80 @@ export default function Editor({
   );
 
   const handleStrokeEnd = useCallback(
-    (next: PixelValue[], moveOriginalMask?: Set<number> | null) => {
+    (
+      next: PixelValue[],
+      moveOriginalMask?: Set<number> | null,
+      moveDelta?: { dx: number; dy: number },
+    ) => {
+      // 이동 도구 + 체크된 레이어가 활성 레이어 말고도 있으면, 같은 선택
+      // 영역·같은 이동량으로 나머지 체크 레이어의 내용도 함께 옮긴다. 활성
+      // 레이어는 캔버스 드래그가 이미 옮긴 결과(next)를 그대로 쓴다. 잠긴
+      // 레이어는 건드리지 않는다.
+      const moved =
+        moveOriginalMask &&
+        moveDelta &&
+        (moveDelta.dx !== 0 || moveDelta.dy !== 0);
+      const peerIds = moved
+        ? new Set(
+            history.presentLayers
+              .filter(
+                (l) =>
+                  layerScope.has(l.id) &&
+                  l.id !== history.activeLayerId &&
+                  !l.locked,
+              )
+              .map((l) => l.id),
+          )
+        : new Set<string>();
+      if (peerIds.size > 0 && moveOriginalMask && moveDelta) {
+        const nextLayers = history.presentLayers.map((l) => {
+          if (l.id === history.activeLayerId) return { ...l, pixels: next };
+          if (!peerIds.has(l.id)) return l;
+          return {
+            ...l,
+            pixels: shiftMaskedContent(
+              l.pixels,
+              doc.width,
+              doc.height,
+              moveOriginalMask,
+              moveDelta.dx,
+              moveDelta.dy,
+            ),
+          };
+        });
+        pushHistoryAllLayers(nextLayers, undefined, moveOriginalMask);
+        return;
+      }
       pushHistory(next, undefined, moveOriginalMask);
     },
-    [pushHistory],
+    [
+      pushHistory,
+      pushHistoryAllLayers,
+      history.presentLayers,
+      history.activeLayerId,
+      layerScope,
+      doc.width,
+      doc.height,
+    ],
   );
 
-  // 실행취소로 되돌릴 수 있으므로(다른 파괴적 동작들과 같은 관례) 별도 확인 없이
-  // 바로 전체를 투명하게 지운다.
+  // 체크된 레이어(layerScope)만 투명하게 비운다 — 안 체크된 레이어는 그대로.
+  // 실행취소로 되돌릴 수 있으므로(다른 파괴적 동작들과 같은 관례) 별도 확인
+  // 없이 바로 지운다.
   const handleClearCanvas = useCallback(() => {
-    pushHistory(createGrid(doc.width, doc.height));
-  }, [pushHistory, doc.width, doc.height]);
+    if (layerScope.size === 0) return;
+    const empty = createGrid(doc.width, doc.height);
+    const nextLayers = history.presentLayers.map((l) =>
+      layerScope.has(l.id) ? { ...l, pixels: empty.slice() } : l,
+    );
+    pushHistoryAllLayers(nextLayers);
+  }, [
+    history.presentLayers,
+    layerScope,
+    doc.width,
+    doc.height,
+    pushHistoryAllLayers,
+  ]);
 
   // 선택 영역(사각형 선택·마법봉으로 고른 픽셀들)을 활성 색상으로 한 번에
   // 칠한다 — 마법봉의 "전역 동일색 선택"과 함께 쓰면, 화면 곳곳에 흩어 칠한
@@ -1831,39 +1990,50 @@ export default function Editor({
     [doc.width, doc.height, history.presentLayers, pushHistoryAllLayers],
   );
 
-  // 상하/좌우 반전과 90도 회전 모두 pushHistoryAllLayers로 되돌리기 스택에
-  // 올린다 — 회전은 크기 자체가 바뀌므로(정사각형이 아닌 캔버스) size 인자를
-  // 함께 넘겨, 되돌리기/다시 실행 때 그 시점의 크기로 정확히 복원되게 한다.
+  // 반전·회전·지우기는 모두 체크된 레이어(layerScope)에만 적용한다 — 안
+  // 체크된 레이어는 그대로 둔다. 캔버스 크기는 바꾸지 않으므로(회전도
+  // rotate90InPlace로 경계 안에서 돈다) 90도 회전을 해도 다른 레이어·캔버스
+  // 크기와 어긋나지 않는다. 정사각형이 아닌 캔버스에서 회전하면 밖으로 나간
+  // 픽셀은 잘린다.
   const handleFlipHorizontal = useCallback(() => {
-    const nextLayers = history.presentLayers.map((l) => ({
-      ...l,
-      pixels: flipHorizontal(l.pixels, doc.width, doc.height),
-    }));
+    if (layerScope.size === 0) return;
+    const nextLayers = history.presentLayers.map((l) =>
+      layerScope.has(l.id)
+        ? { ...l, pixels: flipHorizontal(l.pixels, doc.width, doc.height) }
+        : l,
+    );
     pushHistoryAllLayers(nextLayers);
-  }, [history.presentLayers, doc.width, doc.height, pushHistoryAllLayers]);
+  }, [history.presentLayers, layerScope, doc.width, doc.height, pushHistoryAllLayers]);
 
   const handleFlipVertical = useCallback(() => {
-    const nextLayers = history.presentLayers.map((l) => ({
-      ...l,
-      pixels: flipVertical(l.pixels, doc.width, doc.height),
-    }));
+    if (layerScope.size === 0) return;
+    const nextLayers = history.presentLayers.map((l) =>
+      layerScope.has(l.id)
+        ? { ...l, pixels: flipVertical(l.pixels, doc.width, doc.height) }
+        : l,
+    );
     pushHistoryAllLayers(nextLayers);
-  }, [history.presentLayers, doc.width, doc.height, pushHistoryAllLayers]);
+  }, [history.presentLayers, layerScope, doc.width, doc.height, pushHistoryAllLayers]);
 
   const handleRotate90 = useCallback(
     (direction: 1 | -1) => {
-      let newWidth = doc.height;
-      let newHeight = doc.width;
-      const nextLayers = history.presentLayers.map((l) => {
-        const rotated = rotate90(l.pixels, doc.width, doc.height, direction);
-        newWidth = rotated.width;
-        newHeight = rotated.height;
-        return { ...l, pixels: rotated.pixels };
-      });
-      pushHistoryAllLayers(nextLayers, { width: newWidth, height: newHeight });
-      setHasMetaEdits(true);
+      if (layerScope.size === 0) return;
+      const nextLayers = history.presentLayers.map((l) =>
+        layerScope.has(l.id)
+          ? {
+              ...l,
+              pixels: rotate90InPlace(
+                l.pixels,
+                doc.width,
+                doc.height,
+                direction,
+              ),
+            }
+          : l,
+      );
+      pushHistoryAllLayers(nextLayers);
     },
-    [history.presentLayers, doc.width, doc.height, pushHistoryAllLayers],
+    [history.presentLayers, layerScope, doc.width, doc.height, pushHistoryAllLayers],
   );
 
   // 활성 탭은 라이브 상태(pixelsDirty/hasMetaEdits)로, 비활성 탭은 마지막
@@ -2186,6 +2356,18 @@ export default function Editor({
     [history.presentLayers, history.activeLayerId, pushLayerOp],
   );
 
+  // 블렌드 모드 드롭다운에서 항목에 마우스를 올렸을 때 — 되돌리기 스택은
+  // 건드리지 않고 현재 상태만 바꿔 미리 보여준다(확정은 위 handler가 한다).
+  const handleLayerBlendModePreview = useCallback(
+    (id: string, blendMode: BlendMode) => {
+      const nextLayers = history.presentLayers.map((l) =>
+        l.id === id ? { ...l, blendMode } : l,
+      );
+      history.replacePresentLayers(nextLayers, history.activeLayerId);
+    },
+    [history],
+  );
+
   // range 입력 다섯 개(밝기·대비·채도·색온도·틴트)가 공유하는 핸들러 —
   // handleLayerOpacityChange와 동일한 코얼레싱 패턴이지만, 레이어 id뿐
   // 아니라 어느 필드인지까지 같아야 "이어지는 드래그"로 취급한다.
@@ -2358,11 +2540,17 @@ export default function Editor({
               "다른 기기에서 이 편집기로 만든 작품을 내보내기 > JSON으로 저장해뒀다면, 그 파일을 여기서 다시 불러올 수 있습니다.",
             onClick: () => jsonFileInputRef.current?.click(),
           },
-          { label: "저장", onClick: handleSave, disabled: noActiveTab },
+          {
+            label: "저장",
+            onClick: handleSave,
+            disabled: noActiveTab,
+            shortcut: menuShortcut("S"),
+          },
           {
             label: "다른 이름으로 저장",
             onClick: handleSaveAs,
             disabled: noActiveTab,
+            shortcut: menuShortcut("S", true),
           },
           {
             label: "내보내기",
@@ -2397,16 +2585,19 @@ export default function Editor({
             label: "실행취소",
             onClick: handleUndo,
             disabled: noActiveTab || !history.canUndo,
+            shortcut: menuShortcut("Z"),
           },
           {
             label: "다시실행",
             onClick: handleRedo,
             disabled: noActiveTab || !history.canRedo,
+            shortcut: menuShortcut("Z", true),
           },
           {
             label: "복사",
             onClick: () => selection.copy(history.present, doc.width),
             disabled: noActiveTab,
+            shortcut: menuShortcut("C"),
           },
           {
             label: "캔버스 크기 수정",
@@ -2417,6 +2608,7 @@ export default function Editor({
             label: "붙여넣기",
             onClick: handlePaste,
             disabled: noActiveTab || !selection.clipboard,
+            shortcut: menuShortcut("V"),
           },
         ],
       });
@@ -2484,6 +2676,16 @@ export default function Editor({
         .pam-editor input[type="range"]::-moz-range-thumb,
         .pam-editor input[type="range"]::-moz-range-track {
           cursor: ${CURSOR_POINTING};
+        }
+        /* number 입력칸의 위/아래 스피너 버튼은 좁은 칸에서 값을 가려 없앤다. */
+        .pam-editor input[type="number"] {
+          -moz-appearance: textfield;
+          appearance: textfield;
+        }
+        .pam-editor input[type="number"]::-webkit-outer-spin-button,
+        .pam-editor input[type="number"]::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
         }
         /* 비활성(:disabled) 폼 요소는 브라우저가 cursor CSS를 아예 무시하고
            항상 기본 화살표를 그린다 — pointer-events를 꺼서 호버 자체를
@@ -2650,7 +2852,15 @@ export default function Editor({
       )}
 
       {activeTabIndex >= 0 ? (
-        <>
+        <div
+          className="flex flex-1 overflow-hidden"
+          style={{ backgroundColor: canvasBgColor }}
+        >
+          {/* 왼쪽 색상 패널 + 캔버스, 그리고 그 위 툴바 — 오른쪽 레이어 패널은
+              이 wrapper 밖 형제라, 툴바 높이만큼 위로 올라와 통짜 세로 칼럼으로
+              보인다. 이 바깥 행이 회색 배경을 깔아, 오른쪽 사이드바도 패널
+              카드만 흰색이고 그 사이 여백은 회색이 된다. */}
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <DrawToolbar
             tool={tool}
             onToolChange={setTool}
@@ -2684,8 +2894,10 @@ export default function Editor({
             onFlipHorizontal={handleFlipHorizontal}
             onFlipVertical={handleFlipVertical}
             onRotate90={handleRotate90}
+            onAlignContent={handleAlignLayers}
+            canAlignContent={canAlignContent}
             secondaryPortalTarget={secondaryToolbarPortal}
-            narrow={narrow}
+            compact={toolbarCompact}
           />
           {/* 이 줄(사이드바 두 개 + 캔버스)에는 자체 스크롤을 두지 않는다 —
               overflow-auto가 있으면 사이드바 내용이 조금만 길어져도 캔버스까지
@@ -2739,7 +2951,7 @@ export default function Editor({
                       작업물이 가리면 캔버스를 밀어 빼내면 된다. 기본 시야는
                       PixelCanvas가 스크롤을 가운데로 되돌려 캔버스를 중앙에
                       오게 한다. */}
-                  <div className="p-[320px]">
+                  <div style={{ padding: CANVAS_PAN_PADDING }}>
                     <PixelCanvas
                       width={doc.width}
                       height={doc.height}
@@ -2772,6 +2984,7 @@ export default function Editor({
                     filledShapes={filledShapes}
                     onSelectionChange={selection.setMask}
                     onStrokeEnd={handleStrokeEnd}
+                    onLiveEdit={showPreview ? setLivePixels : undefined}
                     onPickColor={handlePickColor}
                     onTextToolClick={handleTextToolClick}
                     pendingText={
@@ -2832,7 +3045,9 @@ export default function Editor({
                   >
                     <Minus className="h-3 w-3" />
                   </button>
-                  <div className="bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
+                  {/* 너비 고정 — 1x / 1.5x 처럼 자릿수가 달라도 +/- 버튼이
+                      흔들리지 않게 한다. */}
+                  <div className="w-10 bg-black/70 py-1 text-center text-[10px] font-semibold text-white tabular-nums">
                     {canvasZoom}x
                   </div>
                   <button
@@ -2868,6 +3083,12 @@ export default function Editor({
                 />
               )}
             </div>
+          </div>
+          </div>
+          {/* 오른쪽 레이어/프레임 패널 — 콘텐츠 행이 아니라 바깥 행의 자식이라
+              툴바 top부터 바닥까지 통짜 세로 칼럼으로 선다. 전엔 콘텐츠 행의
+              gap-4 px-4 pb-4 pt-2 에서 받던 여백을 여기서 직접 준다. */}
+          <div className={narrow ? "flex shrink-0 py-2 pr-2" : "flex shrink-0 py-3 pr-4"}>
             {(() => {
               // key={doc.id} — 탭마다 독립된 상태를 갖게 강제로 리마운트한다.
               // 키가 없으면 이 패널 하나가 모든 탭이 활성화될 때마다 재사용돼,
@@ -2913,6 +3134,18 @@ export default function Editor({
               if (!narrow) {
                 return (
                   <div className="flex w-60 shrink-0 flex-col gap-3">
+                    {showPreview && (
+                      <PreviewPanel
+                        width={doc.width}
+                        height={doc.height}
+                        pixels={compositePixels}
+                        livePixels={livePixels}
+                        viewRect={artViewRect}
+                        layers={history.presentLayers}
+                        layerMode={layerMode}
+                        canvasBgColor={canvasBgColor}
+                      />
+                    )}
                     <LayerPanel
                       layers={history.presentLayers}
                       activeLayerId={history.activeLayerId}
@@ -2931,13 +3164,13 @@ export default function Editor({
                       onOpacityChange={handleLayerOpacityChange}
                       onOpacityDragEnd={handleOpacityDragEnd}
                       onBlendModeChange={handleLayerBlendModeChange}
+                      onBlendModePreview={handleLayerBlendModePreview}
                       onAdjustmentChange={handleLayerAdjustmentChange}
                       onAdjustmentDragEnd={handleAdjustmentDragEnd}
                       onResetAdjustments={handleResetAdjustments}
                       onFlatten={handleFlattenLayers}
                       layerScope={layerScope}
                       onToggleScope={handleToggleLayerScope}
-                      onAlign={handleAlignLayers}
                       layerMode={layerMode}
                       onLayerModeChange={handleLayerModeChange}
                       isPlaying={isPlaying}
@@ -2992,13 +3225,13 @@ export default function Editor({
                   onOpacityChange={handleLayerOpacityChange}
                   onOpacityDragEnd={handleOpacityDragEnd}
                   onBlendModeChange={handleLayerBlendModeChange}
+                  onBlendModePreview={handleLayerBlendModePreview}
                   onAdjustmentChange={handleLayerAdjustmentChange}
                   onAdjustmentDragEnd={handleAdjustmentDragEnd}
                   onResetAdjustments={handleResetAdjustments}
                   onFlatten={handleFlattenLayers}
                   layerScope={layerScope}
                   onToggleScope={handleToggleLayerScope}
-                  onAlign={handleAlignLayers}
                   layerMode={layerMode}
                   onLayerModeChange={handleLayerModeChange}
                   isPlaying={isPlaying}
@@ -3059,7 +3292,7 @@ export default function Editor({
                         : "bg-white text-gray-500 shadow-md hover:bg-gray-50"
                     }`}
                   >
-                    <Download className="h-4 w-4" />
+                    <Share className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() =>
@@ -3115,7 +3348,7 @@ export default function Editor({
               );
             })()}
           </div>
-        </>
+        </div>
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
           <p className="text-sm text-gray-400">열린 파일이 없습니다</p>

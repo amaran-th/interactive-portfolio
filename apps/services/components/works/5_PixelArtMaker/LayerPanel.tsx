@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Combine,
   Copy,
   Droplet,
   Eye,
@@ -21,7 +22,9 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { BlendMode, PixelLayer } from "../_shared/assetLibrary";
+import BlendModeDropdown from "./BlendModeDropdown";
 import FileThumbnail from "./FileThumbnail";
+import OpacitySlider from "./OpacitySlider";
 import {
   DEFAULT_FRAME_DURATION_MS,
   MAX_FRAME_DURATION_MS,
@@ -45,6 +48,63 @@ const ADJUSTMENT_ROWS: { field: AdjustmentField; label: string }[] = [
   { field: "temperature", label: "색온도" },
   { field: "tint", label: "틴트" },
 ];
+
+// 색보정 슬라이더 한 줄 — 슬라이더는 0 근처에서 살짝 스냅해 영점을 잡기
+// 쉽게 하고, 오른쪽 숫자칸에 값을 직접 입력할 수도 있다.
+function AdjustmentRow({
+  label,
+  value,
+  onChange,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  onCommit: () => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commitDraft = (raw: string) => {
+    const n = Number(raw);
+    if (Number.isFinite(n)) {
+      onChange(Math.max(-100, Math.min(100, Math.round(n))));
+      onCommit();
+    }
+    setDraft(null);
+  };
+  return (
+    <label className="flex items-center gap-2 text-[10px] text-gray-500">
+      <span className="w-8 shrink-0">{label}</span>
+      <input
+        type="range"
+        min={-100}
+        max={100}
+        value={value}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          // 0 근처(±2)는 정확히 0으로 스냅한다.
+          onChange(Math.abs(v) <= 2 ? 0 : v);
+        }}
+        onPointerUp={onCommit}
+        onBlur={onCommit}
+        className="min-w-0 flex-1 accent-violet-500"
+      />
+      <input
+        type="number"
+        min={-100}
+        max={100}
+        value={draft ?? value}
+        onFocus={() => setDraft(String(value))}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={(e) => commitDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Escape") setDraft(null);
+        }}
+        className="w-9 shrink-0 border border-gray-200 px-0.5 text-right text-[10px] text-gray-700 outline-none"
+      />
+    </label>
+  );
+}
 
 // 0.10 → "0.1", 1.00 → "1" — 뒤따르는 0을 떼서 보여준다.
 function formatFrameSeconds(ms: number): string {
@@ -101,13 +161,13 @@ export default function LayerPanel({
   onOpacityChange,
   onOpacityDragEnd,
   onBlendModeChange,
+  onBlendModePreview,
   onAdjustmentChange,
   onAdjustmentDragEnd,
   onResetAdjustments,
   onFlatten,
   layerScope,
   onToggleScope,
-  onAlign,
   isPlaying,
   onTogglePlay,
   loopPlayback,
@@ -148,6 +208,8 @@ export default function LayerPanel({
   // 레이어를 다시 드래그해도 이전 드래그의 연장으로 오인될 수 있다.
   onOpacityDragEnd: () => void;
   onBlendModeChange: (id: string, mode: BlendMode) => void;
+  // 드롭다운에서 항목에 hover했을 때 — 되돌리기 스택 없이 임시 적용(미리보기).
+  onBlendModePreview: (id: string, mode: BlendMode) => void;
   onAdjustmentChange: (
     id: string,
     field: AdjustmentField,
@@ -156,11 +218,11 @@ export default function LayerPanel({
   onAdjustmentDragEnd: () => void;
   onResetAdjustments: (id: string) => void;
   onFlatten: () => void;
-  // 체크된 레이어 집합 — 스포이트·마법봉·페인트통 판정 범위이자 "정렬" 대상.
-  // 활성 레이어(activeLayerId)와는 독립적이다.
+  // 체크된 레이어 집합 — 스포이트·마법봉·페인트통 판정 범위이자 도구 바
+  // "정렬"(그림을 캔버스 정중앙으로)의 대상. 활성 레이어(activeLayerId)와는
+  // 독립적이다.
   layerScope: Set<string>;
   onToggleScope: (id: string) => void;
-  onAlign: () => void;
   // 프레임 모드 전용 재생 컨트롤.
   isPlaying: boolean;
   onTogglePlay: () => void;
@@ -244,23 +306,14 @@ export default function LayerPanel({
           </button>
         </div>
         {layerMode === "layers" && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onAlign}
-              title="체크된 레이어의 그림을 캔버스 중앙으로 옮긴다"
-              className="text-[10px] font-normal text-gray-400 hover:text-gray-600"
-            >
-              정렬
-            </button>
-            <button
-              onClick={onFlatten}
-              disabled={layers.length <= 1}
-              title="모든 레이어를 하나로 평탄화"
-              className="text-[10px] font-normal text-gray-400 hover:text-gray-600 disabled:opacity-30"
-            >
-              평탄화
-            </button>
-          </div>
+          <button
+            onClick={onFlatten}
+            disabled={layers.length <= 1}
+            title="모든 레이어를 하나로 평탄화"
+            className="text-[10px] font-normal text-gray-400 hover:text-gray-600 disabled:opacity-30"
+          >
+            평탄화
+          </button>
         )}
       </div>
       {layerMode === "layers" ? (
@@ -284,7 +337,11 @@ export default function LayerPanel({
                     title="판정·정렬 범위에 포함"
                     className="h-3.5 w-3.5 shrink-0"
                   />
-                  <FileThumbnail width={width} height={height} pixels={layer.pixels} />
+                  <FileThumbnail
+                    width={width}
+                    height={height}
+                    pixels={layer.pixels}
+                  />
                   {editingId === layer.id ? (
                     <input
                       autoFocus
@@ -316,7 +373,7 @@ export default function LayerPanel({
                       e.stopPropagation();
                       onToggleLocked(layer.id);
                     }}
-                    title={layer.locked ? "잠금 해제" : "잠그기"}
+                    title={layer.locked ? "편집 잠금 해제" : "편집 잠금"}
                     className={`flex h-6 w-6 shrink-0 items-center justify-center ${
                       layer.locked
                         ? "text-gray-700"
@@ -348,78 +405,50 @@ export default function LayerPanel({
             })}
           </div>
           <div className="relative shrink-0 border-t border-gray-100 px-3 py-2">
-            <label className="flex items-center gap-2 text-[10px] text-gray-500">
-              투명도
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={Math.round(activeLayer.opacity * 100)}
-                onChange={(e) =>
-                  onOpacityChange(activeLayer.id, Number(e.target.value) / 100)
-                }
-                onPointerUp={onOpacityDragEnd}
-                onBlur={onOpacityDragEnd}
-                className="flex-1"
+            <div className="flex items-center gap-2">
+              <OpacitySlider
+                value={activeLayer.opacity}
+                onChange={(v) => onOpacityChange(activeLayer.id, v)}
+                onChangeEnd={onOpacityDragEnd}
               />
-              <span className="w-7 shrink-0 text-right">
-                {Math.round(activeLayer.opacity * 100)}%
-              </span>
               <button
                 onClick={() => setShowFilterPanel((v) => !v)}
                 title="블렌드 모드·색보정"
                 className={`flex h-6 w-6 shrink-0 items-center justify-center ${
-                  hasActiveFilter
+                  hasActiveFilter || showFilterPanel
                     ? "bg-violet-500 text-white"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
                 <Droplet className="h-3.5 w-3.5" />
               </button>
-            </label>
+            </div>
             {showFilterPanel && (
-              <div className="absolute top-full right-0 z-30 mt-1 flex w-56 flex-col gap-1 bg-white p-2 shadow-xl">
-                <label className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
+              // 위로 열어(bottom-full) 사이드바 하단에서 화면 밖으로 잘리지
+              // 않게 한다. 안에 커스텀 블렌드 드롭다운이 있어 overflow는 두지
+              // 않는다 — 내용이 짧아(블렌드 + 슬라이더 5개 + 초기화) 잘릴 일이
+              // 거의 없다.
+              <div className="absolute right-0 bottom-full z-30 mb-1 flex w-56 flex-col gap-1 bg-white p-2 shadow-xl">
+                <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
                   블렌드 모드
-                  <select
+                  <BlendModeDropdown
                     value={activeLayer.blendMode ?? "normal"}
-                    onChange={(e) =>
-                      onBlendModeChange(activeLayer.id, e.target.value as BlendMode)
+                    onPreview={(mode) =>
+                      onBlendModePreview(activeLayer.id, mode)
                     }
-                    className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600"
-                  >
-                    <option value="normal">Normal</option>
-                    <option value="multiply">Multiply</option>
-                    <option value="screen">Screen</option>
-                    <option value="overlay">Overlay</option>
-                    <option value="darken">Darken</option>
-                    <option value="lighten">Lighten</option>
-                    <option value="color-dodge">Color Dodge</option>
-                    <option value="color-burn">Color Burn</option>
-                  </select>
-                </label>
+                    onCommit={(mode) => onBlendModeChange(activeLayer.id, mode)}
+                  />
+                </div>
                 {ADJUSTMENT_ROWS.map(({ field, label }) => (
-                  <label
+                  <AdjustmentRow
                     key={field}
-                    className="flex items-center gap-2 text-[10px] text-gray-500"
-                  >
-                    <span className="w-8 shrink-0">{label}</span>
-                    <input
-                      type="range"
-                      min={-100}
-                      max={100}
-                      value={activeLayer[field] ?? 0}
-                      onChange={(e) =>
-                        onAdjustmentChange(activeLayer.id, field, Number(e.target.value))
-                      }
-                      onPointerUp={onAdjustmentDragEnd}
-                      onBlur={onAdjustmentDragEnd}
-                      className="flex-1 accent-violet-500"
-                    />
-                    <span className="w-8 shrink-0 text-right">
-                      {activeLayer[field] ?? 0}
-                    </span>
-                  </label>
+                    label={label}
+                    value={activeLayer[field] ?? 0}
+                    onChange={(v) =>
+                      onAdjustmentChange(activeLayer.id, field, v)
+                    }
+                    onCommit={onAdjustmentDragEnd}
+                  />
                 ))}
                 <button
                   onClick={() => onResetAdjustments(activeLayer.id)}
@@ -466,9 +495,9 @@ export default function LayerPanel({
               onClick={() => onMergeDown(activeLayerId)}
               disabled={activeIndex <= 0}
               title="아래 레이어와 병합"
-              className="flex h-7 w-7 items-center justify-center text-[10px] font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+              className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30"
             >
-              병합
+              <Combine className="h-4 w-4" />
             </button>
             <button
               onClick={() => onMoveUp(activeLayerId)}
@@ -489,90 +518,118 @@ export default function LayerPanel({
           </div>
         </>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
-          <button
-            onClick={onTogglePlay}
-            className="flex items-center justify-center gap-1.5 bg-violet-500 py-1.5 text-xs font-semibold text-white hover:bg-violet-600"
-          >
-            {isPlaying ? (
-              <>
-                <Pause className="h-3.5 w-3.5" />
-                정지
-              </>
-            ) : (
-              <>
-                <Play className="h-3.5 w-3.5" />
-                재생
-              </>
-            )}
-          </button>
-          <label className="flex items-center justify-between gap-2 py-0.5 text-xs text-gray-600">
-            <span className="flex items-center gap-1.5">
-              <Repeat className="h-3.5 w-3.5" />
-              반복
-            </span>
-            <Switch checked={loopPlayback} onClick={onToggleLoop} title="반복 재생" />
-          </label>
-          <label className="flex items-center justify-between gap-2 py-0.5 text-xs text-gray-600">
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5" />
-              어니언 스킨
-            </span>
-            <Switch
-              checked={onionSkin}
-              onClick={onToggleOnionSkin}
-              title="앞뒤 프레임을 흐리게 겹쳐 보기"
-            />
-          </label>
-          {onionSkin && (
-            // 어니언 스킨 토글의 하위 옵션임이 드러나도록 왼쪽으로 들여쓰고
-            // (라벨 텍스트 시작선에 맞춤) 연결선을 둔다.
-            <div className="-mt-0.5 ml-5 flex flex-col gap-1.5 border-l-2 border-violet-200 pl-3">
-              <label className="flex items-center gap-2 text-[10px] text-gray-500">
-                <span className="shrink-0">투명도</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={Math.round(onionSkinOpacity * 100)}
-                  onChange={(e) =>
-                    onOnionSkinOpacityChange(Number(e.target.value) / 100)
-                  }
-                  className="min-w-0 flex-1 accent-violet-500"
-                />
-                <span className="w-8 shrink-0 text-right">
-                  {Math.round(onionSkinOpacity * 100)}%
-                </span>
-              </label>
-              <label className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
-                <span className="shrink-0">범위(앞뒤)</span>
-                <select
-                  value={onionSkinRange}
-                  onChange={(e) =>
-                    onOnionSkinRangeChange(Number(e.target.value))
-                  }
-                  className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600"
-                >
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <option key={n} value={n}>
-                      {n}장
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          )}
-
-          {/* 현재 프레임 편집 — 지속시간·표시·복제·순서이동·삭제. 하단
-              필름스트립은 타임라인(선택·추가)만 맡고, 프레임별 편집은 여기서 한다. */}
-          <div className="mt-1 flex shrink-0 flex-col gap-1.5 border-t border-gray-100 pt-2">
-            <div className="flex items-center justify-between text-[10px] font-semibold text-gray-500">
-              <span>현재 프레임</span>
-              <span className="tabular-nums text-gray-400">
-                {activeIndex + 1} / {layers.length}
+        <>
+          {/* 재생·표시 컨트롤 — 레이어 패널의 "레이어 목록" 스크롤 영역에 대응 */}
+          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 py-2">
+            <button
+              onClick={onTogglePlay}
+              className="flex items-center justify-center gap-1.5 bg-violet-500 py-1.5 text-xs font-semibold text-white hover:bg-violet-600"
+            >
+              {isPlaying ? (
+                <>
+                  <Pause className="h-3.5 w-3.5" />
+                  정지
+                </>
+              ) : (
+                <>
+                  <Play className="h-3.5 w-3.5" />
+                  재생
+                </>
+              )}
+            </button>
+            <label className="flex items-center justify-between gap-2 py-0.5 text-xs text-gray-600">
+              <span className="flex items-center gap-1.5">
+                <Repeat className="h-3.5 w-3.5" />
+                반복
               </span>
+              <Switch
+                checked={loopPlayback}
+                onClick={onToggleLoop}
+                title="반복 재생"
+              />
+            </label>
+            <label className="flex items-center justify-between gap-2 py-0.5 text-xs text-gray-600">
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5" />
+                어니언 스킨
+              </span>
+              <Switch
+                checked={onionSkin}
+                onClick={onToggleOnionSkin}
+                title="앞뒤 프레임을 흐리게 겹쳐 보기"
+              />
+            </label>
+            {onionSkin && (
+              // 어니언 스킨 토글의 하위 옵션임이 드러나도록 왼쪽으로 들여쓰고
+              // (라벨 텍스트 시작선에 맞춤) 연결선을 둔다.
+              <div className="-mt-0.5 ml-5 flex flex-col gap-1.5 border-l-2 border-violet-200 pl-3">
+                <label className="flex items-center gap-2 text-[10px] text-gray-500">
+                  <span className="shrink-0">투명도</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={Math.round(onionSkinOpacity * 100)}
+                    onChange={(e) =>
+                      onOnionSkinOpacityChange(Number(e.target.value) / 100)
+                    }
+                    className="min-w-0 flex-1 accent-violet-500"
+                  />
+                  <span className="w-8 shrink-0 text-right">
+                    {Math.round(onionSkinOpacity * 100)}%
+                  </span>
+                </label>
+                <label className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
+                  <span className="shrink-0">범위(앞뒤)</span>
+                  <select
+                    value={onionSkinRange}
+                    onChange={(e) =>
+                      onOnionSkinRangeChange(Number(e.target.value))
+                    }
+                    className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600"
+                  >
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <option key={n} value={n}>
+                        {n}장
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
+          </div>
+
+          {/* 현재 프레임 지속시간 — 레이어 패널의 "투명도" 섹션에 대응
+              (border-t · px-3 py-2 · 같은 라벨 스타일). 이 프레임 숨김
+              토글도 여기(프레임 번호 옆)에 둔다. */}
+          <div className="shrink-0 border-t border-gray-100 px-3 py-2">
+            <div className="flex items-center justify-between text-[10px] text-gray-500">
+              <span>
+                현재 프레임{" "}
+                <span className="tabular-nums text-gray-400">
+                  {activeIndex + 1} / {layers.length}
+                </span>
+              </span>
+              <button
+                onClick={() => onToggleVisible(activeLayer.id)}
+                disabled={isPlaying}
+                title={
+                  activeLayer.visible ? "이 프레임 숨기기" : "이 프레임 보이기"
+                }
+                className={`flex h-5 w-5 shrink-0 items-center justify-center ${
+                  activeLayer.visible
+                    ? "text-gray-400 hover:text-gray-700"
+                    : "text-violet-500"
+                } disabled:opacity-30`}
+              >
+                {activeLayer.visible ? (
+                  <Eye className="h-3.5 w-3.5" />
+                ) : (
+                  <EyeOff className="h-3.5 w-3.5" />
+                )}
+              </button>
             </div>
-            <label className="flex items-center gap-2 text-[10px] text-gray-500">
+            <label className="mt-1 flex items-center gap-2 text-[10px] text-gray-500">
               <span className="shrink-0">지속시간</span>
               <input
                 type="number"
@@ -596,68 +653,63 @@ export default function LayerPanel({
                 onChange={(e) => setDurationDraft(e.target.value)}
                 onBlur={commitFrameDuration}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter")
-                    (e.target as HTMLInputElement).blur();
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                   if (e.key === "Escape") setDurationDraft(null);
                 }}
                 className="w-14 border border-gray-200 px-1 py-0.5 text-center text-[10px] text-gray-700 outline-none disabled:opacity-50"
               />
               <span className="shrink-0 text-gray-400">초</span>
             </label>
-            <div className="flex gap-1">
-              <button
-                onClick={() => onToggleVisible(activeLayer.id)}
-                disabled={isPlaying}
-                title={activeLayer.visible ? "이 프레임 숨기기" : "이 프레임 보이기"}
-                className={`flex h-7 flex-1 items-center justify-center ${
-                  activeLayer.visible
-                    ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    : "bg-violet-50 text-violet-700"
-                } disabled:opacity-30`}
-              >
-                {activeLayer.visible ? (
-                  <Eye className="h-3.5 w-3.5" />
-                ) : (
-                  <EyeOff className="h-3.5 w-3.5" />
-                )}
-              </button>
-              <button
-                onClick={() => onDuplicate(activeLayerId)}
-                disabled={isPlaying || layers.length >= MAX_LAYERS}
-                title="이 프레임 복제"
-                className="flex h-7 flex-1 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
-              >
-                <Copy className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => onMoveDown(activeLayerId)}
-                disabled={isPlaying || activeIndex <= 0}
-                title="앞으로 이동"
-                className="flex h-7 flex-1 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => onMoveUp(activeLayerId)}
-                disabled={
-                  isPlaying || activeIndex < 0 || activeIndex >= layers.length - 1
-                }
-                title="뒤로 이동"
-                className="flex h-7 flex-1 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
-              >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => onDelete(activeLayerId)}
-                disabled={isPlaying || layers.length <= 1}
-                title="이 프레임 삭제"
-                className="flex h-7 flex-1 items-center justify-center bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600 disabled:opacity-30"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
           </div>
-        </div>
+
+          {/* 프레임 조작 버튼 — 레이어 패널 하단 버튼 행과 같은 스타일
+              (border-t · px-2 py-1.5 · 배경 없는 h-7 w-7 아이콘). 맨 앞은
+              레이어 패널의 "레이어 추가"에 대응하는 "새 프레임 추가". */}
+          <div className="flex shrink-0 items-center gap-1 border-t border-gray-100 px-2 py-1.5">
+            <button
+              onClick={onAdd}
+              disabled={isPlaying || layers.length >= MAX_LAYERS}
+              title="새 프레임 추가"
+              className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => onDuplicate(activeLayerId)}
+              disabled={isPlaying || layers.length >= MAX_LAYERS}
+              title="이 프레임 복제"
+              className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+            >
+              <Copy className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => onDelete(activeLayerId)}
+              disabled={isPlaying || layers.length <= 1}
+              title="이 프레임 삭제"
+              className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => onMoveDown(activeLayerId)}
+              disabled={isPlaying || activeIndex <= 0}
+              title="앞으로 이동"
+              className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => onMoveUp(activeLayerId)}
+              disabled={
+                isPlaying || activeIndex < 0 || activeIndex >= layers.length - 1
+              }
+              title="뒤로 이동"
+              className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
