@@ -8,6 +8,7 @@ import {
   Plus,
   Save,
   Share,
+  TriangleAlert,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -91,6 +92,7 @@ import {
   DEFAULT_FRAME_DURATION_MS,
   DEFAULT_REFERENCE_MODE,
   DEFAULT_TRACING_OPACITY,
+  LayerScope,
   MAX_CANVAS_SIZE,
   MAX_LAYERS,
   NARROW_BREAKPOINT,
@@ -99,11 +101,13 @@ import {
   PREVIEW_MIN_WIDTH,
   ReferenceItem,
   ReferenceMode,
+  SampleScopeTool,
   SELECT_TOOL_CATEGORY,
   SelectMode,
   TOOLBAR_COMPACT_WIDTH,
   Tool,
   TracingImage,
+  TransformScopeKey,
   ZOOM_STEPS,
 } from "./types";
 import { CanvasSize, useCanvasHistory } from "./useCanvasHistory";
@@ -290,24 +294,34 @@ function layersFromDoc(doc: PixelArt): {
   return { layers: [layer], activeLayerId: layer.id };
 }
 
-// layers는 아래→위(=필름스트립 왼쪽→오른쪽) 순서. currentId 다음으로
-// "보이는" 레이어를 찾는다 — 끝에 닿았을 때 loop면 처음(보이는 첫 레이어)
-// 으로, 아니면 null(재생 정지 신호)을 돌려준다. 재생 진행 전용이다 —
-// 어니언 스킨은 아래 prevVisibleFrames/nextVisibleFrames를 쓴다.
+// layers는 아래→위(=필름스트립 왼쪽→오른쪽) 순서. currentId에서 direction
+// (1=정방향, -1=역방향) 쪽으로 다음 "보이는" 프레임을 찾는다. 재생은 항상
+// 반복하며, 끝에 닿으면 pingPong일 땐 방향을 뒤집어 앞뒤로 오가고 아닐 땐
+// 반대쪽 끝(순환)으로 넘어간다. 보이는 프레임이 없을 때만 null(정지 신호).
+// 재생 진행 전용 — 어니언 스킨은 prevVisibleFrames/nextVisibleFrames를 쓴다.
 function nextVisibleFrame(
   layers: PixelLayer[],
   currentId: string,
-  loop: boolean,
-): PixelLayer | null {
-  const currentIndex = layers.findIndex((l) => l.id === currentId);
-  for (let i = currentIndex + 1; i < layers.length; i++) {
-    if (layers[i].visible) return layers[i];
+  direction: 1 | -1,
+  pingPong: boolean,
+): { layer: PixelLayer; direction: 1 | -1 } | null {
+  const visible = layers.filter((l) => l.visible);
+  if (visible.length === 0) return null;
+  if (visible.length === 1) return { layer: visible[0], direction };
+  const pos = visible.findIndex((l) => l.id === currentId);
+  if (pos === -1) return { layer: visible[0], direction: 1 };
+  const nextPos = pos + direction;
+  if (nextPos >= 0 && nextPos < visible.length) {
+    return { layer: visible[nextPos], direction };
   }
-  if (!loop) return null;
-  for (let i = 0; i <= currentIndex; i++) {
-    if (layers[i].visible) return layers[i];
+  if (pingPong) {
+    const reversed = (direction * -1) as 1 | -1;
+    return { layer: visible[pos + reversed], direction: reversed };
   }
-  return null;
+  return {
+    layer: direction === 1 ? visible[0] : visible[visible.length - 1],
+    direction,
+  };
 }
 
 // 어니언 스킨 전용 — 현재 프레임에서 이전/다음 방향으로 최대 count장까지
@@ -825,7 +839,9 @@ export default function Editor({
   // 바꾸는 것과 같은 성격).
   const layerMode = doc.layerMode ?? "layers";
   const [isPlaying, setIsPlaying] = useState(false);
-  const [loopPlayback, setLoopPlayback] = useState(true);
+  // 재생은 항상 반복한다. pingPong이면 끝에 닿을 때 처음으로 점프하지 않고
+  // 방향을 뒤집어 앞뒤로 오간다(핑퐁).
+  const [pingPong, setPingPong] = useState(false);
   const [onionSkin, setOnionSkin] = useState(true);
   const [onionSkinOpacity, setOnionSkinOpacity] = useState(ONION_SKIN_OPACITY);
   const [onionSkinRange, setOnionSkinRange] = useState(1);
@@ -838,13 +854,32 @@ export default function Editor({
   );
   const selection = useSelection();
 
-  // 스포이트·마법봉·페인트통의 판정 범위이자 "정렬" 버튼의 대상 레이어 —
-  // 활성 레이어(그리기 대상)와는 완전히 독립된 세션 전용 상태다. 저장 포맷에는
-  // 반영하지 않고, 문서를 열 때마다(loadTab이 history.reset을 부르는 시점)
-  // 그 시점의 활성 레이어 하나로 다시 초기화한다.
-  const [layerScope, setLayerScope] = useState<Set<string>>(
-    () => new Set([initialLayerState.activeLayerId]),
+  // 클립스튜디오식 "참조 레이어" — 레이어 행의 아이콘으로 지정한다. 스포이트·
+  // 마법봉·페인트통의 "참조: 참조 레이어" 모드가 이 레이어들의 합성을 기준으로
+  // 판정한다. 활성 레이어(그리기 대상)와 완전히 독립된 세션 전용 상태 —
+  // 저장 포맷에 안 실리고, 문서를 열 때마다(loadTab) 비운다(참조는 opt-in).
+  const [referenceLayerIds, setReferenceLayerIds] = useState<Set<string>>(
+    () => new Set(),
   );
+  // 각 도구·조작이 "어느 레이어를 대상으로 하는지"를 개별로 기억한다 — 스포이트는
+  // 전체 화면에서 뽑고, 마법봉은 편집 레이어만 보고, 반전은 참조 레이어에만…
+  // 처럼 따로 설정할 수 있다(CSP도 도구별 Tool Property에 저장). 3지는
+  // 활성(활성 레이어) / reference(레이어 행 전구로 지정한 참조 레이어) / all
+  // (보이는 레이어 전부). 세션 전용이라 문서를 열 때 전부 "active"로 초기화.
+  const [sampleScopes, setSampleScopes] = useState<
+    Record<SampleScopeTool, LayerScope>
+  >(() => ({ eyedropper: "active", wand: "active", bucket: "active" }));
+  const [transformScopes, setTransformScopes] = useState<
+    Record<TransformScopeKey, LayerScope>
+  >(() => ({
+    clear: "active",
+    flipH: "active",
+    flipV: "active",
+    rotateCcw: "active",
+    rotateCw: "active",
+    align: "active",
+    move: "active",
+  }));
 
   // 저장·내보내기·탭 스냅숏 등 레이어를 모르는 모든 곳은 이 값(모든 레이어를
   // 합성한 최종 결과)만 쓴다 — PixelCanvas에 넘기는 history.present(활성
@@ -950,40 +985,80 @@ export default function Editor({
     activeLayerIndex,
   ]);
 
-  // 스포이트·마법봉·페인트통 판정 전용 합성 — 화면 렌더링용 belowComposite/
-  // aboveLayers와 별개로, layerScope로 한 번 더 필터링한다. 프레임 모드는
-  // scope 개념이 없고, 어니언 스킨 유령은 내보내기에도 안 들어가는 참고용
-  // 오버레이라 "보이는 그대로 판정"(레이어 모드에서만 유효한 원칙) 대상이
-  // 아니다 — 도구는 항상 지금 편집 중인 프레임 자신만 본다.
-  const scopeBelowComposite = useMemo(() => {
-    if (layerMode === "frames") return null;
-    const scoped = history.presentLayers
-      .slice(0, activeLayerIndex)
-      .filter((l) => layerScope.has(l.id));
-    return compositeLayers(scoped, doc.width, doc.height);
+  // "참조 레이어"로 지정된 것 중 실제로 보이는 게 하나라도 있는지 — 참조 모드인데
+  // 비어 있으면 도구 옵션에 경고를 띄운다(폴백하지 않는다).
+  const hasReferenceLayers = useMemo(
+    () =>
+      history.presentLayers.some(
+        (l) => l.visible && referenceLayerIds.has(l.id),
+      ),
+    [history.presentLayers, referenceLayerIds],
+  );
+
+  // LayerScope 값 하나를 실제 대상 레이어 id 집합으로 푼다. "active"면 활성
+  // 레이어, "reference"면 참조 레이어(비어 있을 수 있음), "all"이면 보이는
+  // 레이어 전부. 프레임 모드에선 항상 현재 프레임 하나뿐이다.
+  const resolveScopeIds = useCallback(
+    (scope: LayerScope): Set<string> => {
+      if (layerMode === "frames" || scope === "active") {
+        return new Set([history.activeLayerId]);
+      }
+      const visible = history.presentLayers.filter((l) => l.visible);
+      return new Set(
+        (scope === "reference"
+          ? visible.filter((l) => referenceLayerIds.has(l.id))
+          : visible
+        ).map((l) => l.id),
+      );
+    },
+    [layerMode, history.activeLayerId, history.presentLayers, referenceLayerIds],
+  );
+
+  // 지금 활성 도구가 스포이트·마법봉·페인트통이면 그 도구에 저장된 판정 범위,
+  // 아니면 "active"(판정 개념 없음).
+  const activeSampleScope: LayerScope =
+    tool === "eyedropper" || tool === "wand" || tool === "bucket"
+      ? sampleScopes[tool]
+      : "active";
+
+  const handleSampleScopeChange = useCallback(
+    (scope: LayerScope) => {
+      if (tool === "eyedropper" || tool === "wand" || tool === "bucket") {
+        setSampleScopes((s) => ({ ...s, [tool]: scope }));
+      }
+    },
+    [tool],
+  );
+  const handleTransformScopeChange = useCallback(
+    (key: TransformScopeKey, scope: LayerScope) =>
+      setTransformScopes((s) => ({ ...s, [key]: scope })),
+    [],
+  );
+
+  // 스포이트·마법봉·페인트통이 판정 기준으로 삼을 픽셀. "active"(기본)면 null →
+  // PixelCanvas가 편집 중인 레이어 픽셀을 그대로 쓴다. "all"이면 보이는 레이어
+  // 전부 합성, "reference"면 참조 레이어만 합성해 넘긴다. 프레임 모드는 합성
+  // 개념이 없어 항상 null. 참조인데 지정된 참조 레이어가 없으면 빈 그리드(전부
+  // 투명)를 넘겨 도구가 아무것도 못 집게 한다(경고는 별도).
+  const sampleComposite = useMemo(() => {
+    if (activeSampleScope === "active" || layerMode === "frames") return null;
+    if (activeSampleScope === "all") return compositePixels;
+    return compositeLayers(
+      history.presentLayers.filter(
+        (l) => l.visible && referenceLayerIds.has(l.id),
+      ),
+      doc.width,
+      doc.height,
+    );
   }, [
+    activeSampleScope,
     layerMode,
+    compositePixels,
     history.presentLayers,
-    activeLayerIndex,
-    layerScope,
+    referenceLayerIds,
     doc.width,
     doc.height,
   ]);
-
-  const scopeAboveLayers = useMemo((): PixelLayer[] | null => {
-    if (layerMode === "frames") return null;
-    const slice = history.presentLayers
-      .slice(activeLayerIndex + 1)
-      .filter((l) => layerScope.has(l.id));
-    return slice.length > 0 ? slice : null;
-  }, [layerMode, history.presentLayers, activeLayerIndex, layerScope]);
-
-  const activeLayerInScope =
-    layerMode === "frames" ? true : layerScope.has(history.activeLayerId);
-
-  // "정렬"(체크된 레이어 그림을 캔버스 정중앙으로)은 레이어 모드에서 체크된
-  // 레이어가 하나라도 있어야 의미가 있다 — 프레임 모드엔 scope 개념이 없다.
-  const canAlignContent = layerMode === "layers" && layerScope.size > 0;
 
   // 선택을 만들거나 다루는 도구 묶음(select·lasso·move·wand) 밖으로 나가면
   // 더 이상 쓸모가 없어진 선택 영역을 자동으로 지운다 — 그 묶음 안에서
@@ -1105,7 +1180,10 @@ export default function Editor({
   }, []);
 
   const handleTogglePlay = useCallback(() => setIsPlaying((p) => !p), []);
-  const handleToggleLoop = useCallback(() => setLoopPlayback((l) => !l), []);
+  const handleTogglePingPong = useCallback(
+    () => setPingPong((p) => !p),
+    [],
+  );
   const handleToggleOnionSkin = useCallback(() => setOnionSkin((o) => !o), []);
   const handleOnionSkinOpacityChange = useCallback(
     (opacity: number) => setOnionSkinOpacity(opacity),
@@ -1124,7 +1202,10 @@ export default function Editor({
   // 자체는 isPlaying이 바뀔 때만(재생 시작/정지) 재시작한다.
   const playbackLayersRef = useRef(history.presentLayers);
   const playbackActiveIdRef = useRef(history.activeLayerId);
-  const playbackLoopRef = useRef(loopPlayback);
+  const pingPongRef = useRef(pingPong);
+  // 핑퐁 재생의 현재 진행 방향(1=정방향, -1=역방향). 재생을 시작할 때 1로
+  // 되돌린다.
+  const playbackDirRef = useRef<1 | -1>(1);
   useEffect(() => {
     playbackLayersRef.current = history.presentLayers;
   }, [history.presentLayers]);
@@ -1132,14 +1213,15 @@ export default function Editor({
     playbackActiveIdRef.current = history.activeLayerId;
   }, [history.activeLayerId]);
   useEffect(() => {
-    playbackLoopRef.current = loopPlayback;
-  }, [loopPlayback]);
+    pingPongRef.current = pingPong;
+  }, [pingPong]);
 
   useEffect(() => {
     if (!isPlaying) return;
     let rafId: number;
     let lastTime = performance.now();
     let elapsed = 0;
+    playbackDirRef.current = 1;
     const tick = (now: number) => {
       const delta = now - lastTime;
       lastTime = now;
@@ -1154,10 +1236,12 @@ export default function Editor({
         const next = nextVisibleFrame(
           playbackLayersRef.current,
           currentId,
-          playbackLoopRef.current,
+          playbackDirRef.current,
+          pingPongRef.current,
         );
         if (next) {
-          history.setActiveLayerId(next.id);
+          playbackDirRef.current = next.direction;
+          history.setActiveLayerId(next.layer.id);
         } else {
           setIsPlaying(false);
           return;
@@ -1280,7 +1364,17 @@ export default function Editor({
         width: tab.doc.width,
         height: tab.doc.height,
       });
-      setLayerScope(new Set([activeLayerId]));
+      setReferenceLayerIds(new Set());
+      setSampleScopes({ eyedropper: "active", wand: "active", bucket: "active" });
+      setTransformScopes({
+        clear: "active",
+        flipH: "active",
+        flipV: "active",
+        rotateCcw: "active",
+        rotateCw: "active",
+        align: "active",
+        move: "active",
+      });
       setActiveColorHex(DEFAULT_ACTIVE_COLOR);
       setSecondaryColorHex(null);
       setHasMetaEdits(tab.hasMetaEdits);
@@ -1407,20 +1501,22 @@ export default function Editor({
       moveOriginalMask?: Set<number> | null,
       moveDelta?: { dx: number; dy: number },
     ) => {
-      // 이동 도구 + 체크된 레이어가 활성 레이어 말고도 있으면, 같은 선택
-      // 영역·같은 이동량으로 나머지 체크 레이어의 내용도 함께 옮긴다. 활성
-      // 레이어는 캔버스 드래그가 이미 옮긴 결과(next)를 그대로 쓴다. 잠긴
-      // 레이어는 건드리지 않는다.
+      // 이동의 대상(transformScopes.move)에 활성 레이어 말고도 있으면(대상=
+      // "참조"나 "전체"), 같은 선택 영역·같은 이동량으로 나머지도 함께 옮긴다.
+      // 활성 레이어는 캔버스 드래그가 이미 옮긴 결과(next)를 그대로 쓴다. 잠긴
+      // 레이어는 건드리지 않는다. 프레임 모드에선 대상이 현재 프레임 하나뿐이라
+      // peerIds가 비어 활성 프레임만 옮긴다.
       const moved =
         moveOriginalMask &&
         moveDelta &&
         (moveDelta.dx !== 0 || moveDelta.dy !== 0);
+      const moveScopeIds = resolveScopeIds(transformScopes.move);
       const peerIds = moved
         ? new Set(
             history.presentLayers
               .filter(
                 (l) =>
-                  layerScope.has(l.id) &&
+                  moveScopeIds.has(l.id) &&
                   l.id !== history.activeLayerId &&
                   !l.locked,
               )
@@ -1453,25 +1549,28 @@ export default function Editor({
       pushHistoryAllLayers,
       history.presentLayers,
       history.activeLayerId,
-      layerScope,
+      resolveScopeIds,
+      transformScopes.move,
       doc.width,
       doc.height,
     ],
   );
 
-  // 체크된 레이어(layerScope)만 투명하게 비운다 — 안 체크된 레이어는 그대로.
+  // 지우기의 대상(transformScopes.clear)만 투명하게 비운다 — 나머지는 그대로.
   // 실행취소로 되돌릴 수 있으므로(다른 파괴적 동작들과 같은 관례) 별도 확인
   // 없이 바로 지운다.
   const handleClearCanvas = useCallback(() => {
-    if (layerScope.size === 0) return;
+    const ids = resolveScopeIds(transformScopes.clear);
+    if (ids.size === 0) return;
     const empty = createGrid(doc.width, doc.height);
     const nextLayers = history.presentLayers.map((l) =>
-      layerScope.has(l.id) ? { ...l, pixels: empty.slice() } : l,
+      ids.has(l.id) ? { ...l, pixels: empty.slice() } : l,
     );
     pushHistoryAllLayers(nextLayers);
   }, [
+    resolveScopeIds,
+    transformScopes.clear,
     history.presentLayers,
-    layerScope,
     doc.width,
     doc.height,
     pushHistoryAllLayers,
@@ -1990,36 +2089,40 @@ export default function Editor({
     [doc.width, doc.height, history.presentLayers, pushHistoryAllLayers],
   );
 
-  // 반전·회전·지우기는 모두 체크된 레이어(layerScope)에만 적용한다 — 안
-  // 체크된 레이어는 그대로 둔다. 캔버스 크기는 바꾸지 않으므로(회전도
-  // rotate90InPlace로 경계 안에서 돈다) 90도 회전을 해도 다른 레이어·캔버스
-  // 크기와 어긋나지 않는다. 정사각형이 아닌 캔버스에서 회전하면 밖으로 나간
-  // 픽셀은 잘린다.
+  // 반전·회전·지우기는 각자의 대상(transformScopes.*)에만 적용한다 — 나머지
+  // 레이어는 그대로 둔다. 캔버스 크기는 바꾸지 않으므로(회전도 rotate90InPlace로
+  // 경계 안에서 돈다) 90도 회전을 해도 다른 레이어·캔버스 크기와 어긋나지 않는다.
+  // 정사각형이 아닌 캔버스에서 회전하면 밖으로 나간 픽셀은 잘린다.
   const handleFlipHorizontal = useCallback(() => {
-    if (layerScope.size === 0) return;
+    const ids = resolveScopeIds(transformScopes.flipH);
+    if (ids.size === 0) return;
     const nextLayers = history.presentLayers.map((l) =>
-      layerScope.has(l.id)
+      ids.has(l.id)
         ? { ...l, pixels: flipHorizontal(l.pixels, doc.width, doc.height) }
         : l,
     );
     pushHistoryAllLayers(nextLayers);
-  }, [history.presentLayers, layerScope, doc.width, doc.height, pushHistoryAllLayers]);
+  }, [resolveScopeIds, transformScopes.flipH, history.presentLayers, doc.width, doc.height, pushHistoryAllLayers]);
 
   const handleFlipVertical = useCallback(() => {
-    if (layerScope.size === 0) return;
+    const ids = resolveScopeIds(transformScopes.flipV);
+    if (ids.size === 0) return;
     const nextLayers = history.presentLayers.map((l) =>
-      layerScope.has(l.id)
+      ids.has(l.id)
         ? { ...l, pixels: flipVertical(l.pixels, doc.width, doc.height) }
         : l,
     );
     pushHistoryAllLayers(nextLayers);
-  }, [history.presentLayers, layerScope, doc.width, doc.height, pushHistoryAllLayers]);
+  }, [resolveScopeIds, transformScopes.flipV, history.presentLayers, doc.width, doc.height, pushHistoryAllLayers]);
 
   const handleRotate90 = useCallback(
     (direction: 1 | -1) => {
-      if (layerScope.size === 0) return;
+      const ids = resolveScopeIds(
+        direction === -1 ? transformScopes.rotateCcw : transformScopes.rotateCw,
+      );
+      if (ids.size === 0) return;
       const nextLayers = history.presentLayers.map((l) =>
-        layerScope.has(l.id)
+        ids.has(l.id)
           ? {
               ...l,
               pixels: rotate90InPlace(
@@ -2033,7 +2136,7 @@ export default function Editor({
       );
       pushHistoryAllLayers(nextLayers);
     },
-    [history.presentLayers, layerScope, doc.width, doc.height, pushHistoryAllLayers],
+    [resolveScopeIds, transformScopes.rotateCcw, transformScopes.rotateCw, history.presentLayers, doc.width, doc.height, pushHistoryAllLayers],
   );
 
   // 활성 탭은 라이브 상태(pixelsDirty/hasMetaEdits)로, 비활성 탭은 마지막
@@ -2193,10 +2296,6 @@ export default function Editor({
       ...history.presentLayers.slice(insertAt),
     ];
     pushLayerOp(nextLayers, newLayer.id);
-    // 방금 생긴 레이어는 사용자가 체크/해제할 기회가 없었으므로, 기본으로
-    // 판정 대상(layerScope)에 넣는다 — 그러지 않으면 새 레이어에 그려도
-    // 스포이트·마법봉·페인트통이 그 레이어를 못 보는 상태로 시작한다.
-    setLayerScope((prev) => new Set(prev).add(newLayer.id));
   }, [history.presentLayers, activeLayerIndex, doc.width, doc.height, pushLayerOp]);
 
   const handleDuplicateLayer = useCallback(
@@ -2217,9 +2316,6 @@ export default function Editor({
         ...history.presentLayers.slice(index + 1),
       ];
       pushLayerOp(nextLayers, copy.id);
-      // handleAddLayer와 같은 이유로, 방금 생긴 복제본도 기본으로 판정
-      // 대상에 넣는다.
-      setLayerScope((prev) => new Set(prev).add(copy.id));
     },
     [history.presentLayers, pushLayerOp],
   );
@@ -2321,6 +2417,18 @@ export default function Editor({
     },
     [history.presentLayers, history.activeLayerId, pushLayerOp],
   );
+
+  // 참조 레이어 지정/해제 — 활성 레이어(그리기 대상)와 무관한 세션 상태라
+  // pushLayerOp(실행취소)를 거치지 않는다. 레이어가 지워지면 그 id는 남아
+  // 있어도 filter 단계에서 자연히 빠지므로 정리는 생략한다.
+  const handleToggleReference = useCallback((id: string) => {
+    setReferenceLayerIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const handleLayerOpacityChange = useCallback(
     (id: string, opacity: number) => {
@@ -2427,32 +2535,15 @@ export default function Editor({
       locked: false,
     };
     pushLayerOp([flat], flat.id);
-    // 평탄화는 기존 레이어를 전부 새 레이어 하나로 합치므로, 이전 layerScope가
-    // 가리키던 id는 전부 사라진다 — 추가가 아니라 이 레이어 하나로 완전히
-    // 교체한다.
-    setLayerScope(new Set([flat.id]));
   }, [history.presentLayers, doc.width, doc.height, pushLayerOp]);
 
-  // 체크된 레이어(layerScope)를 켜고 끈다 — 활성 레이어(그리기 대상)와는
-  // 무관한 독립 상태라 pushLayerOp(실행취소)를 거치지 않는다.
-  const handleToggleLayerScope = useCallback((id: string) => {
-    setLayerScope((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }, []);
-
-  // 체크된 레이어들의 불투명 영역을 하나로 묶어 그 경계 상자가 캔버스
-  // 중앙에 오도록, 체크된 레이어들만 같은 만큼(서로 상대 위치 유지) 이동시킨다.
-  // 체크 안 된 레이어는 건드리지 않는다. handleFlattenLayers와 같은 패턴으로
-  // pushLayerOp 한 번에 실행취소 스택에 올라간다.
+  // 정렬 대상(transformScopes.align) 레이어들의 불투명 영역을 하나로 묶어 그
+  // 경계 상자가 캔버스 중앙에 오도록, 그 레이어들만 같은 만큼(서로 상대 위치
+  // 유지) 이동시킨다. 대상 밖 레이어는 건드리지 않는다. handleFlattenLayers와
+  // 같은 패턴으로 pushLayerOp 한 번에 실행취소된다.
   const handleAlignLayers = useCallback(() => {
-    const targets = history.presentLayers.filter((l) => layerScope.has(l.id));
+    const ids = resolveScopeIds(transformScopes.align);
+    const targets = history.presentLayers.filter((l) => ids.has(l.id));
     if (targets.length === 0) return;
     const box = unionBoundingBox(
       targets.map((l) => l.pixels),
@@ -2466,12 +2557,12 @@ export default function Editor({
     const dy = Math.floor((doc.height - contentH) / 2) - box.minY;
     if (dx === 0 && dy === 0) return;
     const nextLayers = history.presentLayers.map((l) =>
-      layerScope.has(l.id)
+      ids.has(l.id)
         ? { ...l, pixels: shiftPixels(l.pixels, doc.width, doc.height, dx, dy) }
         : l,
     );
     pushLayerOp(nextLayers, history.activeLayerId);
-  }, [history.presentLayers, history.activeLayerId, layerScope, doc.width, doc.height, pushLayerOp]);
+  }, [resolveScopeIds, transformScopes.align, history.presentLayers, history.activeLayerId, doc.width, doc.height, pushLayerOp]);
 
   const handleFrameDurationChange = useCallback(
     (id: string, ms: number) => {
@@ -2895,7 +2986,11 @@ export default function Editor({
             onFlipVertical={handleFlipVertical}
             onRotate90={handleRotate90}
             onAlignContent={handleAlignLayers}
-            canAlignContent={canAlignContent}
+            hasReferenceLayers={hasReferenceLayers}
+            sampleScope={activeSampleScope}
+            onSampleScopeChange={handleSampleScopeChange}
+            transformScopes={transformScopes}
+            onTransformScopeChange={handleTransformScopeChange}
             secondaryPortalTarget={secondaryToolbarPortal}
             compact={toolbarCompact}
           />
@@ -2970,9 +3065,7 @@ export default function Editor({
                     activeLayerAdjustments={
                       layerMode === "frames" ? {} : activeLayer
                     }
-                    scopeBelowComposite={scopeBelowComposite}
-                    scopeAboveLayers={scopeAboveLayers}
-                    activeLayerInScope={activeLayerInScope}
+                    sampleComposite={sampleComposite}
                     tool={tool}
                     onToolChange={setTool}
                     activeColorHex={activeColorHex}
@@ -3070,6 +3163,20 @@ export default function Editor({
                   ref={setSecondaryToolbarPortal}
                   className="pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center px-3"
                 />
+                {/* "참조: 참조 레이어"인데 지정된 참조 레이어가 없을 때의 경고 —
+                    도구 옵션 패널 안에 넣으면 패널 높이가 바뀌어 조작이 흔들린다는
+                    피드백이 있어, 패널 바로 위에 별도로 띄운다(레이아웃 영향 없음). */}
+                {(tool === "eyedropper" ||
+                  tool === "wand" ||
+                  tool === "bucket") &&
+                  activeSampleScope === "reference" &&
+                  !hasReferenceLayers && (
+                    <div className="pointer-events-none absolute bottom-14 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1.5 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700 shadow-md ring-1 ring-amber-200">
+                      <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
+                      참조 레이어로 지정된 레이어가 없습니다 — 레이어 목록의 전구
+                      아이콘을 켜주세요
+                    </div>
+                  )}
               </div>
               {layerMode === "frames" && (
                 <FrameFilmstrip
@@ -3143,6 +3250,7 @@ export default function Editor({
                         viewRect={artViewRect}
                         layers={history.presentLayers}
                         layerMode={layerMode}
+                        pingPong={pingPong}
                         canvasBgColor={canvasBgColor}
                       />
                     )}
@@ -3161,6 +3269,8 @@ export default function Editor({
                       onRename={handleRenameLayer}
                       onToggleVisible={handleToggleLayerVisible}
                       onToggleLocked={handleToggleLayerLocked}
+                      referenceLayerIds={referenceLayerIds}
+                      onToggleReference={handleToggleReference}
                       onOpacityChange={handleLayerOpacityChange}
                       onOpacityDragEnd={handleOpacityDragEnd}
                       onBlendModeChange={handleLayerBlendModeChange}
@@ -3169,14 +3279,12 @@ export default function Editor({
                       onAdjustmentDragEnd={handleAdjustmentDragEnd}
                       onResetAdjustments={handleResetAdjustments}
                       onFlatten={handleFlattenLayers}
-                      layerScope={layerScope}
-                      onToggleScope={handleToggleLayerScope}
                       layerMode={layerMode}
                       onLayerModeChange={handleLayerModeChange}
                       isPlaying={isPlaying}
                       onTogglePlay={handleTogglePlay}
-                      loopPlayback={loopPlayback}
-                      onToggleLoop={handleToggleLoop}
+                      pingPong={pingPong}
+                      onTogglePingPong={handleTogglePingPong}
                       onionSkin={onionSkin}
                       onToggleOnionSkin={handleToggleOnionSkin}
                       onionSkinOpacity={onionSkinOpacity}
@@ -3222,6 +3330,8 @@ export default function Editor({
                   onRename={handleRenameLayer}
                   onToggleVisible={handleToggleLayerVisible}
                   onToggleLocked={handleToggleLayerLocked}
+                  referenceLayerIds={referenceLayerIds}
+                  onToggleReference={handleToggleReference}
                   onOpacityChange={handleLayerOpacityChange}
                   onOpacityDragEnd={handleOpacityDragEnd}
                   onBlendModeChange={handleLayerBlendModeChange}
@@ -3230,14 +3340,12 @@ export default function Editor({
                   onAdjustmentDragEnd={handleAdjustmentDragEnd}
                   onResetAdjustments={handleResetAdjustments}
                   onFlatten={handleFlattenLayers}
-                  layerScope={layerScope}
-                  onToggleScope={handleToggleLayerScope}
                   layerMode={layerMode}
                   onLayerModeChange={handleLayerModeChange}
                   isPlaying={isPlaying}
                   onTogglePlay={handleTogglePlay}
-                  loopPlayback={loopPlayback}
-                  onToggleLoop={handleToggleLoop}
+                  pingPong={pingPong}
+                  onTogglePingPong={handleTogglePingPong}
                   onionSkin={onionSkin}
                   onToggleOnionSkin={handleToggleOnionSkin}
                   onionSkinOpacity={onionSkinOpacity}

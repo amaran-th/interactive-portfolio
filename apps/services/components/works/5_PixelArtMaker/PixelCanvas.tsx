@@ -214,9 +214,7 @@ export default function PixelCanvas({
   onActiveTracingDeselect,
   activeLayerBlendMode,
   activeLayerAdjustments,
-  scopeBelowComposite,
-  scopeAboveLayers,
-  activeLayerInScope,
+  sampleComposite,
 }: {
   width: number;
   height: number;
@@ -341,12 +339,11 @@ export default function PixelCanvas({
   // getFullComposite() 둘 다 이 값을 반영한다.
   activeLayerBlendMode: BlendMode;
   activeLayerAdjustments: LayerAdjustments;
-  // 스포이트·마법봉·페인트통 판정 전용 — belowComposite/aboveLayers(화면
-  // 렌더링용)와 별개로 layerScope로 필터링된 값을 받는다. activeLayerInScope가
-  // false면 활성 레이어(workingRef.current) 자체가 판정에서 제외된다.
-  scopeBelowComposite: PixelValue[] | null;
-  scopeAboveLayers: PixelLayer[] | null;
-  activeLayerInScope: boolean;
+  // 스포이트·마법봉·페인트통이 판정 기준으로 삼을 픽셀. null이면 지금 편집
+  // 중인 레이어(workingRef.current)를, 값이 있으면(= "Sample All Layers") 그
+  // 미리 합성된 "화면에 보이는 그대로"를 쓴다. Editor가 sampleScope에 따라
+  // 넘긴다.
+  sampleComposite: PixelValue[] | null;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // 트랙패드 스크롤/핀치는 짧은 시간 안에 작은 deltaY를 가진 wheel 이벤트를 수십 번
@@ -981,39 +978,14 @@ export default function PixelCanvas({
     [width, height, brushSize],
   );
 
-  // 스포이트·마법봉·페인트통은 화면에 보이는 그대로(합성 기준)로 판정해야
-  // 한다 — belowComposite + 활성 레이어(지금 workingRef 값, 자기 투명도
-  // 적용) + aboveLayers를 그 순간에만 한 번 합성한다. 매 프레임 계산하지
-  // 않고 이 세 도구가 실제로 클릭될 때만 부른다.
-  const getFullComposite = useCallback((): PixelValue[] => {
-    const base = scopeBelowComposite
-      ? scopeBelowComposite.slice()
-      : createGrid(width, height);
-    if (!activeLayerInScope) {
-      return scopeAboveLayers && scopeAboveLayers.length > 0
-        ? compositeLayersOnto(base, scopeAboveLayers)
-        : base;
-    }
-    const withActive = compositeOnto(
-      base,
-      workingRef.current,
-      activeLayerOpacity,
-      activeLayerBlendMode,
-      activeLayerAdjustments,
-    );
-    return scopeAboveLayers && scopeAboveLayers.length > 0
-      ? compositeLayersOnto(withActive, scopeAboveLayers)
-      : withActive;
-  }, [
-    scopeBelowComposite,
-    scopeAboveLayers,
-    activeLayerInScope,
-    activeLayerOpacity,
-    activeLayerBlendMode,
-    activeLayerAdjustments,
-    width,
-    height,
-  ]);
+  // 스포이트·마법봉·페인트통의 판정 기준 픽셀. sampleComposite가 있으면
+  // ("Sample All Layers") Editor가 미리 합성해 준 "화면에 보이는 그대로"를,
+  // 없으면 지금 편집 중인 레이어 픽셀(workingRef.current, 그리는 도중 값 포함)을
+  // 쓴다. 이 세 도구가 실제로 클릭될 때만 부른다.
+  const getFullComposite = useCallback(
+    (): PixelValue[] => sampleComposite ?? workingRef.current,
+    [sampleComposite],
+  );
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {

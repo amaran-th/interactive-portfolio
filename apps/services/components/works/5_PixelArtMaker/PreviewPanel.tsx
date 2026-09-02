@@ -10,8 +10,19 @@ import { DEFAULT_FRAME_DURATION_MS } from "./types";
 // 작으면 정수 배율로 확대해(최대 8배) 이 안에 맞춘다.
 const PREVIEW_MAX = 176;
 
+// 계속 증가하는 카운터를 실제 표시할 프레임 위치로 바꾼다. pingPong이면 끝에
+// 닿을 때 방향을 뒤집어 앞뒤로 오가고(0→n-1→0…), 아니면 순환(mod)한다.
+function frameAt(counter: number, length: number, pingPong: boolean): number {
+  if (length <= 1) return 0;
+  if (!pingPong) return counter % length;
+  const period = 2 * (length - 1);
+  const p = ((counter % period) + period) % period;
+  return p < length ? p : period - p;
+}
+
 // "지금 작업물이 작게 보면 어떤지"를 항상 보여주는 패널. 프레임 모드에서는
-// 메인 재생 버튼과 무관하게 자체 루프로 보이는 프레임을 계속 순환한다.
+// 메인 재생 버튼과 무관하게 자체 루프로 보이는 프레임을 계속 재생한다(항상
+// 반복, pingPong이면 핑퐁).
 export default function PreviewPanel({
   width,
   height,
@@ -20,6 +31,7 @@ export default function PreviewPanel({
   viewRect,
   layers,
   layerMode,
+  pingPong,
   canvasBgColor,
 }: {
   width: number;
@@ -33,6 +45,8 @@ export default function PreviewPanel({
   // 프레임 모드 자동 재생에 쓰인다.
   layers: PixelLayer[];
   layerMode: "layers" | "frames";
+  // 자동 재생을 핑퐁(끝에서 방향 뒤집기)으로 할지.
+  pingPong: boolean;
   canvasBgColor: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -42,11 +56,16 @@ export default function PreviewPanel({
   // 지금 보고 있는 영역(뷰파인더) 사각형 표시 여부 — 헤더의 토글로 켜고 끈다.
   const [showViewRect, setShowViewRect] = useState(true);
 
-  // 애니메이션 루프가 픽셀 편집마다 재시작하지 않도록 layers는 ref로 읽는다.
+  // 애니메이션 루프가 픽셀 편집마다 재시작하지 않도록 layers·pingPong은 ref로
+  // 읽는다.
   const layersRef = useRef(layers);
   useEffect(() => {
     layersRef.current = layers;
   }, [layers]);
+  const pingPongRef = useRef(pingPong);
+  useEffect(() => {
+    pingPongRef.current = pingPong;
+  }, [pingPong]);
 
   // 루프는 프레임 "구조"(보이는 프레임 목록·순서·지속시간)가 바뀔 때만 재시작.
   const framesSignature =
@@ -74,8 +93,8 @@ export default function PreviewPanel({
       const vis = getVisible();
       if (vis.length > 0) {
         const dur =
-          vis[localIdx % vis.length].frameDurationMs ??
-          DEFAULT_FRAME_DURATION_MS;
+          vis[frameAt(localIdx, vis.length, pingPongRef.current)]
+            .frameDurationMs ?? DEFAULT_FRAME_DURATION_MS;
         if (elapsed >= dur) {
           elapsed -= dur;
           localIdx += 1;
@@ -92,7 +111,7 @@ export default function PreviewPanel({
     layerMode === "frames" ? layers.filter((l) => l.visible) : [];
   const shownPixels =
     visibleFrames.length > 0
-      ? visibleFrames[frameIdx % visibleFrames.length].pixels
+      ? visibleFrames[frameAt(frameIdx, visibleFrames.length, pingPong)].pixels
       : (livePixels ?? pixels);
 
   const displayScale = Math.min(PREVIEW_MAX / width, PREVIEW_MAX / height, 8);

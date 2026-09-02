@@ -12,6 +12,7 @@ import {
   Globe,
   Grid3x3,
   Lasso,
+  Loader,
   Minus,
   MousePointer2,
   Move,
@@ -23,7 +24,6 @@ import {
   Square,
   SquareMinus,
   SquarePlus,
-  Loader,
   Type,
   Undo2,
   Wand2,
@@ -32,7 +32,7 @@ import {
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import GradientDial from "./GradientDial";
-import { SelectMode, Tool } from "./types";
+import { LayerScope, SelectMode, Tool, TransformScopeKey } from "./types";
 
 // key는 useKeyboardShortcuts.ts의 TOOL_KEYS와 정확히 일치해야 한다.
 const SELECT_TOOLS: {
@@ -90,6 +90,214 @@ const SHAPE_TOOLS: Tool[] = ["rect", "circle"];
 // 그라데이션 채우기는 길이·면적이 있는 도형 도구(직선·사각형·원)에 모두 의미가
 // 있다 — 직선은 채우기 개념이 없어도 길이 방향으로 색이 변할 수 있다.
 const GRADIENT_SHAPE_TOOLS: Tool[] = ["line", "rect", "circle"];
+
+// 스포이트·마법봉·페인트통만 "판정 기준"(활성 레이어 vs 전체 화면)이 의미가 있다.
+const SAMPLE_SCOPE_TOOLS: Tool[] = ["eyedropper", "wand", "bucket"];
+
+// 스포이트·마법봉·페인트통의 "판정 대상" 세그먼트(도구별로 따로 저장). 이동
+// 도구의 "이동 대상"도 같은 컨트롤을 쓴다.
+const SCOPE_OPTIONS = [
+  ["active", "활성"],
+  ["reference", "참조"],
+  ["all", "전체"],
+] as const;
+const SCOPE_FULL: Record<LayerScope, string> = {
+  active: "활성 레이어",
+  reference: "참조 레이어",
+  all: "전체 레이어",
+};
+// 대상 표시용 색 — 활성=회색, 참조=violet(전구 아이콘과 통일), 전체=하늘색.
+const SCOPE_DOT: Record<LayerScope, string> = {
+  active: "bg-gray-300",
+  reference: "bg-violet-400",
+  all: "bg-sky-400",
+};
+
+function SegmentedControl({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: LayerScope;
+  onChange: (v: LayerScope) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 text-[10px] text-gray-600">
+      <span className="shrink-0">{label}</span>
+      <div className="flex overflow-hidden rounded-sm border border-gray-200">
+        {SCOPE_OPTIONS.map(([v, l]) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onChange(v)}
+            className={`px-1.5 py-1 ${
+              value === v
+                ? "bg-violet-500 text-white"
+                : "bg-white text-gray-500 hover:bg-gray-100"
+            }`}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// 변형 조작 하나 = 실행 아이콘 + 대상 드롭다운(캐럿). 아이콘 클릭 = 지금 대상
+// 으로 실행, 캐럿 = 대상(활성/참조/전체) 선택. 아이콘 밑 작은 점이 현재 대상
+// 색을 보여준다. 대상="참조"인데 지정된 참조 레이어가 없으면 실행만 비활성.
+function ScopedActionButton({
+  icon: Icon,
+  label,
+  scope,
+  hasReferenceLayers,
+  onScopeChange,
+  onRun,
+  danger,
+}: {
+  icon: typeof Paintbrush;
+  label: string;
+  scope: LayerScope;
+  hasReferenceLayers: boolean;
+  onScopeChange: (s: LayerScope) => void;
+  onRun: () => void;
+  danger?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const disabled = scope === "reference" && !hasReferenceLayers;
+  return (
+    <div className="relative flex shrink-0">
+      <button
+        type="button"
+        onClick={onRun}
+        disabled={disabled}
+        title={`${label} · 대상: ${SCOPE_FULL[scope]}${disabled ? " (지정된 참조 레이어 없음)" : ""}`}
+        className={`relative flex h-8 w-7 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30 ${
+          danger ? "hover:bg-red-50 hover:text-red-500" : ""
+        }`}
+      >
+        <Icon className="h-4 w-4" />
+        <span
+          className={`absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${SCOPE_DOT[scope]}`}
+        />
+      </button>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        title="대상 레이어 선택"
+        className={`flex h-8 w-3 items-center justify-center bg-gray-100 hover:bg-gray-200 ${
+          open ? "text-violet-500" : "text-gray-400"
+        }`}
+      >
+        <ChevronDown className="h-2.5 w-2.5" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full z-40 mt-1 flex w-24 flex-col bg-white py-1 text-[10px] shadow-xl">
+            {(["active", "reference", "all"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => {
+                  onScopeChange(v);
+                  setOpen(false);
+                }}
+                className={`px-2 py-1 text-left hover:bg-violet-50 ${
+                  v === scope
+                    ? "font-semibold text-violet-700"
+                    : "text-gray-600"
+                }`}
+              >
+                {SCOPE_FULL[v]}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// 지우기·반전·회전·정렬 — 각자 자기 대상을 갖는다. "변형" 카드에 함께 두고,
+// 좁을 때만 카드 밑 팝오버로 접는다.
+function TransformButtons({
+  transformScopes,
+  hasReferenceLayers,
+  onTransformScopeChange,
+  onClearCanvas,
+  onFlipHorizontal,
+  onFlipVertical,
+  onRotate90,
+  onAlignContent,
+}: {
+  transformScopes: Record<TransformScopeKey, LayerScope>;
+  hasReferenceLayers: boolean;
+  onTransformScopeChange: (key: TransformScopeKey, scope: LayerScope) => void;
+  onClearCanvas: () => void;
+  onFlipHorizontal: () => void;
+  onFlipVertical: () => void;
+  onRotate90: (direction: 1 | -1) => void;
+  onAlignContent: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <ScopedActionButton
+        icon={Loader}
+        label="지우기"
+        danger
+        scope={transformScopes.clear}
+        hasReferenceLayers={hasReferenceLayers}
+        onScopeChange={(s) => onTransformScopeChange("clear", s)}
+        onRun={onClearCanvas}
+      />
+      <div className="mx-0.5 h-6 w-px shrink-0 bg-gray-200" />
+      <ScopedActionButton
+        icon={FlipHorizontal2}
+        label="좌우 반전"
+        scope={transformScopes.flipH}
+        hasReferenceLayers={hasReferenceLayers}
+        onScopeChange={(s) => onTransformScopeChange("flipH", s)}
+        onRun={onFlipHorizontal}
+      />
+      <ScopedActionButton
+        icon={FlipVertical2}
+        label="상하 반전"
+        scope={transformScopes.flipV}
+        hasReferenceLayers={hasReferenceLayers}
+        onScopeChange={(s) => onTransformScopeChange("flipV", s)}
+        onRun={onFlipVertical}
+      />
+      <ScopedActionButton
+        icon={RotateCcw}
+        label="90도 반시계 회전"
+        scope={transformScopes.rotateCcw}
+        hasReferenceLayers={hasReferenceLayers}
+        onScopeChange={(s) => onTransformScopeChange("rotateCcw", s)}
+        onRun={() => onRotate90(-1)}
+      />
+      <ScopedActionButton
+        icon={RotateCw}
+        label="90도 시계 회전"
+        scope={transformScopes.rotateCw}
+        hasReferenceLayers={hasReferenceLayers}
+        onScopeChange={(s) => onTransformScopeChange("rotateCw", s)}
+        onRun={() => onRotate90(1)}
+      />
+      <div className="mx-0.5 h-6 w-px shrink-0 bg-gray-200" />
+      <ScopedActionButton
+        icon={Focus}
+        label="정렬"
+        scope={transformScopes.align}
+        hasReferenceLayers={hasReferenceLayers}
+        onScopeChange={(s) => onTransformScopeChange("align", s)}
+        onRun={onAlignContent}
+      />
+    </div>
+  );
+}
 
 // 카테고리 하나를 흰 카드로 감싼다 — 예전 좌측 사이드바(Toolbar/ColorWheel)와
 // 같은 시각 언어를 상단 바에도 그대로 적용해, 캔버스 배경색이 칠해진 회색
@@ -184,7 +392,11 @@ export default function DrawToolbar({
   onFlipVertical,
   onRotate90,
   onAlignContent,
-  canAlignContent,
+  hasReferenceLayers,
+  sampleScope,
+  onSampleScopeChange,
+  transformScopes,
+  onTransformScopeChange,
   secondaryPortalTarget,
   compact,
 }: {
@@ -227,10 +439,16 @@ export default function DrawToolbar({
   onFlipHorizontal: () => void;
   onFlipVertical: () => void;
   onRotate90: (direction: 1 | -1) => void;
-  // 체크된 레이어의 그림을 캔버스 정중앙으로 옮긴다. 레이어 모드에서 체크된
-  // 레이어가 하나라도 있을 때만 켜진다(canAlignContent).
+  // 대상 레이어들의 그림을 캔버스 정중앙으로 옮긴다.
   onAlignContent: () => void;
-  canAlignContent: boolean;
+  // 참조 레이어로 지정된 게 하나라도 있는지 — 없으면 "참조" 대상 실행 비활성.
+  hasReferenceLayers: boolean;
+  // 지금 활성 도구(스포이트·마법봉·페인트통)의 판정 대상 — 도구별로 따로다.
+  sampleScope: LayerScope;
+  onSampleScopeChange: (scope: LayerScope) => void;
+  // 지우기·반전H·반전V·회전↺·회전↻·정렬·이동의 대상 — 조작마다 따로 저장한다.
+  transformScopes: Record<TransformScopeKey, LayerScope>;
+  onTransformScopeChange: (key: TransformScopeKey, scope: LayerScope) => void;
   // 도구별 하위 옵션(브러시 크기·채우기·그라데이션·선택 모드)을 그릴 자리 —
   // 캔버스 영역 하단 중앙에 떠 있는 DOM 노드를 Editor.tsx가 내려준다. 이
   // 컴포넌트 자신은 상단 바에 렌더링되므로 포털로 그 노드에 그린다.
@@ -408,7 +626,11 @@ export default function DrawToolbar({
             {(
               [
                 { mode: "new", label: "새 선택", icon: Square },
-                { mode: "add", label: "선택 영역에 추가 (Shift)", icon: SquarePlus },
+                {
+                  mode: "add",
+                  label: "선택 영역에 추가 (Shift)",
+                  icon: SquarePlus,
+                },
                 {
                   mode: "subtract",
                   label: "선택 영역에서 제외 (Alt)",
@@ -444,6 +666,36 @@ export default function DrawToolbar({
             <Globe className="h-3.5 w-3.5" />
           </button>
         </div>
+      ),
+    });
+  }
+  // 스포이트·마법봉·페인트통: "무엇을 기준으로 색·영역을 판정할지" (클립스튜디오
+  // "다중 참조"). "참조 레이어"인데 지정된 게 없을 때의 경고는 이 패널이 아니라
+  // Editor가 캔버스 위쪽에 따로 띄운다 — 여기서 한 줄 늘어나면 옵션 위치가
+  // 흔들려 쓰기 불편하다는 피드백.
+  if (SAMPLE_SCOPE_TOOLS.includes(tool)) {
+    secondarySections.push({
+      key: "sampleScope",
+      node: (
+        <SegmentedControl
+          label="판정 대상"
+          value={sampleScope}
+          onChange={onSampleScopeChange}
+        />
+      ),
+    });
+  }
+  // 이동 도구는 "변형" 카드가 멀어서(선택 카드에 있음) 여기서도 대상을 바꾼다 —
+  // 반전·회전 등과 다른 별개 상태(transformScopes.move)다.
+  if (tool === "move") {
+    secondarySections.push({
+      key: "moveScope",
+      node: (
+        <SegmentedControl
+          label="이동 대상"
+          value={transformScopes.move}
+          onChange={(s) => onTransformScopeChange("move", s)}
+        />
       ),
     });
   }
@@ -526,101 +778,83 @@ export default function DrawToolbar({
           </div>
         </ToolCard>
 
+        <ToolCard title="편집" compact={compact}>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={onUndo}
+              disabled={!canUndo}
+              title="실행취소"
+              className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 disabled:opacity-30"
+            >
+              <Undo2 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={onRedo}
+              disabled={!canRedo}
+              title="다시실행"
+              className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 disabled:opacity-30"
+            >
+              <Redo2 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={onToggleGrid}
+              title="격자 표시 (기본 켜짐)"
+              className={`flex h-8 w-8 items-center justify-center ${showGrid ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600"}`}
+            >
+              <Grid3x3 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={onToggleCrosshair}
+              title="중앙 십자 보조선"
+              className={`flex h-8 w-8 items-center justify-center ${showCrosshair ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600"}`}
+            >
+              <Crosshair className="h-4 w-4" />
+            </button>
+          </div>
+        </ToolCard>
 
-        {/* 반전·회전(더보기)은 다른 하위 옵션들과 달리 캔버스 하단 중앙
-            포털로 보내지 않고, 이 카드 바로 아래에 로컬로 띄운다 — 가끔 한 번
-            누르고 마는 조작이라 "더보기" 버튼 바로 아래 뜨는 편이 더 직관적이다. */}
+        {/* 변형 묶음 — 지우기·반전·회전·정렬을 한곳에 모으고, 조작마다 자기
+            대상(활성/참조/전체 레이어)을 아이콘 옆 캐럿으로 고른다. 예전엔
+            지우기만 편집 카드, 나머지는 "더보기" 뒤라 어긋나 있었다. */}
         <div className="relative">
-          <ToolCard title="편집" compact={compact}>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={onUndo}
-                disabled={!canUndo}
-                title="실행취소"
-                className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 disabled:opacity-30"
-              >
-                <Undo2 className="h-4 w-4" />
-              </button>
-              <button
-                onClick={onRedo}
-                disabled={!canRedo}
-                title="다시실행"
-                className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 disabled:opacity-30"
-              >
-                <Redo2 className="h-4 w-4" />
-              </button>
-              <button
-                onClick={onToggleGrid}
-                title="격자 표시 (기본 켜짐)"
-                className={`flex h-8 w-8 items-center justify-center ${showGrid ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600"}`}
-              >
-                <Grid3x3 className="h-4 w-4" />
-              </button>
-              <button
-                onClick={onToggleCrosshair}
-                title="중앙 십자 보조선"
-                className={`flex h-8 w-8 items-center justify-center ${showCrosshair ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600"}`}
-              >
-                <Crosshair className="h-4 w-4" />
-              </button>
-              <button
-                onClick={onClearCanvas}
-                title="체크된 레이어 지우기"
-                className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-500"
-              >
-                <Loader className="h-4 w-4" />
-              </button>
+          <ToolCard title="변형" compact={compact}>
+            {compact ? (
+              // 좁을 때는 카드가 "변형" 버튼 하나로 줄고, 버튼들은 팝오버로.
               <button
                 onClick={() => setShowMoreEdit((v) => !v)}
-                title="반전·회전·정렬 더보기"
-                className="flex h-8 items-center gap-0.5 bg-gray-100 px-1.5 text-[10px] text-gray-600 hover:bg-gray-200"
+                title="지우기·반전·회전·정렬"
+                className="flex h-8 items-center justify-center gap-0.5 bg-gray-100 px-1.5 text-[10px] text-gray-600 hover:bg-gray-200"
               >
-                더보기
+                변형
                 <ChevronDown
                   className={`h-3 w-3 transition-transform ${showMoreEdit ? "rotate-180" : ""}`}
                 />
               </button>
-            </div>
+            ) : (
+              <TransformButtons
+                transformScopes={transformScopes}
+                hasReferenceLayers={hasReferenceLayers}
+                onTransformScopeChange={onTransformScopeChange}
+                onClearCanvas={onClearCanvas}
+                onFlipHorizontal={onFlipHorizontal}
+                onFlipVertical={onFlipVertical}
+                onRotate90={onRotate90}
+                onAlignContent={onAlignContent}
+              />
+            )}
           </ToolCard>
-          {showMoreEdit && (
-            <div className="absolute top-full right-0 z-30 mt-1 flex items-center gap-1.5 bg-white p-2 shadow-xl">
-              <button
-                onClick={onFlipHorizontal}
-                title="좌우 반전 (체크된 레이어)"
-                className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200"
-              >
-                <FlipHorizontal2 className="h-4 w-4" />
-              </button>
-              <button
-                onClick={onFlipVertical}
-                title="상하 반전 (체크된 레이어)"
-                className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200"
-              >
-                <FlipVertical2 className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => onRotate90(-1)}
-                title="90도 반시계 회전 (체크된 레이어)"
-                className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => onRotate90(1)}
-                title="90도 시계 회전 (체크된 레이어)"
-                className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200"
-              >
-                <RotateCw className="h-4 w-4" />
-              </button>
-              <div className="mx-0.5 h-6 w-px shrink-0 bg-gray-200" />
-              <button
-                onClick={onAlignContent}
-                disabled={!canAlignContent}
-                title="체크된 레이어의 그림을 캔버스 정중앙으로"
-                className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
-              >
-                <Focus className="h-4 w-4" />
-              </button>
+          {compact && showMoreEdit && (
+            <div className="absolute top-full right-0 z-30 mt-1 bg-white p-2 shadow-xl">
+              <TransformButtons
+                transformScopes={transformScopes}
+                hasReferenceLayers={hasReferenceLayers}
+                onTransformScopeChange={onTransformScopeChange}
+                onClearCanvas={onClearCanvas}
+                onFlipHorizontal={onFlipHorizontal}
+                onFlipVertical={onFlipVertical}
+                onRotate90={onRotate90}
+                onAlignContent={onAlignContent}
+              />
             </div>
           )}
         </div>

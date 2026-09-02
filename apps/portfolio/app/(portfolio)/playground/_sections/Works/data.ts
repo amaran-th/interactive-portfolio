@@ -97,7 +97,7 @@ export const works: WorkItem[] = [
   📷 이미지 import: 사진을 업로드하면 픽셀 크기와 안티에일리어싱을 조절하며 미리보기로 확인한 뒤 가져올 수 있습니다. 추출된 색상은 대표색 개수로 자동/수동 병합해 팔레트를 정리합니다.
 
   💾 내보내기: PNG·SVG·JSON·JPG로 내보낼 수 있고, 저장한 작품은 비주얼 노벨 스튜디오 등 다른 Work에서 그대로 재사용됩니다.`,
-    period: "2026.07.10 - 09.01",
+    period: "2026.07.10 - 09.02",
     platforms: [{ type: "pc", specialized: true }, { type: "mobile" }],
     embedPath: "/nemo-nemo-beam",
     thumbnail: "/playground/nemo-beam.png",

@@ -1,21 +1,22 @@
 "use client";
 
 import {
+  ArrowDownToLine,
+  ArrowLeftRight,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
-  Combine,
   Copy,
   Droplet,
   Eye,
   EyeOff,
   Layers as LayersIcon,
+  Lightbulb,
   Lock,
   Pause,
   Play,
   Plus,
-  Repeat,
   Sparkles,
   Trash2,
   Unlock,
@@ -158,6 +159,8 @@ export default function LayerPanel({
   onRename,
   onToggleVisible,
   onToggleLocked,
+  referenceLayerIds,
+  onToggleReference,
   onOpacityChange,
   onOpacityDragEnd,
   onBlendModeChange,
@@ -166,12 +169,10 @@ export default function LayerPanel({
   onAdjustmentDragEnd,
   onResetAdjustments,
   onFlatten,
-  layerScope,
-  onToggleScope,
   isPlaying,
   onTogglePlay,
-  loopPlayback,
-  onToggleLoop,
+  pingPong,
+  onTogglePingPong,
   onionSkin,
   onToggleOnionSkin,
   onionSkinOpacity,
@@ -201,6 +202,10 @@ export default function LayerPanel({
   onRename: (id: string, name: string) => void;
   onToggleVisible: (id: string) => void;
   onToggleLocked: (id: string) => void;
+  // 클립스튜디오식 "참조 레이어" — 스포이트·마법봉·페인트통의 "참조: 참조 레이어"
+  // 모드가 이 레이어들의 합성을 기준으로 판정한다. 활성 레이어와는 무관하다.
+  referenceLayerIds: Set<string>;
+  onToggleReference: (id: string) => void;
   onOpacityChange: (id: string, opacity: number) => void;
   // 슬라이더를 드래그하는 동안 onOpacityChange가 연속으로 불려도 실행취소
   // 항목 하나로 묶이도록(Editor가 코얼레싱한다), 포인터를 떼거나 포커스가
@@ -218,16 +223,13 @@ export default function LayerPanel({
   onAdjustmentDragEnd: () => void;
   onResetAdjustments: (id: string) => void;
   onFlatten: () => void;
-  // 체크된 레이어 집합 — 스포이트·마법봉·페인트통 판정 범위이자 도구 바
-  // "정렬"(그림을 캔버스 정중앙으로)의 대상. 활성 레이어(activeLayerId)와는
-  // 독립적이다.
-  layerScope: Set<string>;
-  onToggleScope: (id: string) => void;
   // 프레임 모드 전용 재생 컨트롤.
   isPlaying: boolean;
   onTogglePlay: () => void;
-  loopPlayback: boolean;
-  onToggleLoop: () => void;
+  // 재생은 항상 반복한다 — 이 토글은 "핑퐁"(끝에 닿으면 방향을 뒤집어
+  // 앞뒤로 오간다) on/off다.
+  pingPong: boolean;
+  onTogglePingPong: () => void;
   onionSkin: boolean;
   onToggleOnionSkin: () => void;
   onionSkinOpacity: number;
@@ -329,14 +331,6 @@ export default function LayerPanel({
                     isActive ? "bg-violet-50" : "hover:bg-gray-50"
                   } ${layer.visible ? "" : "opacity-40"}`}
                 >
-                  <input
-                    type="checkbox"
-                    checked={layerScope.has(layer.id)}
-                    onChange={() => onToggleScope(layer.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    title="판정·정렬 범위에 포함"
-                    className="h-3.5 w-3.5 shrink-0"
-                  />
                   <FileThumbnail
                     width={width}
                     height={height}
@@ -368,38 +362,58 @@ export default function LayerPanel({
                       {layer.name}
                     </span>
                   )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleLocked(layer.id);
-                    }}
-                    title={layer.locked ? "편집 잠금 해제" : "편집 잠금"}
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center ${
-                      layer.locked
-                        ? "text-gray-700"
-                        : "text-gray-300 hover:text-gray-600"
-                    }`}
-                  >
-                    {layer.locked ? (
-                      <Lock className="h-3.5 w-3.5" />
-                    ) : (
-                      <Unlock className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleVisible(layer.id);
-                    }}
-                    title={layer.visible ? "숨기기" : "보이기"}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center text-gray-500 hover:text-gray-800"
-                  >
-                    {layer.visible ? (
-                      <Eye className="h-3.5 w-3.5" />
-                    ) : (
-                      <EyeOff className="h-3.5 w-3.5" />
-                    )}
-                  </button>
+                  <div className="flex shrink-0 items-center">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleReference(layer.id);
+                      }}
+                      title={
+                        referenceLayerIds.has(layer.id)
+                          ? "참조 레이어 해제"
+                          : "참조 레이어로 지정 (스포이트·마법봉·페인트통의 '참조: 참조 레이어' 기준)"
+                      }
+                      className={`flex h-6 w-5 items-center justify-center ${
+                        referenceLayerIds.has(layer.id)
+                          ? "text-violet-500"
+                          : "text-gray-300 hover:text-gray-600"
+                      }`}
+                    >
+                      <Lightbulb className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleLocked(layer.id);
+                      }}
+                      title={layer.locked ? "편집 잠금 해제" : "편집 잠금"}
+                      className={`flex h-6 w-5 items-center justify-center ${
+                        layer.locked
+                          ? "text-gray-700"
+                          : "text-gray-300 hover:text-gray-600"
+                      }`}
+                    >
+                      {layer.locked ? (
+                        <Lock className="h-3.5 w-3.5" />
+                      ) : (
+                        <Unlock className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleVisible(layer.id);
+                      }}
+                      title={layer.visible ? "숨기기" : "보이기"}
+                      className="flex h-6 w-5 items-center justify-center text-gray-500 hover:text-gray-800"
+                    >
+                      {layer.visible ? (
+                        <Eye className="h-3.5 w-3.5" />
+                      ) : (
+                        <EyeOff className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -497,7 +511,7 @@ export default function LayerPanel({
               title="아래 레이어와 병합"
               className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30"
             >
-              <Combine className="h-4 w-4" />
+              <ArrowDownToLine className="h-4 w-4" />
             </button>
             <button
               onClick={() => onMoveUp(activeLayerId)}
@@ -539,13 +553,13 @@ export default function LayerPanel({
             </button>
             <label className="flex items-center justify-between gap-2 py-0.5 text-xs text-gray-600">
               <span className="flex items-center gap-1.5">
-                <Repeat className="h-3.5 w-3.5" />
-                반복
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+                핑퐁
               </span>
               <Switch
-                checked={loopPlayback}
-                onClick={onToggleLoop}
-                title="반복 재생"
+                checked={pingPong}
+                onClick={onTogglePingPong}
+                title="끝에 닿으면 방향을 뒤집어 앞뒤로 오가며 재생"
               />
             </label>
             <label className="flex items-center justify-between gap-2 py-0.5 text-xs text-gray-600">

@@ -18,6 +18,23 @@ export type Tool =
 // 있게 한다(누르고 있을 필요 없이 토글).
 export type SelectMode = "new" | "add" | "subtract";
 
+// 도구·조작이 대상으로 삼는 레이어 범위 — active(활성 레이어) / reference(레이어
+// 행 전구로 지정한 "참조 레이어") / all(보이는 레이어 전부). 스포이트·마법봉·
+// 페인트통의 판정 기준, 반전·회전·지우기·정렬·이동의 적용 대상에 각각 따로
+// 저장된다.
+export type LayerScope = "active" | "reference" | "all";
+// 판정 기준(LayerScope)을 개별로 갖는 도구.
+export type SampleScopeTool = "eyedropper" | "wand" | "bucket";
+// 적용 대상(LayerScope)을 개별로 갖는 변형 조작.
+export type TransformScopeKey =
+  | "clear"
+  | "flipH"
+  | "flipV"
+  | "rotateCcw"
+  | "rotateCw"
+  | "align"
+  | "move";
+
 // 선택 영역을 만들거나(select·lasso·wand) 그 선택 내용을 다루는(move) 도구
 // 묶음 — 이 안에서 도구를 바꾸는 동안은 선택 영역이 계속 의미가 있으므로
 // 유지하고, 이 묶음을 벗어나는 순간(다른 그리기 도구로 바뀌거나 처음부터
@@ -149,12 +166,12 @@ export const DEFAULT_CANVAS_BG_COLOR = "#9ca3af";
 // Editor.tsx가 한 번만 측정해 여러 하위 컴포넌트에 내려준다.
 export const NARROW_BREAKPOINT = 820;
 
-// 편집기 폭이 이 값보다 좁으면 DrawToolbar가 도형·텍스트·그라데이션 도구를
-// "더보기" 뒤로 접는다(그러지 않으면 도구 카드가 2줄로 넘어감). 레이아웃
-// 재구성으로 툴바가 오른쪽 패널 폭만큼 좁아진 것을 감안한 값 — NARROW_BREAKPOINT
-// 와 독립적이라, 이 구간에서도 레이어 패널은 계속 통짜로 보인다. 순수하게
-// rootRef.clientWidth만 보므로 창 폭이 그대로면 토글되지 않는다.
-export const TOOLBAR_COMPACT_WIDTH = 1140;
+// 편집기 폭이 이 값보다 좁으면 DrawToolbar가 도형·텍스트·그라데이션 도구와
+// 변형 버튼(지우기·반전·회전·정렬)을 "더보기" 뒤로 접는다(그러지 않으면 도구
+// 카드가 2줄로 넘어감). "변형" 카드가 생겨 툴바가 넓어진 만큼 상향한 값 —
+// 실측상 rootRef.clientWidth ~1185에서 줄바꿈이 시작돼 그 위로 여유를 뒀다.
+// NARROW_BREAKPOINT와 독립적이라 이 구간에서도 레이어 패널은 통짜로 보인다.
+export const TOOLBAR_COMPACT_WIDTH = 1210;
 
 // 편집기 폭이 이 값 이상일 때만 오른쪽 패널 맨 위에 미리보기 패널을 보여준다
 // — 그보다 좁으면 레이어 목록·아코디언에 세로 공간을 양보한다. 역시 순수하게
