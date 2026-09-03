@@ -25,7 +25,11 @@ import { useState } from "react";
 import type { BlendMode, PixelLayer } from "../_shared/assetLibrary";
 import BlendModeDropdown from "./BlendModeDropdown";
 import FileThumbnail from "./FileThumbnail";
+import HelpTip from "./HelpTip";
+import { HELP } from "./helpTexts";
+import { FLOATING_PANEL, FLOATING_PANEL_HEADER } from "./panelStyles";
 import OpacitySlider from "./OpacitySlider";
+import Switch from "./Switch";
 import {
   DEFAULT_FRAME_DURATION_MS,
   MAX_FRAME_DURATION_MS,
@@ -110,36 +114,6 @@ function AdjustmentRow({
 // 0.10 → "0.1", 1.00 → "1" — 뒤따르는 0을 떼서 보여준다.
 function formatFrameSeconds(ms: number): string {
   return String(parseFloat((ms / 1000).toFixed(2)));
-}
-
-// 켜고 끄는 상태(반복·어니언 스킨)를 위한 스위치 — ReferenceWindow의
-// 참고/트레이싱 토글과 같은 형태.
-function Switch({
-  checked,
-  onClick,
-  title,
-}: {
-  checked: boolean;
-  onClick: () => void;
-  title?: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={onClick}
-      title={title}
-      className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${
-        checked ? "bg-violet-500" : "bg-gray-300"
-      }`}
-    >
-      <span
-        className="absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform"
-        style={{ transform: checked ? "translateX(12px)" : "translateX(0)" }}
-      />
-    </button>
-  );
 }
 
 export default function LayerPanel({
@@ -306,16 +280,21 @@ export default function LayerPanel({
             <Play className="h-3 w-3" />
             프레임
           </button>
+          <span className="ml-1 flex items-center">
+            <HelpTip text={HELP.layerVsFrameMode} />
+          </span>
         </div>
         {layerMode === "layers" && (
-          <button
-            onClick={onFlatten}
-            disabled={layers.length <= 1}
-            title="모든 레이어를 하나로 평탄화"
-            className="text-[10px] font-normal text-gray-400 hover:text-gray-600 disabled:opacity-30"
-          >
-            평탄화
-          </button>
+          <span className="flex items-center gap-1">
+            <button
+              onClick={onFlatten}
+              disabled={layers.length <= 1}
+              className="text-[10px] font-normal text-gray-400 hover:text-gray-600 disabled:opacity-30"
+            >
+              평탄화
+            </button>
+            <HelpTip text={HELP.flatten} />
+          </span>
         )}
       </div>
       {layerMode === "layers" ? (
@@ -442,41 +421,55 @@ export default function LayerPanel({
               // 않게 한다. 안에 커스텀 블렌드 드롭다운이 있어 overflow는 두지
               // 않는다 — 내용이 짧아(블렌드 + 슬라이더 5개 + 초기화) 잘릴 일이
               // 거의 없다.
-              <div className="absolute right-0 bottom-full z-30 mb-1 flex w-56 flex-col gap-1 bg-white p-2 shadow-xl">
-                <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
-                  블렌드 모드
-                  <BlendModeDropdown
-                    value={activeLayer.blendMode ?? "normal"}
-                    onPreview={(mode) =>
-                      onBlendModePreview(activeLayer.id, mode)
+              <div
+                className={`absolute right-0 bottom-full z-30 mb-1 flex w-56 flex-col ${FLOATING_PANEL}`}
+              >
+                <p className={FLOATING_PANEL_HEADER}>레이어 보정</p>
+                <div className="flex flex-col gap-1 p-2">
+                  <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
+                    <span className="flex items-center gap-1">
+                      블렌드 모드
+                      <HelpTip text={HELP.blendMode} />
+                    </span>
+                    <BlendModeDropdown
+                      value={activeLayer.blendMode ?? "normal"}
+                      onPreview={(mode) =>
+                        onBlendModePreview(activeLayer.id, mode)
+                      }
+                      onCommit={(mode) =>
+                        onBlendModeChange(activeLayer.id, mode)
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center gap-1 pt-1 text-[10px] text-gray-400">
+                    색보정
+                    <HelpTip text={HELP.colorAdjust} />
+                  </div>
+                  {ADJUSTMENT_ROWS.map(({ field, label }) => (
+                    <AdjustmentRow
+                      key={field}
+                      label={label}
+                      value={activeLayer[field] ?? 0}
+                      onChange={(v) =>
+                        onAdjustmentChange(activeLayer.id, field, v)
+                      }
+                      onCommit={onAdjustmentDragEnd}
+                    />
+                  ))}
+                  <button
+                    onClick={() => onResetAdjustments(activeLayer.id)}
+                    disabled={
+                      !activeLayer.brightness &&
+                      !activeLayer.contrast &&
+                      !activeLayer.saturation &&
+                      !activeLayer.temperature &&
+                      !activeLayer.tint
                     }
-                    onCommit={(mode) => onBlendModeChange(activeLayer.id, mode)}
-                  />
+                    className="self-end text-[10px] text-violet-500 hover:text-violet-700 disabled:opacity-30"
+                  >
+                    초기화
+                  </button>
                 </div>
-                {ADJUSTMENT_ROWS.map(({ field, label }) => (
-                  <AdjustmentRow
-                    key={field}
-                    label={label}
-                    value={activeLayer[field] ?? 0}
-                    onChange={(v) =>
-                      onAdjustmentChange(activeLayer.id, field, v)
-                    }
-                    onCommit={onAdjustmentDragEnd}
-                  />
-                ))}
-                <button
-                  onClick={() => onResetAdjustments(activeLayer.id)}
-                  disabled={
-                    !activeLayer.brightness &&
-                    !activeLayer.contrast &&
-                    !activeLayer.saturation &&
-                    !activeLayer.temperature &&
-                    !activeLayer.tint
-                  }
-                  className="self-end text-[10px] text-violet-500 hover:text-violet-700 disabled:opacity-30"
-                >
-                  초기화
-                </button>
               </div>
             )}
           </div>
@@ -566,6 +559,7 @@ export default function LayerPanel({
               <span className="flex items-center gap-1.5">
                 <Sparkles className="h-3.5 w-3.5" />
                 어니언 스킨
+                <HelpTip text={HELP.onionSkin} />
               </span>
               <Switch
                 checked={onionSkin}

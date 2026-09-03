@@ -12,6 +12,8 @@ import {
   Globe,
   Grid3x3,
   Lasso,
+  Layers,
+  Lightbulb,
   Loader,
   Minus,
   MousePointer2,
@@ -32,6 +34,10 @@ import {
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import GradientDial from "./GradientDial";
+import HelpTip from "./HelpTip";
+import { HELP } from "./helpTexts";
+import { FLOATING_PANEL } from "./panelStyles";
+import Switch from "./Switch";
 import { LayerScope, SelectMode, Tool, TransformScopeKey } from "./types";
 
 // key는 useKeyboardShortcuts.ts의 TOOL_KEYS와 정확히 일치해야 한다.
@@ -94,23 +100,23 @@ const GRADIENT_SHAPE_TOOLS: Tool[] = ["line", "rect", "circle"];
 // 스포이트·마법봉·페인트통만 "판정 기준"(활성 레이어 vs 전체 화면)이 의미가 있다.
 const SAMPLE_SCOPE_TOOLS: Tool[] = ["eyedropper", "wand", "bucket"];
 
-// 스포이트·마법봉·페인트통의 "판정 대상" 세그먼트(도구별로 따로 저장). 이동
-// 도구의 "이동 대상"도 같은 컨트롤을 쓴다.
+// 도구·조작이 대상으로 삼는 레이어("대상 레이어"). 스포이트·마법봉·페인트통
+// 은 판정 기준, 이동·반전·회전·지우기·정렬은 적용 대상 — 저장은 각자 따로.
 const SCOPE_OPTIONS = [
-  ["active", "활성"],
+  ["active", "현재"],
   ["reference", "참조"],
   ["all", "전체"],
 ] as const;
 const SCOPE_FULL: Record<LayerScope, string> = {
-  active: "활성 레이어",
+  active: "현재 레이어",
   reference: "참조 레이어",
   all: "전체 레이어",
 };
-// 대상 표시용 색 — 활성=회색, 참조=violet(전구 아이콘과 통일), 전체=하늘색.
-const SCOPE_DOT: Record<LayerScope, string> = {
-  active: "bg-gray-300",
-  reference: "bg-violet-400",
-  all: "bg-sky-400",
+// 대상 표시 — 실행 아이콘 우하단에 작은 서브 아이콘을 겹친다. 활성(기본)은
+// 없음, 참조는 전구(레이어 행 토글과 통일), 전체는 레이어 스택.
+const SCOPE_BADGE: Partial<Record<LayerScope, { icon: typeof Paintbrush; color: string }>> = {
+  reference: { icon: Lightbulb, color: "text-violet-500" },
+  all: { icon: Layers, color: "text-sky-600" },
 };
 
 function SegmentedControl({
@@ -124,7 +130,10 @@ function SegmentedControl({
 }) {
   return (
     <div className="flex items-center gap-1.5 text-[10px] text-gray-600">
-      <span className="shrink-0">{label}</span>
+      <span className="flex shrink-0 items-center gap-1">
+        {label}
+        <HelpTip text={HELP.layerScope} />
+      </span>
       <div className="flex overflow-hidden rounded-sm border border-gray-200">
         {SCOPE_OPTIONS.map(([v, l]) => (
           <button
@@ -146,8 +155,9 @@ function SegmentedControl({
 }
 
 // 변형 조작 하나 = 실행 아이콘 + 대상 드롭다운(캐럿). 아이콘 클릭 = 지금 대상
-// 으로 실행, 캐럿 = 대상(활성/참조/전체) 선택. 아이콘 밑 작은 점이 현재 대상
-// 색을 보여준다. 대상="참조"인데 지정된 참조 레이어가 없으면 실행만 비활성.
+// 으로 실행, 캐럿 = 대상(활성/참조/전체) 선택. 참조·전체면 아이콘 우하단에
+// 작은 서브 아이콘(전구·레이어 스택)을 겹쳐 대상을 나타낸다. 대상="참조"인데
+// 지정된 참조 레이어가 없으면 실행만 비활성.
 function ScopedActionButton({
   icon: Icon,
   label,
@@ -173,15 +183,21 @@ function ScopedActionButton({
         type="button"
         onClick={onRun}
         disabled={disabled}
-        title={`${label} · 대상: ${SCOPE_FULL[scope]}${disabled ? " (지정된 참조 레이어 없음)" : ""}`}
+        title={`${label} · 대상 레이어: ${SCOPE_FULL[scope]}${disabled ? " (지정된 참조 레이어 없음)" : ""}`}
         className={`relative flex h-8 w-7 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30 ${
           danger ? "hover:bg-red-50 hover:text-red-500" : ""
         }`}
       >
         <Icon className="h-4 w-4" />
-        <span
-          className={`absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${SCOPE_DOT[scope]}`}
-        />
+        {SCOPE_BADGE[scope] &&
+          (() => {
+            const { icon: Badge, color } = SCOPE_BADGE[scope]!;
+            return (
+              <Badge
+                className={`absolute right-0 bottom-0 h-2.5 w-2.5 rounded-full bg-gray-100 ${color}`}
+              />
+            );
+          })()}
       </button>
       <button
         type="button"
@@ -196,7 +212,9 @@ function ScopedActionButton({
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full z-40 mt-1 flex w-24 flex-col bg-white py-1 text-[10px] shadow-xl">
+          <div
+            className={`absolute left-0 top-full z-40 mt-1 flex w-24 flex-col py-1 text-[10px] ${FLOATING_PANEL}`}
+          >
             {(["active", "reference", "all"] as const).map((v) => (
               <button
                 key={v}
@@ -221,13 +239,13 @@ function ScopedActionButton({
   );
 }
 
-// 지우기·반전·회전·정렬 — 각자 자기 대상을 갖는다. "변형" 카드에 함께 두고,
-// 좁을 때만 카드 밑 팝오버로 접는다.
-function TransformButtons({
+// 반전·회전·정렬 — 편집 카드의 "더보기" 뒤에 접어 둔다(가끔 한 번 쓰는
+// 조작). 지우기는 자주 써서 편집 카드에 바로 보인다. 각 버튼은 자기 대상을
+// 캐럿으로 고른다.
+function TransformMoreButtons({
   transformScopes,
   hasReferenceLayers,
   onTransformScopeChange,
-  onClearCanvas,
   onFlipHorizontal,
   onFlipVertical,
   onRotate90,
@@ -236,7 +254,6 @@ function TransformButtons({
   transformScopes: Record<TransformScopeKey, LayerScope>;
   hasReferenceLayers: boolean;
   onTransformScopeChange: (key: TransformScopeKey, scope: LayerScope) => void;
-  onClearCanvas: () => void;
   onFlipHorizontal: () => void;
   onFlipVertical: () => void;
   onRotate90: (direction: 1 | -1) => void;
@@ -244,16 +261,6 @@ function TransformButtons({
 }) {
   return (
     <div className="flex items-center gap-1">
-      <ScopedActionButton
-        icon={Loader}
-        label="지우기"
-        danger
-        scope={transformScopes.clear}
-        hasReferenceLayers={hasReferenceLayers}
-        onScopeChange={(s) => onTransformScopeChange("clear", s)}
-        onRun={onClearCanvas}
-      />
-      <div className="mx-0.5 h-6 w-px shrink-0 bg-gray-200" />
       <ScopedActionButton
         icon={FlipHorizontal2}
         label="좌우 반전"
@@ -555,7 +562,10 @@ export default function DrawToolbar({
           {showGradientControls && (
             <div className="flex items-center gap-2">
               <label className="flex items-center gap-1 text-[10px] text-gray-600">
-                <span>단계</span>
+                <span className="flex items-center gap-1">
+                  단계
+                  <HelpTip text={HELP.gradientSteps} />
+                </span>
                 <input
                   type="range"
                   min={2}
@@ -653,18 +663,20 @@ export default function DrawToolbar({
               </button>
             ))}
           </div>
-          <button
-            disabled={tool !== "wand"}
-            onClick={onToggleWandGlobal}
-            title="전역 동일색 — 켜면 마법봉이 이어진 영역이 아니라 캔버스 전체에서 같은 색을 모두 선택한다"
-            className={`flex h-8 w-8 items-center justify-center disabled:opacity-30 ${
-              wandGlobal
-                ? "bg-violet-500 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          <label
+            className={`flex items-center gap-1.5 text-[10px] ${
+              tool === "wand" ? "text-gray-600" : "text-gray-400"
             }`}
           >
-            <Globe className="h-3.5 w-3.5" />
-          </button>
+            <Globe className="h-3.5 w-3.5 shrink-0" />
+            전역 동일색
+            <HelpTip text={HELP.wandGlobal} />
+            <Switch
+              checked={wandGlobal}
+              onClick={onToggleWandGlobal}
+              disabled={tool !== "wand"}
+            />
+          </label>
         </div>
       ),
     });
@@ -678,7 +690,7 @@ export default function DrawToolbar({
       key: "sampleScope",
       node: (
         <SegmentedControl
-          label="판정 대상"
+          label="대상 레이어"
           value={sampleScope}
           onChange={onSampleScopeChange}
         />
@@ -692,7 +704,7 @@ export default function DrawToolbar({
       key: "moveScope",
       node: (
         <SegmentedControl
-          label="이동 대상"
+          label="대상 레이어"
           value={transformScopes.move}
           onChange={(s) => onTransformScopeChange("move", s)}
         />
@@ -747,7 +759,9 @@ export default function DrawToolbar({
             </div>
           </ToolCard>
           {compact && showMoreDrawTools && (
-            <div className="absolute top-full left-0 z-30 mt-1 flex items-center gap-1 bg-white p-2 shadow-xl">
+            <div
+              className={`absolute top-full left-0 z-30 mt-1 flex items-center gap-1 p-2 ${FLOATING_PANEL}`}
+            >
               {COLLAPSIBLE_DRAW_TOOLS.map(({ tool: t, icon, label, key }) => (
                 <ToolButton
                   key={t}
@@ -778,78 +792,72 @@ export default function DrawToolbar({
           </div>
         </ToolCard>
 
-        <ToolCard title="편집" compact={compact}>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={onUndo}
-              disabled={!canUndo}
-              title="실행취소"
-              className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 disabled:opacity-30"
-            >
-              <Undo2 className="h-4 w-4" />
-            </button>
-            <button
-              onClick={onRedo}
-              disabled={!canRedo}
-              title="다시실행"
-              className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 disabled:opacity-30"
-            >
-              <Redo2 className="h-4 w-4" />
-            </button>
-            <button
-              onClick={onToggleGrid}
-              title="격자 표시 (기본 켜짐)"
-              className={`flex h-8 w-8 items-center justify-center ${showGrid ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600"}`}
-            >
-              <Grid3x3 className="h-4 w-4" />
-            </button>
-            <button
-              onClick={onToggleCrosshair}
-              title="중앙 십자 보조선"
-              className={`flex h-8 w-8 items-center justify-center ${showCrosshair ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600"}`}
-            >
-              <Crosshair className="h-4 w-4" />
-            </button>
-          </div>
-        </ToolCard>
-
-        {/* 변형 묶음 — 지우기·반전·회전·정렬을 한곳에 모으고, 조작마다 자기
-            대상(활성/참조/전체 레이어)을 아이콘 옆 캐럿으로 고른다. 예전엔
-            지우기만 편집 카드, 나머지는 "더보기" 뒤라 어긋나 있었다. */}
+        {/* 실행취소·격자·지우기는 항상 보이고, 가끔 쓰는 반전·회전·정렬은
+            그리기 카드와 같은 방식으로 "더보기" 뒤에 접는다. 각 변형 버튼은
+            자기 대상 레이어를 캐럿으로 고른다(지우기 포함). */}
         <div className="relative">
-          <ToolCard title="변형" compact={compact}>
-            {compact ? (
-              // 좁을 때는 카드가 "변형" 버튼 하나로 줄고, 버튼들은 팝오버로.
+          <ToolCard title="편집" compact={compact}>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={onUndo}
+                disabled={!canUndo}
+                title="실행취소"
+                className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 disabled:opacity-30"
+              >
+                <Undo2 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={onRedo}
+                disabled={!canRedo}
+                title="다시실행"
+                className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 disabled:opacity-30"
+              >
+                <Redo2 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={onToggleGrid}
+                title="격자 표시 (기본 켜짐)"
+                className={`flex h-8 w-8 items-center justify-center ${showGrid ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600"}`}
+              >
+                <Grid3x3 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={onToggleCrosshair}
+                title="중앙 십자 보조선"
+                className={`flex h-8 w-8 items-center justify-center ${showCrosshair ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-600"}`}
+              >
+                <Crosshair className="h-4 w-4" />
+              </button>
+              <div className="mx-0.5 h-6 w-px shrink-0 bg-gray-200" />
+              <ScopedActionButton
+                icon={Loader}
+                label="지우기"
+                danger
+                scope={transformScopes.clear}
+                hasReferenceLayers={hasReferenceLayers}
+                onScopeChange={(s) => onTransformScopeChange("clear", s)}
+                onRun={onClearCanvas}
+              />
               <button
                 onClick={() => setShowMoreEdit((v) => !v)}
-                title="지우기·반전·회전·정렬"
-                className="flex h-8 items-center justify-center gap-0.5 bg-gray-100 px-1.5 text-[10px] text-gray-600 hover:bg-gray-200"
+                title="반전·회전·정렬"
+                className="flex h-8 items-center gap-0.5 bg-gray-100 px-1.5 text-[10px] text-gray-600 hover:bg-gray-200"
               >
-                변형
+                더보기
                 <ChevronDown
                   className={`h-3 w-3 transition-transform ${showMoreEdit ? "rotate-180" : ""}`}
                 />
               </button>
-            ) : (
-              <TransformButtons
-                transformScopes={transformScopes}
-                hasReferenceLayers={hasReferenceLayers}
-                onTransformScopeChange={onTransformScopeChange}
-                onClearCanvas={onClearCanvas}
-                onFlipHorizontal={onFlipHorizontal}
-                onFlipVertical={onFlipVertical}
-                onRotate90={onRotate90}
-                onAlignContent={onAlignContent}
-              />
-            )}
+            </div>
           </ToolCard>
-          {compact && showMoreEdit && (
-            <div className="absolute top-full right-0 z-30 mt-1 bg-white p-2 shadow-xl">
-              <TransformButtons
+          {showMoreEdit && (
+            <div
+              className={`absolute top-full right-0 z-30 mt-1 p-2 ${FLOATING_PANEL}`}
+            >
+              <TransformMoreButtons
                 transformScopes={transformScopes}
                 hasReferenceLayers={hasReferenceLayers}
                 onTransformScopeChange={onTransformScopeChange}
-                onClearCanvas={onClearCanvas}
                 onFlipHorizontal={onFlipHorizontal}
                 onFlipVertical={onFlipVertical}
                 onRotate90={onRotate90}
@@ -872,7 +880,7 @@ export default function DrawToolbar({
             {secondarySections.map(({ key, node }) => (
               <div
                 key={key}
-                className="flex flex-col gap-1.5 bg-white p-2 shadow-xl"
+                className={`flex flex-col gap-1.5 p-2 ${FLOATING_PANEL}`}
               >
                 {node}
               </div>

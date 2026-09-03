@@ -20,6 +20,7 @@ import {
 } from "./cursors";
 import GradientDial from "./GradientDial";
 import { mixHex } from "./hsv";
+import { FLOATING_PANEL } from "./panelStyles";
 import Magnifier, { MAGNIFIER_RADIUS, MagnifierGrid } from "./Magnifier";
 import {
   bboxGradientAxis,
@@ -1871,7 +1872,7 @@ export default function PixelCanvas({
             // 않도록 막는다.
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-2 bg-white p-2 shadow-xl">
+            <div className={`flex items-center gap-2 p-2 ${FLOATING_PANEL}`}>
               <textarea
                 // autoFocus만으로는 캔버스의 mousedown 기본 동작(포커스 가능한 요소가
                 // 아니므로 브라우저가 방금 옮겨준 포커스를 도로 빼앗아 간다)에 밀려
@@ -1927,7 +1928,7 @@ export default function PixelCanvas({
               </div>
             </div>
 
-            <div className="flex items-center gap-1 bg-white p-2 shadow-xl">
+            <div className={`flex items-center gap-1 p-2 ${FLOATING_PANEL}`}>
               <button
                 onClick={onPendingTextToggleAA}
                 title="안티에일리어싱 — 글자 가장자리를 부드럽게(끄면 픽셀 그대로)"
@@ -1984,7 +1985,7 @@ export default function PixelCanvas({
               )}
             </div>
 
-            <div className="flex items-center gap-2 bg-white p-2 shadow-xl">
+            <div className={`flex items-center gap-2 p-2 ${FLOATING_PANEL}`}>
               <div
                 className="flex gap-1"
                 title="정렬 — 타이핑 중 폭이 바뀌어도 고정점이 유지된다"
@@ -2032,7 +2033,7 @@ export default function PixelCanvas({
               </button>
             </div>
 
-            <div className="flex items-center gap-1 bg-white p-2 shadow-xl">
+            <div className={`flex items-center gap-1 p-2 ${FLOATING_PANEL}`}>
               <button
                 onClick={onPendingTextCommit}
                 title="확정 (Enter)"

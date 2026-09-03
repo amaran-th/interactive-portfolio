@@ -166,12 +166,11 @@ export const DEFAULT_CANVAS_BG_COLOR = "#9ca3af";
 // Editor.tsx가 한 번만 측정해 여러 하위 컴포넌트에 내려준다.
 export const NARROW_BREAKPOINT = 820;
 
-// 편집기 폭이 이 값보다 좁으면 DrawToolbar가 도형·텍스트·그라데이션 도구와
-// 변형 버튼(지우기·반전·회전·정렬)을 "더보기" 뒤로 접는다(그러지 않으면 도구
-// 카드가 2줄로 넘어감). "변형" 카드가 생겨 툴바가 넓어진 만큼 상향한 값 —
-// 실측상 rootRef.clientWidth ~1185에서 줄바꿈이 시작돼 그 위로 여유를 뒀다.
-// NARROW_BREAKPOINT와 독립적이라 이 구간에서도 레이어 패널은 통짜로 보인다.
-export const TOOLBAR_COMPACT_WIDTH = 1210;
+// 편집기 폭이 이 값보다 좁으면 DrawToolbar가 도형·텍스트·그라데이션 도구를
+// "더보기" 뒤로 접는다(그러지 않으면 도구 카드가 2줄로 넘어감). 편집 카드에
+// 지우기·더보기가 붙어 원래보다 살짝 넓어진 만큼 상향한 값. NARROW_BREAKPOINT
+// 와 독립적이라 이 구간에서도 레이어 패널은 계속 통짜로 보인다.
+export const TOOLBAR_COMPACT_WIDTH = 1170;
 
 // 편집기 폭이 이 값 이상일 때만 오른쪽 패널 맨 위에 미리보기 패널을 보여준다
 // — 그보다 좁으면 레이어 목록·아코디언에 세로 공간을 양보한다. 역시 순수하게

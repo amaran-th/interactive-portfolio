@@ -3,18 +3,20 @@
 import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import ColorPicker from "./ColorPicker";
-import { CURSOR_CROSSHAIR, CURSOR_NORMAL, CURSOR_POINTING } from "./cursors";
+import { CURSOR_CROSSHAIR, CURSOR_NORMAL } from "./cursors";
+import HelpTip from "./HelpTip";
+import { HELP } from "./helpTexts";
+import { FLOATING_PANEL } from "./panelStyles";
 import Magnifier, { MAGNIFIER_RADIUS, MagnifierGrid } from "./Magnifier";
 import { PixelValue } from "./pixelGrid";
 import {
   dedupePalette,
   mergeManyColors,
   pixelateImage,
-  quantizeColors,
-  reducePaletteFast,
+  quantizeMedianCut,
   resamplePixelGrid,
 } from "./pixelate";
-import { CANVAS_PRESET_GROUPS, MAX_CANVAS_SIZE } from "./types";
+import { MAX_CANVAS_SIZE } from "./types";
 
 // 색상 추출·병합 알고리즘은 내부적으로 계속 인덱스 팔레트를 쓴다(대표색
 // 개수 기준 병합은 인덱스 단위가 자연스럽다) — onConfirm 경계에서만 각 픽셀에
@@ -34,8 +36,8 @@ function toTrueColor(pixels: number[], palette: string[]): PixelValue[] {
 // 비율은 유지) — 실제 캔버스 픽셀 수(preview.width/height)와는 별개다.
 const PREVIEW_DISPLAY_MAX = 160;
 
-// 대표 색상 개수의 실용적 상한 — quantizeColors의 정밀 병합이 느려지는 지점을
-// 고려한 값일 뿐, 그 아래로는 자유롭게 정할 수 있다(슬라이더 + 직접 입력 모두).
+// 대표 색상 개수 슬라이더의 실용적 상한 — 이 위로는 픽셀아트로서 의미가 옅고
+// 슬라이더 조작감도 떨어진다. 사진에 실제 색이 이보다 많아도 여기서 자른다.
 const MAX_REPRESENTATIVE_COLORS = 256;
 
 export default function ImportPanel({
@@ -75,6 +77,12 @@ export default function ImportPanel({
   const [pixelSize, setPixelSize] = useState(32);
   const [antiAlias, setAntiAlias] = useState(false);
   const [maxColors, setMaxColors] = useState(8);
+  // 지금 픽셀 해상도·안티에일리어싱 조합에서 실제로 뽑히는 서로 다른 색 수 —
+  // 대표 색상 개수 슬라이더의 상한이 된다. 사진·해상도마다 다르고, 이 값을
+  // 넘겨 요청해도 median cut이 더 나눌 색이 없어 의미가 없다(256은 도구 상한).
+  const [availableColors, setAvailableColors] = useState(
+    MAX_REPRESENTATIVE_COLORS,
+  );
   // null = 픽셀 해상도(pixelSize)를 그대로 최종 캔버스 크기로 쓴다. 값이 있으면
   // 그 규격으로 확대/축소해 배치한다 — "변환할 대상 비트 규격"(pixelSize)과
   // "실제 캔버스 크기"를 독립적으로 고를 수 있게 하는 게 이 상태의 목적이다.
@@ -99,6 +107,7 @@ export default function ImportPanel({
   } | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const swatchContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // 병합 모드 on/off — 켜지면 스와치 클릭이 재색상 팝오버 대신 다중 선택으로
   // 동작한다.
   const [mergeMode, setMergeMode] = useState(false);
@@ -125,11 +134,19 @@ export default function ImportPanel({
 
   const runPixelate = useCallback(
     (img: HTMLImageElement, size: number, aa: boolean, colors: number) => {
-      const raw = pixelateImage(img, size, size, aa);
-      // 사진처럼 원본 색이 아주 다양한 이미지는 quantizeColors의 정밀한(느린) 병합에
-      // 넘기기 전에 먼저 빠르게 후보 수를 줄여야 브라우저가 멈추지 않는다.
-      const capped = reducePaletteFast(raw.palette, raw.pixels, 256);
-      const quantized = quantizeColors(capped.palette, capped.pixels, colors);
+      // 원본 비율을 유지한 채 긴 변이 size가 되도록 격자 크기를 정한다
+      // (정사각형으로 찌그러뜨리지 않는다).
+      const iw = img.naturalWidth || 1;
+      const ih = img.naturalHeight || 1;
+      const w =
+        iw >= ih ? size : Math.max(1, Math.round((size * iw) / ih));
+      const h =
+        ih >= iw ? size : Math.max(1, Math.round((size * ih) / iw));
+      const raw = pixelateImage(img, w, h, aa);
+      // 픽셀화 직후의 고유색 수 — 대표 색상 개수 슬라이더의 상한.
+      setAvailableColors(raw.palette.length);
+      // 빈도 기반 median cut으로 대표색을 뽑는다(사전 감축 단계 없이 한 번에).
+      const quantized = quantizeMedianCut(raw.palette, raw.pixels, colors);
       setPreview({
         width: raw.width,
         height: raw.height,
@@ -475,6 +492,16 @@ export default function ImportPanel({
     Math.max(1, Math.min(MAX_CANVAS_SIZE, v || 1));
   const effectiveWidth = canvasPreset?.width ?? preview?.width ?? 0;
   const effectiveHeight = canvasPreset?.height ?? preview?.height ?? 0;
+  // 대표 색상 개수 슬라이더의 실제 상한 — 이 사진·해상도에서 뽑히는 색 수와
+  // 내부 상한(256) 중 작은 쪽.
+  const colorCap = Math.min(MAX_REPRESENTATIVE_COLORS, availableColors);
+  const shownMaxColors = Math.min(maxColors, colorCap);
+  // 사진에 실제 색이 256보다 많아 도구 상한에 걸린 경우와, 사진 자체가
+  // 그보다 적어 그게 곧 상한인 경우를 구분해 안내한다.
+  const colorCapNote =
+    availableColors > MAX_REPRESENTATIVE_COLORS
+      ? `최대 ${colorCap}`
+      : `이 사진 최대 ${colorCap}`;
 
   return (
     // 이 패널만의 세로 여백(gap-3)을 직접 갖는다 — Accordion(Editor.tsx)
@@ -496,14 +523,21 @@ export default function ImportPanel({
         }`}
       >
         <p className="text-center text-[10px] text-gray-400">
-          이미지를 여기로 드래그하거나 파일을 선택하세요
+          이미지를 여기로 드래그하거나{" "}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="text-violet-600 underline underline-offset-2 hover:text-violet-700"
+          >
+            파일을 선택
+          </button>
+          하세요
         </p>
         <input
+          ref={fileInputRef}
           type="file"
           accept="image/*"
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-          className="text-xs text-gray-600"
-          style={{ cursor: CURSOR_POINTING }}
+          className="hidden"
         />
         <button
           onClick={handlePasteFromClipboard}
@@ -572,186 +606,16 @@ export default function ImportPanel({
                 />
               );
             })()}
-          {/* 라벨 옆에 슬라이더+숫자칸까지 한 줄에 우겨넣으면(justify-between)
-              사이드바 폭이 좁아 라벨 텍스트가 글자 단위로 줄바꿈될 만큼
-              찌그러졌다 — 라벨을 위, 슬라이더를 아래 줄로 내려 각자 필요한
-              폭을 그대로 쓰게 한다. */}
-          <label className="flex flex-col gap-1 text-xs text-gray-600">
-            <span>픽셀 해상도(비트 규격)</span>
-            <span className="flex items-center gap-1.5">
-              <input
-                type="range"
-                min={8}
-                max={128}
-                value={pixelSize}
-                onChange={(e) =>
-                  handleOptionChange(
-                    Number(e.target.value),
-                    antiAlias,
-                    maxColors,
-                  )
-                }
-                className="flex-1"
-              />
-              <input
-                type="number"
-                min={1}
-                max={512}
-                value={pixelSize}
-                onChange={(e) =>
-                  handleOptionChange(
-                    Math.max(1, Number(e.target.value) || 1),
-                    antiAlias,
-                    maxColors,
-                  )
-                }
-                className="w-12 shrink-0 bg-gray-100 px-1 py-0.5 text-right text-[10px] tabular-nums text-gray-600"
-              />
-            </span>
-          </label>
-          <label className="flex items-center justify-between text-xs text-gray-600">
-            안티에일리어싱
-            <input
-              type="checkbox"
-              checked={antiAlias}
-              onChange={(e) =>
-                handleOptionChange(pixelSize, e.target.checked, maxColors)
-              }
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-gray-600">
-            <span>대표 색상 개수</span>
-            <span className="flex items-center gap-1.5">
-              <input
-                type="range"
-                min={1}
-                max={MAX_REPRESENTATIVE_COLORS}
-                value={maxColors}
-                onChange={(e) =>
-                  handleOptionChange(
-                    pixelSize,
-                    antiAlias,
-                    Number(e.target.value),
-                  )
-                }
-                className="flex-1"
-              />
-              <input
-                type="number"
-                min={1}
-                max={MAX_REPRESENTATIVE_COLORS}
-                value={maxColors}
-                onChange={(e) =>
-                  handleOptionChange(
-                    pixelSize,
-                    antiAlias,
-                    Math.max(1, Number(e.target.value) || 1),
-                  )
-                }
-                className="w-12 shrink-0 bg-gray-100 px-1 py-0.5 text-right text-[10px] tabular-nums text-gray-600"
-              />
-            </span>
-          </label>
 
-          {existingCanvasSize ? (
-            (preview.width > existingCanvasSize.width ||
-              preview.height > existingCanvasSize.height) && (
-              <p className="bg-amber-50 px-2 py-1.5 text-[10px] text-amber-700 shadow-[inset_0_0_0_1px_rgba(217,119,6,0.25)]">
-                해상도({preview.width}×{preview.height})가 현재 캔버스 크기(
-                {existingCanvasSize.width}×{existingCanvasSize.height})보다
-                큽니다. 이 상태로도 가져올 수 있고, 불러온 뒤 위치·크기를 다시
-                조절할 수 있습니다.
-              </p>
-            )
-          ) : (
-            <div>
-              <p className="mb-1 text-xs text-gray-600">캔버스 크기</p>
-              <button
-                onClick={() => setCanvasPreset(null)}
-                className={`mb-1.5 w-full px-1.5 py-1 text-[10px] ${
-                  !canvasPreset
-                    ? "bg-violet-50 text-violet-700 shadow-[0_0_0_1.5px_#8b5cf6]"
-                    : "bg-gray-50 text-gray-600 hover:bg-violet-50"
-                }`}
-              >
-                픽셀 해상도와 동일
-              </button>
-              {CANVAS_PRESET_GROUPS.map(({ group, presets }) => (
-                <div key={group} className="mb-1.5">
-                  <p className="mb-0.5 text-[9px] font-semibold text-gray-400">
-                    {group}
-                  </p>
-                  <div className="grid grid-cols-3 gap-1">
-                    {presets.map((p) => (
-                      <button
-                        key={p.label}
-                        onClick={() =>
-                          setCanvasPreset({ width: p.width, height: p.height })
-                        }
-                        className={`px-1.5 py-1 text-[10px] ${
-                          canvasPreset?.width === p.width &&
-                          canvasPreset?.height === p.height
-                            ? "bg-violet-50 text-violet-700 shadow-[0_0_0_1.5px_#8b5cf6]"
-                            : "bg-gray-50 text-gray-600 hover:bg-violet-50"
-                        }`}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="number"
-                  min={1}
-                  max={MAX_CANVAS_SIZE}
-                  value={effectiveWidth}
-                  onChange={(e) =>
-                    setCanvasPreset({
-                      width: clampSize(Number(e.target.value)),
-                      height: effectiveHeight,
-                    })
-                  }
-                  className="w-full bg-gray-100 px-1.5 py-1 text-center text-[10px] text-gray-700"
-                />
-                <span className="text-[10px] text-gray-400">×</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={MAX_CANVAS_SIZE}
-                  value={effectiveHeight}
-                  onChange={(e) =>
-                    setCanvasPreset({
-                      width: effectiveWidth,
-                      height: clampSize(Number(e.target.value)),
-                    })
-                  }
-                  className="w-full bg-gray-100 px-1.5 py-1 text-center text-[10px] text-gray-700"
-                />
-              </div>
-              {/* 고른 캔버스 크기가 실제 픽셀화 해상도보다 작으면 축소(리샘플)하지
-                  않는다 — 원본 해상도 그대로 캔버스 위에 올려두고, 위치를
-                  옮긴 뒤 확정하면 캔버스 밖으로 나간 부분만 잘려나간다. */}
-              {canvasPreset &&
-                (preview.width > canvasPreset.width ||
-                  preview.height > canvasPreset.height) && (
-                  <p className="mt-1.5 bg-amber-50 px-2 py-1.5 text-[10px] text-amber-700 shadow-[inset_0_0_0_1px_rgba(217,119,6,0.25)]">
-                    해상도({preview.width}×{preview.height})가 고른 캔버스 크기(
-                    {canvasPreset.width}×{canvasPreset.height})보다 큽니다.
-                    축소되지 않고 원본 해상도 그대로 캔버스 위에 올라가며,
-                    위치를 정한 뒤 확정하면 캔버스 밖 영역만 잘려나갑니다.
-                  </p>
-                )}
-            </div>
-          )}
-
+          {/* 추출된 색상(팔레트)은 미리보기의 결과물이라 미리보기 바로 아래에
+              둔다 — 슬라이더·캔버스 크기 설정은 그 아래로 내린다. */}
           <div>
             <div className="mb-1 flex flex-col gap-1">
-              <p className="text-xs text-gray-600">
+              <p className="flex items-center gap-1 text-xs text-gray-600">
                 {mergeMode
                   ? "병합할 색상을 클릭해 선택 · 다시 클릭하면 기준색 지정"
                   : "추출된 색상 — 클릭해 재색상"}
+                <HelpTip text={HELP.importExtractedColors} />
               </p>
               <div className="flex items-center justify-end gap-1">
                 <button
@@ -775,14 +639,6 @@ export default function ImportPanel({
                   실행취소
                 </button>
               </div>
-              {mergeMode && mergeSelection.length >= 2 && (
-                <button
-                  onClick={handleMergeConfirm}
-                  className="bg-emerald-500 py-1 text-[10px] font-semibold text-white hover:bg-emerald-600"
-                >
-                  선택한 색상 {mergeSelection.length}개 병합
-                </button>
-              )}
             </div>
             <div ref={swatchContainerRef} className="flex flex-wrap gap-1.5">
               {preview.palette.map((color, i) => {
@@ -824,6 +680,25 @@ export default function ImportPanel({
                 );
               })}
             </div>
+            {/* 병합 버튼은 스와치 격자 "아래"에 두고, 병합 모드인 동안은
+                항상 같은 높이를 차지한다 — 2번째 색을 고르는 순간 버튼이
+                격자 위에 나타나 스와치가 밀려 3번째를 잘못 누르던 문제를 없앤다. */}
+            {mergeMode && (
+              <div className="mt-1.5">
+                {mergeSelection.length >= 2 ? (
+                  <button
+                    onClick={handleMergeConfirm}
+                    className="w-full bg-emerald-500 py-1 text-[10px] font-semibold text-white hover:bg-emerald-600"
+                  >
+                    선택한 색상 {mergeSelection.length}개 병합
+                  </button>
+                ) : (
+                  <p className="py-1 text-center text-[10px] text-gray-400">
+                    병합할 색상을 2개 이상 클릭하세요
+                  </p>
+                )}
+              </div>
+            )}
             {armedColorIndex !== null &&
               preview.palette[armedColorIndex] &&
               popoverPos &&
@@ -836,7 +711,7 @@ export default function ImportPanel({
                 // 조상의 overflow에도 영향받지 않게 한다.
                 <div
                   ref={popoverRef}
-                  className="fixed z-50 w-max bg-white p-2 shadow-xl"
+                  className={`fixed z-50 w-max p-2 ${FLOATING_PANEL}`}
                   style={{
                     left: popoverPos.left,
                     top: popoverPos.top,
@@ -855,6 +730,187 @@ export default function ImportPanel({
                 document.body,
               )}
           </div>
+
+          {/* 라벨 옆에 슬라이더+숫자칸까지 한 줄에 우겨넣으면(justify-between)
+              사이드바 폭이 좁아 라벨 텍스트가 글자 단위로 줄바꿈될 만큼
+              찌그러졌다 — 라벨을 위, 슬라이더를 아래 줄로 내려 각자 필요한
+              폭을 그대로 쓰게 한다. */}
+          {/* 해상도·캔버스 크기는 "얼마나 큰가"를 정하는 짝이라 붙여 둔다.
+              라벨 옆에 슬라이더+숫자칸까지 한 줄에 우겨넣으면(justify-between)
+              사이드바 폭이 좁아 라벨이 글자 단위로 줄바꿈될 만큼 찌그러졌다 —
+              라벨을 위, 슬라이더를 아래 줄로 내려 각자 필요한 폭을 쓰게 한다. */}
+          <label className="flex flex-col gap-1 text-xs text-gray-600">
+            <span className="flex items-center gap-1">
+              픽셀 해상도(비트 규격)
+              <span className="ml-auto text-[10px] font-normal text-gray-400">
+                {preview.width}×{preview.height}
+              </span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <input
+                type="range"
+                min={8}
+                max={128}
+                value={pixelSize}
+                onChange={(e) =>
+                  handleOptionChange(
+                    Number(e.target.value),
+                    antiAlias,
+                    maxColors,
+                  )
+                }
+                className="flex-1"
+              />
+              <input
+                type="number"
+                min={1}
+                max={512}
+                value={pixelSize}
+                onChange={(e) =>
+                  handleOptionChange(
+                    Math.max(1, Number(e.target.value) || 1),
+                    antiAlias,
+                    maxColors,
+                  )
+                }
+                className="w-12 shrink-0 bg-gray-100 px-1 py-0.5 text-right text-[10px] tabular-nums text-gray-600"
+              />
+            </span>
+          </label>
+
+          {existingCanvasSize ? (
+            (preview.width > existingCanvasSize.width ||
+              preview.height > existingCanvasSize.height) && (
+              <p className="bg-amber-50 px-2 py-1.5 text-[10px] text-amber-700 shadow-[inset_0_0_0_1px_rgba(217,119,6,0.25)]">
+                해상도({preview.width}×{preview.height})가 현재 캔버스 크기(
+                {existingCanvasSize.width}×{existingCanvasSize.height})보다
+                큽니다. 이 상태로도 가져올 수 있고, 불러온 뒤 위치·크기를 다시
+                조절할 수 있습니다.
+              </p>
+            )
+          ) : (
+            <div>
+              <p className="mb-1 text-xs text-gray-600">캔버스 크기</p>
+              {/* 켜면(canvasPreset === null) 캔버스 크기 = 픽셀 해상도라 아래
+                  폭×높이 칸은 비활성. 끄면 지금 해상도를 시작값으로 직접 편집. */}
+              <button
+                onClick={() =>
+                  setCanvasPreset(
+                    canvasPreset
+                      ? null
+                      : { width: preview.width, height: preview.height },
+                  )
+                }
+                className={`mb-1.5 w-full px-1.5 py-1 text-[10px] ${
+                  !canvasPreset
+                    ? "bg-violet-50 text-violet-700 shadow-[0_0_0_1.5px_#8b5cf6]"
+                    : "bg-gray-50 text-gray-600 hover:bg-violet-50"
+                }`}
+              >
+                픽셀 해상도와 동일
+              </button>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min={1}
+                  max={MAX_CANVAS_SIZE}
+                  value={effectiveWidth}
+                  disabled={!canvasPreset}
+                  onChange={(e) =>
+                    setCanvasPreset({
+                      width: clampSize(Number(e.target.value)),
+                      height: effectiveHeight,
+                    })
+                  }
+                  className="w-full bg-gray-100 px-1.5 py-1 text-center text-[10px] text-gray-700 disabled:bg-gray-50 disabled:text-gray-400"
+                />
+                <span className="text-[10px] text-gray-400">×</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={MAX_CANVAS_SIZE}
+                  value={effectiveHeight}
+                  disabled={!canvasPreset}
+                  onChange={(e) =>
+                    setCanvasPreset({
+                      width: effectiveWidth,
+                      height: clampSize(Number(e.target.value)),
+                    })
+                  }
+                  className="w-full bg-gray-100 px-1.5 py-1 text-center text-[10px] text-gray-700 disabled:bg-gray-50 disabled:text-gray-400"
+                />
+              </div>
+              {/* 고른 캔버스 크기가 실제 픽셀화 해상도보다 작으면 축소(리샘플)하지
+                  않는다 — 원본 해상도 그대로 캔버스 위에 올려두고, 위치를
+                  옮긴 뒤 확정하면 캔버스 밖으로 나간 부분만 잘려나간다. */}
+              {canvasPreset &&
+                (preview.width > canvasPreset.width ||
+                  preview.height > canvasPreset.height) && (
+                  <p className="mt-1.5 bg-amber-50 px-2 py-1.5 text-[10px] text-amber-700 shadow-[inset_0_0_0_1px_rgba(217,119,6,0.25)]">
+                    해상도({preview.width}×{preview.height})가 고른 캔버스 크기(
+                    {canvasPreset.width}×{canvasPreset.height})보다 큽니다.
+                    축소되지 않고 원본 해상도 그대로 캔버스 위에 올라가며,
+                    위치를 정한 뒤 확정하면 캔버스 밖 영역만 잘려나갑니다.
+                  </p>
+                )}
+            </div>
+          )}
+
+          <label className="flex items-center justify-between text-xs text-gray-600">
+            <span className="flex items-center gap-1">
+              안티에일리어싱
+              <HelpTip text={HELP.importAntialias} />
+            </span>
+            <input
+              type="checkbox"
+              checked={antiAlias}
+              onChange={(e) =>
+                handleOptionChange(pixelSize, e.target.checked, maxColors)
+              }
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-gray-600">
+            <span className="flex items-center gap-1">
+              대표 색상 개수
+              <HelpTip text={HELP.importMaxColors} />
+              <span className="ml-auto text-[10px] font-normal text-gray-400">
+                {colorCapNote}
+              </span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <input
+                type="range"
+                min={1}
+                max={colorCap}
+                value={shownMaxColors}
+                onChange={(e) =>
+                  handleOptionChange(
+                    pixelSize,
+                    antiAlias,
+                    Number(e.target.value),
+                  )
+                }
+                className="flex-1"
+              />
+              <input
+                type="number"
+                min={1}
+                max={colorCap}
+                value={shownMaxColors}
+                onChange={(e) =>
+                  handleOptionChange(
+                    pixelSize,
+                    antiAlias,
+                    Math.min(
+                      colorCap,
+                      Math.max(1, Number(e.target.value) || 1),
+                    ),
+                  )
+                }
+                className="w-12 shrink-0 bg-gray-100 px-1 py-0.5 text-right text-[10px] tabular-nums text-gray-600"
+              />
+            </span>
+          </label>
 
           <button
             onClick={handleConfirm}

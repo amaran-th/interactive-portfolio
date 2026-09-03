@@ -53,6 +53,7 @@ import FrameFilmstrip from "./FrameFilmstrip";
 import PreviewPanel from "./PreviewPanel";
 import TracingListPanel from "./TracingListPanel";
 import NewCanvasDialog from "./NewCanvasDialog";
+import { FLOATING_PANEL } from "./panelStyles";
 import ReferenceWindow from "./ReferenceWindow";
 import PixelCanvas, {
   PendingImage,
@@ -2709,6 +2710,47 @@ export default function Editor({
 
   const helpMod = helpPlatform === "mac" ? "⌘" : "Ctrl+";
 
+  // 이미지 불러오기·내보내기 패널 — wide에서는 왼쪽 열(색상환 아래), narrow에서는
+  // 플로팅 팝업으로 같은 노드를 재사용한다. key={doc.id}로 탭마다 리마운트해,
+  // 한 탭의 미리보기·해상도·색상 수 설정이 다른 탭으로 새지 않게 한다.
+  const importPanel = (
+    <ImportPanel
+      key={doc.id}
+      existingCanvasSize={{ width: doc.width, height: doc.height }}
+      containerRef={rootRef}
+      onConfirm={(imported) => {
+        // 지금 열려 있던(이미 그려뒀을 수 있는) 캔버스를 바로 덮어쓰지
+        // 않는다 — 텍스트 도구처럼 위치·크기를 조절할 수 있는 상태로
+        // 띄워두고, 확정해야만 실제 픽셀에 합성된다. 화면 가운데에서
+        // 시작한다(캔버스보다 크면 일부만 보여도 그대로 둔다).
+        setPendingImage({
+          x: Math.floor((doc.width - imported.width) / 2),
+          y: Math.floor((doc.height - imported.height) / 2),
+          width: imported.width,
+          height: imported.height,
+          srcWidth: imported.width,
+          srcHeight: imported.height,
+          pixels: imported.pixels,
+          rotation: 0,
+        });
+      }}
+    />
+  );
+  // 파일 메뉴의 내보내기와 마찬가지로 라이브 레이어 값을 실어 보낸다(Critical-1)
+  // — 그렇지 않으면 저장한 적 없는 새 캔버스나 방금 그린 내용이 JSON
+  // 내보내기에서 조용히 빠질 수 있다.
+  const exportPanel = (
+    <ExportPanel
+      doc={{
+        ...doc,
+        pixels: compositePixels,
+        layers: history.presentLayers,
+        activeLayerId: history.activeLayerId,
+      }}
+      canvasBgColor={canvasBgColor}
+    />
+  );
+
   return (
     <div
       ref={rootRef}
@@ -2743,6 +2785,10 @@ export default function Editor({
       <style>{`
         .pam-editor { cursor: ${CURSOR_NORMAL}; }
         .pam-editor button:not(:disabled) { cursor: ${CURSOR_POINTING}; }
+        /* <label>도 UA 스타일시트가 cursor:default를 박아둬서(range·checkbox와
+           같은 이유) 상속만으로는 안 먹는다 — 명시적으로 되돌린다. 안쪽의
+           input·button 등은 더 구체적인 아래 규칙이 이겨 각자 커서를 유지한다. */
+        .pam-editor label { cursor: ${CURSOR_NORMAL}; }
         .pam-editor input[type="text"],
         .pam-editor input:not([type]),
         .pam-editor input[type="number"],
@@ -3006,25 +3052,47 @@ export default function Editor({
             }`}
             style={{ backgroundColor: canvasBgColor }}
           >
+            {/* 이 열에는 자체 스크롤을 두지 않는다 — 아코디언을 펼쳐 내용이
+                길어지면 색상환까지 함께 밀려 스크롤되는 대신, 아코디언이 자기
+                안에서만(Accordion 내부 overflow-y-auto) 스크롤되게 한다. */}
             <div
-              className={`flex w-56 shrink-0 flex-col overflow-y-auto ${narrow ? "gap-2" : "gap-3"}`}
+              className={`flex w-60 shrink-0 flex-col ${narrow ? "gap-2" : "gap-3"}`}
             >
-              <ColorWheel
-                favorites={doc.palette}
-                activeColorHex={activeColorHex}
-                secondaryColorHex={secondaryColorHex}
-                onChangeActiveColor={setActiveColorHex}
-                onChangeSecondaryColor={setSecondaryColorHex}
-                onAddFavorite={handleAddFavorite}
-                onRemoveFavorite={handleRemoveFavorite}
-                onEditFavorite={handleEditFavorite}
-                onReplaceFavorites={handleReplaceFavorites}
-                tool={tool}
-                onToolChange={setTool}
-                canvasBgColor={canvasBgColor}
-                onChangeCanvasBgColor={setCanvasBgColor}
-                boundsRef={rootRef}
-              />
+              <div className="shrink-0">
+                <ColorWheel
+                  favorites={doc.palette}
+                  activeColorHex={activeColorHex}
+                  secondaryColorHex={secondaryColorHex}
+                  onChangeActiveColor={setActiveColorHex}
+                  onChangeSecondaryColor={setSecondaryColorHex}
+                  onAddFavorite={handleAddFavorite}
+                  onRemoveFavorite={handleRemoveFavorite}
+                  onEditFavorite={handleEditFavorite}
+                  onReplaceFavorites={handleReplaceFavorites}
+                  tool={tool}
+                  onToolChange={setTool}
+                  canvasBgColor={canvasBgColor}
+                  onChangeCanvasBgColor={setCanvasBgColor}
+                  boundsRef={rootRef}
+                />
+              </div>
+              {/* 불러오기·내보내기는 세션 단위 입출력이라 오른쪽 레이어 스택과
+                  분리해 왼쪽 열 맨 아래(mt-auto)에 붙인다 — 색상환은 위에,
+                  입출력은 아래에 모아 오른쪽 열이 미리보기 + 레이어로 꽉 차던
+                  것을 덜어낸다. min-h-0으로 이 묶음이 남은 높이 밑으로 줄어들 수
+                  있게 해, 펼쳤을 때 아코디언이 열 스크롤 대신 자기 안에서
+                  스크롤되게 한다. narrow에서는 오른쪽 아이콘 열에서 플로팅
+                  팝업으로 열리므로 여기서는 빼둔다. */}
+              {!narrow && (
+                <div className="mt-auto flex min-h-0 flex-col gap-3">
+                  <Accordion title="이미지 불러오기" defaultOpen={false}>
+                    {importPanel}
+                  </Accordion>
+                  <Accordion title="내보내기" defaultOpen={false}>
+                    {exportPanel}
+                  </Accordion>
+                </div>
+              )}
             </div>
             <div className="relative flex flex-1 flex-col overflow-hidden">
               <div className="relative flex flex-1 overflow-hidden">
@@ -3197,47 +3265,6 @@ export default function Editor({
               gap-4 px-4 pb-4 pt-2 에서 받던 여백을 여기서 직접 준다. */}
           <div className={narrow ? "flex shrink-0 py-2 pr-2" : "flex shrink-0 py-3 pr-4"}>
             {(() => {
-              // key={doc.id} — 탭마다 독립된 상태를 갖게 강제로 리마운트한다.
-              // 키가 없으면 이 패널 하나가 모든 탭이 활성화될 때마다 재사용돼,
-              // 한 탭에서 조정한 미리보기·픽셀 해상도·색상 수 등의 설정이
-              // 다른 탭으로 전환해도 그대로 남아 있었다.
-              const importPanel = (
-                <ImportPanel
-                  key={doc.id}
-                  existingCanvasSize={{ width: doc.width, height: doc.height }}
-                  containerRef={rootRef}
-                  onConfirm={(imported) => {
-                    // 지금 열려 있던(이미 그려뒀을 수 있는) 캔버스를 바로 덮어쓰지
-                    // 않는다 — 텍스트 도구처럼 위치·크기를 조절할 수 있는 상태로
-                    // 띄워두고, 확정해야만 실제 픽셀에 합성된다. 화면 가운데에서
-                    // 시작한다(캔버스보다 크면 일부만 보여도 그대로 둔다).
-                    setPendingImage({
-                      x: Math.floor((doc.width - imported.width) / 2),
-                      y: Math.floor((doc.height - imported.height) / 2),
-                      width: imported.width,
-                      height: imported.height,
-                      srcWidth: imported.width,
-                      srcHeight: imported.height,
-                      pixels: imported.pixels,
-                      rotation: 0,
-                    });
-                  }}
-                />
-              );
-              // 파일 메뉴의 내보내기와 마찬가지로 라이브 레이어 값을 실어
-              // 보낸다(Critical-1) — 그렇지 않으면 저장한 적 없는 새 캔버스나
-              // 방금 그린 내용이 JSON 내보내기에서 조용히 빠질 수 있다.
-              const exportPanel = (
-                <ExportPanel
-                  doc={{
-                    ...doc,
-                    pixels: compositePixels,
-                    layers: history.presentLayers,
-                    activeLayerId: history.activeLayerId,
-                  }}
-                />
-              );
-
               if (!narrow) {
                 return (
                   <div className="flex w-60 shrink-0 flex-col gap-3">
@@ -3293,12 +3320,6 @@ export default function Editor({
                       onOnionSkinRangeChange={handleOnionSkinRangeChange}
                       onFrameDurationChange={handleFrameDurationChange}
                     />
-                    <Accordion title="이미지 불러오기" defaultOpen={false}>
-                      {importPanel}
-                    </Accordion>
-                    <Accordion title="내보내기" defaultOpen={false}>
-                      {exportPanel}
-                    </Accordion>
                   </div>
                 );
               }
@@ -3418,8 +3439,10 @@ export default function Editor({
                     <ImageIcon className="h-4 w-4" />
                   </button>
                   {openFloatingPanel && (
-                    <div className="absolute top-0 right-full z-40 mr-2 flex max-h-full w-72 flex-col bg-white shadow-xl">
-                      <div className="flex shrink-0 items-center justify-between px-3 py-2 text-xs font-semibold text-gray-500">
+                    <div
+                      className={`absolute top-0 right-full z-40 mr-2 flex max-h-full w-72 flex-col ${FLOATING_PANEL}`}
+                    >
+                      <div className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-gray-100 px-3 py-1.5 text-[11px] font-semibold text-gray-600">
                         {panelTitle}
                         <button
                           onClick={() => setOpenFloatingPanel(null)}
@@ -3429,7 +3452,7 @@ export default function Editor({
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                      <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-3 pt-0">
+                      <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-3">
                         {openFloatingPanel === "layers" ? (
                           layerPanel
                         ) : openFloatingPanel === "import" ? (

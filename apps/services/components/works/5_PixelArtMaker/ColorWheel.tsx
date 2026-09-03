@@ -11,6 +11,7 @@ import {
 } from "react";
 import ColorPicker, { transparencySwatchStyle } from "./ColorPicker";
 import { PromptModal } from "./Dialogs";
+import { FLOATING_PANEL, FLOATING_PANEL_HEADER } from "./panelStyles";
 import {
   createPaletteSet,
   deletePaletteSet,
@@ -365,68 +366,73 @@ export default function ColorWheel({
           <div
             ref={paletteManagerPanelRef}
             style={paletteManagerPanelStyle}
-            className="fixed z-30 flex w-52 flex-col gap-1 overflow-hidden bg-white p-2 shadow-xl"
+            className={`fixed z-30 flex w-52 flex-col overflow-hidden ${FLOATING_PANEL}`}
           >
-            <p className="text-xs font-semibold text-gray-500">즐겨찾기 관리</p>
-            {paletteSets.length === 0 ? (
-              <p className="text-[10px] text-gray-400">저장된 세트가 없습니다</p>
-            ) : (
-              <div className="flex min-h-0 flex-col overflow-y-auto">
-                {paletteSets.map((set) => (
-                  <div key={set.id} className="group flex items-center gap-1 py-1">
-                    <div className="flex shrink-0 gap-px">
-                      {set.colors.slice(0, 5).map((c, i) => (
-                        <span
-                          key={i}
-                          className="h-2.5 w-2.5"
-                          style={{ backgroundColor: c }}
-                        />
-                      ))}
-                    </div>
-                    {set.colors.length > 5 && (
-                      <span className="shrink-0 text-[8px] text-gray-400">
-                        +{set.colors.length - 5}
+            <p className={FLOATING_PANEL_HEADER}>즐겨찾기 관리</p>
+            <div className="flex min-h-0 flex-col gap-1 p-2">
+              {paletteSets.length === 0 ? (
+                <p className="text-[10px] text-gray-400">저장된 세트가 없습니다</p>
+              ) : (
+                <div className="flex min-h-0 flex-col overflow-y-auto">
+                  {paletteSets.map((set) => (
+                    <div
+                      key={set.id}
+                      className="group flex items-center gap-1 py-1"
+                    >
+                      <div className="flex shrink-0 gap-px">
+                        {set.colors.slice(0, 5).map((c, i) => (
+                          <span
+                            key={i}
+                            className="h-2.5 w-2.5"
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </div>
+                      {set.colors.length > 5 && (
+                        <span className="shrink-0 text-[8px] text-gray-400">
+                          +{set.colors.length - 5}
+                        </span>
+                      )}
+                      <span
+                        className="min-w-0 flex-1 truncate text-[10px] text-gray-700"
+                        title={set.name}
+                      >
+                        {set.name}
                       </span>
-                    )}
-                    <span
-                      className="min-w-0 flex-1 truncate text-[10px] text-gray-700"
-                      title={set.name}
-                    >
-                      {set.name}
-                    </span>
-                    <button
-                      onClick={() => handleLoadSet(set)}
-                      title="즐겨찾기 전체를 이 세트 색으로 교체"
-                      className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                    >
-                      <ArrowDownToLine className="h-3 w-3" />
-                    </button>
-                    <button
-                      onClick={() => handleOverwriteSet(set)}
-                      title="이 세트를 지금 즐겨찾기 내용으로 덮어쓰기"
-                      className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                    >
-                      <ArrowUpFromLine className="h-3 w-3" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteSet(set)}
-                      title="이 세트 삭제"
-                      className="invisible flex h-5 w-5 shrink-0 items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 group-hover:visible"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <button
-              onClick={handleSaveAsNewSet}
-              disabled={favorites.length === 0}
-              title="지금 즐겨찾기를 새 이름의 팔레트 세트로 저장"
-              className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600 hover:bg-gray-200 disabled:opacity-30"
-            >
-              새로 저장
-            </button>
+                      <button
+                        onClick={() => handleLoadSet(set)}
+                        title="즐겨찾기 전체를 이 세트 색으로 교체"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                      >
+                        <ArrowDownToLine className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => handleOverwriteSet(set)}
+                        title="이 세트를 지금 즐겨찾기 내용으로 덮어쓰기"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                      >
+                        <ArrowUpFromLine className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSet(set)}
+                        title="이 세트 삭제"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={handleSaveAsNewSet}
+                disabled={favorites.length === 0}
+                title="지금 즐겨찾기를 새 이름의 팔레트 세트로 저장"
+                className="bg-gray-100 px-1.5 py-1 text-[10px] text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+              >
+                새로 저장
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -466,21 +472,22 @@ export default function ColorWheel({
             </button>
           </div>
         ))}
-        <button
-          disabled={isFull}
-          onClick={() => {
-            // 방금 추가한 스와치를 바로 활성 색상과 연결한다 — 추가하자마자
-            // 색상환으로 이어서 다듬을 수 있다.
-            setPrimaryFavoriteIndex(favorites.length);
-            onAddFavorite(activeColorHex);
-          }}
-          title={
-            isFull ? "즐겨찾기가 가득 찼습니다" : "현재 값을 즐겨찾기에 추가"
-          }
-          className="flex h-6 w-6 items-center justify-center bg-gray-100 text-xs text-gray-500 shadow-sm disabled:opacity-30"
-        >
-          +
-        </button>
+        {/* 가득 차면(12개 = grid-cols-6 두 줄) + 버튼을 아예 숨긴다 —
+            비활성 상태로 남겨두면 셋째 줄에 혼자 걸려 어색하다. */}
+        {!isFull && (
+          <button
+            onClick={() => {
+              // 방금 추가한 스와치를 바로 활성 색상과 연결한다 — 추가하자마자
+              // 색상환으로 이어서 다듬을 수 있다.
+              setPrimaryFavoriteIndex(favorites.length);
+              onAddFavorite(activeColorHex);
+            }}
+            title="현재 값을 즐겨찾기에 추가"
+            className="flex h-6 w-6 items-center justify-center bg-gray-100 text-xs text-gray-500 shadow-sm"
+          >
+            +
+          </button>
+        )}
       </div>
 
       <PromptModal

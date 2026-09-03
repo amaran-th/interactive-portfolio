@@ -19,12 +19,18 @@ export function exportAsPNG(doc: PixelArt, scale = 8): void {
   }, "image/png");
 }
 
-export function exportAsJPG(doc: PixelArt, scale = 8): void {
+// JPG는 알파를 지원하지 않으므로 투명한 픽셀 뒤에 불투명 배경을 먼저 깐다 —
+// 편집기 작업 영역 배경색(bgColor)을 그대로 써서 "화면에서 보이던 그대로"
+// 내보낸다. 기본값은 검정.
+export function exportAsJPG(
+  doc: PixelArt,
+  scale = 8,
+  bgColor = "#000000",
+): void {
   const canvas = renderToCanvas(doc, scale);
-  // JPG는 알파를 지원하지 않으므로 검은 배경을 먼저 채운다
   const ctx = canvas.getContext("2d")!;
   ctx.globalCompositeOperation = "destination-over";
-  ctx.fillStyle = "#000000";
+  ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   canvas.toBlob(
     (blob) => {
@@ -159,16 +165,17 @@ export async function copyPngToClipboard(
 
 // JPG를 클립보드에 이미지로 복사한다. 최신 브라우저는 ClipboardItem에서
 // image/jpeg를 받지만(Chrome·Edge·Firefox), Safari 등 안 받는 환경에서는
-// 같은 화면(검은 배경·손실 압축)을 PNG로 다시 인코딩해 복사한다.
+// 같은 화면(bgColor 배경·손실 압축)을 PNG로 다시 인코딩해 복사한다.
 export async function copyJpgToClipboard(
   doc: PixelArt,
   scale = 8,
+  bgColor = "#000000",
 ): Promise<boolean> {
   try {
     const canvas = renderToCanvas(doc, scale);
     const ctx = canvas.getContext("2d")!;
     ctx.globalCompositeOperation = "destination-over";
-    ctx.fillStyle = "#000000";
+    ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     const jpg = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, "image/jpeg", 0.92),
@@ -209,14 +216,13 @@ function visibleFrames(doc: PixelArt): PixelLayer[] {
   return (doc.layers ?? []).filter((l) => l.visible);
 }
 
-// 보이는 프레임을 왼쪽부터 가로로 이어붙인 PNG 한 장 — 그리드(여러 행)는
-// 지원하지 않는다. 각 프레임은 다른 레이어와 합성하지 않고 그 프레임 자신의
-// 픽셀만 그린다.
-export function exportAsSpriteSheet(doc: PixelArt, scale = 8): void {
+// 보이는 프레임을 왼쪽부터 가로로 이어붙인 한 장 — 그리드(여러 행)는 지원하지
+// 않는다. 각 프레임은 다른 레이어와 합성하지 않고 그 프레임 자신의 픽셀만
+// 그린다. PNG·JPG 스프라이트 시트 내보내기가 공유한다.
+function buildSpriteSheetCanvas(doc: PixelArt, scale: number): HTMLCanvasElement {
   const frames = visibleFrames(doc);
-  if (frames.length === 0) return;
   const canvas = document.createElement("canvas");
-  canvas.width = doc.width * scale * frames.length;
+  canvas.width = doc.width * scale * Math.max(1, frames.length);
   canvas.height = doc.height * scale;
   const ctx = canvas.getContext("2d")!;
   ctx.imageSmoothingEnabled = false;
@@ -224,9 +230,17 @@ export function exportAsSpriteSheet(doc: PixelArt, scale = 8): void {
     const frameCanvas = renderToCanvas({ ...doc, pixels: frame.pixels }, scale);
     ctx.drawImage(frameCanvas, i * doc.width * scale, 0);
   });
-  canvas.toBlob((blob) => {
-    if (blob) triggerDownload(blob, `${doc.name}_sprite.png`);
-  }, "image/png");
+  return canvas;
+}
+
+// 스프라이트 시트는 게임 엔진에서 프레임을 합성해 쓰므로 알파 채널이 필요하다
+// — JPG는 지원하지 않아 항상 투명 배경 PNG로 내보낸다.
+export function exportAsSpriteSheet(doc: PixelArt, scale = 8): void {
+  if (visibleFrames(doc).length === 0) return;
+  buildSpriteSheetCanvas(doc, scale).toBlob(
+    (blob) => blob && triggerDownload(blob, `${doc.name}_sprite.png`),
+    "image/png",
+  );
 }
 
 // 보이는 프레임을 순서대로 재생하는 애니메이션 GIF로 내보낸다. 프레임마다
@@ -283,18 +297,9 @@ export async function copySpriteSheetToClipboard(
   doc: PixelArt,
   scale = 8,
 ): Promise<boolean> {
-  const frames = visibleFrames(doc);
-  if (frames.length === 0) return false;
+  if (visibleFrames(doc).length === 0) return false;
   try {
-    const canvas = document.createElement("canvas");
-    canvas.width = doc.width * scale * frames.length;
-    canvas.height = doc.height * scale;
-    const ctx = canvas.getContext("2d")!;
-    ctx.imageSmoothingEnabled = false;
-    frames.forEach((frame, i) => {
-      const frameCanvas = renderToCanvas({ ...doc, pixels: frame.pixels }, scale);
-      ctx.drawImage(frameCanvas, i * doc.width * scale, 0);
-    });
+    const canvas = buildSpriteSheetCanvas(doc, scale);
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, "image/png"),
     );

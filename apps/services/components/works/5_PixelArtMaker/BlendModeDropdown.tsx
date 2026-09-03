@@ -3,6 +3,7 @@
 import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { BlendMode } from "../_shared/assetLibrary";
+import { FLOATING_PANEL } from "./panelStyles";
 
 const MODES: { value: BlendMode; label: string }[] = [
   { value: "normal", label: "Normal" },
@@ -80,7 +81,7 @@ export default function BlendModeDropdown({
       {open && (
         <div
           onMouseLeave={() => onPreview(committedRef.current)}
-          className="absolute right-0 top-full z-40 mt-1 flex w-32 flex-col bg-white py-1 shadow-xl"
+          className={`absolute right-0 top-full z-40 mt-1 flex w-32 flex-col py-1 ${FLOATING_PANEL}`}
         >
           {MODES.map((m) => (
             <button

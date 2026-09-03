@@ -2,6 +2,7 @@
 
 import { ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { FLOATING_PANEL } from "./panelStyles";
 
 export type ContextMenuItem = {
   label: string;
@@ -53,7 +54,7 @@ export default function ContextMenu({
     <div
       ref={ref}
       style={{ left: x, top: y }}
-      className="fixed z-50 w-max min-w-40 max-w-64 bg-white py-1 shadow-xl"
+      className={`fixed z-50 w-max min-w-40 max-w-64 py-1 ${FLOATING_PANEL}`}
     >
       {items.map((item) => (
         <div
@@ -87,7 +88,9 @@ export default function ContextMenu({
             )}
           </button>
           {item.submenu && openSubmenu === item.label && (
-            <div className="absolute left-full top-0 w-40 overflow-hidden bg-white py-1 shadow-xl">
+            <div
+              className={`absolute left-full top-0 w-40 overflow-hidden py-1 ${FLOATING_PANEL}`}
+            >
               {item.submenu.map((sub) => (
                 <button
                   key={sub.label}
