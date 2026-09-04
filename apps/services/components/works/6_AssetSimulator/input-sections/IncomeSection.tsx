@@ -7,12 +7,14 @@ import {
   IncomeItem,
   NewIncomeItemInput,
   RepeatSchedule,
+  AmountAdjustment,
   addMonths,
   toMonthInputValue,
 } from "../types";
 import { validateSchedule } from "../simulation";
 import CategoryPicker from "./CategoryPicker";
 import ScheduleEditor from "./ScheduleEditor";
+import AmountAdjustmentEditor from "./AmountAdjustmentEditor";
 import FloatingFormPanel from "./FloatingFormPanel";
 import { useDragReorder } from "./useDragReorder";
 
@@ -74,6 +76,7 @@ export default function IncomeSection({
   const [schedule, setSchedule] = useState<RepeatSchedule>(
     defaultSchedule(today),
   );
+  const [adjustments, setAdjustments] = useState<AmountAdjustment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const isFormVisible = isFormOpen || Boolean(editingId);
   const listRef = useRef<HTMLUListElement>(null);
@@ -102,6 +105,7 @@ export default function IncomeSection({
     setAmount("");
     setCategoryId("");
     setSchedule(defaultSchedule(today));
+    setAdjustments([]);
     setError(null);
   };
 
@@ -112,6 +116,7 @@ export default function IncomeSection({
     setAmount(String(item.amount));
     setCategoryId(item.categoryId ?? "");
     setSchedule(item.schedule);
+    setAdjustments(item.adjustments);
     setError(null);
   };
 
@@ -135,7 +140,7 @@ export default function IncomeSection({
       amount: Number(amount),
       categoryId: categoryId || undefined,
       schedule,
-      adjustments: [],
+      adjustments,
     };
     if (editingId) {
       onUpdateIncome(editingId, input);
@@ -283,7 +288,24 @@ export default function IncomeSection({
           placeholder="금액"
           className="rounded-full border border-emerald-200 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-emerald-400"
         />
-        <ScheduleEditor value={schedule} onChange={setSchedule} today={today} />
+        <ScheduleEditor
+          value={schedule}
+          onChange={(s) => {
+            setSchedule(s);
+            if (s.mode === "once") setAdjustments([]);
+          }}
+          today={today}
+        />
+        {schedule.mode === "recurring" && (
+          <div className="flex flex-col gap-1.5">
+            <p className="text-xs text-gray-500">금액 변동</p>
+            <AmountAdjustmentEditor
+              value={adjustments}
+              onChange={setAdjustments}
+              today={today}
+            />
+          </div>
+        )}
         {error && <p className="text-xs text-rose-500">{error}</p>}
         <div className="flex gap-2">
           <button
