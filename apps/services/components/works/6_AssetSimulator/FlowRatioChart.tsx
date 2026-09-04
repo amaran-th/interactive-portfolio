@@ -11,7 +11,7 @@ import {
   formatKRW,
   toRealValue,
 } from "./types";
-import { fires } from "./simulation";
+import { fires, effectiveAmount } from "./simulation";
 import ChartTooltip from "./ChartTooltip";
 
 type FlowRatioChartProps = {
@@ -338,7 +338,9 @@ export default function FlowRatioChart({
       id: item.id,
       name: item.name,
       categoryId: item.categoryId,
-      amount: realAmount(item.amount),
+      amount: realAmount(
+        effectiveAmount(item.amount, item.adjustments, snapshot.monthIndex, today),
+      ),
     }));
   const expenseItems: FlowItem[] = expenses
     .filter(
@@ -350,7 +352,9 @@ export default function FlowRatioChart({
       id: item.id,
       name: item.name,
       categoryId: item.categoryId,
-      amount: realAmount(item.amount),
+      amount: realAmount(
+        effectiveAmount(item.amount, item.adjustments, snapshot.monthIndex, today),
+      ),
     }));
 
   if (incomes.length === 0 && expenses.length === 0) {
