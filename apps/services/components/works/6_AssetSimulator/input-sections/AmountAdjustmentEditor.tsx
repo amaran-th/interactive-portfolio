@@ -28,7 +28,7 @@ const PERSIST_OPTIONS = [
 ];
 
 const KIND_OPTIONS = [
-  { value: "period", label: "구간 변경" },
+  { value: "period", label: "한 번 변경" },
   { value: "recurring", label: "반복 변경" },
 ];
 
