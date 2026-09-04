@@ -1,4 +1,12 @@
-import { AssetClass, MonthSnapshot, Scenario, newId } from "./types";
+import {
+  AssetClass,
+  ExpenseItem,
+  IncomeItem,
+  MonthSnapshot,
+  Scenario,
+  TransferRule,
+  newId,
+} from "./types";
 
 export function todayStamp(): string {
   const d = new Date();
@@ -29,8 +37,10 @@ export function exportScenarioJson(scenario: Scenario): void {
   );
 }
 
-/** Loosely validates the parsed shape and reassigns a fresh id so an
- * imported scenario never collides with an existing one. */
+/** 이 필드들이 추가되기 전에 내보낸 시나리오 JSON을 가져올 때, 없는
+ * 필드를 기본값으로 채운다. 시나리오 상태는 localStorage에 저장되지
+ * 않고 항상 seedScenario()로 새로 시드되므로, 하위호환이 필요한 건
+ * 이 JSON import 경로 하나뿐이다. */
 export function parseScenarioJson(text: string): Scenario | null {
   let parsed: unknown;
   try {
@@ -47,7 +57,26 @@ export function parseScenarioJson(text: string): Scenario | null {
   ) {
     return null;
   }
-  return { ...(parsed as Scenario), id: newId() };
+  const scenario = parsed as Scenario;
+  const normalizeAsset = (a: AssetClass): AssetClass =>
+    Object.assign({ interestCycle: { mode: "monthly" } }, a);
+  const normalizeAdjustments = <T extends { adjustments: unknown[] }>(
+    item: T,
+  ): T => Object.assign({ adjustments: [] }, item);
+  return {
+    ...scenario,
+    id: newId(),
+    assetClasses: scenario.assetClasses.map(normalizeAsset),
+    incomes: (scenario.incomes ?? []).map((i: IncomeItem) =>
+      normalizeAdjustments(i),
+    ),
+    expenses: (scenario.expenses ?? []).map((e: ExpenseItem) =>
+      normalizeAdjustments(e),
+    ),
+    transferRules: (scenario.transferRules ?? []).map((t: TransferRule) =>
+      normalizeAdjustments(t),
+    ),
+  };
 }
 
 function csvCell(value: string | number): string {
