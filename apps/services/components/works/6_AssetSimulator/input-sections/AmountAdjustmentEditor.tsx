@@ -13,7 +13,7 @@ import CustomSelect from "../CustomSelect";
 import { FREQUENCY_OPTIONS, UNTIL_TYPE_OPTIONS } from "./ScheduleEditor";
 
 const TYPE_OPTIONS = [
-  { value: "percent", label: "%" },
+  { value: "percent", label: "비율" },
   { value: "amount", label: "금액" },
 ];
 
@@ -192,6 +192,7 @@ export default function AmountAdjustmentEditor({
                     />
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11px] text-gray-400">반복 종료</span>
                     <CustomSelect
                       value={adj.until.type}
                       onChange={(v) =>
@@ -233,6 +234,9 @@ export default function AmountAdjustmentEditor({
                         className="w-16 rounded-full border border-gray-200 bg-white px-2 py-1 text-xs"
                       />
                     )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11px] text-gray-400">적용 방식</span>
                     <CustomSelect
                       value={String(adj.persist)}
                       onChange={(v) => update(adj.id, { persist: v === "true" })}
@@ -273,6 +277,9 @@ export default function AmountAdjustmentEditor({
                   type="number"
                   className="w-20 rounded-full border border-gray-200 bg-white px-2 py-1 text-xs"
                 />
+                <span className="text-[11px] text-gray-400">
+                  {adj.type === "percent" ? "%" : "원"}
+                </span>
               </div>
             </li>
           ))}
