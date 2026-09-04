@@ -27,6 +27,11 @@ const PERSIST_OPTIONS = [
   { value: "false", label: "그 달만" },
 ];
 
+const KIND_OPTIONS = [
+  { value: "period", label: "기간" },
+  { value: "recurring", label: "정기 변동" },
+];
+
 type AmountAdjustmentEditorProps = {
   value: AmountAdjustment[];
   onChange: (adjustments: AmountAdjustment[]) => void;
@@ -54,7 +59,7 @@ export default function AmountAdjustmentEditor({
     onChange(value.filter((adj) => adj.id !== id));
   };
 
-  const addPeriod = () => {
+  const addAdjustment = () => {
     onChange([
       ...value,
       {
@@ -68,21 +73,29 @@ export default function AmountAdjustmentEditor({
     ]);
   };
 
-  const addRecurring = () => {
-    onChange([
-      ...value,
-      {
-        kind: "recurring",
-        id: newId(),
-        startDate: nextMonthValue,
-        frequency: "yearly",
-        until: { type: "indefinite" },
-        type: "percent",
-        direction: "increase",
-        value: 5,
-        persist: true,
-      },
-    ]);
+  const changeKind = (id: string, kind: "period" | "recurring") => {
+    onChange(
+      value.map((adj): AmountAdjustment => {
+        if (adj.id !== id || adj.kind === kind) return adj;
+        const shared = {
+          id: adj.id,
+          type: adj.type,
+          direction: adj.direction,
+          value: adj.value,
+        };
+        if (kind === "period") {
+          return { kind: "period", ...shared, fromDate: nextMonthValue };
+        }
+        return {
+          kind: "recurring",
+          ...shared,
+          startDate: nextMonthValue,
+          frequency: "yearly",
+          until: { type: "indefinite" },
+          persist: true,
+        };
+      }),
+    );
   };
 
   const handleRecurringUntilTypeChange = (
@@ -108,9 +121,15 @@ export default function AmountAdjustmentEditor({
               className="flex flex-col gap-1.5 rounded-xl border border-gray-200 bg-white/80 p-2"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">
-                  {adj.kind === "period" ? "기간" : "정기 변동"}
-                </span>
+                <CustomSelect
+                  value={adj.kind}
+                  onChange={(v) =>
+                    changeKind(adj.id, v as "period" | "recurring")
+                  }
+                  options={KIND_OPTIONS}
+                  compact
+                  className="w-28 shrink-0"
+                />
                 <button
                   type="button"
                   onClick={() => remove(adj.id)}
@@ -259,22 +278,13 @@ export default function AmountAdjustmentEditor({
           ))}
         </ul>
       )}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={addPeriod}
-          className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-500 hover:border-gray-300 hover:bg-gray-50"
-        >
-          <Plus className="h-3 w-3" /> 기간 추가
-        </button>
-        <button
-          type="button"
-          onClick={addRecurring}
-          className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-500 hover:border-gray-300 hover:bg-gray-50"
-        >
-          <Plus className="h-3 w-3" /> 정기 변동 추가
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={addAdjustment}
+        className="inline-flex items-center gap-1 self-start rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+      >
+        <Plus className="h-3 w-3" /> 변동 추가
+      </button>
     </div>
   );
 }

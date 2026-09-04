@@ -192,7 +192,11 @@ export function validateAdjustments(
     }
     if (adj.kind === "period") {
       const from = monthIndexFromTargetDate(adj.fromDate, today);
-      if (!Number.isFinite(from) || from < 1 || from > horizonMonths) {
+      // 하한(1개월 후)은 검사하지 않는다 — 이미 저장된 항목을 나중에 수정할
+      // 때, 시간이 흘러 시작월이 오늘 기준 과거가 된 경우까지 막으면 그
+      // 필드를 손대지 않았는데도 저장이 막히는 문제가 생긴다. 과거 시작월
+      // 자체는 계산 로직상 아무 문제가 없다.
+      if (!Number.isFinite(from) || from > horizonMonths) {
         return rangeMessage;
       }
       if (adj.toDate) {
@@ -203,7 +207,7 @@ export function validateAdjustments(
       }
     } else {
       const start = monthIndexFromTargetDate(adj.startDate, today);
-      if (!Number.isFinite(start) || start < 1 || start > horizonMonths) {
+      if (!Number.isFinite(start) || start > horizonMonths) {
         return rangeMessage;
       }
       if (adj.until.type === "date") {
