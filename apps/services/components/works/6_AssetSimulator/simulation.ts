@@ -1,10 +1,12 @@
 import {
+  AmountAdjustment,
   AssetClass,
   Goal,
   GOAL_SEARCH_CAP_MONTHS,
   Group,
   MonthSnapshot,
   RepeatSchedule,
+  RepeatUntil,
   SimulationInput,
   formatMonthsFromNow,
 } from "./types";
@@ -36,6 +38,115 @@ export function fires(
     return month <= monthIndexFromTargetDate(schedule.until.date, today);
   }
   return true;
+}
+
+/** startDate부터 시작해 month(포함)까지 이 반복 일정이 총 몇 번 발생했는지 센다.
+ * fires()는 "정확히 이 달에 발생하는가"만 보지만, 이건 "누적 발생 횟수"가
+ * 필요한 persist:true 금액 변동에 쓴다. */
+export function occurrences(
+  startDate: string,
+  frequency: "monthly" | "yearly",
+  until: RepeatUntil,
+  month: number,
+  today: Date,
+): number {
+  const start = monthIndexFromTargetDate(startDate, today);
+  if (month < start) return 0;
+  const period = frequency === "monthly" ? 1 : 12;
+  let count = Math.floor((month - start) / period) + 1;
+  if (until.type === "count") {
+    count = Math.min(count, until.count);
+  }
+  if (until.type === "date") {
+    const untilMonth = monthIndexFromTargetDate(until.date, today);
+    if (untilMonth < start) return 0;
+    const untilMaxOccurrence = Math.floor((untilMonth - start) / period) + 1;
+    count = Math.min(count, untilMaxOccurrence);
+  }
+  return Math.max(0, count);
+}
+
+/** 기간(period)/정기(recurring) 금액 변동을 시작일 오름차순으로 baseAmount에
+ * 순서대로 적용한 최종 금액을 계산한다. */
+export function effectiveAmount(
+  baseAmount: number,
+  adjustments: AmountAdjustment[],
+  month: number,
+  today: Date,
+): number {
+  const steps: {
+    sortKey: number;
+    type: "percent" | "amount";
+    direction: "increase" | "decrease";
+    value: number;
+  }[] = [];
+
+  for (const adj of adjustments) {
+    if (adj.kind === "period") {
+      const from = monthIndexFromTargetDate(adj.fromDate, today);
+      const to = adj.toDate
+        ? monthIndexFromTargetDate(adj.toDate, today)
+        : Infinity;
+      if (month >= from && month <= to) {
+        steps.push({
+          sortKey: from,
+          type: adj.type,
+          direction: adj.direction,
+          value: adj.value,
+        });
+      }
+    } else {
+      const start = monthIndexFromTargetDate(adj.startDate, today);
+      const count = occurrences(
+        adj.startDate,
+        adj.frequency,
+        adj.until,
+        month,
+        today,
+      );
+      if (adj.persist) {
+        for (let i = 0; i < count; i++) {
+          steps.push({
+            sortKey: start,
+            type: adj.type,
+            direction: adj.direction,
+            value: adj.value,
+          });
+        }
+      } else if (
+        count > 0 &&
+        fires(
+          {
+            mode: "recurring",
+            startDate: adj.startDate,
+            frequency: adj.frequency,
+            until: adj.until,
+          },
+          month,
+          today,
+        )
+      ) {
+        steps.push({
+          sortKey: start,
+          type: adj.type,
+          direction: adj.direction,
+          value: adj.value,
+        });
+      }
+    }
+  }
+
+  steps.sort((a, b) => a.sortKey - b.sortKey);
+
+  let amount = baseAmount;
+  for (const step of steps) {
+    const sign = step.direction === "increase" ? 1 : -1;
+    amount =
+      step.type === "percent"
+        ? amount * (1 + (sign * step.value) / 100)
+        : amount + sign * step.value;
+  }
+  return amount;
 }
 
 export function validateSchedule(
@@ -168,7 +279,11 @@ export function runSimulation(
     if (primary) {
       const incomeIn = input.incomes
         .filter((item) => fires(item.schedule, month, today))
-        .reduce((sum, item) => sum + item.amount, 0);
+        .reduce(
+          (sum, item) =>
+            sum + effectiveAmount(item.amount, item.adjustments, month, today),
+          0,
+        );
       balances[primary.id] += incomeIn;
       flow.incomeIn = incomeIn;
 
@@ -177,16 +292,22 @@ export function runSimulation(
       let expenseOut = 0;
       for (const item of input.expenses) {
         if (!fires(item.schedule, month, today)) continue;
-        if (balances[primary.id] < item.amount) {
+        const amount = effectiveAmount(
+          item.amount,
+          item.adjustments,
+          month,
+          today,
+        );
+        if (balances[primary.id] < amount) {
           flow.failedExpenses.push({
             itemId: item.id,
             name: item.name,
-            amount: item.amount,
+            amount,
           });
           continue;
         }
-        balances[primary.id] -= item.amount;
-        expenseOut += item.amount;
+        balances[primary.id] -= amount;
+        expenseOut += amount;
       }
       flow.expenseOut = expenseOut;
     }
@@ -198,7 +319,7 @@ export function runSimulation(
       const destBalance = balances[rule.toAssetId] ?? 0;
       const requested =
         rule.mode === "fixed"
-          ? rule.amount
+          ? effectiveAmount(rule.amount, rule.adjustments, month, today)
           : sourceBalance * (rule.amount / 100);
 
       // 잔액이 부족하면 있는 만큼만 옮기는 대신 이체 자체를 건너뛴다 —
@@ -233,8 +354,16 @@ export function runSimulation(
     }
 
     for (const asset of assetClasses) {
-      const monthlyRate = asset.annualReturnRate / 100 / 12;
-      balances[asset.id] *= 1 + monthlyRate;
+      const cycle = asset.interestCycle;
+      if (cycle.mode === "monthly") {
+        const monthlyRate = asset.annualReturnRate / 100 / 12;
+        balances[asset.id] *= 1 + monthlyRate;
+      } else {
+        const simulatedMonth = ((today.getMonth() + month) % 12) + 1;
+        if (simulatedMonth === cycle.month) {
+          balances[asset.id] *= 1 + asset.annualReturnRate / 100;
+        }
+      }
     }
 
     snapshots.push(
