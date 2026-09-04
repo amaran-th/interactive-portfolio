@@ -7,6 +7,7 @@ import {
   Currency,
   GROUP_PALETTE,
   Group,
+  InterestCycle,
   NewAssetClassInput,
   nextVisibleColor,
   usedColors,
@@ -19,6 +20,16 @@ const CURRENCY_OPTIONS = [
   { value: "KRW", label: "KRW(원)" },
   { value: "USD", label: "USD(달러)" },
 ];
+
+const INTEREST_CYCLE_OPTIONS = [
+  { value: "monthly", label: "매월" },
+  { value: "yearly", label: "매년" },
+];
+
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
+  value: String(i + 1),
+  label: `${i + 1}월`,
+}));
 
 type GroupAssetSectionProps = {
   groups: Group[];
@@ -55,6 +66,10 @@ export default function GroupAssetSection({
   const [currency, setCurrency] = useState<Currency>("KRW");
   const [balance, setBalance] = useState("");
   const [returnRate, setReturnRate] = useState("0");
+  const [interestCycleMode, setInterestCycleMode] = useState<
+    "monthly" | "yearly"
+  >("monthly");
+  const [interestCycleMonth, setInterestCycleMonth] = useState("1");
   const [isLiability, setIsLiability] = useState(false);
   const [color, setColor] = useState(() => nextVisibleColor(groups, assetClasses));
   const [colorPickerId, setColorPickerId] = useState<string | null>(null);
@@ -108,6 +123,8 @@ export default function GroupAssetSection({
     setCurrency("KRW");
     setBalance("");
     setReturnRate("0");
+    setInterestCycleMode("monthly");
+    setInterestCycleMonth("1");
     setIsLiability(false);
     setColor(nextVisibleColor(groups, assetClasses));
     setFormColorPickerOpen(false);
@@ -121,6 +138,12 @@ export default function GroupAssetSection({
     setCurrency(asset.currency);
     setBalance(String(Math.abs(asset.initialBalance)));
     setReturnRate(String(asset.annualReturnRate));
+    setInterestCycleMode(asset.interestCycle.mode);
+    setInterestCycleMonth(
+      asset.interestCycle.mode === "yearly"
+        ? String(asset.interestCycle.month)
+        : "1",
+    );
     setIsLiability(asset.initialBalance < 0);
     setColor(asset.color);
   };
@@ -130,13 +153,17 @@ export default function GroupAssetSection({
       nameRef.current?.focus();
       return;
     }
+    const interestCycle: InterestCycle =
+      interestCycleMode === "monthly"
+        ? { mode: "monthly" }
+        : { mode: "yearly", month: Number(interestCycleMonth) };
     const input: NewAssetClassInput = {
       name: name.trim(),
       groupId: groupId || undefined,
       currency,
       initialBalance: (isLiability ? -1 : 1) * (Number(balance) || 0),
       annualReturnRate: Number(returnRate) || 0,
-      interestCycle: { mode: "monthly" },
+      interestCycle,
       color,
     };
     if (editingId) {
@@ -457,6 +484,25 @@ export default function GroupAssetSection({
             className="w-20 rounded-full border border-indigo-200 bg-white/80 px-2 py-1"
           />
         </label>
+        <div className="flex items-center gap-2 text-xs text-gray-600">
+          <span>이자 지급 주기</span>
+          <CustomSelect
+            value={interestCycleMode}
+            onChange={(v) => setInterestCycleMode(v as "monthly" | "yearly")}
+            options={INTEREST_CYCLE_OPTIONS}
+            borderClassName="border-indigo-200"
+            className="w-24 shrink-0"
+          />
+          {interestCycleMode === "yearly" && (
+            <CustomSelect
+              value={interestCycleMonth}
+              onChange={setInterestCycleMonth}
+              options={MONTH_OPTIONS}
+              borderClassName="border-indigo-200"
+              className="w-20 shrink-0"
+            />
+          )}
+        </div>
         <div className="flex gap-2">
           <button
             type="button"
