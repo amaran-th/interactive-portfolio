@@ -9,12 +9,12 @@ import {
 import { monthIndexFromTargetDate } from "../simulation";
 import CustomSelect from "../CustomSelect";
 
-const FREQUENCY_OPTIONS = [
+export const FREQUENCY_OPTIONS = [
   { value: "monthly", label: "매월" },
   { value: "yearly", label: "매년" },
 ];
 
-const UNTIL_TYPE_OPTIONS = [
+export const UNTIL_TYPE_OPTIONS = [
   { value: "indefinite", label: "무기한" },
   { value: "date", label: "특정 날짜까지" },
   { value: "count", label: "횟수" },
