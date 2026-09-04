@@ -2,7 +2,7 @@
 
 import { History, Inbox } from "lucide-react";
 import { AssetClass, ExpenseItem, IncomeItem, MonthSnapshot, formatKRW } from "./types";
-import { fires } from "./simulation";
+import { effectiveAmount, fires } from "./simulation";
 
 type HistoryPanelProps = {
   snapshots: MonthSnapshot[];
@@ -117,14 +117,15 @@ export default function HistoryPanel({
 
     for (const item of incomes) {
       if (fires(item.schedule, month, today)) {
+        const amount = effectiveAmount(item.amount, item.adjustments, month, today);
         entries.push({
           key: `income-${item.id}-${month}`,
           month,
           kind: "income",
           label: item.name,
-          amount: item.amount,
+          amount,
         });
-        totalIncome += item.amount;
+        totalIncome += amount;
       }
     }
     const failedExpenseIds = new Set(
@@ -133,15 +134,16 @@ export default function HistoryPanel({
     for (const item of expenses) {
       if (!fires(item.schedule, month, today)) continue;
       const failed = failedExpenseIds.has(item.id);
+      const amount = effectiveAmount(item.amount, item.adjustments, month, today);
       entries.push({
         key: `expense-${item.id}-${month}`,
         month,
         kind: "expense",
         label: item.name,
-        amount: item.amount,
+        amount,
         failed,
       });
-      if (!failed) totalExpense += item.amount;
+      if (!failed) totalExpense += amount;
     }
     for (const transfer of snapshot.flow.transfers) {
       entries.push({

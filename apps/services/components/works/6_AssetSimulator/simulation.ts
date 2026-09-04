@@ -146,7 +146,7 @@ export function effectiveAmount(
         ? amount * (1 + (sign * step.value) / 100)
         : amount + sign * step.value;
   }
-  return amount;
+  return Math.max(0, amount);
 }
 
 export function validateSchedule(
@@ -175,6 +175,47 @@ export function validateSchedule(
   }
   if (schedule.until.type === "count" && schedule.until.count < 1) {
     return "반복 횟수는 1 이상이어야 합니다.";
+  }
+  return null;
+}
+
+export function validateAdjustments(
+  adjustments: AmountAdjustment[],
+  today: Date,
+  horizonMonths: number,
+): string | null {
+  const rangeMessage = `1개월 후부터 ${formatMonthsFromNow(horizonMonths)} 사이의 날짜만 선택할 수 있습니다.`;
+
+  for (const adj of adjustments) {
+    if (!Number.isFinite(adj.value) || adj.value <= 0) {
+      return "금액 변동 값은 0보다 커야 합니다.";
+    }
+    if (adj.kind === "period") {
+      const from = monthIndexFromTargetDate(adj.fromDate, today);
+      if (!Number.isFinite(from) || from < 1 || from > horizonMonths) {
+        return rangeMessage;
+      }
+      if (adj.toDate) {
+        const to = monthIndexFromTargetDate(adj.toDate, today);
+        if (!Number.isFinite(to) || to < from) {
+          return "금액 변동 종료 날짜는 시작 날짜보다 이후여야 합니다.";
+        }
+      }
+    } else {
+      const start = monthIndexFromTargetDate(adj.startDate, today);
+      if (!Number.isFinite(start) || start < 1 || start > horizonMonths) {
+        return rangeMessage;
+      }
+      if (adj.until.type === "date") {
+        const until = monthIndexFromTargetDate(adj.until.date, today);
+        if (!Number.isFinite(until) || until < start) {
+          return "금액 변동 반복 종료 날짜는 시작 날짜보다 이후여야 합니다.";
+        }
+      }
+      if (adj.until.type === "count" && adj.until.count < 1) {
+        return "금액 변동 반복 횟수는 1 이상이어야 합니다.";
+      }
+    }
   }
   return null;
 }

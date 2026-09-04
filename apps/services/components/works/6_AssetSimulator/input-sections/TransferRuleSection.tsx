@@ -3,7 +3,7 @@
 import { ArrowLeftRight, GripVertical, Inbox, Plus, Settings } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import CustomSelect from "../CustomSelect";
-import { validateSchedule } from "../simulation";
+import { validateAdjustments, validateSchedule } from "../simulation";
 import {
   AmountAdjustment,
   AssetClass,
@@ -130,7 +130,7 @@ export default function TransferRuleSection({
     setToAssetId(rule.toAssetId);
     setMode(rule.mode);
     setAmount(String(rule.amount));
-    setAdjustments(rule.adjustments);
+    setAdjustments(rule.mode === "fixed" ? rule.adjustments : []);
     setSchedule(rule.schedule);
     setError(null);
   };
@@ -147,6 +147,11 @@ export default function TransferRuleSection({
     const scheduleError = validateSchedule(schedule, today, horizonMonths);
     if (scheduleError) {
       setError(scheduleError);
+      return;
+    }
+    const adjustmentsError = validateAdjustments(adjustments, today, horizonMonths);
+    if (adjustmentsError) {
+      setError(adjustmentsError);
       return;
     }
     setError(null);

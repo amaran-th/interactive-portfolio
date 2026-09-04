@@ -40,7 +40,8 @@ export function exportScenarioJson(scenario: Scenario): void {
 /** 이 필드들이 추가되기 전에 내보낸 시나리오 JSON을 가져올 때, 없는
  * 필드를 기본값으로 채운다. 시나리오 상태는 localStorage에 저장되지
  * 않고 항상 seedScenario()로 새로 시드되므로, 하위호환이 필요한 건
- * 이 JSON import 경로 하나뿐이다. */
+ * 이 JSON import 경로 하나뿐이다. 파싱 후 id를 newId()로 새로 부여해
+ * 가져온 시나리오가 기존 시나리오와 충돌하지 않게 한다. */
 export function parseScenarioJson(text: string): Scenario | null {
   let parsed: unknown;
   try {

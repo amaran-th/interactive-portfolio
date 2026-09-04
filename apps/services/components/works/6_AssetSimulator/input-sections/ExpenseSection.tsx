@@ -11,7 +11,7 @@ import {
   addMonths,
   toMonthInputValue,
 } from "../types";
-import { validateSchedule } from "../simulation";
+import { validateAdjustments, validateSchedule } from "../simulation";
 import CategoryPicker from "./CategoryPicker";
 import ScheduleEditor from "./ScheduleEditor";
 import AmountAdjustmentEditor from "./AmountAdjustmentEditor";
@@ -132,6 +132,11 @@ export default function ExpenseSection({
     const scheduleError = validateSchedule(schedule, today, horizonMonths);
     if (scheduleError) {
       setError(scheduleError);
+      return;
+    }
+    const adjustmentsError = validateAdjustments(adjustments, today, horizonMonths);
+    if (adjustmentsError) {
+      setError(adjustmentsError);
       return;
     }
     setError(null);
