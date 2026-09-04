@@ -28,8 +28,8 @@ const PERSIST_OPTIONS = [
 ];
 
 const KIND_OPTIONS = [
-  { value: "period", label: "기간" },
-  { value: "recurring", label: "정기 변동" },
+  { value: "period", label: "구간 변경" },
+  { value: "recurring", label: "반복 변경" },
 ];
 
 type AmountAdjustmentEditorProps = {
