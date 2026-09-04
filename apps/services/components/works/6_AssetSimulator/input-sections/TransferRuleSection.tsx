@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import CustomSelect from "../CustomSelect";
 import { validateSchedule } from "../simulation";
 import {
+  AmountAdjustment,
   AssetClass,
   NewTransferRuleInput,
   RepeatSchedule,
@@ -13,6 +14,7 @@ import {
   addMonths,
   toMonthInputValue,
 } from "../types";
+import AmountAdjustmentEditor from "./AmountAdjustmentEditor";
 import FloatingFormPanel from "./FloatingFormPanel";
 import ScheduleEditor from "./ScheduleEditor";
 import { useDragReorder } from "./useDragReorder";
@@ -75,6 +77,7 @@ export default function TransferRuleSection({
   const [schedule, setSchedule] = useState<RepeatSchedule>(
     defaultSchedule(today),
   );
+  const [adjustments, setAdjustments] = useState<AmountAdjustment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const isFormVisible = isFormOpen || Boolean(editingId);
   const listRef = useRef<HTMLUListElement>(null);
@@ -116,6 +119,7 @@ export default function TransferRuleSection({
     setMode("fixed");
     setAmount("");
     setSchedule(defaultSchedule(today));
+    setAdjustments([]);
     setError(null);
   };
 
@@ -126,6 +130,7 @@ export default function TransferRuleSection({
     setToAssetId(rule.toAssetId);
     setMode(rule.mode);
     setAmount(String(rule.amount));
+    setAdjustments(rule.adjustments);
     setSchedule(rule.schedule);
     setError(null);
   };
@@ -151,7 +156,7 @@ export default function TransferRuleSection({
       mode,
       amount: Number(amount),
       schedule,
-      adjustments: [],
+      adjustments,
     };
     if (editingId) {
       onUpdateTransferRule(editingId, input);
@@ -300,7 +305,10 @@ export default function TransferRuleSection({
           <div className="flex items-center gap-2">
             <CustomSelect
               value={mode}
-              onChange={(v) => setMode(v as TransferMode)}
+              onChange={(v) => {
+                setMode(v as TransferMode);
+                if (v !== "fixed") setAdjustments([]);
+              }}
               options={TRANSFER_MODE_OPTIONS}
               borderClassName="border-amber-200"
               className="w-44 shrink-0"
@@ -316,9 +324,22 @@ export default function TransferRuleSection({
           </div>
           <ScheduleEditor
             value={schedule}
-            onChange={setSchedule}
+            onChange={(s) => {
+              setSchedule(s);
+              if (s.mode === "once") setAdjustments([]);
+            }}
             today={today}
           />
+          {mode === "fixed" && schedule.mode === "recurring" && (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-xs text-gray-500">금액 변동</p>
+              <AmountAdjustmentEditor
+                value={adjustments}
+                onChange={setAdjustments}
+                today={today}
+              />
+            </div>
+          )}
           {error && <p className="text-xs text-rose-500">{error}</p>}
           <div className="flex gap-2">
             <button
