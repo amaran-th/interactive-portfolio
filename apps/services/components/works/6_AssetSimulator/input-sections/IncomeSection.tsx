@@ -135,6 +135,7 @@ export default function IncomeSection({
       amount: Number(amount),
       categoryId: categoryId || undefined,
       schedule,
+      adjustments: [],
     };
     if (editingId) {
       onUpdateIncome(editingId, input);

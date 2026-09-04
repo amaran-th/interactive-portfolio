@@ -20,6 +20,7 @@ export type AssetClass = {
   currency: Currency;
   initialBalance: number;
   annualReturnRate: number;
+  interestCycle: InterestCycle;
   isPrimary: boolean;
   color: string;
 };
@@ -38,12 +39,39 @@ export type RepeatSchedule =
       until: RepeatUntil;
     };
 
+export type InterestCycle =
+  | { mode: "monthly" }
+  | { mode: "yearly"; month: number }; // 1-12
+
+export type AmountAdjustment =
+  | {
+      kind: "period";
+      id: string;
+      fromDate: string; // "YYYY-MM"
+      toDate?: string; // "YYYY-MM", 비우면 이후 계속(영구 변경)
+      type: "percent" | "amount";
+      direction: "increase" | "decrease";
+      value: number;
+    }
+  | {
+      kind: "recurring";
+      id: string;
+      startDate: string; // "YYYY-MM"
+      frequency: "monthly" | "yearly";
+      until: RepeatUntil;
+      type: "percent" | "amount";
+      direction: "increase" | "decrease";
+      value: number;
+      persist: boolean; // true: 누적 유지(인상) / false: 발생한 달만 적용(보너스)
+    };
+
 export type IncomeItem = {
   id: string;
   name: string;
   amount: number;
   categoryId?: string;
   schedule: RepeatSchedule;
+  adjustments: AmountAdjustment[];
 };
 
 export type ExpenseItem = {
@@ -52,6 +80,7 @@ export type ExpenseItem = {
   amount: number;
   categoryId?: string;
   schedule: RepeatSchedule;
+  adjustments: AmountAdjustment[];
 };
 
 export type TransferMode = "fixed" | "percentOfSource";
@@ -63,6 +92,7 @@ export type TransferRule = {
   mode: TransferMode;
   amount: number;
   schedule: RepeatSchedule;
+  adjustments: AmountAdjustment[];
 };
 
 export type GoalMetric =
@@ -139,6 +169,7 @@ export type NewAssetClassInput = {
   currency: Currency;
   initialBalance: number;
   annualReturnRate: number;
+  interestCycle: InterestCycle;
   color: string;
 };
 
@@ -147,6 +178,7 @@ export type NewIncomeItemInput = {
   amount: number;
   categoryId?: string;
   schedule: RepeatSchedule;
+  adjustments: AmountAdjustment[];
 };
 
 export type NewExpenseItemInput = {
@@ -154,6 +186,7 @@ export type NewExpenseItemInput = {
   amount: number;
   categoryId?: string;
   schedule: RepeatSchedule;
+  adjustments: AmountAdjustment[];
 };
 
 export type NewTransferRuleInput = {
@@ -162,6 +195,7 @@ export type NewTransferRuleInput = {
   mode: TransferMode;
   amount: number;
   schedule: RepeatSchedule;
+  adjustments: AmountAdjustment[];
 };
 
 export const HORIZON_PRESET_YEARS = [5, 10, 20, 30] as const;

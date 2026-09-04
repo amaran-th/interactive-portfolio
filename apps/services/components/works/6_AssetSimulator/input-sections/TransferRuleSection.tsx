@@ -151,6 +151,7 @@ export default function TransferRuleSection({
       mode,
       amount: Number(amount),
       schedule,
+      adjustments: [],
     };
     if (editingId) {
       onUpdateTransferRule(editingId, input);

@@ -136,6 +136,7 @@ export default function GroupAssetSection({
       currency,
       initialBalance: (isLiability ? -1 : 1) * (Number(balance) || 0),
       annualReturnRate: Number(returnRate) || 0,
+      interestCycle: { mode: "monthly" },
       color,
     };
     if (editingId) {

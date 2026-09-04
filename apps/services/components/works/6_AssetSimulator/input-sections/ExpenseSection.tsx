@@ -135,6 +135,7 @@ export default function ExpenseSection({
       amount: Number(amount),
       categoryId: categoryId || undefined,
       schedule,
+      adjustments: [],
     };
     if (editingId) {
       onUpdateExpense(editingId, input);
