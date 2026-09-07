@@ -80,9 +80,13 @@ export function buildSvgString(doc: PixelArt): string {
 
 // 프레임 모드 전용 — 보이는 프레임을 각 지속시간대로 순환 재생하는 SMIL
 // 애니메이션 SVG. 각 프레임 <g>의 opacity를 discrete calcMode로 자기 구간에서만
-// 1로, 나머지 구간은 0으로 두고 전체 길이만큼 무한 반복한다.
-export function buildAnimatedSvgString(doc: PixelArt): string {
-  const frames = visibleFrames(doc);
+// 1로, 나머지 구간은 0으로 두고 전체 길이만큼 무한 반복한다. pingPong이면
+// 프레임 순서 자체를 왕복으로 펼쳐서 그 순서대로 재생한다.
+export function buildAnimatedSvgString(
+  doc: PixelArt,
+  pingPong = false,
+): string {
+  const frames = pingPongOrder(visibleFrames(doc), pingPong);
   if (frames.length <= 1) {
     return svgWrap(
       doc.width,
@@ -130,9 +134,11 @@ export function exportAsSVG(doc: PixelArt): void {
   );
 }
 
-export function exportAsAnimatedSVG(doc: PixelArt): void {
+export function exportAsAnimatedSVG(doc: PixelArt, pingPong = false): void {
   triggerDownload(
-    new Blob([buildAnimatedSvgString(doc)], { type: "image/svg+xml" }),
+    new Blob([buildAnimatedSvgString(doc, pingPong)], {
+      type: "image/svg+xml",
+    }),
     `${doc.name}.svg`,
   );
 }
@@ -216,6 +222,16 @@ function visibleFrames(doc: PixelArt): PixelLayer[] {
   return (doc.layers ?? []).filter((l) => l.visible);
 }
 
+// PreviewPanel.tsx의 frameAt과 같은 왕복 순서를 만든다 — 끝에 닿으면
+// 방향을 뒤집어 앞뒤로 오간다. 양 끝(처음·마지막) 프레임은 한 번만 지나고
+// 그 사이만 되짚어 나오므로(0,1,2,…,n-1,n-2,…,1), 재생이 반복돼도 끝
+// 프레임이 두 번 연달아 나오며 멈칫하지 않는다. 프레임이 2개 이하면
+// 왕복해도 순서가 그대로라(원본과 동일) 별도 분기 없이도 안전하다.
+function pingPongOrder<T>(frames: T[], pingPong: boolean): T[] {
+  if (!pingPong) return frames;
+  return [...frames, ...frames.slice(1, -1).reverse()];
+}
+
 // 보이는 프레임을 왼쪽부터 가로로 이어붙인 한 장 — 그리드(여러 행)는 지원하지
 // 않는다. 각 프레임은 다른 레이어와 합성하지 않고 그 프레임 자신의 픽셀만
 // 그린다. PNG·JPG 스프라이트 시트 내보내기가 공유한다.
@@ -246,9 +262,14 @@ export function exportAsSpriteSheet(doc: PixelArt, scale = 8): void {
 // 보이는 프레임을 순서대로 재생하는 애니메이션 GIF로 내보낸다. 프레임마다
 // 따로 양자화하면 프레임 사이에 색이 미세하게 달라져 깜빡이므로, 모든
 // 프레임의 RGBA를 한 번에 합쳐 전역 팔레트 하나만 만들고 프레임마다
-// 재사용한다.
-export async function exportAsGIF(doc: PixelArt, scale = 8): Promise<void> {
-  const frames = visibleFrames(doc);
+// 재사용한다. pingPong이면 프레임 순서 자체를 왕복으로 펼친 뒤 그 순서대로
+// 인코딩한다.
+export async function exportAsGIF(
+  doc: PixelArt,
+  scale = 8,
+  pingPong = false,
+): Promise<void> {
+  const frames = pingPongOrder(visibleFrames(doc), pingPong);
   if (frames.length === 0) return;
   const width = doc.width * scale;
   const height = doc.height * scale;

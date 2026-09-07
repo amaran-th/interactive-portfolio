@@ -2610,7 +2610,7 @@ export default function Editor({
             label: "GIF",
             title: "보이는 프레임을 순서대로 재생하는 GIF로 내보냅니다.",
             onClick: () => {
-              void exportAsGIF(exportDoc);
+              void exportAsGIF(exportDoc, undefined, pingPong);
             },
           },
           {
@@ -2661,6 +2661,7 @@ export default function Editor({
       handleSaveAs,
       activeTabIndex,
       layerMode,
+      pingPong,
     ],
   );
 
@@ -2748,6 +2749,7 @@ export default function Editor({
         activeLayerId: history.activeLayerId,
       }}
       canvasBgColor={canvasBgColor}
+      pingPong={pingPong}
     />
   );
 

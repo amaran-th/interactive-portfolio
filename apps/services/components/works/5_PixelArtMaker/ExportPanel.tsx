@@ -44,10 +44,14 @@ const FRAME_SCALE_OPTIONS = [1, 2, 4, 8];
 export default function ExportPanel({
   doc,
   canvasBgColor,
+  pingPong,
 }: {
   doc: PixelArt;
   // JPG는 알파가 없어 투명한 곳을 이 색(편집기 작업 영역 배경색)으로 채운다.
   canvasBgColor: string;
+  // 프레임 모드 패널의 핑퐁 토글을 그대로 쓴다 — 내보내기 전용 옵션을 따로
+  // 두지 않고, 미리보기에서 보이는 재생 방향과 항상 일치하게 한다.
+  pingPong: boolean;
 }) {
   const isFrames = doc.layerMode === "frames";
   const [format, setFormat] = useState<Format>("png");
@@ -101,11 +105,19 @@ export default function ExportPanel({
       else exportAsPNG(doc, scale);
     } else if (format === "jpg") exportAsJPG(doc, scale, canvasBgColor);
     else if (format === "svg") {
-      if (svgAsAnimation) exportAsAnimatedSVG(doc);
+      if (svgAsAnimation) exportAsAnimatedSVG(doc, pingPong);
       else exportAsSVG(doc);
     } else if (format === "json") exportAsJSON(doc);
-    else if (format === "gif") void exportAsGIF(doc, scale);
-  }, [format, doc, scale, svgAsAnimation, spriteAsSheet, canvasBgColor]);
+    else if (format === "gif") void exportAsGIF(doc, scale, pingPong);
+  }, [
+    format,
+    doc,
+    scale,
+    svgAsAnimation,
+    spriteAsSheet,
+    canvasBgColor,
+    pingPong,
+  ]);
 
   // PNG·JPG는 이미지로, SVG·JSON은 코드(텍스트)로 클립보드에 복사한다.
   const handleSecondary = useCallback(async () => {
@@ -120,7 +132,9 @@ export default function ExportPanel({
     } else if (format === "svg") {
       flash(
         (await copyTextToClipboard(
-          svgAsAnimation ? buildAnimatedSvgString(doc) : buildSvgString(doc),
+          svgAsAnimation
+            ? buildAnimatedSvgString(doc, pingPong)
+            : buildSvgString(doc),
         ))
           ? "SVG 코드를 복사했습니다"
           : "클립보드 복사 실패",
@@ -132,7 +146,16 @@ export default function ExportPanel({
           : "클립보드 복사 실패",
       );
     }
-  }, [format, doc, scale, flash, svgAsAnimation, spriteAsSheet, canvasBgColor]);
+  }, [
+    format,
+    doc,
+    scale,
+    flash,
+    svgAsAnimation,
+    spriteAsSheet,
+    canvasBgColor,
+    pingPong,
+  ]);
 
   const hasSecondary = format !== "gif";
   const secondaryTitle =
