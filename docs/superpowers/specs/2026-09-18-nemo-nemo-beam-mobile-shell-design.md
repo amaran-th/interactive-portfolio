@@ -47,23 +47,40 @@ useEffect(() => {
 return (
   <div ref={rootRef} className="pam-editor ..." onPointerDownCapture={...}>
     <style>{/* 지금과 동일 */}</style>
+    <input ref={jsonFileInputRef} type="file" .../>{/* 지금과 동일 — 위치만 유지 */}
+
     {narrow ? (
       <MobileEditorShell {...mobileShellProps} />
     ) : (
-      /* 기존 데스크톱 JSX(제목표시줄부터 끝까지), 지금과 동일 */
+      <>{/* 제목표시줄 · 메뉴 바 · 탭 바 · ContextMenu · 3열 콘텐츠, 지금과 동일 */}</>
     )}
+
+    {/* 아래는 분기와 무관하게 항상 렌더 — 모바일의 "더보기" 항목(새로 만들기·
+        열기·저장·캔버스 크기 수정 등)도 이 다이얼로그들을 그대로 연다.
+        지금 이미 이 위치(desktop 콘텐츠 다음, pam-editor 루트의 형제)에
+        있으므로 옮길 필요 없이 그대로 둔다: */}
+    {showNewCanvasDialog && <NewCanvasDialog .../>}
+    {showOpenDialog && (/* 지금과 동일 */)}
+    {showHelpDialog && (/* 지금과 동일 */)}
+    {resizingCanvas && (/* 지금과 동일 */)}
+    {pendingCloseTabIndex !== null && (/* 지금과 동일 */)}
+    {pendingExit && (/* 지금과 동일 */)}
+    <AlertModal /* 지금과 동일 */ />
+    <PromptModal /* 지금과 동일 */ />
+    {!narrow && (/* 레퍼런스 창 — 이미 !narrow 가드가 있어 그대로 둔다 */)}
   </div>
 );
 ```
 
+즉 실제로 "새로 통째로 갈라야 하는" 부분은 제목표시줄·메뉴바·탭바·`menuAnchor`(ContextMenu)·3열 콘텐츠뿐이다. 나머지(다이얼로그·모달·알림 두 개·레퍼런스 창)는 이미 그 콘텐츠 블록 *다음*에 형제로 있으므로 위치를 옮기지 않고 그대로 둔다 — 두 분기 모두에서 계속 동작한다.
+
 `MobileEditorShell`은 새 파일(`MobileEditorShell.tsx`)로 뺀다 — `Editor.tsx`가 이미 3800줄 넘게 크고, 셸은 데스크톱 트리와 공유하는 마크업이 거의 없다. `Editor.tsx`는 이미 `importPanel`/`exportPanel`/`layerPanel`처럼 재사용 가능한 JSX 조각을 변수로 만들어 데스크톱 분기와 narrow 아이콘 열이 공유하게 하고 있다 — `MobileEditorShell`도 이 조각들을 그대로 props로 받는다(내부 구현을 모른 채 완성된 패널만 받으면 되므로 결합이 느슨하다).
 
-`MobileEditorShell` props (1차 초안 — 필요 시 구현 중 조정):
+`MobileEditorShell` props (1차 초안 — 필요 시 구현 중 조정). 지금 어느 시트가 열려 있는지(`mobileSheet`/`moreDetail`)는 셸 내부 상태다 — Editor.tsx가 알 필요 없는 순수 네비게이션 상태라 prop으로 안 뺀다:
 
 ```ts
 {
   fileName: string;
-  onOpenTabList: () => void;      // 파일명 탭 → 탭 목록 시트
   onExit: () => void;              // 상단 바 좌측 닫기 — Editor.tsx의 handleExitClick 그대로
   onSave: () => void;              // 상단 바 저장 아이콘 — handleSave 그대로
   saveError: boolean;
@@ -77,8 +94,9 @@ return (
   colorPanel: ReactNode;           // <ColorWheel>(Editor.tsx:3107) — 마찬가지로 인라인 1회성 → top-level 변수로. Phase 3
   layerPanel: ReactNode;           // <LayerPanel> — 지금 desktop wide(3391)·narrow 아이콘열(3446) 두 곳에 완전히 같은 props로 중복 선언돼 있다. 이 셸 작업에서 top-level 변수 하나로 합쳐 세 곳(wide·narrow 아이콘열·모바일 셸)이 공유하게 한다. Phase 4
   moreItems: { label: string; onClick: () => void }[]; // 더보기 리스트 항목
-  tabs: { id: string; name: string; active: boolean }[];
-  onSelectTab: (id: string) => void;
+  tabs: { index: number; name: string; active: boolean }[];
+  onSelectTab: (index: number) => void;
+  onCloseTab: (index: number) => void; // requestCloseTab 그대로(더러우면 확인 다이얼로그, 아니면 바로 닫기) — 데스크톱 탭 바의 X와 동일 기능, 탭 목록 시트 각 행에도 필요(빠지면 탭을 닫을 방법이 없어진다)
   // 데스크톱 제목표시줄과 마찬가지로 활성 탭만 이름을 바꿀 수 있다(비활성
   // 탭은 데스크톱에서도 탭 바 자체에 편집 가능한 입력칸이 없다) — 탭 목록
   // 시트에서 활성 탭 행에만 편집 아이콘을 둔다.
@@ -146,7 +164,7 @@ function BottomSheet({
 
 ## 새 상태 — 탭 목록 시트
 
-`heightMode="full"`. 열려 있는 탭(`tabs` 배열)을 리스트로 보여주고, 맨 아래 "+ 새 파일" 항목을 둔다. 항목을 누르면 그 탭으로 전환(`switchToTab`)하고 시트를 닫는다. 활성 탭은 강조 표시(●)하고, 그 행에만 편집(연필) 아이콘을 둬 이름을 바꿀 수 있게 한다(`onRenameActiveTab`) — 비활성 탭은 이름 편집을 지원하지 않는다(데스크톱과 동일한 제약).
+`heightMode="full"`. 열려 있는 탭(`tabs` 배열)을 리스트로 보여주고, 맨 아래 "+ 새 파일" 항목을 둔다. 항목을 누르면 그 탭으로 전환(`onSelectTab`)하고 시트를 닫는다. 각 행에 닫기(✕, `onCloseTab`) 아이콘을 둔다 — 데스크톱 탭 바의 X와 같은 기능(저장 안 된 변경이 있으면 확인 다이얼로그). 활성 탭은 강조 표시(●)하고, 그 행에만 편집(연필) 아이콘을 둬 이름을 바꿀 수 있게 한다(`onRenameActiveTab`) — 비활성 탭은 이름 편집을 지원하지 않는다(데스크톱과 동일한 제약).
 
 ## 영향받지 않는 것
 
