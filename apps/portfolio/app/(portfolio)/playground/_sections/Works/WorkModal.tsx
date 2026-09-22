@@ -69,7 +69,7 @@ export default function WorkModal({
         onClick={onClose}
       >
         <div
-          className="relative flex h-full w-full flex-col overflow-hidden bg-gray-900 md:h-[90vh] md:w-[90vw] md:rounded-xl md:border md:border-white/10"
+          className="relative flex h-full w-full flex-col overflow-hidden bg-gray-900 md:h-[95vh] md:w-[90vw] md:rounded-xl md:border md:border-white/10"
           onClick={(e) => e.stopPropagation()}
         >
           <div
@@ -148,7 +148,7 @@ export default function WorkModal({
           </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto text-gray-300 md:flex-row md:divide-x md:divide-gray-800">
             <div
-              className={`min-h-[40dvh] h-full shrink-0 flex-col border-b border-gray-800 md:min-h-0 md:w-[calc(80vh-64px)] md:border-b-0 ${
+              className={`min-h-[40dvh] h-full shrink-0 flex-col border-b border-gray-800 md:min-h-0 md:w-[55%] md:border-b-0 ${
                 mobileView === "content" ? "flex" : "hidden md:flex"
               }`}
             >

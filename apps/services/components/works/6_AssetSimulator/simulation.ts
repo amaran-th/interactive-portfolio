@@ -40,34 +40,33 @@ export function fires(
   return true;
 }
 
-/** startDate부터 시작해 month(포함)까지 이 반복 일정이 총 몇 번 발생했는지 센다.
- * fires()는 "정확히 이 달에 발생하는가"만 보지만, 이건 "누적 발생 횟수"가
- * 필요한 persist:true 금액 변동에 쓴다. */
-export function occurrences(
-  startDate: string,
+/** 금액 변동의 반복(frequency 주기로 발생)이 month(포함)까지 총 몇 번
+ * 발생했는지 센다. until이 date면 그 시점을 넘어서는 month를 넣어도 그
+ * 시점 기준 발생 횟수에서 더 늘지 않는다 — 변동이 반복 종료 후 마지막
+ * 수준에서 멈추는 데 쓴다. */
+export function adjustmentOccurrences(
+  fromDate: string,
   frequency: "monthly" | "yearly",
   until: RepeatUntil,
   month: number,
   today: Date,
 ): number {
-  const start = monthIndexFromTargetDate(startDate, today);
-  if (month < start) return 0;
+  const start = monthIndexFromTargetDate(fromDate, today);
+  const periodEnd =
+    until.type === "date" ? monthIndexFromTargetDate(until.date, today) : Infinity;
+  const cappedMonth = Math.min(month, periodEnd);
+  if (cappedMonth < start) return 0;
   const period = frequency === "monthly" ? 1 : 12;
-  let count = Math.floor((month - start) / period) + 1;
+  let count = Math.floor((cappedMonth - start) / period) + 1;
   if (until.type === "count") {
     count = Math.min(count, until.count);
-  }
-  if (until.type === "date") {
-    const untilMonth = monthIndexFromTargetDate(until.date, today);
-    if (untilMonth < start) return 0;
-    const untilMaxOccurrence = Math.floor((untilMonth - start) / period) + 1;
-    count = Math.min(count, untilMaxOccurrence);
   }
   return Math.max(0, count);
 }
 
-/** 기간(period)/정기(recurring) 금액 변동을 시작일 오름차순으로 baseAmount에
- * 순서대로 적용한 최종 금액을 계산한다. */
+/** 금액 변동을 시작일 오름차순으로 baseAmount에 순서대로 적용한 최종 금액을
+ * 계산한다. 반복 발생 횟수만큼 누적 적용되므로(until: count:1이면 한 번만),
+ * 단발/반복 변동 모두 이 하나의 경로로 처리된다. */
 export function effectiveAmount(
   baseAmount: number,
   adjustments: AmountAdjustment[],
@@ -82,57 +81,21 @@ export function effectiveAmount(
   }[] = [];
 
   for (const adj of adjustments) {
-    if (adj.kind === "period") {
-      const from = monthIndexFromTargetDate(adj.fromDate, today);
-      const to = adj.toDate
-        ? monthIndexFromTargetDate(adj.toDate, today)
-        : Infinity;
-      if (month >= from && month <= to) {
-        steps.push({
-          sortKey: from,
-          type: adj.type,
-          direction: adj.direction,
-          value: adj.value,
-        });
-      }
-    } else {
-      const start = monthIndexFromTargetDate(adj.startDate, today);
-      const count = occurrences(
-        adj.startDate,
-        adj.frequency,
-        adj.until,
-        month,
-        today,
-      );
-      if (adj.persist) {
-        for (let i = 0; i < count; i++) {
-          steps.push({
-            sortKey: start,
-            type: adj.type,
-            direction: adj.direction,
-            value: adj.value,
-          });
-        }
-      } else if (
-        count > 0 &&
-        fires(
-          {
-            mode: "recurring",
-            startDate: adj.startDate,
-            frequency: adj.frequency,
-            until: adj.until,
-          },
-          month,
-          today,
-        )
-      ) {
-        steps.push({
-          sortKey: start,
-          type: adj.type,
-          direction: adj.direction,
-          value: adj.value,
-        });
-      }
+    const start = monthIndexFromTargetDate(adj.fromDate, today);
+    const count = adjustmentOccurrences(
+      adj.fromDate,
+      adj.frequency,
+      adj.until,
+      month,
+      today,
+    );
+    for (let i = 0; i < count; i++) {
+      steps.push({
+        sortKey: start,
+        type: adj.type,
+        direction: adj.direction,
+        value: adj.value,
+      });
     }
   }
 
@@ -190,35 +153,22 @@ export function validateAdjustments(
     if (!Number.isFinite(adj.value) || adj.value <= 0) {
       return "금액 변동 값은 0보다 커야 합니다.";
     }
-    if (adj.kind === "period") {
-      const from = monthIndexFromTargetDate(adj.fromDate, today);
-      // 하한(1개월 후)은 검사하지 않는다 — 이미 저장된 항목을 나중에 수정할
-      // 때, 시간이 흘러 시작월이 오늘 기준 과거가 된 경우까지 막으면 그
-      // 필드를 손대지 않았는데도 저장이 막히는 문제가 생긴다. 과거 시작월
-      // 자체는 계산 로직상 아무 문제가 없다.
-      if (!Number.isFinite(from) || from > horizonMonths) {
-        return rangeMessage;
+    const from = monthIndexFromTargetDate(adj.fromDate, today);
+    // 하한(1개월 후)은 검사하지 않는다 — 이미 저장된 항목을 나중에 수정할
+    // 때, 시간이 흘러 시작월이 오늘 기준 과거가 된 경우까지 막으면 그
+    // 필드를 손대지 않았는데도 저장이 막히는 문제가 생긴다. 과거 시작월
+    // 자체는 계산 로직상 아무 문제가 없다.
+    if (!Number.isFinite(from) || from > horizonMonths) {
+      return rangeMessage;
+    }
+    if (adj.until.type === "date") {
+      const to = monthIndexFromTargetDate(adj.until.date, today);
+      if (!Number.isFinite(to) || to < from) {
+        return "금액 변동 반복 종료 날짜는 시작 날짜보다 이후여야 합니다.";
       }
-      if (adj.toDate) {
-        const to = monthIndexFromTargetDate(adj.toDate, today);
-        if (!Number.isFinite(to) || to < from) {
-          return "금액 변동 종료 날짜는 시작 날짜보다 이후여야 합니다.";
-        }
-      }
-    } else {
-      const start = monthIndexFromTargetDate(adj.startDate, today);
-      if (!Number.isFinite(start) || start > horizonMonths) {
-        return rangeMessage;
-      }
-      if (adj.until.type === "date") {
-        const until = monthIndexFromTargetDate(adj.until.date, today);
-        if (!Number.isFinite(until) || until < start) {
-          return "금액 변동 반복 종료 날짜는 시작 날짜보다 이후여야 합니다.";
-        }
-      }
-      if (adj.until.type === "count" && adj.until.count < 1) {
-        return "금액 변동 반복 횟수는 1 이상이어야 합니다.";
-      }
+    }
+    if (adj.until.type === "count" && adj.until.count < 1) {
+      return "금액 변동 반복 횟수는 1 이상이어야 합니다.";
     }
   }
   return null;

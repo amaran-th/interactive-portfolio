@@ -43,27 +43,21 @@ export type InterestCycle =
   | { mode: "monthly" }
   | { mode: "yearly"; month: number }; // 1-12
 
-export type AmountAdjustment =
-  | {
-      kind: "period";
-      id: string;
-      fromDate: string; // "YYYY-MM"
-      toDate?: string; // "YYYY-MM", 비우면 이후 계속(영구 변경)
-      type: "percent" | "amount";
-      direction: "increase" | "decrease";
-      value: number;
-    }
-  | {
-      kind: "recurring";
-      id: string;
-      startDate: string; // "YYYY-MM"
-      frequency: "monthly" | "yearly";
-      until: RepeatUntil;
-      type: "percent" | "amount";
-      direction: "increase" | "decrease";
-      value: number;
-      persist: boolean; // true: 누적 유지(인상) / false: 발생한 달만 적용(보너스)
-    };
+/** 값 변동은 항상 지속적(한 번 적용되면 계속 유지)이며, 단발/반복을 별도
+ * 필드로 나누지 않고 반복 구조 하나로 표현한다 — until을 count:1로 두면
+ * "한 번만 적용되고 계속 유지되는" 단발 변동과 수학적으로 동일하기 때문.
+ * (예: 대출 상환 완료로 지출이 한 번 줄어든 뒤 유지 = 횟수 1회.
+ * 연봉 인상률처럼 매년 오르는 경우 = 주기 매년 + 무기한/N회/특정 날짜까지.)
+ * until은 RepeatSchedule과 동일한 RepeatUntil을 그대로 쓴다. */
+export type AmountAdjustment = {
+  id: string;
+  type: "percent" | "amount";
+  direction: "increase" | "decrease";
+  value: number;
+  fromDate: string; // "YYYY-MM"
+  frequency: "monthly" | "yearly";
+  until: RepeatUntil;
+};
 
 export type IncomeItem = {
   id: string;
@@ -340,4 +334,10 @@ export function addMonths(date: Date, months: number): Date {
 
 export function toMonthInputValue(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** "YYYY-MM" -> "2026년 3월" */
+export function formatYearMonth(value: string): string {
+  const [year, month] = value.split("-").map(Number);
+  return `${year}년 ${month}월`;
 }

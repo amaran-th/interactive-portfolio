@@ -20,9 +20,17 @@ export default function FloatingFormPanel({
     if (!el) return;
     const margin = 16;
     const align = () => {
-      const rect = el.getBoundingClientRect();
-      if (rect.width === 0) return;
-      const overflowsRight = rect.right > window.innerWidth - margin;
+      const panelWidth = el.getBoundingClientRect().width;
+      if (panelWidth === 0) return;
+      // 카드(offsetParent) 기준 left:0으로 붙었을 때의 "자연 위치"로 넘침을
+      // 판단한다. 팝업 자신의 현재 rect로 판단하면, 이미 right:0으로 보정된
+      // 상태를 다시 측정해 "안 넘치네"라고 오判단하고 스스로 보정을
+      // 되돌려버린다 — 되돌린 뒤에는 크기 변화가 없어 ResizeObserver가
+      // 재실행되지 않으므로 잘못된 left:0 상태로 고정돼 버린다.
+      const anchor = (el.offsetParent as HTMLElement | null) ?? el.parentElement;
+      if (!anchor) return;
+      const anchorLeft = anchor.getBoundingClientRect().left;
+      const overflowsRight = anchorLeft + panelWidth > window.innerWidth - margin;
       el.style.left = overflowsRight ? "auto" : "";
       el.style.right = overflowsRight ? "0px" : "";
     };

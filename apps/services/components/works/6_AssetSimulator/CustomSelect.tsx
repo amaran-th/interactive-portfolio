@@ -27,6 +27,10 @@ type CustomSelectProps = {
   borderClassName?: string;
   /** Smaller, lighter trigger — for a select that's secondary to nearby content. */
   compact?: boolean;
+  /** compact와 함께 쓸 때, 테두리 없는 기본 compact 스타일 대신 옆에 놓인
+   * input과 같은 테두리·배경을 보여준다 — 같은 줄에 select와 input이
+   * 섞여 있는데 select만 테두리가 없으면 어색해 보이는 곳에 쓴다. */
+  bordered?: boolean;
 };
 
 export default function CustomSelect({
@@ -39,6 +43,7 @@ export default function CustomSelect({
   className = "",
   borderClassName = "border-gray-200",
   compact = false,
+  bordered = false,
 }: CustomSelectProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -92,7 +97,11 @@ export default function CustomSelect({
         onClick={() => setOpen((prev) => !prev)}
         className={`flex w-full items-center justify-between gap-1 rounded-full text-left ${
           compact
-            ? "border border-transparent bg-transparent px-1.5 py-0.5 text-xs text-gray-500 hover:border-gray-200 hover:bg-white/60"
+            ? `border px-1.5 py-0.5 text-xs text-gray-500 ${
+                bordered
+                  ? "border-gray-200 bg-white hover:border-gray-300"
+                  : "border-transparent bg-transparent hover:border-gray-200 hover:bg-white/60"
+              }`
             : `border bg-white/80 px-3 py-1.5 text-sm ${borderClassName}`
         } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
       >

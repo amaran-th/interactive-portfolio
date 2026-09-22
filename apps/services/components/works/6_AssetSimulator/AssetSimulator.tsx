@@ -1257,7 +1257,7 @@ export default function AssetSimulator() {
               inputPanelCollapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"
             }`}
           >
-          <div className="overflow-hidden @min-[500px]:overflow-visible">
+          <div className={inputPanelCollapsed ? "overflow-hidden" : "overflow-visible"}>
           <InputPanel
             key={activeScenarioId}
             groups={activeScenario.groups}

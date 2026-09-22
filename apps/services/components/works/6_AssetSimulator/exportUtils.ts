@@ -1,12 +1,68 @@
 import {
+  AmountAdjustment,
   AssetClass,
   ExpenseItem,
   IncomeItem,
   MonthSnapshot,
+  RepeatUntil,
   Scenario,
   TransferRule,
   newId,
 } from "./types";
+
+/** kind/persist 필드를 쓰던 옛 형식(effect 축 도입 전)의 금액 변동. */
+type LegacyAmountAdjustment = {
+  id: string;
+  type: "percent" | "amount";
+  direction: "increase" | "decrease";
+  value: number;
+} & (
+  | { kind: "period"; fromDate: string; toDate?: string }
+  | {
+      kind: "recurring";
+      startDate: string;
+      frequency: "monthly" | "yearly";
+      until: RepeatUntil;
+      persist: boolean;
+    }
+);
+
+function isLegacyAdjustment(
+  adj: AmountAdjustment | LegacyAmountAdjustment,
+): adj is LegacyAmountAdjustment {
+  return "kind" in adj;
+}
+
+/** 옛 kind/persist 필드를 지금의 단일 구조로 변환한다. 값 변동은 이제
+ * 항상 지속적이고, 단발/반복 구분도 없다(반복 구조 하나로 통일, 횟수
+ * 1회 = 옛 단발 변동과 동일). period는 fromDate만 남기고 toDate(원복
+ * 기한)는 버린 뒤 횟수 1회로 채운다. recurring은 startDate→fromDate로
+ * 이름만 바꾸면 나머지(frequency, until)는 그대로 옮겨 담을 수 있다. */
+function migrateAdjustment(
+  adj: AmountAdjustment | LegacyAmountAdjustment,
+): AmountAdjustment {
+  if (!isLegacyAdjustment(adj)) return adj;
+  const shared = {
+    id: adj.id,
+    type: adj.type,
+    direction: adj.direction,
+    value: adj.value,
+  };
+  if (adj.kind === "period") {
+    return {
+      ...shared,
+      fromDate: adj.fromDate,
+      frequency: "yearly",
+      until: { type: "count", count: 1 },
+    };
+  }
+  return {
+    ...shared,
+    fromDate: adj.startDate,
+    frequency: adj.frequency,
+    until: adj.until,
+  };
+}
 
 export function todayStamp(): string {
   const d = new Date();
@@ -61,9 +117,18 @@ export function parseScenarioJson(text: string): Scenario | null {
   const scenario = parsed as Scenario;
   const normalizeAsset = (a: AssetClass): AssetClass =>
     Object.assign({ interestCycle: { mode: "monthly" } }, a);
-  const normalizeAdjustments = <T extends { adjustments: unknown[] }>(
+  // 금액 변동은 이제 항목당 1개만 허용하므로, 옛 시나리오에 여러 개가
+  // 있었다면 첫 번째만 남긴다.
+  const normalizeAdjustments = <T extends { adjustments?: unknown[] }>(
     item: T,
-  ): T => Object.assign({ adjustments: [] }, item);
+  ): T & { adjustments: AmountAdjustment[] } => ({
+    ...item,
+    adjustments: (
+      (item.adjustments ?? []) as (AmountAdjustment | LegacyAmountAdjustment)[]
+    )
+      .map(migrateAdjustment)
+      .slice(0, 1),
+  });
   return {
     ...scenario,
     id: newId(),

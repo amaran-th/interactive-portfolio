@@ -130,6 +130,14 @@ export default function GroupAssetSection({
     setFormColorPickerOpen(false);
   };
 
+  // 다른 섹션의 폼이 열리면 공유 openSection 상태가 바뀌면서 이 섹션의
+  // isFormOpen은 꺼지는데, editingId 등 로컬 상태를 그대로 두면
+  // isFormVisible이 계속 true로 남아 팝업이 안 닫힌 채로 다른 섹션과 겹쳐 보인다.
+  useEffect(() => {
+    if (!isFormOpen) resetForm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFormOpen]);
+
   const startEdit = (asset: AssetClass) => {
     onOpenForm();
     setEditingId(asset.id);
