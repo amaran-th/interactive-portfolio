@@ -41,13 +41,19 @@ useEffect(() => {
 
 ## 새 상태 — Editor.tsx 최상위 분기
 
-지금은 `narrow` 값에 따라 하나의 거대한 JSX 트리 안에서 조각조각 갈라지는데, 모바일은 구조 자체가 다르므로 최상위에서 통째로 분기한다:
+지금은 `narrow` 값에 따라 하나의 거대한 JSX 트리 안에서 조각조각 갈라지는데, 모바일은 구조 자체가 다르므로 콘텐츠는 최상위에서 통째로 분기한다. 단, **바깥 루트 `<div ref={rootRef} className="pam-editor ...">`(커서 `<style>`·`onPointerDownCapture` 포함, `Editor.tsx:2800-2825`)는 두 분기가 그대로 공유**해야 한다 — `narrow` 자체가 이 `rootRef.current`를 재서 계산되는데(폭 감지 `useEffect`가 `[]` deps로 마운트 시 한 번만 `ResizeObserver`를 답), `if (narrow) return <MobileEditorShell/>`처럼 **루트 엘리먼트 자체**를 다른 타입으로 바꿔버리면 그 순간 리액트가 통째로 언마운트·재마운트해 옵저버가 옛 노드를 잃고 다시는 못 얻는다(모바일로 넘어가면 그 뒤로 다시 넓혀도 영원히 데스크톱으로 못 돌아오는 버그). 그래서 분기는 루트 **안쪽**에서 한다:
 
 ```tsx
-if (narrow) {
-  return <MobileEditorShell {...mobileShellProps} />;
-}
-return (/* 기존 데스크톱 JSX, 지금과 동일 */);
+return (
+  <div ref={rootRef} className="pam-editor ..." onPointerDownCapture={...}>
+    <style>{/* 지금과 동일 */}</style>
+    {narrow ? (
+      <MobileEditorShell {...mobileShellProps} />
+    ) : (
+      /* 기존 데스크톱 JSX(제목표시줄부터 끝까지), 지금과 동일 */
+    )}
+  </div>
+);
 ```
 
 `MobileEditorShell`은 새 파일(`MobileEditorShell.tsx`)로 뺀다 — `Editor.tsx`가 이미 3800줄 넘게 크고, 셸은 데스크톱 트리와 공유하는 마크업이 거의 없다. `Editor.tsx`는 이미 `importPanel`/`exportPanel`/`layerPanel`처럼 재사용 가능한 JSX 조각을 변수로 만들어 데스크톱 분기와 narrow 아이콘 열이 공유하게 하고 있다 — `MobileEditorShell`도 이 조각들을 그대로 props로 받는다(내부 구현을 모른 채 완성된 패널만 받으면 되므로 결합이 느슨하다).
@@ -67,9 +73,9 @@ return (/* 기존 데스크톱 JSX, 지금과 동일 */);
   onUndo: () => void;
   onRedo: () => void;
   canvas: ReactNode;               // 지금 데스크톱 트리의 캔버스 뷰포트 부분 그대로
-  toolPanel: ReactNode;            // DrawToolbar를 감싼 것 (Phase 2에서 모바일용으로 교체)
-  colorPanel: ReactNode;           // ColorWheel (Phase 3)
-  layerPanel: ReactNode;           // LayerPanel (Phase 4, 이미 존재하는 layerPanel 변수 재사용)
+  toolPanel: ReactNode;            // <DrawToolbar>(Editor.tsx:3046) — 지금은 인라인 1회성, 셸을 위해 top-level 변수로 뺀다. Phase 2에서 모바일용으로 교체
+  colorPanel: ReactNode;           // <ColorWheel>(Editor.tsx:3107) — 마찬가지로 인라인 1회성 → top-level 변수로. Phase 3
+  layerPanel: ReactNode;           // <LayerPanel> — 지금 desktop wide(3391)·narrow 아이콘열(3446) 두 곳에 완전히 같은 props로 중복 선언돼 있다. 이 셸 작업에서 top-level 변수 하나로 합쳐 세 곳(wide·narrow 아이콘열·모바일 셸)이 공유하게 한다. Phase 4
   moreItems: { label: string; onClick: () => void }[]; // 더보기 리스트 항목
   tabs: { id: string; name: string; active: boolean }[];
   onSelectTab: (id: string) => void;
