@@ -6,6 +6,7 @@ import { CURSOR_NORMAL, CURSOR_POINTING } from "./cursors";
 import Desktop from "./Desktop";
 import Editor from "./Editor";
 import { monaFont } from "../_shared/fonts";
+import { NARROW_BREAKPOINT } from "./types";
 
 type Screen =
   | { view: "desktop" }
@@ -30,6 +31,20 @@ function setEditorQueryParam(on: boolean) {
 
 export default function PixelArtMaker() {
   const [screen, setScreen] = useState<Screen>({ view: "desktop" });
+  const appRef = useRef<HTMLDivElement>(null);
+  // narrow 폭에서는 편집창이 데스크탑 배경화면 비율(fittedSize)을 무시하고
+  // 뷰포트를 그대로 채운다 — Editor.tsx가 이 폭을 기준으로 모바일 셸을
+  // 켜므로, 편집창 자체도 letterbox 없이 그 폭 그대로 받아야 앞뒤가 맞는다.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const el = appRef.current;
+    if (!el) return;
+    const update = () => setIsMobile(el.clientWidth < NARROW_BREAKPOINT);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const [closing, setClosing] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   // 편집창도 데스크탑(배경화면)과 같은 letterbox 상자 크기를 쓰도록 Desktop이
@@ -93,6 +108,7 @@ export default function PixelArtMaker() {
 
   return (
     <div
+      ref={appRef}
       className={`pam-app ${monaFont.className} relative h-full w-full overflow-hidden`}
     >
       {/* 데스크탑(바탕화면)은 편집기 밖에 있어 .pam-editor의 커서 규칙이 닿지
@@ -118,7 +134,7 @@ export default function PixelArtMaker() {
           <div
             className="pointer-events-auto h-full w-full"
             style={
-              fittedSize
+              !isMobile && fittedSize
                 ? { width: fittedSize.width, height: fittedSize.height }
                 : undefined
             }
