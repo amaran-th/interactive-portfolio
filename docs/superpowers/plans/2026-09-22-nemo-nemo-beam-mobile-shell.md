@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 편집창이 좁은 화면(< 820px)에서 열릴 때, 데스크톱 letterbox 창 대신 진짜 전체화면 + 캔버스 최대화 + 하단 독/바텀시트로 도구·색상·레이어·나머지 기능에 접근하는 모바일 셸을 만든다.
+**Goal:** 편집창이 좁은 화면(< 820px)에서 열릴 때, 데스크톱 letterbox 창 대신 진짜 전체화면 + 캔버스 최대화 + 하단 독과 그 위 앵커 팝오버로 도구·색상·레이어·나머지 기능에 접근하는 모바일 셸을 만든다(개정 2026-09-24: 바텀시트·탭 목록 시트 방식에서 하단 독+`FLOATING_PANEL` 앵커 팝오버 방식으로 전환, 자세한 배경은 스펙 참고).
 
-**Architecture:** `PixelArtMaker.tsx`에서 모바일 폭이면 편집창 wrapper의 letterbox 크기 제약을 없앤다. `Editor.tsx`는 루트 `<div ref={rootRef}>`는 그대로 유지한 채(폭 감지 `ResizeObserver`가 이 노드를 계속 관찰해야 하므로), 그 안의 콘텐츠만 `narrow` 여부로 통째로 갈라 새 `MobileEditorShell` 컴포넌트를 렌더한다. 도구바·색상환·레이어 패널은 지금 인라인/중복 선언된 것을 top-level 변수로 뽑아 데스크톱과 모바일 셸이 공유한다. 다이얼로그·모달(새 캔버스·열기·도움말·크기수정·탭 닫기 확인·나가기 확인·알림)은 이미 조건부 렌더 위치가 두 분기 바깥(형제)이라 손대지 않는다.
+**Architecture:** `PixelArtMaker.tsx`에서 모바일 폭이면 편집창 wrapper의 letterbox 크기 제약을 없앤다. `Editor.tsx`는 루트 `<div ref={rootRef}>`는 그대로 유지한 채(폭 감지 `ResizeObserver`가 이 노드를 계속 관찰해야 하므로), 그 안의 콘텐츠만 `narrow` 여부로 통째로 갈라 새 `MobileEditorShell` 컴포넌트를 렌더한다. 도구바·색상환·레이어 패널은 지금 인라인/중복 선언된 것을 top-level 변수로 뽑아 데스크톱과 모바일 셸이 공유한다. 모바일 셸은 하단 독 아이콘을 누르면 이 편집기에 이미 있는 `FLOATING_PANEL` 플로팅 패널 패턴(narrow 아이콘열이 이미 씀)을 그대로 재사용해 그 아이콘 바로 위에 작은 팝오버만 띄운다 — 화면을 덮는 바텀시트나 편집기 내 탭 전환 UI는 만들지 않는다(여러 파일 전환은 갤러리 화면으로 나가서 처리). 다이얼로그·모달(새 캔버스·열기·도움말·크기수정·탭 닫기 확인·나가기 확인·알림)은 이미 조건부 렌더 위치가 두 분기 바깥(형제)이라 손대지 않는다.
 
 **Tech Stack:** Next.js 16 App Router, React 19, TypeScript, Tailwind CSS v4 (기존 스택 그대로, 새 의존성 없음).
 
@@ -146,111 +146,48 @@ EOF
 
 ---
 
-## Task 2: 공용 `BottomSheet` 컴포넌트
+## Task 2 (개정 2026-09-24): `BottomSheet.tsx` 삭제 — 대체 컴포넌트 없음
+
+> 원래 Task 2는 공용 `BottomSheet`(바텀시트) 컴포넌트를 만들고 커밋(`e8d26ed`)까지 마쳤으나, 스펙이 "웹사이트/모달 느낌" 피드백에 따라 하단 독 + `FLOATING_PANEL` 앵커 팝오버 방식(Option F)으로 전면 개정되며 이 컴포넌트 자체가 필요 없어졌다. 대체 컴포넌트를 만들지 않는다 — Task 4가 이 편집기에 이미 있는 `FLOATING_PANEL`(`./panelStyles`) + `absolute bottom-full` 패턴(`Editor.tsx:3399`)을 그대로 재사용한다. 자세한 배경은 스펙 문서의 "개정 이력(2026-09-24)" 참고.
 
 **Files:**
-- Create: `apps/services/components/works/5_PixelArtMaker/BottomSheet.tsx`
+- Delete: `apps/services/components/works/5_PixelArtMaker/BottomSheet.tsx`
 
 **Interfaces:**
-- Consumes: 없음(순수 프레젠테이션 컴포넌트, 다른 파일 상태에 의존 안 함).
-- Produces: `export default function BottomSheet(props: BottomSheetProps): JSX.Element | null` — Task 4가 이 컴포넌트를 5곳(도구/색상/레이어/더보기/탭목록)에서 쓴다.
+- Consumes: 없음.
+- Produces: 없음(삭제만 한다 — Task 4는 이 컴포넌트를 쓰지 않는다).
 
-```ts
-export type BottomSheetProps = {
-  open: boolean;
-  onClose: () => void;
-  title?: string;
-  // peek: 화면 아래 부분 높이(최대 55vh)만 차지 — 캔버스가 위로 계속 보인다.
-  // full: 화면 대부분(최대 90vh) — 리스트·긴 패널용.
-  heightMode: "peek" | "full";
-  children: React.ReactNode;
-};
+- [ ] **Step 1: 참조 확인**
+
+```bash
+grep -rn "BottomSheet" apps/services/components/works/5_PixelArtMaker/
 ```
 
-- [ ] **Step 1: 컴포넌트 작성**
+`BottomSheet.tsx` 자기 자신 말고 다른 파일에서 import하는 곳이 없어야 한다(Task 4의 `MobileEditorShell.tsx`는 아직 존재하지 않거나, 존재하더라도 이 계획의 새 버전은 `BottomSheet`를 import하지 않는다). 참조가 남아 있으면 먼저 그 참조부터 정리한다.
 
-```tsx
-"use client";
+- [ ] **Step 2: 파일 삭제**
 
-import { X } from "lucide-react";
-
-// 모바일 셸 전용 바텀시트 — 하단 독(도구/색상/레이어/더보기)과 탭 목록이
-// 전부 이 하나를 재사용한다. peek는 캔버스를 계속 보여주는 부분 높이,
-// full은 리스트·긴 패널을 위한 거의 전체 높이다. 열림/닫힘 애니메이션은
-// CSS transition만 쓴다(별도 라이브러리 없이 이 프로젝트의 다른 패널들과
-// 같은 방식).
-export type BottomSheetProps = {
-  open: boolean;
-  onClose: () => void;
-  title?: string;
-  heightMode: "peek" | "full";
-  children: React.ReactNode;
-};
-
-export default function BottomSheet({
-  open,
-  onClose,
-  title,
-  heightMode,
-  children,
-}: BottomSheetProps) {
-  if (!open) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end">
-      {/* 배경 — 누르면 닫힌다. peek는 캔버스가 보여야 하므로 반투명 없이
-          투명하게 둔다(탭 감지만). full은 리스트류라 살짝 어둡게 깔아
-          뒤 캔버스와 시각적으로 분리한다. */}
-      <div
-        className={`absolute inset-0 ${heightMode === "full" ? "bg-black/30" : ""}`}
-        onClick={onClose}
-      />
-      <div
-        className={`relative flex flex-col bg-white shadow-[0_-4px_16px_rgba(0,0,0,0.15)] ${
-          heightMode === "peek" ? "max-h-[55vh]" : "max-h-[90vh]"
-        }`}
-      >
-        <div className="flex shrink-0 items-center justify-center pt-2">
-          <div className="h-1 w-9 rounded-full bg-gray-300" />
-        </div>
-        {title && (
-          <div className="flex shrink-0 items-center justify-between px-4 pb-2 pt-1">
-            <span className="text-sm font-semibold text-gray-900">
-              {title}
-            </span>
-            <button
-              onClick={onClose}
-              title="닫기"
-              className="flex h-7 w-7 items-center justify-center text-gray-400 hover:text-gray-700"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-}
+```bash
+rm apps/services/components/works/5_PixelArtMaker/BottomSheet.tsx
 ```
 
-- [ ] **Step 2: 정적 검증**
+- [ ] **Step 3: 정적 검증**
 
 ```bash
 npx tsc --noEmit -p apps/services/tsconfig.json
 npm run lint --workspace services
 ```
 
-이 파일은 아직 아무 데서도 import하지 않으므로(Task 4에서 씀) 브라우저로 볼 방법이 없다 — 이 태스크는 정적 검증까지만 하고, 실제 동작 확인은 Task 4의 브라우저 확인에서 함께 한다.
-
-- [ ] **Step 3: 커밋**
+- [ ] **Step 4: 커밋**
 
 ```bash
-git add apps/services/components/works/5_PixelArtMaker/BottomSheet.tsx
+git add -A apps/services/components/works/5_PixelArtMaker/BottomSheet.tsx
 git commit -m "$(cat <<'EOF'
-feat : 네모네모빔 모바일 셸용 공용 BottomSheet 컴포넌트 추가
+refactor : 네모네모빔 모바일 셸 설계 개정으로 BottomSheet 컴포넌트 제거
+
+하단 독 + FLOATING_PANEL 앵커 팝오버 방식(Option F)으로 전환하며
+이 편집기에 이미 있는 플로팅 패널 패턴을 재사용하게 되어 더 이상
+필요 없어짐(대체 컴포넌트 없음).
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_0142A7VXzRmpPmTm1jdBw1Z9
@@ -552,14 +489,16 @@ EOF
 
 ---
 
-## Task 4: `MobileEditorShell` 작성 및 연결
+## Task 4 (개정 2026-09-24): `MobileEditorShell` 작성 및 연결 — 하단 독 + 앵커 팝오버
+
+> 원래 Task 4는 Task 2의 `BottomSheet`와 탭 목록 시트를 쓰는 설계였으나, 스펙 개정(Option F)에 따라 전면 재작성한다. 바텀시트 대신 이 편집기에 이미 있는 `FLOATING_PANEL`(`./panelStyles`) + `absolute bottom-full` 앵커링 패턴(`Editor.tsx:3399`, narrow 아이콘열의 이미지 불러오기/내보내기 팝업과 동일한 방식)을 그대로 쓴다. **여러 파일 전환 UI(탭 목록)는 만들지 않는다** — 파일을 바꾸려면 상단 바의 `‹`(`onExit`)로 갤러리(`Desktop.tsx`)로 나간다. 파일명 인라인 편집은 탭 목록과 충돌할 일이 없어졌으므로 상단 바에 그대로 둔다.
 
 **Files:**
 - Create: `apps/services/components/works/5_PixelArtMaker/MobileEditorShell.tsx`
 - Modify: `apps/services/components/works/5_PixelArtMaker/Editor.tsx`
 
 **Interfaces:**
-- Consumes: `BottomSheet`(Task 2), `toolPanel`/`colorPanel`/`layerPanel`/`canvasArea`/`importPanel`/`exportPanel`(Task 3 + 기존).
+- Consumes: `FLOATING_PANEL`(`./panelStyles`, 기존), `toolPanel`/`colorPanel`/`layerPanel`/`canvasArea`/`importPanel`/`exportPanel`(Task 3 + 기존), `TracingListPanel`(기존, 이미 `Editor.tsx`가 import함).
 - Produces: `MobileEditorShell` 컴포넌트(이 계획의 마지막 소비자 — 더 이상 다른 태스크가 이걸 쓰지 않는다).
 
 - [ ] **Step 1: `MobileEditorShell.tsx` 작성**
@@ -567,9 +506,9 @@ EOF
 ```tsx
 "use client";
 
-import { ChevronLeft, Layers, Menu, Palette, PenTool, Plus, Save, X } from "lucide-react";
-import { useState } from "react";
-import BottomSheet from "./BottomSheet";
+import { Layers, Menu, Palette, PenTool, Save } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { FLOATING_PANEL } from "./panelStyles";
 
 export type MobileMoreItem =
   | { id: string; label: string; kind: "action"; onSelect: () => void }
@@ -578,17 +517,17 @@ export type MobileMoreItem =
       label: string;
       kind: "detail";
       // 렌더 프롭 — "레퍼런스" 항목이 이미지를 조정 모드로 고르는 순간
-      // 데스크톱처럼 시트를 닫아 캔버스를 보여줘야 해서, 콘텐츠 쪽에서
-      // 시트를 닫을 수 있는 함수를 받는다(단순 ReactNode면 이걸 할 수
-      // 없다). 안 쓰는 항목(파일/편집/불러오기/내보내기)은 인자를 무시한다.
-      content: (closeSheet: () => void) => React.ReactNode;
+      // 데스크톱(narrow 아이콘열)처럼 팝오버를 닫아 캔버스의 조정 손잡이가
+      // 보이게 해야 해서, 콘텐츠 쪽에서 팝오버를 닫을 수 있는 함수를
+      // 받는다(단순 ReactNode면 이걸 할 수 없다). 안 쓰는 항목(파일/편집/
+      // 불러오기/내보내기)은 인자를 무시한다.
+      content: (closeAll: () => void) => React.ReactNode;
     };
-
-export type MobileTab = { index: number; name: string; active: boolean };
 
 export type MobileEditorShellProps = {
   hasActiveTab: boolean; // false면 "열린 파일 없음" 빈 상태를 보여준다
   fileName: string;
+  onRenameFile: (name: string) => void;
   onExit: () => void;
   onSave: () => void;
   saveError: boolean;
@@ -602,19 +541,16 @@ export type MobileEditorShellProps = {
   colorPanel: React.ReactNode;
   layerPanel: React.ReactNode;
   moreItems: MobileMoreItem[];
-  tabs: MobileTab[];
-  onSelectTab: (index: number) => void;
-  onCloseTab: (index: number) => void;
-  onRenameActiveTab: (name: string) => void;
   onNewTab: () => void;
   onOpenExisting: () => void;
 };
 
-type SheetKind = "tools" | "color" | "layers" | "more" | "tabs" | null;
+type PopoverKind = "tools" | "color" | "layers" | "more" | null;
 
 export default function MobileEditorShell({
   hasActiveTab,
   fileName,
+  onRenameFile,
   onExit,
   onSave,
   saveError,
@@ -628,27 +564,36 @@ export default function MobileEditorShell({
   colorPanel,
   layerPanel,
   moreItems,
-  tabs,
-  onSelectTab,
-  onCloseTab,
-  onRenameActiveTab,
   onNewTab,
   onOpenExisting,
 }: MobileEditorShellProps) {
-  const [sheet, setSheet] = useState<SheetKind>(null);
+  const [openPopover, setOpenPopover] = useState<PopoverKind>(null);
   const [moreDetail, setMoreDetail] = useState<string | null>(null);
-  const [renameDraft, setRenameDraft] = useState<string | null>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
 
-  const closeSheet = () => {
-    setSheet(null);
+  const closeAll = () => {
+    setOpenPopover(null);
     setMoreDetail(null);
-    setRenameDraft(null);
   };
 
-  const toggleSheet = (kind: Exclude<SheetKind, null>) => {
-    setSheet((cur) => (cur === kind ? null : kind));
-    if (sheet !== "more") setMoreDetail(null);
+  const toggle = (kind: Exclude<PopoverKind, null>) => {
+    setOpenPopover((cur) => (cur === kind ? null : kind));
+    setMoreDetail(null);
   };
+
+  // 독(팝오버 + 하단 아이콘 바) 바깥을 누르면 닫는다 — ContextMenu.tsx와
+  // 같은 mousedown 패턴. 독 자체(아이콘 버튼 포함)는 ref 안에 있으므로
+  // 아이콘을 다시 눌러 토글하는 동작과 충돌하지 않는다.
+  useEffect(() => {
+    if (!openPopover) return;
+    const handler = (e: MouseEvent) => {
+      if (dockRef.current && !dockRef.current.contains(e.target as Node)) {
+        closeAll();
+      }
+    };
+    window.addEventListener("mousedown", handler);
+    return () => window.removeEventListener("mousedown", handler);
+  }, [openPopover]);
 
   if (!hasActiveTab) {
     return (
@@ -675,6 +620,46 @@ export default function MobileEditorShell({
 
   const activeMoreItem = moreItems.find((m) => m.id === moreDetail);
 
+  let popoverContent: React.ReactNode = null;
+  if (openPopover === "tools") popoverContent = toolPanel;
+  else if (openPopover === "color") popoverContent = colorPanel;
+  else if (openPopover === "layers") popoverContent = layerPanel;
+  else if (openPopover === "more") {
+    popoverContent = activeMoreItem ? (
+      <div>
+        <button
+          onClick={() => setMoreDetail(null)}
+          className="mb-2 flex items-center gap-1 text-xs text-violet-600"
+        >
+          ‹ 목록으로
+        </button>
+        {activeMoreItem.content(closeAll)}
+      </div>
+    ) : (
+      <div className="flex flex-col divide-y divide-gray-100">
+        {moreItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => {
+              if (item.kind === "action") {
+                item.onSelect();
+                closeAll();
+              } else {
+                setMoreDetail(item.id);
+              }
+            }}
+            className="flex items-center justify-between py-3 text-left text-sm text-gray-800"
+          >
+            {item.label}
+            {item.kind === "detail" && (
+              <span className="text-gray-300">›</span>
+            )}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-white">
       {/* 상단 바 */}
@@ -684,24 +669,23 @@ export default function MobileEditorShell({
           title="닫기"
           className="flex h-8 w-8 shrink-0 items-center justify-center text-gray-500"
         >
-          <ChevronLeft className="h-5 w-5" />
+          ‹
         </button>
-        <button
-          onClick={() => toggleSheet("tabs")}
-          className="flex min-w-0 flex-1 items-center gap-1 truncate px-1 text-sm font-semibold text-gray-900"
-        >
-          <span className="truncate">{fileName}</span>
-          {saveError && (
-            <span className="shrink-0 text-[10px] font-semibold text-red-500">
-              저장 실패
-            </span>
-          )}
-          {!saveError && showSavedNotice && (
-            <span className="shrink-0 text-[10px] font-semibold text-green-600">
-              저장됨
-            </span>
-          )}
-        </button>
+        <input
+          value={fileName}
+          onChange={(e) => onRenameFile(e.target.value)}
+          className="min-w-0 flex-1 truncate border-none bg-transparent px-1 text-sm font-semibold text-gray-900 outline-none"
+        />
+        {saveError && (
+          <span className="shrink-0 text-[10px] font-semibold text-red-500">
+            저장 실패
+          </span>
+        )}
+        {!saveError && showSavedNotice && (
+          <span className="shrink-0 text-[10px] font-semibold text-green-600">
+            저장됨
+          </span>
+        )}
         <button
           onClick={onSave}
           title="저장"
@@ -730,175 +714,54 @@ export default function MobileEditorShell({
       {/* 캔버스 */}
       <div className="relative min-h-0 flex-1">{canvas}</div>
 
-      {/* 하단 독 */}
-      <div className="flex shrink-0 items-center justify-around border-t border-gray-200 bg-white py-1.5">
-        <button
-          onClick={() => toggleSheet("tools")}
-          className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
-            sheet === "tools" ? "text-violet-600" : "text-gray-500"
-          }`}
-        >
-          <PenTool className="h-5 w-5" />
-          도구
-        </button>
-        <button
-          onClick={() => toggleSheet("color")}
-          className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
-            sheet === "color" ? "text-violet-600" : "text-gray-500"
-          }`}
-        >
-          <Palette className="h-5 w-5" />
-          색상
-        </button>
-        <button
-          onClick={() => toggleSheet("layers")}
-          className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
-            sheet === "layers" ? "text-violet-600" : "text-gray-500"
-          }`}
-        >
-          <Layers className="h-5 w-5" />
-          레이어
-        </button>
-        <button
-          onClick={() => toggleSheet("more")}
-          className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
-            sheet === "more" ? "text-violet-600" : "text-gray-500"
-          }`}
-        >
-          <Menu className="h-5 w-5" />
-          더보기
-        </button>
-      </div>
-
-      <BottomSheet
-        open={sheet === "tools"}
-        onClose={closeSheet}
-        heightMode="peek"
-        title="도구"
-      >
-        {toolPanel}
-      </BottomSheet>
-      <BottomSheet
-        open={sheet === "color"}
-        onClose={closeSheet}
-        heightMode="peek"
-        title="색상"
-      >
-        {colorPanel}
-      </BottomSheet>
-      <BottomSheet
-        open={sheet === "layers"}
-        onClose={closeSheet}
-        heightMode="peek"
-        title="레이어"
-      >
-        {layerPanel}
-      </BottomSheet>
-      <BottomSheet
-        open={sheet === "more"}
-        onClose={closeSheet}
-        heightMode="full"
-        title={activeMoreItem ? activeMoreItem.label : "더보기"}
-      >
-        {activeMoreItem ? (
-          <div>
-            <button
-              onClick={() => setMoreDetail(null)}
-              className="mb-2 flex items-center gap-1 text-xs text-violet-600"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-              목록으로
-            </button>
-            {activeMoreItem.content(closeSheet)}
-          </div>
-        ) : (
-          <div className="flex flex-col divide-y divide-gray-100">
-            {moreItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  if (item.kind === "action") {
-                    item.onSelect();
-                    closeSheet();
-                  } else {
-                    setMoreDetail(item.id);
-                  }
-                }}
-                className="flex items-center justify-between py-3 text-left text-sm text-gray-800"
-              >
-                {item.label}
-                {item.kind === "detail" && (
-                  <span className="text-gray-300">›</span>
-                )}
-              </button>
-            ))}
+      {/* 하단 독 + 그 위 팝오버 — Editor.tsx:3399의 FLOATING_PANEL 패턴 그대로 */}
+      <div ref={dockRef} className="relative">
+        {openPopover && (
+          <div
+            className={`absolute bottom-full left-2 right-2 z-40 mb-2 flex max-h-[60vh] flex-col overflow-y-auto ${FLOATING_PANEL}`}
+          >
+            {popoverContent}
           </div>
         )}
-      </BottomSheet>
-      <BottomSheet
-        open={sheet === "tabs"}
-        onClose={closeSheet}
-        heightMode="full"
-        title="열린 파일"
-      >
-        <div className="flex flex-col divide-y divide-gray-100">
-          {tabs.map((t) => (
-            <div key={t.index} className="flex items-center gap-2 py-2.5">
-              {t.active && renameDraft !== null ? (
-                <input
-                  autoFocus
-                  value={renameDraft}
-                  onChange={(e) => setRenameDraft(e.target.value)}
-                  onBlur={() => {
-                    onRenameActiveTab(renameDraft);
-                    setRenameDraft(null);
-                  }}
-                  className="min-w-0 flex-1 border-b border-violet-300 text-sm outline-none"
-                />
-              ) : (
-                <button
-                  onClick={() => {
-                    onSelectTab(t.index);
-                    closeSheet();
-                  }}
-                  className={`min-w-0 flex-1 truncate text-left text-sm ${
-                    t.active ? "font-semibold text-violet-700" : "text-gray-800"
-                  }`}
-                >
-                  {t.active ? "● " : ""}
-                  {t.name}
-                </button>
-              )}
-              {t.active && renameDraft === null && (
-                <button
-                  onClick={() => setRenameDraft(t.name)}
-                  title="이름 바꾸기"
-                  className="shrink-0 text-xs text-gray-400"
-                >
-                  ✎
-                </button>
-              )}
-              <button
-                onClick={() => onCloseTab(t.index)}
-                title="닫기"
-                className="shrink-0 text-gray-300 hover:text-red-500"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ))}
+        <div className="flex items-center justify-around border-t border-gray-200 bg-white py-1.5">
           <button
-            onClick={() => {
-              onNewTab();
-              closeSheet();
-            }}
-            className="flex items-center gap-1.5 py-3 text-sm text-violet-600"
+            onClick={() => toggle("tools")}
+            className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
+              openPopover === "tools" ? "text-violet-600" : "text-gray-500"
+            }`}
           >
-            <Plus className="h-4 w-4" />
-            새 파일
+            <PenTool className="h-5 w-5" />
+            도구
+          </button>
+          <button
+            onClick={() => toggle("color")}
+            className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
+              openPopover === "color" ? "text-violet-600" : "text-gray-500"
+            }`}
+          >
+            <Palette className="h-5 w-5" />
+            색상
+          </button>
+          <button
+            onClick={() => toggle("layers")}
+            className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
+              openPopover === "layers" ? "text-violet-600" : "text-gray-500"
+            }`}
+          >
+            <Layers className="h-5 w-5" />
+            레이어
+          </button>
+          <button
+            onClick={() => toggle("more")}
+            className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
+              openPopover === "more" ? "text-violet-600" : "text-gray-500"
+            }`}
+          >
+            <Menu className="h-5 w-5" />
+            더보기
           </button>
         </div>
-      </BottomSheet>
+      </div>
     </div>
   );
 }
@@ -911,7 +774,7 @@ npx tsc --noEmit -p apps/services/tsconfig.json
 npm run lint --workspace services
 ```
 
-`lucide-react`의 `ChevronLeft`/`Layers`/`Menu`/`Palette`/`PenTool`/`Plus`/`Save`/`X` 아이콘이 없다는 에러가 나면(이 라이브러리 버전에 따라 이름이 다를 수 있다) `Editor.tsx` 상단 import에서 이미 쓰고 있는 아이콘 이름을 참고해 맞춘다.
+`lucide-react`의 `Layers`/`Menu`/`Palette`/`PenTool`/`Save` 아이콘이 없다는 에러가 나면(이 라이브러리 버전에 따라 이름이 다를 수 있다) `Editor.tsx` 상단 import에서 이미 쓰고 있는 아이콘 이름을 참고해 맞춘다. `FLOATING_PANEL`이 `./panelStyles`에 없다는 에러가 나면 `Editor.tsx` 상단에서 실제 import 경로/이름을 확인한다.
 
 - [ ] **Step 3: `Editor.tsx`에 데이터 준비 + 최상위 분기 연결**
 
@@ -929,8 +792,6 @@ import MobileEditorShell, { MobileMoreItem } from "./MobileEditorShell";
 | 다른 이름으로 저장 | `handleSaveAs` |
 | 편집기 나가기(더러우면 확인) | `handleExitClick` |
 | 실행취소/다시실행 | `handleUndo` / `handleRedo`, `history.canUndo` / `history.canRedo` |
-| 탭 전환 | `switchToTab` |
-| 탭 닫기 요청(더러우면 확인) | `requestCloseTab` |
 | 새 캔버스 다이얼로그 열기 | `setShowNewCanvasDialog(true)` |
 | 열기 다이얼로그 열기 | `setShowOpenDialog(true)` |
 | JSON 불러오기 | `jsonFileInputRef.current?.click()` |
@@ -939,7 +800,7 @@ import MobileEditorShell, { MobileMoreItem } from "./MobileEditorShell";
 | 캔버스 크기 수정 다이얼로그 | `setResizingCanvas(true)` |
 | 붙여넣기 | `handlePaste` |
 | 레퍼런스 리스트 | `TracingListPanel`(이미 import됨), props는 아래 참고 |
-| 활성 탭 이름 바꾸기 | `setName` + `setHasMetaEdits(true)`(단, `isWallpaper`면 무시) |
+| 파일명 인라인 편집 | `setName` + `setHasMetaEdits(true)`(단, `isWallpaper`면 무시 — 데스크톱 제목표시줄과 동일) |
 
 ```tsx
   // 모바일 셸 전용 데이터 — Editor.tsx의 기존 핸들러를 그대로 재사용한다.
@@ -979,8 +840,8 @@ import MobileEditorShell, { MobileMoreItem } from "./MobileEditorShell";
       label: "레퍼런스",
       kind: "detail",
       // 조정할 이미지를 고르는 순간 데스크톱(narrow 아이콘열)과 똑같이
-      // 시트를 닫아 캔버스의 조정 손잡이가 보이게 한다.
-      content: (closeSheet) => (
+      // 팝오버를 닫아 캔버스의 조정 손잡이가 보이게 한다.
+      content: (closeAll) => (
         <TracingListPanel
           tracingImages={tracingCanvasImages}
           activeTracingId={activeReferenceId}
@@ -988,7 +849,7 @@ import MobileEditorShell, { MobileMoreItem } from "./MobileEditorShell";
           onOpacityChange={handleReferenceOpacityChange}
           onToggleAdjust={(id) => {
             handleToggleReferenceAdjust(id);
-            closeSheet();
+            closeAll();
           }}
           onDelete={handleReferenceDelete}
         />
@@ -996,17 +857,6 @@ import MobileEditorShell, { MobileMoreItem } from "./MobileEditorShell";
     },
     { id: "help", label: "도움말", kind: "action", onSelect: () => setShowHelpDialog(true) },
   ];
-
-  const mobileTabs = tabs.map((t, i) => ({
-    index: i,
-    name:
-      t.doc.id === WALLPAPER_ID
-        ? WALLPAPER_NAME
-        : i === activeTabIndex
-          ? name
-          : t.doc.name,
-    active: i === activeTabIndex,
-  }));
 ```
 
 - [ ] **Step 4: 루트 반환문 재구성**
@@ -1042,6 +892,11 @@ import MobileEditorShell, { MobileMoreItem } from "./MobileEditorShell";
         <MobileEditorShell
           hasActiveTab={activeTabIndex >= 0}
           fileName={isWallpaperTab ? WALLPAPER_NAME : name}
+          onRenameFile={(newName) => {
+            if (isWallpaperTab) return;
+            setName(newName);
+            setHasMetaEdits(true);
+          }}
           onExit={handleExitClick}
           onSave={handleSave}
           saveError={saveError}
@@ -1055,14 +910,6 @@ import MobileEditorShell, { MobileMoreItem } from "./MobileEditorShell";
           colorPanel={colorPanel}
           layerPanel={layerPanel}
           moreItems={mobileMoreItems}
-          tabs={mobileTabs}
-          onSelectTab={switchToTab}
-          onCloseTab={requestCloseTab}
-          onRenameActiveTab={(newName) => {
-            if (isWallpaperTab) return;
-            setName(newName);
-            setHasMetaEdits(true);
-          }}
           onNewTab={() => setShowNewCanvasDialog(true)}
           onOpenExisting={() => setShowOpenDialog(true)}
         />
@@ -1117,16 +964,17 @@ npm run lint --workspace services
 `http://localhost:3100/nemo-nemo-beam`, DevTools 기기 에뮬레이션 390px:
 
 1. 편집창이 letterbox 없이 전체화면, 상단 바(‹ 파일명 💾 ↩ ↪) + 캔버스 + 하단 독(도구/색상/레이어/더보기)이 보이는지.
-2. 도구/색상/레이어를 각각 눌러 시트가 열리고(캔버스가 위로 계속 보임), 같은 아이콘을 다시 누르면 닫히는지. 색상환에서 색을 고르면 실제로 활성 색이 바뀌는지, 도구를 바꾸면 실제로 그리기 도구가 바뀌는지, 레이어를 추가/삭제하면 반영되는지(내부 컴포넌트는 그대로라 잘 되는 게 정상).
-3. 더보기 → 파일/편집/이미지 불러오기/내보내기/레퍼런스가 각각 열리고 "목록으로"로 돌아오는지. 도움말은 바로 다이얼로그가 뜨는지.
+2. 도구/색상/레이어를 각각 눌러 그 독 바로 위에 작은 팝오버가 뜨고(캔버스 대부분이 계속 보임, 화면을 덮는 모달이 아님), 같은 아이콘을 다시 누르거나 팝오버 바깥(캔버스)을 누르면 닫히는지. 색상환에서 색을 고르면 실제로 활성 색이 바뀌는지, 도구를 바꾸면 실제로 그리기 도구가 바뀌는지, 레이어를 추가/삭제하면 반영되는지(내부 컴포넌트는 그대로라 잘 되는 게 정상).
+3. 더보기 → 목록이 뜨고, 파일/편집/이미지 불러오기/내보내기/레퍼런스를 누르면 같은 팝오버 안에서 그 내용으로 바뀌며 "‹ 목록으로"로 되돌아오는지. 도움말을 누르면 팝오버가 닫히며 도움말 다이얼로그가 뜨는지.
 4. 더보기 > 파일 > 새로 만들기 → NewCanvasDialog가 실제로 뜨는지(전역 다이얼로그라 모바일에서도 떠야 함 — Step 4의 재구성이 맞는지 검증하는 핵심 지점).
-5. 상단 바 파일명을 눌러 탭 목록 시트가 뜨고, "+ 새 파일"로 탭이 늘어나는지, 탭을 눌러 전환되는지, ✕로 탭을 닫을 수 있는지(저장 안 된 변경이 있으면 확인 다이얼로그가 뜨는지), 활성 탭 연필 아이콘으로 이름을 바꿀 수 있는지.
-6. 상단 바 저장 버튼과 ‹(닫기)가 동작하는지(닫기는 변경사항이 있으면 확인 없이 나가지지 않아야 함).
-7. 탭을 전부 닫아 "열린 파일이 없습니다" 빈 상태가 뜨고 새로 만들기/열기가 동작하는지.
+5. 상단 바 파일명 입력칸을 눌러 이름을 바꿀 수 있는지(입력하는 즉시 반영되는지, 데스크톱 제목표시줄과 동일).
+6. 상단 바 저장 버튼과 ‹(닫기)가 동작하는지(닫기는 변경사항이 있으면 확인 없이 나가지지 않아야 함 — `handleExitClick`이 그대로 처리).
+7. 레퍼런스 팝오버에서 이미지를 조정 모드로 고르면 팝오버가 닫히고 캔버스에 조정 손잡이가 보이는지.
+8. (드문 경우) 마지막 탭을 닫아 "열린 파일이 없습니다" 빈 상태가 뜨면 새로 만들기/열기가 동작하는지.
 
 - [ ] **Step 7: 브라우저 회귀 확인 — 데스크톱 폭(1280px)**
 
-같은 페이지를 1280px로 열어 Task 3의 Step 6 체크리스트를 다시 확인한다 — 제목표시줄·메뉴바·탭바·레퍼런스 창까지 전부 재구성 전과 동일해야 한다.
+같은 페이지를 1280px로 열어 Task 3의 Step 6 체크리스트를 다시 확인한다 — 제목표시줄·메뉴바·탭바·레퍼런스 창까지 전부 재구성 전과 동일해야 한다(모바일 셸에 탭 UI가 없다고 데스크톱의 탭 기능이 줄어드는 게 아니다).
 
 - [ ] **Step 8: 폭 전환 확인**
 
@@ -1137,7 +985,7 @@ npm run lint --workspace services
 ```bash
 git add apps/services/components/works/5_PixelArtMaker/MobileEditorShell.tsx apps/services/components/works/5_PixelArtMaker/Editor.tsx
 git commit -m "$(cat <<'EOF'
-feat : 네모네모빔 모바일 폭(<820px)에 전용 셸(하단 독+바텀시트) 적용
+feat : 네모네모빔 모바일 폭(<820px)에 전용 셸(하단 독+앵커 팝오버) 적용
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_0142A7VXzRmpPmTm1jdBw1Z9
@@ -1149,7 +997,10 @@ EOF
 
 ## Self-Review Notes
 
-- **스펙 커버리지:** 컨테이너 전체화면(Task 1), BottomSheet peek/full(Task 2), 도구/색상/레이어/캔버스 공유 변수(Task 3), 상단 바(닫기·파일명·저장·되돌리기·다시실행)·하단 독·더보기 매핑·탭 목록(닫기·이름바꾸기 포함)(Task 4) — 스펙의 모든 섹션에 대응하는 태스크가 있다.
-- **빈 상태:** 스펙에 명시되진 않았지만 데스크톱에 이미 있는 "열린 파일이 없습니다" 상태를 모바일에도 동등하게 뒀다(`hasActiveTab`/`onOpenExisting`) — 없으면 마지막 탭을 닫는 순간 모바일에서 막다른 화면이 된다.
-- **타입 일관성:** `MobileEditorShellProps`의 `tabs: MobileTab[]`(index 기반)와 Editor.tsx의 `onSelectTab={switchToTab}`/`onCloseTab={requestCloseTab}`(둘 다 index를 받음)가 일치한다. `MobileMoreItem`의 `kind` 판별 유니언을 `MobileEditorShell.tsx`와 `Editor.tsx` 양쪽에서 동일하게 쓴다(타입은 `MobileEditorShell.tsx`에서 export).
+> **개정 2026-09-24:** 아래 노트는 Option F(하단 독 + 앵커 팝오버) 재작성 이후 기준으로 다시 썼다. 원래 Task 2(BottomSheet)/Task 4(탭 목록 포함) 버전의 self-review는 더 이상 유효하지 않다.
+
+- **스펙 커버리지:** 컨테이너 전체화면(Task 1), `BottomSheet.tsx` 삭제·대체 없음(Task 2), 도구/색상/레이어/캔버스 공유 변수(Task 3), 상단 바(닫기·파일명 인라인 편집·저장·되돌리기·다시실행)·하단 독·`FLOATING_PANEL` 앵커 팝오버·더보기 목록→상세 매핑(Task 4) — 스펙의 모든 섹션에 대응하는 태스크가 있다. 여러 파일 전환은 스펙대로 셸 범위 밖(갤러리로 나가기)이라 별도 태스크가 없다.
+- **빈 상태:** 스펙에 명시되진 않았지만 데스크톱에 이미 있는 "열린 파일이 없습니다" 상태를 모바일에도 동등하게 뒀다(`hasActiveTab`/`onNewTab`/`onOpenExisting`) — 없으면 마지막 탭을 닫는 순간 모바일에서 막다른 화면이 된다(드문 경우지만 데스크톱과 동급 커버리지를 위해 유지).
+- **타입 일관성:** `MobileMoreItem`의 `kind` 판별 유니언과 `content: (closeAll: () => void) => ReactNode` 렌더 프롭 시그니처를 `MobileEditorShell.tsx`(정의)와 `Editor.tsx`(구성)에서 동일하게 쓴다. `openPopover`/`moreDetail`은 셸 내부 상태로만 존재하고 `MobileEditorShellProps`에 없다 — Editor.tsx는 이 값을 몰라도 된다(스펙의 "Editor.tsx가 알 필요 없는 순수 네비게이션 상태" 원칙과 일치).
+- **outside-click 충돌 검증:** 하단 독 팝오버의 바깥 클릭 감지는 `ContextMenu.tsx`와 같은 `window` `mousedown` 리스너 패턴을 쓰되, ref를 팝오버 자신이 아니라 팝오버+독 아이콘 바를 함께 감싸는 `relative` 컨테이너에 둔다 — 그래야 독 아이콘을 다시 눌러 토글하는 클릭이 "바깥 클릭"으로 오인되어 `mousedown` 시점에 먼저 닫혔다가 뒤이은 `onClick` 토글로 다시 열리는 깜빡임/오작동이 생기지 않는다.
 - **플레이스홀더 없음:** 전 태스크의 코드 스텝은 실제 JSX/핸들러 이름을 그대로 썼다(TBD 없음). Task 4 Step 4의 "기존 코드 그대로"는 자리표시자가 아니라 "이 계획 문서에 전체를 다시 옮겨적지 않고 원본을 그대로 이동하라"는 명시적 지시다 — 실행자는 실제 파일에서 그 블록을 잘라 옮기면 된다(내용을 새로 작성하지 않는다).
