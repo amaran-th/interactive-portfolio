@@ -93,6 +93,7 @@ import {
   DEFAULT_FRAME_DURATION_MS,
   DEFAULT_REFERENCE_MODE,
   DEFAULT_TRACING_OPACITY,
+  IMPORT_EXPORT_BREAKPOINT,
   LayerScope,
   MAX_CANVAS_SIZE,
   MAX_LAYERS,
@@ -122,10 +123,20 @@ import {
 } from "./wallpaper";
 
 // 클립스튜디오처럼 여러 파일을 탭으로 동시에 열어둘 수 있다. 활성 탭의 실제
-// 편집 상태(doc/history/이름/hasMetaEdits/pixelsDirty)만 살아있는 hook 상태로
-// 유지하고, 비활성 탭은 이 스냅샷 형태로만 보관한다(전환 시 되돌리기 스택은
-// 초기화되지만 그림 내용은 그대로 보존된다).
-type Tab = { doc: PixelArt; hasMetaEdits: boolean; pixelsDirty: boolean };
+// 편집 상태(doc/history/이름/hasMetaEdits/pixelsDirty/레퍼런스·트레이싱)만
+// 살아있는 hook 상태로 유지하고, 비활성 탭은 이 스냅샷 형태로만 보관한다
+// (전환 시 되돌리기 스택은 초기화되지만 그림 내용·레퍼런스 창은 그대로
+// 보존된다). 레퍼런스/트레이싱은 예전엔 탭과 무관한 편집기 전역 상태였는데
+// (여러 파일을 오가면 창이 그대로 남아 서로 섞여 보였다), 이제 doc과
+// 똑같이 탭마다 따로 저장·복원한다.
+type Tab = {
+  doc: PixelArt;
+  hasMetaEdits: boolean;
+  pixelsDirty: boolean;
+  referenceWindows: { id: string; zIndex: number; spawnIndex: number }[];
+  referenceItems: ReferenceItem[];
+  activeReferenceId: string | null;
+};
 
 // 투명도·보정(밝기·대비·채도·색온도·틴트) 슬라이더의 드래그 코얼레싱이
 // "지금 이어지는 드래그가 어느 레이어의 어느 값인지" 구분하는 데 쓰는 필드.
@@ -400,7 +411,16 @@ export default function Editor({
   const [initial] = useState(() => resolveInitialDoc(docId));
   const [tabs, setTabs] = useState<Tab[]>(() =>
     initial.found
-      ? [{ doc: initial.doc, hasMetaEdits: false, pixelsDirty: false }]
+      ? [
+          {
+            doc: initial.doc,
+            hasMetaEdits: false,
+            pixelsDirty: false,
+            referenceWindows: [],
+            referenceItems: [],
+            activeReferenceId: null,
+          },
+        ]
       : [],
   );
   const [activeTabIndex, setActiveTabIndex] = useState(() =>
@@ -698,12 +718,17 @@ export default function Editor({
   // 아니라 이 루트 기준 상대좌표로 계산해야 편집창이 letterbox로 작아지거나
   // 가운데 정렬돼도 메뉴가 버튼 바로 아래에 정확히 뜬다.
   const rootRef = useRef<HTMLDivElement>(null);
-  // narrow: 이미지 불러오기/내보내기·오른쪽 레이어 패널이 아이콘으로 접힘.
-  // toolbarCompact: DrawToolbar가 도형·텍스트·그라데이션 도구를 "더보기"로
-  // 접음(도구 카드 2줄 방지). 레이아웃 재구성으로 툴바가 오른쪽 패널 폭만큼
-  // 좁아진 것을 감안해 narrow보다 큰 기준을 쓴다 — 둘 다 순수하게
-  // rootRef.clientWidth만 보므로 창 폭이 그대로면 토글되지 않는다.
+  // narrow: 왼쪽 열의 이미지 불러오기/내보내기까지 포함해 오른쪽 레이어
+  // 패널이 통째로 아이콘 열로 접힘. importExportCollapsed: narrow보다 넓은
+  // 구간에서 이미지 불러오기/내보내기 아코디언만 먼저 아이콘+팝업으로 접힘
+  // (레이어 패널은 그대로 사이드바에 남음) — narrow가 되면 이 조건은 폭
+  // 비교상 자동으로 함께 참이 된다. toolbarCompact: DrawToolbar가
+  // 도형·텍스트·그라데이션 도구를 "더보기"로 접음(도구 카드 2줄 방지).
+  // 레이아웃 재구성으로 툴바가 오른쪽 패널 폭만큼 좁아진 것을 감안해
+  // narrow보다 큰 기준을 쓴다 — 전부 순수하게 rootRef.clientWidth만 보므로
+  // 창 폭이 그대로면 토글되지 않는다.
   const [narrow, setNarrow] = useState(false);
+  const [importExportCollapsed, setImportExportCollapsed] = useState(false);
   const [toolbarCompact, setToolbarCompact] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   useEffect(() => {
@@ -711,6 +736,7 @@ export default function Editor({
     if (!el) return;
     const update = () => {
       setNarrow(el.clientWidth < NARROW_BREAKPOINT);
+      setImportExportCollapsed(el.clientWidth < IMPORT_EXPORT_BREAKPOINT);
       setToolbarCompact(el.clientWidth < TOOLBAR_COMPACT_WIDTH);
       setShowPreview(el.clientWidth >= PREVIEW_MIN_WIDTH);
     };
@@ -719,8 +745,10 @@ export default function Editor({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  // narrow일 때 이미지 불러오기/내보내기 사이드바가 아이콘 두 개로 줄어들고,
-  // 그 중 하나를 누르면 이 상태에 맞는 패널이 플로팅 팝업으로 뜬다.
+  // importExportCollapsed(narrow 포함)일 때 이미지 불러오기/내보내기가
+  // 아이콘 트리거로 줄어들고, 그 중 하나를 누르면 이 상태에 맞는 패널이
+  // 플로팅 팝업으로 뜬다. narrow에서는 오른쪽 레이어 열의 아이콘 칼럼에서,
+  // 그보다 넓지만 importExportCollapsed인 구간에서는 왼쪽 열 자체에서 연다.
   const [openFloatingPanel, setOpenFloatingPanel] = useState<
     "layers" | "import" | "export" | "reference" | null
   >(null);
@@ -1340,6 +1368,9 @@ export default function Editor({
               },
               hasMetaEdits,
               pixelsDirty,
+              referenceWindows,
+              referenceItems,
+              activeReferenceId,
             }
           : t,
       );
@@ -1353,6 +1384,9 @@ export default function Editor({
       history.activeLayerId,
       hasMetaEdits,
       pixelsDirty,
+      referenceWindows,
+      referenceItems,
+      activeReferenceId,
     ],
   );
 
@@ -1366,6 +1400,12 @@ export default function Editor({
         height: tab.doc.height,
       });
       setReferenceLayerIds(new Set());
+      // 레퍼런스/트레이싱 창은 doc과 마찬가지로 이 탭에 저장된 것을 그대로
+      // 복원한다 — 예전엔 이 상태가 탭과 무관해서 다른 파일로 넘어가도
+      // 그대로 남아 있었다(공유되는 것처럼 보였다).
+      setReferenceWindows(tab.referenceWindows);
+      setReferenceItems(tab.referenceItems);
+      setActiveReferenceId(tab.activeReferenceId);
       setSampleScopes({ eyedropper: "active", wand: "active", bucket: "active" });
       setTransformScopes({
         clear: "active",
@@ -1409,6 +1449,9 @@ export default function Editor({
         doc: newDoc,
         hasMetaEdits: false,
         pixelsDirty: false,
+        referenceWindows: [],
+        referenceItems: [],
+        activeReferenceId: null,
       };
       setTabs([...synced, freshTab]);
       loadTab(freshTab, newIndex);
@@ -2057,7 +2100,7 @@ export default function Editor({
       setTabs((prev) =>
         prev.map((t, i) =>
           i === activeTabIndex
-            ? { doc: toSave, hasMetaEdits: false, pixelsDirty: false }
+            ? { ...t, doc: toSave, hasMetaEdits: false, pixelsDirty: false }
             : t,
         ),
       );
@@ -2752,254 +2795,10 @@ export default function Editor({
       pingPong={pingPong}
     />
   );
-
-  return (
-    <div
-      ref={rootRef}
-      className={`pam-editor relative flex h-full w-full select-none flex-col overflow-hidden bg-white text-gray-900 transition-all duration-200 ease-out ${
-        mounted && !closing ? "scale-100 opacity-100" : "scale-95 opacity-0"
-      }`}
-      // 입력칸(파일명, 헥스 코드, 픽셀 크기 등)에 값을 넣고 나서 클릭만으로
-      // 캔버스로 넘어가면(캔버스는 포커스를 받는 요소가 아니다) 포커스가
-      // 그 입력칸에 그대로 남아 있었다 — useKeyboardShortcuts가 "지금
-      // 포커스된 요소가 입력칸이면 무시"하는 가드를 갖고 있어서, 실제로는
-      // 캔버스를 만지고 있는데도 도구 단축키가 조용히 먹히지 않는 문제로
-      // 이어졌다. 입력칸이 아닌 곳을 누르는 순간 남아 있는 포커스를 직접
-      // 풀어준다(capture 단계라 다른 요소의 onClick보다 먼저 실행된다).
-      onPointerDownCapture={(e) => {
-        const target = e.target as HTMLElement;
-        if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
-          return;
-        }
-        const active = document.activeElement;
-        if (
-          active instanceof HTMLElement &&
-          (active.tagName === "INPUT" || active.tagName === "TEXTAREA")
-        ) {
-          active.blur();
-        }
-      }}
-    >
-      {/* 실제 OS 커서 대신 이 편집기 전용 커스텀 커서를 쓴다 — 기본은 일반
-          화살표, 버튼은 포인팅, 텍스트 입력칸은 텍스트 커서. 캔버스 자체의
-          도구별 커서는 PixelCanvas가 인라인 style로 직접 지정한다(이 규칙보다
-          더 구체적인 선택자라 우선한다). */}
-      <style>{`
-        .pam-editor { cursor: ${CURSOR_NORMAL}; }
-        .pam-editor button:not(:disabled) { cursor: ${CURSOR_POINTING}; }
-        /* <label>도 UA 스타일시트가 cursor:default를 박아둬서(range·checkbox와
-           같은 이유) 상속만으로는 안 먹는다 — 명시적으로 되돌린다. 안쪽의
-           input·button 등은 더 구체적인 아래 규칙이 이겨 각자 커서를 유지한다. */
-        .pam-editor label { cursor: ${CURSOR_NORMAL}; }
-        .pam-editor input[type="text"],
-        .pam-editor input:not([type]),
-        .pam-editor input[type="number"],
-        .pam-editor textarea { cursor: ${CURSOR_TEXT}; }
-        /* input[type=file]은 브라우저 UA 스타일시트가 cursor:default를 직접
-           박아둬서 상속만으로는 안 먹는다 — 요소 자체와, 실제 클릭 대상인
-           "파일 선택" 버튼 pseudo-element(표준/webkit 별칭 둘 다) 모두에
-           명시적으로 지정해야 한다. */
-        .pam-editor input[type="file"] { cursor: ${CURSOR_POINTING}; }
-        .pam-editor input[type="file"]::file-selector-button,
-        .pam-editor input[type="file"]::-webkit-file-upload-button {
-          cursor: ${CURSOR_POINTING};
-        }
-        /* range·checkbox·select도 file input과 같은 이유로 UA 스타일시트가
-           cursor:default를 직접 박아둔다 — range는 트랙 자체와 실제로 잡고
-           끄는 thumb이 서로 다른 pseudo-element라 둘 다 지정해야 한다. */
-        .pam-editor input[type="range"],
-        .pam-editor input[type="checkbox"],
-        .pam-editor select { cursor: ${CURSOR_POINTING}; }
-        .pam-editor input[type="range"]::-webkit-slider-thumb,
-        .pam-editor input[type="range"]::-webkit-slider-runnable-track,
-        .pam-editor input[type="range"]::-moz-range-thumb,
-        .pam-editor input[type="range"]::-moz-range-track {
-          cursor: ${CURSOR_POINTING};
-        }
-        /* number 입력칸의 위/아래 스피너 버튼은 좁은 칸에서 값을 가려 없앤다. */
-        .pam-editor input[type="number"] {
-          -moz-appearance: textfield;
-          appearance: textfield;
-        }
-        .pam-editor input[type="number"]::-webkit-outer-spin-button,
-        .pam-editor input[type="number"]::-webkit-inner-spin-button {
-          -webkit-appearance: none;
-          margin: 0;
-        }
-        /* 비활성(:disabled) 폼 요소는 브라우저가 cursor CSS를 아예 무시하고
-           항상 기본 화살표를 그린다 — pointer-events를 꺼서 호버 자체를
-           부모로 흘려보내야 부모의 커스텀 커서가 그대로 보인다. button 외에
-           input·select 등 다른 폼 요소가 나중에 disabled로 추가돼도 이
-           규칙 하나로 그대로 커버된다. */
-        .pam-editor :disabled { pointer-events: none; cursor: ${CURSOR_NORMAL}; }
-      `}</style>
-      {/* 제목표시줄 — 메뉴 바·캔버스 영역의 무채색 배경과 구분되도록 바이올렛 톤을 준다. */}
-      <div className="flex items-center gap-2 bg-violet-100 px-3 py-2">
-        {activeTabIndex >= 0 ? (
-          <input
-            value={isWallpaper ? WALLPAPER_NAME : name}
-            readOnly={isWallpaper}
-            onChange={(e) => {
-              if (isWallpaper) return;
-              setName(e.target.value);
-              setHasMetaEdits(true);
-            }}
-            className="flex-1 select-text bg-transparent text-sm font-semibold text-gray-900 outline-none"
-            style={isWallpaper ? { cursor: CURSOR_NORMAL } : undefined}
-          />
-        ) : (
-          <span className="flex-1 text-sm font-semibold text-gray-400">
-            편집기
-          </span>
-        )}
-        {saveError && (
-          <span className="text-[10px] font-semibold text-red-500">
-            저장 실패
-          </span>
-        )}
-        {!saveError && showSavedNotice && (
-          <span className="text-[10px] font-semibold text-green-600">
-            자동 저장됨
-          </span>
-        )}
-        {activeTabIndex >= 0 && (
-          <button
-            onClick={handleSave}
-            title="저장"
-            className="flex h-6 w-6 items-center justify-center bg-violet-500 text-white hover:bg-violet-600"
-          >
-            <Save className="h-3.5 w-3.5" />
-          </button>
-        )}
-        <button
-          onClick={handleExitClick}
-          title="닫기"
-          className="flex h-6 w-6 items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* "JSON 불러오기" 메뉴 항목이 대신 클릭시키는, 화면에 보이지 않는
-          파일 선택창 — 같은 파일을 다시 골라도 onChange가 또 fire되도록
-          매번 값을 비운다. */}
-      <input
-        ref={jsonFileInputRef}
-        type="file"
-        accept=".json,application/json"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleImportJSONFile(file);
-          e.target.value = "";
-        }}
-      />
-
-      {/* 메뉴 바 */}
-      <div className="flex items-center gap-0.5 bg-white px-2 py-1 shadow-sm">
-        <button
-          onClick={openFileMenu}
-          className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
-        >
-          파일
-        </button>
-        <button
-          onClick={openEditMenu}
-          className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
-        >
-          편집
-        </button>
-        <button
-          onClick={() => setShowHelpDialog(true)}
-          className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
-        >
-          도움말
-        </button>
-        {!narrow && (
-          <button
-            onClick={openReferenceWindow}
-            title="참고 이미지 창을 새로 엽니다. 참고 모드(뷰포트로 보기)와 트레이싱 모드(캔버스 배경에 깔아 따라 그리기)를 창 안에서 오갈 수 있습니다. 여러 개를 동시에 띄울 수 있습니다(저장되지 않음)"
-            className={`px-2 py-1 text-xs ${
-              referenceWindows.length > 0
-                ? "bg-violet-50 text-violet-700"
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            레퍼런스
-          </button>
-        )}
-      </div>
-
-      {/* 탭 바 — 클립스튜디오처럼 여러 파일을 동시에 열어두고 전환한다 */}
-      {tabs.length > 0 && (
-        <div className="flex items-center gap-0.5 overflow-x-auto bg-gray-50 px-2 py-1 shadow-sm">
-          {tabs.map((tab, i) => (
-            <div
-              key={tab.doc.id}
-              onClick={() => switchToTab(i)}
-              className={`group flex shrink-0 items-center gap-1.5 px-2.5 py-1 text-xs ${
-                i === activeTabIndex
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:bg-gray-100"
-              }`}
-              style={{ cursor: CURSOR_POINTING }}
-            >
-              <span className="max-w-[100px] truncate">
-                {i === activeTabIndex ? name : tab.doc.name}
-              </span>
-              {/* 클립스튜디오처럼: 저장되지 않은 변경이 있으면 닫기(X) 대신 원형
-                  점을 보여주고, 탭에 마우스를 올렸을 때만 X로 바뀌어 닫을 수 있다. */}
-              {isTabDirty(i) ? (
-                <span className="relative flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-                  <span
-                    className="h-1.5 w-1.5 rounded-full bg-gray-500 group-hover:hidden"
-                    title="저장되지 않은 변경 사항"
-                  />
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      requestCloseTab(i);
-                    }}
-                    className="hidden h-3.5 w-3.5 items-center justify-center text-gray-400 hover:text-gray-900 group-hover:flex"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ) : (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    requestCloseTab(i);
-                  }}
-                  className="flex h-3.5 w-3.5 shrink-0 items-center justify-center text-gray-400 hover:text-gray-900"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {menuAnchor && (
-        <ContextMenu
-          x={menuAnchor.x}
-          y={menuAnchor.y}
-          items={menuAnchor.items}
-          onClose={() => setMenuAnchor(null)}
-        />
-      )}
-
-      {activeTabIndex >= 0 ? (
-        <div
-          className="flex flex-1 overflow-hidden"
-          style={{ backgroundColor: canvasBgColor }}
-        >
-          {/* 왼쪽 색상 패널 + 캔버스, 그리고 그 위 툴바 — 오른쪽 레이어 패널은
-              이 wrapper 밖 형제라, 툴바 높이만큼 위로 올라와 통짜 세로 칼럼으로
-              보인다. 이 바깥 행이 회색 배경을 깔아, 오른쪽 사이드바도 패널
-              카드만 흰색이고 그 사이 여백은 회색이 된다. */}
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+  // 도구바 — wide/narrow 어디서든 인스턴스가 하나뿐이라 지금까지는 그 자리에
+  // 인라인으로 있었다. 모바일 셸의 "도구" 시트도 같은 노드를 써야 해서
+  // top-level 변수로 뺀다.
+  const toolPanel = (
           <DrawToolbar
             tool={tool}
             onToolChange={setTool}
@@ -3042,25 +2841,8 @@ export default function Editor({
             secondaryPortalTarget={secondaryToolbarPortal}
             compact={toolbarCompact}
           />
-          {/* 이 줄(사이드바 두 개 + 캔버스)에는 자체 스크롤을 두지 않는다 —
-              overflow-auto가 있으면 사이드바 내용이 조금만 길어져도 캔버스까지
-              포함한 줄 전체가 세로로 밀려 스크롤됐다(캔버스는 확대·화면맞춤을
-              위한 자기 자신의 스크롤 뷰포트를 이미 갖고 있어 이중으로 스크롤이
-              생기는 셈이었다). 대신 각 사이드바가 필요할 때만 자기 안에서만
-              스크롤되게 한다. */}
-          <div
-            className={`flex flex-1 overflow-hidden ${
-              narrow ? "gap-2 px-2 pb-2 pt-1" : "gap-4 px-4 pb-4 pt-2"
-            }`}
-            style={{ backgroundColor: canvasBgColor }}
-          >
-            {/* 이 열에는 자체 스크롤을 두지 않는다 — 아코디언을 펼쳐 내용이
-                길어지면 색상환까지 함께 밀려 스크롤되는 대신, 아코디언이 자기
-                안에서만(Accordion 내부 overflow-y-auto) 스크롤되게 한다. */}
-            <div
-              className={`flex w-60 shrink-0 flex-col ${narrow ? "gap-2" : "gap-3"}`}
-            >
-              <div className="shrink-0">
+  );
+  const colorPanel = (
                 <ColorWheel
                   favorites={doc.palette}
                   activeColorHex={activeColorHex}
@@ -3077,25 +2859,52 @@ export default function Editor({
                   onChangeCanvasBgColor={setCanvasBgColor}
                   boundsRef={rootRef}
                 />
-              </div>
-              {/* 불러오기·내보내기는 세션 단위 입출력이라 오른쪽 레이어 스택과
-                  분리해 왼쪽 열 맨 아래(mt-auto)에 붙인다 — 색상환은 위에,
-                  입출력은 아래에 모아 오른쪽 열이 미리보기 + 레이어로 꽉 차던
-                  것을 덜어낸다. min-h-0으로 이 묶음이 남은 높이 밑으로 줄어들 수
-                  있게 해, 펼쳤을 때 아코디언이 열 스크롤 대신 자기 안에서
-                  스크롤되게 한다. narrow에서는 오른쪽 아이콘 열에서 플로팅
-                  팝업으로 열리므로 여기서는 빼둔다. */}
-              {!narrow && (
-                <div className="mt-auto flex min-h-0 flex-col gap-3">
-                  <Accordion title="이미지 불러오기" defaultOpen={false}>
-                    {importPanel}
-                  </Accordion>
-                  <Accordion title="내보내기" defaultOpen={false}>
-                    {exportPanel}
-                  </Accordion>
-                </div>
-              )}
-            </div>
+  );
+  // wide 사이드바·narrow 아이콘열 두 곳에 완전히 같은 props로 중복
+  // 선언돼 있던 걸 하나로 합친다 — 모바일 셸의 "레이어" 시트도 같은
+  // 노드를 쓴다.
+  const layerPanel = (
+                    <LayerPanel
+                      layers={history.presentLayers}
+                      activeLayerId={history.activeLayerId}
+                      width={doc.width}
+                      height={doc.height}
+                      onSelect={handleSelectLayer}
+                      onAdd={handleAddLayer}
+                      onDuplicate={handleDuplicateLayer}
+                      onDelete={handleDeleteLayer}
+                      onMergeDown={handleMergeDown}
+                      onMoveUp={(id) => handleMoveLayer(id, 1)}
+                      onMoveDown={(id) => handleMoveLayer(id, -1)}
+                      onRename={handleRenameLayer}
+                      onToggleVisible={handleToggleLayerVisible}
+                      onToggleLocked={handleToggleLayerLocked}
+                      referenceLayerIds={referenceLayerIds}
+                      onToggleReference={handleToggleReference}
+                      onOpacityChange={handleLayerOpacityChange}
+                      onOpacityDragEnd={handleOpacityDragEnd}
+                      onBlendModeChange={handleLayerBlendModeChange}
+                      onBlendModePreview={handleLayerBlendModePreview}
+                      onAdjustmentChange={handleLayerAdjustmentChange}
+                      onAdjustmentDragEnd={handleAdjustmentDragEnd}
+                      onResetAdjustments={handleResetAdjustments}
+                      onFlatten={handleFlattenLayers}
+                      layerMode={layerMode}
+                      onLayerModeChange={handleLayerModeChange}
+                      isPlaying={isPlaying}
+                      onTogglePlay={handleTogglePlay}
+                      pingPong={pingPong}
+                      onTogglePingPong={handleTogglePingPong}
+                      onionSkin={onionSkin}
+                      onToggleOnionSkin={handleToggleOnionSkin}
+                      onionSkinOpacity={onionSkinOpacity}
+                      onOnionSkinOpacityChange={handleOnionSkinOpacityChange}
+                      onionSkinRange={onionSkinRange}
+                      onOnionSkinRangeChange={handleOnionSkinRangeChange}
+                      onFrameDurationChange={handleFrameDurationChange}
+                    />
+  );
+  const canvasArea = (
             <div className="relative flex flex-1 flex-col overflow-hidden">
               <div className="relative flex flex-1 overflow-hidden">
                 <div
@@ -3260,6 +3069,358 @@ export default function Editor({
                 />
               )}
             </div>
+  );
+
+  return (
+    <div
+      ref={rootRef}
+      className={`pam-editor relative flex h-full w-full select-none flex-col overflow-hidden bg-white text-gray-900 transition-all duration-200 ease-out ${
+        mounted && !closing ? "scale-100 opacity-100" : "scale-95 opacity-0"
+      }`}
+      // 입력칸(파일명, 헥스 코드, 픽셀 크기 등)에 값을 넣고 나서 클릭만으로
+      // 캔버스로 넘어가면(캔버스는 포커스를 받는 요소가 아니다) 포커스가
+      // 그 입력칸에 그대로 남아 있었다 — useKeyboardShortcuts가 "지금
+      // 포커스된 요소가 입력칸이면 무시"하는 가드를 갖고 있어서, 실제로는
+      // 캔버스를 만지고 있는데도 도구 단축키가 조용히 먹히지 않는 문제로
+      // 이어졌다. 입력칸이 아닌 곳을 누르는 순간 남아 있는 포커스를 직접
+      // 풀어준다(capture 단계라 다른 요소의 onClick보다 먼저 실행된다).
+      onPointerDownCapture={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+          return;
+        }
+        const active = document.activeElement;
+        if (
+          active instanceof HTMLElement &&
+          (active.tagName === "INPUT" || active.tagName === "TEXTAREA")
+        ) {
+          active.blur();
+        }
+      }}
+    >
+      {/* 실제 OS 커서 대신 이 편집기 전용 커스텀 커서를 쓴다 — 기본은 일반
+          화살표, 버튼은 포인팅, 텍스트 입력칸은 텍스트 커서. 캔버스 자체의
+          도구별 커서는 PixelCanvas가 인라인 style로 직접 지정한다(이 규칙보다
+          더 구체적인 선택자라 우선한다). */}
+      <style>{`
+        .pam-editor { cursor: ${CURSOR_NORMAL}; }
+        .pam-editor button:not(:disabled) { cursor: ${CURSOR_POINTING}; }
+        /* <label>도 UA 스타일시트가 cursor:default를 박아둬서(range·checkbox와
+           같은 이유) 상속만으로는 안 먹는다 — 명시적으로 되돌린다. 안쪽의
+           input·button 등은 더 구체적인 아래 규칙이 이겨 각자 커서를 유지한다. */
+        .pam-editor label { cursor: ${CURSOR_NORMAL}; }
+        .pam-editor input[type="text"],
+        .pam-editor input:not([type]),
+        .pam-editor input[type="number"],
+        .pam-editor textarea { cursor: ${CURSOR_TEXT}; }
+        /* input[type=file]은 브라우저 UA 스타일시트가 cursor:default를 직접
+           박아둬서 상속만으로는 안 먹는다 — 요소 자체와, 실제 클릭 대상인
+           "파일 선택" 버튼 pseudo-element(표준/webkit 별칭 둘 다) 모두에
+           명시적으로 지정해야 한다. */
+        .pam-editor input[type="file"] { cursor: ${CURSOR_POINTING}; }
+        .pam-editor input[type="file"]::file-selector-button,
+        .pam-editor input[type="file"]::-webkit-file-upload-button {
+          cursor: ${CURSOR_POINTING};
+        }
+        /* range·checkbox·select도 file input과 같은 이유로 UA 스타일시트가
+           cursor:default를 직접 박아둔다 — range는 트랙 자체와 실제로 잡고
+           끄는 thumb이 서로 다른 pseudo-element라 둘 다 지정해야 한다. */
+        .pam-editor input[type="range"],
+        .pam-editor input[type="checkbox"],
+        .pam-editor select { cursor: ${CURSOR_POINTING}; }
+        .pam-editor input[type="range"]::-webkit-slider-thumb,
+        .pam-editor input[type="range"]::-webkit-slider-runnable-track,
+        .pam-editor input[type="range"]::-moz-range-thumb,
+        .pam-editor input[type="range"]::-moz-range-track {
+          cursor: ${CURSOR_POINTING};
+        }
+        /* number 입력칸의 위/아래 스피너 버튼은 좁은 칸에서 값을 가려 없앤다. */
+        .pam-editor input[type="number"] {
+          -moz-appearance: textfield;
+          appearance: textfield;
+        }
+        .pam-editor input[type="number"]::-webkit-outer-spin-button,
+        .pam-editor input[type="number"]::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        /* 비활성(:disabled) 폼 요소는 브라우저가 cursor CSS를 아예 무시하고
+           항상 기본 화살표를 그린다 — pointer-events를 꺼서 호버 자체를
+           부모로 흘려보내야 부모의 커스텀 커서가 그대로 보인다. button 외에
+           input·select 등 다른 폼 요소가 나중에 disabled로 추가돼도 이
+           규칙 하나로 그대로 커버된다. */
+        .pam-editor :disabled { pointer-events: none; cursor: ${CURSOR_NORMAL}; }
+      `}</style>
+      {/* 제목표시줄 — 메뉴 바·캔버스 영역의 무채색 배경과 구분되도록 바이올렛 톤을 준다. */}
+      <div className="flex items-center gap-2 bg-violet-100 px-3 py-2">
+        {activeTabIndex >= 0 ? (
+          <input
+            value={isWallpaper ? WALLPAPER_NAME : name}
+            readOnly={isWallpaper}
+            onChange={(e) => {
+              if (isWallpaper) return;
+              setName(e.target.value);
+              setHasMetaEdits(true);
+            }}
+            className="flex-1 select-text bg-transparent text-sm font-semibold text-gray-900 outline-none"
+            style={isWallpaper ? { cursor: CURSOR_NORMAL } : undefined}
+          />
+        ) : (
+          <span className="flex-1 text-sm font-semibold text-gray-400">
+            편집기
+          </span>
+        )}
+        {saveError && (
+          <span className="text-[10px] font-semibold text-red-500">
+            저장 실패
+          </span>
+        )}
+        {!saveError && showSavedNotice && (
+          <span className="text-[10px] font-semibold text-green-600">
+            자동 저장됨
+          </span>
+        )}
+        {activeTabIndex >= 0 && (
+          <button
+            onClick={handleSave}
+            title="저장"
+            className="flex h-6 w-6 items-center justify-center bg-violet-500 text-white hover:bg-violet-600"
+          >
+            <Save className="h-3.5 w-3.5" />
+          </button>
+        )}
+        <button
+          onClick={handleExitClick}
+          title="닫기"
+          className="flex h-6 w-6 items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* "JSON 불러오기" 메뉴 항목이 대신 클릭시키는, 화면에 보이지 않는
+          파일 선택창 — 같은 파일을 다시 골라도 onChange가 또 fire되도록
+          매번 값을 비운다. */}
+      <input
+        ref={jsonFileInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleImportJSONFile(file);
+          e.target.value = "";
+        }}
+      />
+
+      {/* 메뉴 바 */}
+      <div className="flex items-center gap-0.5 bg-white px-2 py-1 shadow-sm">
+        <button
+          onClick={openFileMenu}
+          className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
+        >
+          파일
+        </button>
+        <button
+          onClick={openEditMenu}
+          className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
+        >
+          편집
+        </button>
+        {!narrow && (
+          <button
+            onClick={openReferenceWindow}
+            title="참고 이미지 창을 새로 엽니다. 참고 모드(뷰포트로 보기)와 트레이싱 모드(캔버스 배경에 깔아 따라 그리기)를 창 안에서 오갈 수 있습니다. 여러 개를 동시에 띄울 수 있습니다(저장되지 않음)"
+            className={`px-2 py-1 text-xs ${
+              referenceWindows.length > 0
+                ? "bg-violet-50 text-violet-700"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            레퍼런스
+          </button>
+        )}
+        <button
+          onClick={() => setShowHelpDialog(true)}
+          className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
+        >
+          도움말
+        </button>
+      </div>
+
+      {/* 탭 바 — 클립스튜디오처럼 여러 파일을 동시에 열어두고 전환한다 */}
+      {tabs.length > 0 && (
+        <div className="flex items-center gap-0.5 overflow-x-auto bg-gray-50 px-2 py-1 shadow-sm">
+          {tabs.map((tab, i) => (
+            <div
+              key={tab.doc.id}
+              onClick={() => switchToTab(i)}
+              className={`group flex shrink-0 items-center gap-1.5 px-2.5 py-1 text-xs ${
+                i === activeTabIndex
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:bg-gray-100"
+              }`}
+              style={{ cursor: CURSOR_POINTING }}
+            >
+              <span className="max-w-[100px] truncate">
+                {i === activeTabIndex ? name : tab.doc.name}
+              </span>
+              {/* 클립스튜디오처럼: 저장되지 않은 변경이 있으면 닫기(X) 대신 원형
+                  점을 보여주고, 탭에 마우스를 올렸을 때만 X로 바뀌어 닫을 수 있다. */}
+              {isTabDirty(i) ? (
+                <span className="relative flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                  <span
+                    className="h-1.5 w-1.5 rounded-full bg-gray-500 group-hover:hidden"
+                    title="저장되지 않은 변경 사항"
+                  />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      requestCloseTab(i);
+                    }}
+                    className="hidden h-3.5 w-3.5 items-center justify-center text-gray-400 hover:text-gray-900 group-hover:flex"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    requestCloseTab(i);
+                  }}
+                  className="flex h-3.5 w-3.5 shrink-0 items-center justify-center text-gray-400 hover:text-gray-900"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {menuAnchor && (
+        <ContextMenu
+          x={menuAnchor.x}
+          y={menuAnchor.y}
+          items={menuAnchor.items}
+          onClose={() => setMenuAnchor(null)}
+        />
+      )}
+
+      {activeTabIndex >= 0 ? (
+        <div
+          className="flex flex-1 overflow-hidden"
+          style={{ backgroundColor: canvasBgColor }}
+        >
+          {/* 왼쪽 색상 패널 + 캔버스, 그리고 그 위 툴바 — 오른쪽 레이어 패널은
+              이 wrapper 밖 형제라, 툴바 높이만큼 위로 올라와 통짜 세로 칼럼으로
+              보인다. 이 바깥 행이 회색 배경을 깔아, 오른쪽 사이드바도 패널
+              카드만 흰색이고 그 사이 여백은 회색이 된다. */}
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          {toolPanel}
+          {/* 이 줄(사이드바 두 개 + 캔버스)에는 자체 스크롤을 두지 않는다 —
+              overflow-auto가 있으면 사이드바 내용이 조금만 길어져도 캔버스까지
+              포함한 줄 전체가 세로로 밀려 스크롤됐다(캔버스는 확대·화면맞춤을
+              위한 자기 자신의 스크롤 뷰포트를 이미 갖고 있어 이중으로 스크롤이
+              생기는 셈이었다). 대신 각 사이드바가 필요할 때만 자기 안에서만
+              스크롤되게 한다. */}
+          <div
+            className={`flex flex-1 overflow-hidden ${
+              narrow ? "gap-2 px-2 pb-2 pt-1" : "gap-4 px-4 pb-4 pt-2"
+            }`}
+            style={{ backgroundColor: canvasBgColor }}
+          >
+            {/* 이 열에는 자체 스크롤을 두지 않는다 — 아코디언을 펼쳐 내용이
+                길어지면 색상환까지 함께 밀려 스크롤되는 대신, 아코디언이 자기
+                안에서만(Accordion 내부 overflow-y-auto) 스크롤되게 한다. */}
+            <div
+              className={`flex w-60 shrink-0 flex-col ${narrow ? "gap-2" : "gap-3"}`}
+            >
+              <div className="shrink-0">
+                {colorPanel}
+              </div>
+              {/* 불러오기·내보내기는 세션 단위 입출력이라 오른쪽 레이어 스택과
+                  분리해 왼쪽 열 맨 아래(mt-auto)에 붙인다 — 색상환은 위에,
+                  입출력은 아래에 모아 오른쪽 열이 미리보기 + 레이어로 꽉 차던
+                  것을 덜어낸다. min-h-0으로 이 묶음이 남은 높이 밑으로 줄어들 수
+                  있게 해, 펼쳤을 때 아코디언이 열 스크롤 대신 자기 안에서
+                  스크롤되게 한다. importExportCollapsed(narrow 포함)에서는
+                  아이콘+팝업으로 대신 열리므로 여기서는 빼둔다. */}
+              {!importExportCollapsed && (
+                <div className="mt-auto flex min-h-0 flex-col gap-3">
+                  <Accordion title="이미지 불러오기" defaultOpen={false}>
+                    {importPanel}
+                  </Accordion>
+                  <Accordion title="내보내기" defaultOpen={false}>
+                    {exportPanel}
+                  </Accordion>
+                </div>
+              )}
+              {/* narrow보다는 넓지만 importExportCollapsed인 구간 — 레이어
+                  패널은 오른쪽에 그대로 두고, 이 둘만 먼저 아이콘+팝업으로
+                  접는다. narrow가 되면 오른쪽 아이콘 열이 이 역할을 대신
+                  맡으므로 여기서는 숨긴다. */}
+              {importExportCollapsed && !narrow && (
+                <div className="relative mt-auto flex shrink-0 items-center gap-2">
+                  <button
+                    onClick={() =>
+                      setOpenFloatingPanel((p) =>
+                        p === "import" ? null : "import",
+                      )
+                    }
+                    title="이미지 불러오기"
+                    className={`flex h-8 w-8 items-center justify-center transition-colors ${
+                      openFloatingPanel === "import"
+                        ? "bg-violet-500 text-white"
+                        : "bg-white text-gray-500 shadow-md hover:bg-gray-50"
+                    }`}
+                  >
+                    <ImagePlus className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() =>
+                      setOpenFloatingPanel((p) =>
+                        p === "export" ? null : "export",
+                      )
+                    }
+                    title="내보내기"
+                    className={`flex h-8 w-8 items-center justify-center transition-colors ${
+                      openFloatingPanel === "export"
+                        ? "bg-violet-500 text-white"
+                        : "bg-white text-gray-500 shadow-md hover:bg-gray-50"
+                    }`}
+                  >
+                    <Share className="h-4 w-4" />
+                  </button>
+                  {(openFloatingPanel === "import" ||
+                    openFloatingPanel === "export") && (
+                    <div
+                      className={`absolute bottom-full left-0 z-40 mb-2 flex max-h-[70vh] w-72 flex-col ${FLOATING_PANEL}`}
+                    >
+                      <div className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-gray-100 px-3 py-1.5 text-[11px] font-semibold text-gray-600">
+                        {openFloatingPanel === "import"
+                          ? "이미지 불러오기"
+                          : "내보내기"}
+                        <button
+                          onClick={() => setOpenFloatingPanel(null)}
+                          title="닫기"
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-3">
+                        {openFloatingPanel === "import"
+                          ? importPanel
+                          : exportPanel}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {canvasArea}
           </div>
           </div>
           {/* 오른쪽 레이어/프레임 패널 — 콘텐츠 행이 아니라 바깥 행의 자식이라
@@ -3283,45 +3444,7 @@ export default function Editor({
                         canvasBgColor={canvasBgColor}
                       />
                     )}
-                    <LayerPanel
-                      layers={history.presentLayers}
-                      activeLayerId={history.activeLayerId}
-                      width={doc.width}
-                      height={doc.height}
-                      onSelect={handleSelectLayer}
-                      onAdd={handleAddLayer}
-                      onDuplicate={handleDuplicateLayer}
-                      onDelete={handleDeleteLayer}
-                      onMergeDown={handleMergeDown}
-                      onMoveUp={(id) => handleMoveLayer(id, 1)}
-                      onMoveDown={(id) => handleMoveLayer(id, -1)}
-                      onRename={handleRenameLayer}
-                      onToggleVisible={handleToggleLayerVisible}
-                      onToggleLocked={handleToggleLayerLocked}
-                      referenceLayerIds={referenceLayerIds}
-                      onToggleReference={handleToggleReference}
-                      onOpacityChange={handleLayerOpacityChange}
-                      onOpacityDragEnd={handleOpacityDragEnd}
-                      onBlendModeChange={handleLayerBlendModeChange}
-                      onBlendModePreview={handleLayerBlendModePreview}
-                      onAdjustmentChange={handleLayerAdjustmentChange}
-                      onAdjustmentDragEnd={handleAdjustmentDragEnd}
-                      onResetAdjustments={handleResetAdjustments}
-                      onFlatten={handleFlattenLayers}
-                      layerMode={layerMode}
-                      onLayerModeChange={handleLayerModeChange}
-                      isPlaying={isPlaying}
-                      onTogglePlay={handleTogglePlay}
-                      pingPong={pingPong}
-                      onTogglePingPong={handleTogglePingPong}
-                      onionSkin={onionSkin}
-                      onToggleOnionSkin={handleToggleOnionSkin}
-                      onionSkinOpacity={onionSkinOpacity}
-                      onOnionSkinOpacityChange={handleOnionSkinOpacityChange}
-                      onionSkinRange={onionSkinRange}
-                      onOnionSkinRangeChange={handleOnionSkinRangeChange}
-                      onFrameDurationChange={handleFrameDurationChange}
-                    />
+                    {layerPanel}
                   </div>
                 );
               }
@@ -3337,47 +3460,6 @@ export default function Editor({
                     : openFloatingPanel === "export"
                       ? "내보내기"
                       : "레퍼런스";
-              const layerPanel = (
-                <LayerPanel
-                  layers={history.presentLayers}
-                  activeLayerId={history.activeLayerId}
-                  width={doc.width}
-                  height={doc.height}
-                  onSelect={handleSelectLayer}
-                  onAdd={handleAddLayer}
-                  onDuplicate={handleDuplicateLayer}
-                  onDelete={handleDeleteLayer}
-                  onMergeDown={handleMergeDown}
-                  onMoveUp={(id) => handleMoveLayer(id, 1)}
-                  onMoveDown={(id) => handleMoveLayer(id, -1)}
-                  onRename={handleRenameLayer}
-                  onToggleVisible={handleToggleLayerVisible}
-                  onToggleLocked={handleToggleLayerLocked}
-                  referenceLayerIds={referenceLayerIds}
-                  onToggleReference={handleToggleReference}
-                  onOpacityChange={handleLayerOpacityChange}
-                  onOpacityDragEnd={handleOpacityDragEnd}
-                  onBlendModeChange={handleLayerBlendModeChange}
-                  onBlendModePreview={handleLayerBlendModePreview}
-                  onAdjustmentChange={handleLayerAdjustmentChange}
-                  onAdjustmentDragEnd={handleAdjustmentDragEnd}
-                  onResetAdjustments={handleResetAdjustments}
-                  onFlatten={handleFlattenLayers}
-                  layerMode={layerMode}
-                  onLayerModeChange={handleLayerModeChange}
-                  isPlaying={isPlaying}
-                  onTogglePlay={handleTogglePlay}
-                  pingPong={pingPong}
-                  onTogglePingPong={handleTogglePingPong}
-                  onionSkin={onionSkin}
-                  onToggleOnionSkin={handleToggleOnionSkin}
-                  onionSkinOpacity={onionSkinOpacity}
-                  onOnionSkinOpacityChange={handleOnionSkinOpacityChange}
-                  onionSkinRange={onionSkinRange}
-                  onOnionSkinRangeChange={handleOnionSkinRangeChange}
-                  onFrameDurationChange={handleFrameDurationChange}
-                />
-              );
               return (
                 <div className="relative flex w-10 shrink-0 flex-col items-center gap-2">
                   <button
