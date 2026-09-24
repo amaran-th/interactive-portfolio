@@ -3107,26 +3107,8 @@ export default function Editor({
     },
     { id: "import", label: "이미지 불러오기", kind: "detail", content: () => importPanel },
     { id: "export", label: "내보내기", kind: "detail", content: () => exportPanel },
-    {
-      id: "reference",
-      label: "레퍼런스",
-      kind: "detail",
-      // 조정할 이미지를 고르는 순간 데스크톱(narrow 아이콘열)과 똑같이
-      // 팝오버를 닫아 캔버스의 조정 손잡이가 보이게 한다.
-      content: (closeAll) => (
-        <TracingListPanel
-          tracingImages={tracingCanvasImages}
-          activeTracingId={activeReferenceId}
-          onAdd={handleReferenceListAdd}
-          onOpacityChange={handleReferenceOpacityChange}
-          onToggleAdjust={(id) => {
-            handleToggleReferenceAdjust(id);
-            closeAll();
-          }}
-          onDelete={handleReferenceDelete}
-        />
-      ),
-    },
+    // 레퍼런스(트레이싱)는 모바일 범위에서 제외 — 데스크톱 메뉴 바에도
+    // 이미 !narrow 가드가 있어 모바일에서는 애초에 진입점이 없었다.
     { id: "help", label: "도움말", kind: "action", onSelect: () => setShowHelpDialog(true) },
   ];
 
