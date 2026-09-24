@@ -40,6 +40,7 @@ import {
   ICON_PADDING,
 } from "./iconMetrics";
 import { getWallpaper, resetWallpaper, WALLPAPER_ID } from "./wallpaper";
+import { NARROW_BREAKPOINT } from "./types";
 
 type Menu = { x: number; y: number; items: ContextMenuItem[] } | null;
 
@@ -126,12 +127,20 @@ export default function Desktop({
   // 데스크탑 자체의 가로세로 비율을 배경화면 이미지 비율에 맞춘다 — 뷰포트를
   // 꽉 채우도록 배경화면을 늘리거나 자르는 대신, 데스크탑을 배경화면 비율의
   // 상자로 만들어 가능한 공간 안에 최대한 크게(letterbox) 가운데 정렬한다.
+  // 다만 narrow(모바일) 폭에서는 편집창과 마찬가지로 letterbox 없이 뷰포트를
+  // 그대로 채운다 — WallpaperBackground가 이미 object-fit: cover라 비율이
+  // 달라져도 이미지가 찌그러지지 않고 잘릴 뿐이다.
   useEffect(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
     const ratio = wallpaper.width / wallpaper.height;
     const compute = () => {
       const rect = wrapper.getBoundingClientRect();
+      if (rect.width < NARROW_BREAKPOINT) {
+        setFittedSize({ width: rect.width, height: rect.height });
+        onFittedSizeChange?.({ width: rect.width, height: rect.height });
+        return;
+      }
       let w = rect.width;
       let h = w / ratio;
       if (h > rect.height) {

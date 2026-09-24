@@ -772,7 +772,13 @@ export default function LayerPanel({
               title="앞으로 이동"
               className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30"
             >
-              <ChevronLeft className="h-4 w-4" />
+              {/* 프레임 목록이 가로 필름스트립(데스크톱)이면 왼쪽=이전이라
+                  ChevronLeft, 세로 목록(모바일)이면 위쪽=이전이라 ChevronUp. */}
+              {showFrameThumbnails ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronLeft className="h-4 w-4" />
+              )}
             </button>
             <button
               onClick={() => onMoveUp(activeLayerId)}
@@ -782,7 +788,11 @@ export default function LayerPanel({
               title="뒤로 이동"
               className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30"
             >
-              <ChevronRight className="h-4 w-4" />
+              {showFrameThumbnails ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
             </button>
           </div>
         </>
