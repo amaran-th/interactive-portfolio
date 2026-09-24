@@ -224,14 +224,21 @@ export default function MobileEditorShell({
         </button>
       </div>
 
-      {/* 캔버스 */}
-      <div className="relative min-h-0 flex-1">{canvas}</div>
+      {/* 캔버스 — canvasArea 자신의 flex-1이 실제로 늘어나 세로 공간을
+          채우려면 부모가 flex 컨테이너여야 한다(데스크톱에서는 이 자리의
+          부모가 이미 `flex flex-1 overflow-hidden`이다). 여기 display:flex를
+          빼먹으면 canvasArea가 내용 높이만큼만 차지해 캔버스가 아래로
+          치우쳐 보인다 — canvasArea 내부의 safe-center 정렬이 제대로
+          작동하려면 이 래퍼가 flex여야 한다. */}
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        {canvas}
+      </div>
 
       {/* 하단 독 + 그 위 팝오버 — Editor.tsx:3399의 FLOATING_PANEL 패턴 그대로 */}
       <div ref={dockRef} className="relative">
         {openPopover && (
           <div
-            className={`absolute bottom-full left-2 right-2 z-40 mb-2 flex max-h-[60vh] flex-col overflow-y-auto ${FLOATING_PANEL}`}
+            className={`absolute bottom-full left-1/2 z-40 mb-2 flex w-72 max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-col overflow-y-auto max-h-[60vh] ${FLOATING_PANEL}`}
           >
             {popoverContent}
           </div>
