@@ -2903,6 +2903,8 @@ export default function Editor({
                       onionSkinRange={onionSkinRange}
                       onOnionSkinRangeChange={handleOnionSkinRangeChange}
                       onFrameDurationChange={handleFrameDurationChange}
+                      hideModeToggle={narrow}
+                      showFrameThumbnails={narrow}
                     />
   );
   const canvasArea = (
@@ -3058,7 +3060,10 @@ export default function Editor({
                     </div>
                   )}
               </div>
-              {layerMode === "frames" && (
+              {/* 모바일 셸에서는 이 자리 대신 레이어/프레임 팝오버 안에
+                  세로 프레임 목록(showFrameThumbnails)을 쓴다 — 캔버스
+                  아래 별도 "하단 섹션"을 두지 않는다. */}
+              {layerMode === "frames" && !narrow && (
                 <FrameFilmstrip
                   layers={history.presentLayers}
                   activeLayerId={history.activeLayerId}
@@ -3239,6 +3244,8 @@ export default function Editor({
           canRedo={history.canRedo}
           onUndo={handleUndo}
           onRedo={handleRedo}
+          layerMode={layerMode}
+          onLayerModeChange={handleLayerModeChange}
           canvas={canvasArea}
           toolPanel={toolPanel}
           colorPanel={colorPanel}

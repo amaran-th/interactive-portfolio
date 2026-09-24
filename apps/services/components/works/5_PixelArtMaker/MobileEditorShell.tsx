@@ -1,7 +1,7 @@
 "use client";
 
-import { Layers, Menu, Palette, PenTool, Save } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Layers, Menu, Palette, PenTool, Play, Save } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { FLOATING_PANEL } from "./panelStyles";
 
 export type MobileMoreItem =
@@ -31,6 +31,11 @@ export type MobileEditorShellProps = {
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
+  // 레이어/프레임 모드 선택 — 이 셸에서는 상단 바가 이 선택 UI를 담당한다
+  // (데스크톱은 레이어 패널 자체에 있다). 하단 독의 세 번째 아이콘도 이
+  // 값에 따라 "레이어"/"프레임"으로 라벨·아이콘이 바뀐다.
+  layerMode: "layers" | "frames";
+  onLayerModeChange: (mode: "layers" | "frames") => void;
   canvas: React.ReactNode;
   toolPanel: React.ReactNode;
   colorPanel: React.ReactNode;
@@ -41,6 +46,11 @@ export type MobileEditorShellProps = {
 };
 
 type PopoverKind = "tools" | "color" | "layers" | "more" | null;
+
+// 팝오버 고정 폭(px) — Tailwind의 w-72와 맞춘다. 트리거 아이콘 위치에 맞춰
+// left를 계산할 때 이 값이 필요하다(className만으로는 실제 px를 알 수 없다).
+const POPOVER_WIDTH = 288;
+const POPOVER_MARGIN = 8; // 화면 가장자리에서 최소로 띄우는 여백 — mb-2와 같은 0.5rem
 
 export default function MobileEditorShell({
   hasActiveTab,
@@ -55,6 +65,8 @@ export default function MobileEditorShell({
   canRedo,
   onUndo,
   onRedo,
+  layerMode,
+  onLayerModeChange,
   canvas,
   toolPanel,
   colorPanel,
@@ -65,7 +77,21 @@ export default function MobileEditorShell({
 }: MobileEditorShellProps) {
   const [openPopover, setOpenPopover] = useState<PopoverKind>(null);
   const [moreDetail, setMoreDetail] = useState<string | null>(null);
+  const [popoverLeft, setPopoverLeft] = useState(0);
   const dockRef = useRef<HTMLDivElement>(null);
+  const toolsBtnRef = useRef<HTMLButtonElement>(null);
+  const colorBtnRef = useRef<HTMLButtonElement>(null);
+  const layersBtnRef = useRef<HTMLButtonElement>(null);
+  const moreBtnRef = useRef<HTMLButtonElement>(null);
+
+  const btnRefFor = (kind: Exclude<PopoverKind, null>) =>
+    kind === "tools"
+      ? toolsBtnRef
+      : kind === "color"
+        ? colorBtnRef
+        : kind === "layers"
+          ? layersBtnRef
+          : moreBtnRef;
 
   const closeAll = () => {
     setOpenPopover(null);
@@ -76,6 +102,31 @@ export default function MobileEditorShell({
     setOpenPopover((cur) => (cur === kind ? null : kind));
     setMoreDetail(null);
   };
+
+  // 팝오버는 자신을 연 독 아이콘 바로 위(가운데)에 뜬다 — 4개 아이콘이 늘
+  // 같은 자리에 있지 않으므로, 매번 그 아이콘의 실제 위치를 재서
+  // dockRef 기준 left를 계산한다(ContextMenu·PaletteModal 등 이 편집기의
+  // 다른 팝업들과 같은 "컨테이너 기준 rect 계산" 패턴).
+  useLayoutEffect(() => {
+    if (!openPopover) return;
+    const place = () => {
+      const btn = btnRefFor(openPopover).current;
+      const dock = dockRef.current;
+      if (!btn || !dock) return;
+      const btnRect = btn.getBoundingClientRect();
+      const dockRect = dock.getBoundingClientRect();
+      const btnCenter = btnRect.left - dockRect.left + btnRect.width / 2;
+      const maxLeft = dockRect.width - POPOVER_WIDTH - POPOVER_MARGIN;
+      const left = Math.max(
+        POPOVER_MARGIN,
+        Math.min(btnCenter - POPOVER_WIDTH / 2, Math.max(maxLeft, POPOVER_MARGIN)),
+      );
+      setPopoverLeft(left);
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [openPopover]);
 
   // 독(팝오버 + 하단 아이콘 바) 바깥을 누르면 닫는다 — ContextMenu.tsx와
   // 같은 mousedown 패턴. 독 자체(아이콘 버튼 포함)는 ref 안에 있으므로
@@ -202,6 +253,29 @@ export default function MobileEditorShell({
             저장됨
           </span>
         )}
+        {/* 레이어/프레임 모드 선택 — 데스크톱에서는 레이어 패널 안에 있는
+            토글을 여기(상단 바)로 옮겼다. 하단 독은 선택만 반영하고 이
+            토글 자체는 여기서만 조작한다. */}
+        <div className="flex shrink-0 items-center">
+          <button
+            onClick={() => onLayerModeChange("layers")}
+            title="레이어 모드"
+            className={`flex h-8 w-8 items-center justify-center ${
+              layerMode === "layers" ? "text-violet-600" : "text-gray-400"
+            }`}
+          >
+            <Layers className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => onLayerModeChange("frames")}
+            title="프레임 모드"
+            className={`flex h-8 w-8 items-center justify-center ${
+              layerMode === "frames" ? "text-violet-600" : "text-gray-400"
+            }`}
+          >
+            <Play className="h-4 w-4" />
+          </button>
+        </div>
         <button
           onClick={onSave}
           title="저장"
@@ -237,17 +311,21 @@ export default function MobileEditorShell({
         {canvas}
       </div>
 
-      {/* 하단 독 + 그 위 팝오버 — Editor.tsx:3399의 FLOATING_PANEL 패턴 그대로 */}
+      {/* 하단 독 + 그 위 팝오버 — Editor.tsx:3399의 FLOATING_PANEL 패턴 그대로.
+          높이는 내용과 무관하게 고정(h-[55vh])해, 도구/색상/레이어 사이를
+          오갈 때 팝오버 크기가 들쭉날쭉하지 않게 한다. */}
       <div ref={dockRef} className="relative">
         {openPopover && (
           <div
-            className={`absolute bottom-full left-1/2 z-40 mb-2 flex w-72 max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-col overflow-y-auto max-h-[60vh] ${FLOATING_PANEL}`}
+            style={{ left: popoverLeft }}
+            className={`absolute bottom-full z-40 mb-2 flex h-[55vh] w-72 max-w-[calc(100vw-1rem)] flex-col overflow-y-auto ${FLOATING_PANEL}`}
           >
             {popoverContent}
           </div>
         )}
         <div className="flex items-center justify-around border-t border-gray-200 bg-white py-1.5">
           <button
+            ref={toolsBtnRef}
             onClick={() => toggle("tools")}
             className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
               openPopover === "tools" ? "text-violet-600" : "text-gray-500"
@@ -257,6 +335,7 @@ export default function MobileEditorShell({
             도구
           </button>
           <button
+            ref={colorBtnRef}
             onClick={() => toggle("color")}
             className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
               openPopover === "color" ? "text-violet-600" : "text-gray-500"
@@ -266,15 +345,21 @@ export default function MobileEditorShell({
             색상
           </button>
           <button
+            ref={layersBtnRef}
             onClick={() => toggle("layers")}
             className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
               openPopover === "layers" ? "text-violet-600" : "text-gray-500"
             }`}
           >
-            <Layers className="h-5 w-5" />
-            레이어
+            {layerMode === "frames" ? (
+              <Play className="h-5 w-5" />
+            ) : (
+              <Layers className="h-5 w-5" />
+            )}
+            {layerMode === "frames" ? "프레임" : "레이어"}
           </button>
           <button
+            ref={moreBtnRef}
             onClick={() => toggle("more")}
             className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
               openPopover === "more" ? "text-violet-600" : "text-gray-500"

@@ -154,6 +154,8 @@ export default function LayerPanel({
   onionSkinRange,
   onOnionSkinRangeChange,
   onFrameDurationChange,
+  hideModeToggle,
+  showFrameThumbnails,
 }: {
   // 아래→위 순서(가장 아래가 0번)로 저장된 레이어 배열 — 데이터 모델과
   // Editor의 useCanvasHistory가 쓰는 순서를 그대로 따른다.
@@ -213,6 +215,13 @@ export default function LayerPanel({
   // 프레임 모드 "현재 프레임" 섹션에서 지속시간을 고칠 때 — 필름스트립이
   // 아니라 이 패널이 지속시간 편집을 담당한다.
   onFrameDurationChange: (id: string, ms: number) => void;
+  // 모바일 셸 전용 — 레이어/프레임 모드 선택을 상단 바로 옮겼을 때, 이
+  // 패널 자체의 토글 버튼은 중복이라 숨긴다(평탄화 버튼은 그대로 둔다).
+  hideModeToggle?: boolean;
+  // 모바일 셸 전용 — 프레임 모드에서 캔버스 아래 별도 필름스트립을 쓰지
+  // 않는 대신, 레이어 목록과 같은 방식의 세로 썸네일 목록을 패널 안에
+  // 보여준다(데스크톱은 필름스트립을 그대로 쓰므로 기본 false).
+  showFrameThumbnails?: boolean;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
@@ -256,47 +265,51 @@ export default function LayerPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-white shadow-md">
-      <div className="flex shrink-0 items-center justify-between px-2 py-2">
-        <div className="flex text-[10px] font-semibold">
-          <button
-            onClick={() => onLayerModeChange("layers")}
-            className={`flex items-center gap-1 px-2 py-1 ${
-              layerMode === "layers"
-                ? "bg-violet-500 text-white"
-                : "text-gray-500 hover:bg-gray-100"
-            }`}
-          >
-            <LayersIcon className="h-3 w-3" />
-            레이어
-          </button>
-          <button
-            onClick={() => onLayerModeChange("frames")}
-            className={`flex items-center gap-1 px-2 py-1 ${
-              layerMode === "frames"
-                ? "bg-violet-500 text-white"
-                : "text-gray-500 hover:bg-gray-100"
-            }`}
-          >
-            <Play className="h-3 w-3" />
-            프레임
-          </button>
-          <span className="ml-1 flex items-center">
-            <HelpTip text={HELP.layerVsFrameMode} />
-          </span>
+      {(!hideModeToggle || layerMode === "layers") && (
+        <div className="flex shrink-0 items-center justify-between px-2 py-2">
+          {!hideModeToggle && (
+            <div className="flex text-[10px] font-semibold">
+              <button
+                onClick={() => onLayerModeChange("layers")}
+                className={`flex items-center gap-1 px-2 py-1 ${
+                  layerMode === "layers"
+                    ? "bg-violet-500 text-white"
+                    : "text-gray-500 hover:bg-gray-100"
+                }`}
+              >
+                <LayersIcon className="h-3 w-3" />
+                레이어
+              </button>
+              <button
+                onClick={() => onLayerModeChange("frames")}
+                className={`flex items-center gap-1 px-2 py-1 ${
+                  layerMode === "frames"
+                    ? "bg-violet-500 text-white"
+                    : "text-gray-500 hover:bg-gray-100"
+                }`}
+              >
+                <Play className="h-3 w-3" />
+                프레임
+              </button>
+              <span className="ml-1 flex items-center">
+                <HelpTip text={HELP.layerVsFrameMode} />
+              </span>
+            </div>
+          )}
+          {layerMode === "layers" && (
+            <span className="flex items-center gap-1">
+              <button
+                onClick={onFlatten}
+                disabled={layers.length <= 1}
+                className="text-[10px] font-normal text-gray-400 hover:text-gray-600 disabled:opacity-30"
+              >
+                평탄화
+              </button>
+              <HelpTip text={HELP.flatten} />
+            </span>
+          )}
         </div>
-        {layerMode === "layers" && (
-          <span className="flex items-center gap-1">
-            <button
-              onClick={onFlatten}
-              disabled={layers.length <= 1}
-              className="text-[10px] font-normal text-gray-400 hover:text-gray-600 disabled:opacity-30"
-            >
-              평탄화
-            </button>
-            <HelpTip text={HELP.flatten} />
-          </span>
-        )}
-      </div>
+      )}
       {layerMode === "layers" ? (
         <>
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -526,8 +539,63 @@ export default function LayerPanel({
         </>
       ) : (
         <>
-          {/* 재생·표시 컨트롤 — 레이어 패널의 "레이어 목록" 스크롤 영역에 대응 */}
-          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 py-2">
+          {/* 모바일 셸 전용 — 캔버스 아래 필름스트립 대신, 레이어 목록과 같은
+              방식(썸네일 + 라벨 + 보이기 토글)의 세로 프레임 목록을 이
+              패널 안에 보여준다. 순서는 필름스트립과 동일하게 배열 그대로
+              (레이어 목록처럼 뒤집지 않는다) — 프레임은 쌓임이 아니라
+              시간순이라 위→아래가 그대로 1→N번이 되어야 자연스럽다. */}
+          {showFrameThumbnails && (
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+              {layers.map((layer, index) => {
+                const isActive = layer.id === activeLayerId;
+                return (
+                  <div
+                    key={layer.id}
+                    onClick={() => !isPlaying && onSelect(layer.id)}
+                    className={`flex items-center gap-2 px-2 py-1.5 ${
+                      isPlaying ? "cursor-default" : "cursor-pointer"
+                    } ${isActive ? "bg-violet-50" : "hover:bg-gray-50"} ${
+                      layer.visible ? "" : "opacity-40"
+                    }`}
+                  >
+                    <FileThumbnail
+                      width={width}
+                      height={height}
+                      pixels={layer.pixels}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-xs text-gray-700">
+                      프레임 {index + 1}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleVisible(layer.id);
+                      }}
+                      disabled={isPlaying}
+                      title={
+                        layer.visible ? "이 프레임 숨기기" : "이 프레임 보이기"
+                      }
+                      className="flex h-6 w-5 shrink-0 items-center justify-center text-gray-500 hover:text-gray-800 disabled:opacity-30"
+                    >
+                      {layer.visible ? (
+                        <Eye className="h-3.5 w-3.5" />
+                      ) : (
+                        <EyeOff className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {/* 재생·표시 컨트롤 — 레이어 패널의 "레이어 목록" 스크롤 영역에 대응
+              (모바일에서는 위 프레임 목록이 그 역할을 대신하므로 이 블록은
+              shrink-0로 줄어든다). */}
+          <div
+            className={`flex ${
+              showFrameThumbnails ? "shrink-0" : "min-h-0 flex-1"
+            } flex-col gap-2 overflow-y-auto px-2 py-2`}
+          >
             <button
               onClick={onTogglePlay}
               className="flex items-center justify-center gap-1.5 bg-violet-500 py-1.5 text-xs font-semibold text-white hover:bg-violet-600"
