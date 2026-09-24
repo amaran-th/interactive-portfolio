@@ -3225,6 +3225,7 @@ export default function Editor({
         <MobileEditorShell
           hasActiveTab={activeTabIndex >= 0}
           fileName={isWallpaper ? WALLPAPER_NAME : name}
+          fileNameReadOnly={isWallpaper}
           onRenameFile={(newName) => {
             if (isWallpaper) return;
             setName(newName);

@@ -21,6 +21,7 @@ export type MobileMoreItem =
 export type MobileEditorShellProps = {
   hasActiveTab: boolean; // false면 "열린 파일 없음" 빈 상태를 보여준다
   fileName: string;
+  fileNameReadOnly: boolean; // 배경화면 탭이면 데스크톱 제목표시줄과 동일하게 편집 불가
   onRenameFile: (name: string) => void;
   onExit: () => void;
   onSave: () => void;
@@ -44,6 +45,7 @@ type PopoverKind = "tools" | "color" | "layers" | "more" | null;
 export default function MobileEditorShell({
   hasActiveTab,
   fileName,
+  fileNameReadOnly,
   onRenameFile,
   onExit,
   onSave,
@@ -186,6 +188,7 @@ export default function MobileEditorShell({
         </button>
         <input
           value={fileName}
+          readOnly={fileNameReadOnly}
           onChange={(e) => onRenameFile(e.target.value)}
           className="min-w-0 flex-1 truncate border-none bg-transparent px-1 text-sm font-semibold text-gray-900 outline-none"
         />
