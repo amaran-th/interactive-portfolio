@@ -50,6 +50,7 @@ import { mixHex } from "./hsv";
 import ImportPanel from "./ImportPanel";
 import LayerPanel from "./LayerPanel";
 import FrameFilmstrip from "./FrameFilmstrip";
+import MobileEditorShell, { MobileMoreItem } from "./MobileEditorShell";
 import PreviewPanel from "./PreviewPanel";
 import TracingListPanel from "./TracingListPanel";
 import NewCanvasDialog from "./NewCanvasDialog";
@@ -3071,6 +3072,59 @@ export default function Editor({
             </div>
   );
 
+  // 모바일 셸 전용 데이터 — Editor.tsx의 기존 핸들러를 그대로 재사용한다.
+  const mobileMoreItems: MobileMoreItem[] = [
+    {
+      id: "file",
+      label: "파일",
+      kind: "detail",
+      content: () => (
+        <div className="flex flex-col divide-y divide-gray-100">
+          <button onClick={() => setShowNewCanvasDialog(true)} className="py-3 text-left text-sm text-gray-800">새로 만들기</button>
+          <button onClick={() => setShowOpenDialog(true)} className="py-3 text-left text-sm text-gray-800">열기</button>
+          <button onClick={() => jsonFileInputRef.current?.click()} className="py-3 text-left text-sm text-gray-800">JSON 불러오기</button>
+          <button onClick={handleSave} disabled={activeTabIndex < 0} className="py-3 text-left text-sm text-gray-800 disabled:text-gray-300">저장</button>
+          <button onClick={handleSaveAs} disabled={activeTabIndex < 0} className="py-3 text-left text-sm text-gray-800 disabled:text-gray-300">다른 이름으로 저장</button>
+        </div>
+      ),
+    },
+    {
+      id: "edit",
+      label: "편집",
+      kind: "detail",
+      content: () => (
+        <div className="flex flex-col divide-y divide-gray-100">
+          <button onClick={() => selection.copy(history.present, doc.width)} disabled={activeTabIndex < 0} className="py-3 text-left text-sm text-gray-800 disabled:text-gray-300">복사</button>
+          <button onClick={() => setResizingCanvas(true)} disabled={activeTabIndex < 0} className="py-3 text-left text-sm text-gray-800 disabled:text-gray-300">캔버스 크기 수정</button>
+          <button onClick={handlePaste} disabled={activeTabIndex < 0 || !selection.clipboard} className="py-3 text-left text-sm text-gray-800 disabled:text-gray-300">붙여넣기</button>
+        </div>
+      ),
+    },
+    { id: "import", label: "이미지 불러오기", kind: "detail", content: () => importPanel },
+    { id: "export", label: "내보내기", kind: "detail", content: () => exportPanel },
+    {
+      id: "reference",
+      label: "레퍼런스",
+      kind: "detail",
+      // 조정할 이미지를 고르는 순간 데스크톱(narrow 아이콘열)과 똑같이
+      // 팝오버를 닫아 캔버스의 조정 손잡이가 보이게 한다.
+      content: (closeAll) => (
+        <TracingListPanel
+          tracingImages={tracingCanvasImages}
+          activeTracingId={activeReferenceId}
+          onAdd={handleReferenceListAdd}
+          onOpacityChange={handleReferenceOpacityChange}
+          onToggleAdjust={(id) => {
+            handleToggleReferenceAdjust(id);
+            closeAll();
+          }}
+          onDelete={handleReferenceDelete}
+        />
+      ),
+    },
+    { id: "help", label: "도움말", kind: "action", onSelect: () => setShowHelpDialog(true) },
+  ];
+
   return (
     <div
       ref={rootRef}
@@ -3151,56 +3205,10 @@ export default function Editor({
            규칙 하나로 그대로 커버된다. */
         .pam-editor :disabled { pointer-events: none; cursor: ${CURSOR_NORMAL}; }
       `}</style>
-      {/* 제목표시줄 — 메뉴 바·캔버스 영역의 무채색 배경과 구분되도록 바이올렛 톤을 준다. */}
-      <div className="flex items-center gap-2 bg-violet-100 px-3 py-2">
-        {activeTabIndex >= 0 ? (
-          <input
-            value={isWallpaper ? WALLPAPER_NAME : name}
-            readOnly={isWallpaper}
-            onChange={(e) => {
-              if (isWallpaper) return;
-              setName(e.target.value);
-              setHasMetaEdits(true);
-            }}
-            className="flex-1 select-text bg-transparent text-sm font-semibold text-gray-900 outline-none"
-            style={isWallpaper ? { cursor: CURSOR_NORMAL } : undefined}
-          />
-        ) : (
-          <span className="flex-1 text-sm font-semibold text-gray-400">
-            편집기
-          </span>
-        )}
-        {saveError && (
-          <span className="text-[10px] font-semibold text-red-500">
-            저장 실패
-          </span>
-        )}
-        {!saveError && showSavedNotice && (
-          <span className="text-[10px] font-semibold text-green-600">
-            자동 저장됨
-          </span>
-        )}
-        {activeTabIndex >= 0 && (
-          <button
-            onClick={handleSave}
-            title="저장"
-            className="flex h-6 w-6 items-center justify-center bg-violet-500 text-white hover:bg-violet-600"
-          >
-            <Save className="h-3.5 w-3.5" />
-          </button>
-        )}
-        <button
-          onClick={handleExitClick}
-          title="닫기"
-          className="flex h-6 w-6 items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
       {/* "JSON 불러오기" 메뉴 항목이 대신 클릭시키는, 화면에 보이지 않는
           파일 선택창 — 같은 파일을 다시 골라도 onChange가 또 fire되도록
-          매번 값을 비운다. */}
+          매번 값을 비운다. 모바일 셸의 "더보기 > 파일 > JSON 불러오기"도
+          같은 ref를 쓰므로 narrow 분기와 무관하게 항상 마운트해 둔다. */}
       <input
         ref={jsonFileInputRef}
         type="file"
@@ -3213,102 +3221,176 @@ export default function Editor({
         }}
       />
 
-      {/* 메뉴 바 */}
-      <div className="flex items-center gap-0.5 bg-white px-2 py-1 shadow-sm">
-        <button
-          onClick={openFileMenu}
-          className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
-        >
-          파일
-        </button>
-        <button
-          onClick={openEditMenu}
-          className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
-        >
-          편집
-        </button>
-        {!narrow && (
-          <button
-            onClick={openReferenceWindow}
-            title="참고 이미지 창을 새로 엽니다. 참고 모드(뷰포트로 보기)와 트레이싱 모드(캔버스 배경에 깔아 따라 그리기)를 창 안에서 오갈 수 있습니다. 여러 개를 동시에 띄울 수 있습니다(저장되지 않음)"
-            className={`px-2 py-1 text-xs ${
-              referenceWindows.length > 0
-                ? "bg-violet-50 text-violet-700"
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            레퍼런스
-          </button>
-        )}
-        <button
-          onClick={() => setShowHelpDialog(true)}
-          className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
-        >
-          도움말
-        </button>
-      </div>
-
-      {/* 탭 바 — 클립스튜디오처럼 여러 파일을 동시에 열어두고 전환한다 */}
-      {tabs.length > 0 && (
-        <div className="flex items-center gap-0.5 overflow-x-auto bg-gray-50 px-2 py-1 shadow-sm">
-          {tabs.map((tab, i) => (
-            <div
-              key={tab.doc.id}
-              onClick={() => switchToTab(i)}
-              className={`group flex shrink-0 items-center gap-1.5 px-2.5 py-1 text-xs ${
-                i === activeTabIndex
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:bg-gray-100"
-              }`}
-              style={{ cursor: CURSOR_POINTING }}
-            >
-              <span className="max-w-[100px] truncate">
-                {i === activeTabIndex ? name : tab.doc.name}
-              </span>
-              {/* 클립스튜디오처럼: 저장되지 않은 변경이 있으면 닫기(X) 대신 원형
-                  점을 보여주고, 탭에 마우스를 올렸을 때만 X로 바뀌어 닫을 수 있다. */}
-              {isTabDirty(i) ? (
-                <span className="relative flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-                  <span
-                    className="h-1.5 w-1.5 rounded-full bg-gray-500 group-hover:hidden"
-                    title="저장되지 않은 변경 사항"
-                  />
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      requestCloseTab(i);
-                    }}
-                    className="hidden h-3.5 w-3.5 items-center justify-center text-gray-400 hover:text-gray-900 group-hover:flex"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ) : (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    requestCloseTab(i);
-                  }}
-                  className="flex h-3.5 w-3.5 shrink-0 items-center justify-center text-gray-400 hover:text-gray-900"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {menuAnchor && (
-        <ContextMenu
-          x={menuAnchor.x}
-          y={menuAnchor.y}
-          items={menuAnchor.items}
-          onClose={() => setMenuAnchor(null)}
+      {narrow ? (
+        <MobileEditorShell
+          hasActiveTab={activeTabIndex >= 0}
+          fileName={isWallpaper ? WALLPAPER_NAME : name}
+          onRenameFile={(newName) => {
+            if (isWallpaper) return;
+            setName(newName);
+            setHasMetaEdits(true);
+          }}
+          onExit={handleExitClick}
+          onSave={handleSave}
+          saveError={saveError}
+          showSavedNotice={showSavedNotice}
+          canUndo={history.canUndo}
+          canRedo={history.canRedo}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          canvas={canvasArea}
+          toolPanel={toolPanel}
+          colorPanel={colorPanel}
+          layerPanel={layerPanel}
+          moreItems={mobileMoreItems}
+          onNewTab={() => setShowNewCanvasDialog(true)}
+          onOpenExisting={() => setShowOpenDialog(true)}
         />
-      )}
+      ) : (
+        <>
+          {/* 제목표시줄 — 메뉴 바·캔버스 영역의 무채색 배경과 구분되도록 바이올렛 톤을 준다. */}
+          <div className="flex items-center gap-2 bg-violet-100 px-3 py-2">
+            {activeTabIndex >= 0 ? (
+              <input
+                value={isWallpaper ? WALLPAPER_NAME : name}
+                readOnly={isWallpaper}
+                onChange={(e) => {
+                  if (isWallpaper) return;
+                  setName(e.target.value);
+                  setHasMetaEdits(true);
+                }}
+                className="flex-1 select-text bg-transparent text-sm font-semibold text-gray-900 outline-none"
+                style={isWallpaper ? { cursor: CURSOR_NORMAL } : undefined}
+              />
+            ) : (
+              <span className="flex-1 text-sm font-semibold text-gray-400">
+                편집기
+              </span>
+            )}
+            {saveError && (
+              <span className="text-[10px] font-semibold text-red-500">
+                저장 실패
+              </span>
+            )}
+            {!saveError && showSavedNotice && (
+              <span className="text-[10px] font-semibold text-green-600">
+                자동 저장됨
+              </span>
+            )}
+            {activeTabIndex >= 0 && (
+              <button
+                onClick={handleSave}
+                title="저장"
+                className="flex h-6 w-6 items-center justify-center bg-violet-500 text-white hover:bg-violet-600"
+              >
+                <Save className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <button
+              onClick={handleExitClick}
+              title="닫기"
+              className="flex h-6 w-6 items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
 
-      {activeTabIndex >= 0 ? (
+          {/* 메뉴 바 */}
+          <div className="flex items-center gap-0.5 bg-white px-2 py-1 shadow-sm">
+            <button
+              onClick={openFileMenu}
+              className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
+            >
+              파일
+            </button>
+            <button
+              onClick={openEditMenu}
+              className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
+            >
+              편집
+            </button>
+            {!narrow && (
+              <button
+                onClick={openReferenceWindow}
+                title="참고 이미지 창을 새로 엽니다. 참고 모드(뷰포트로 보기)와 트레이싱 모드(캔버스 배경에 깔아 따라 그리기)를 창 안에서 오갈 수 있습니다. 여러 개를 동시에 띄울 수 있습니다(저장되지 않음)"
+                className={`px-2 py-1 text-xs ${
+                  referenceWindows.length > 0
+                    ? "bg-violet-50 text-violet-700"
+                    : "text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                레퍼런스
+              </button>
+            )}
+            <button
+              onClick={() => setShowHelpDialog(true)}
+              className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
+            >
+              도움말
+            </button>
+          </div>
+
+          {/* 탭 바 — 클립스튜디오처럼 여러 파일을 동시에 열어두고 전환한다 */}
+          {tabs.length > 0 && (
+            <div className="flex items-center gap-0.5 overflow-x-auto bg-gray-50 px-2 py-1 shadow-sm">
+              {tabs.map((tab, i) => (
+                <div
+                  key={tab.doc.id}
+                  onClick={() => switchToTab(i)}
+                  className={`group flex shrink-0 items-center gap-1.5 px-2.5 py-1 text-xs ${
+                    i === activeTabIndex
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:bg-gray-100"
+                  }`}
+                  style={{ cursor: CURSOR_POINTING }}
+                >
+                  <span className="max-w-[100px] truncate">
+                    {i === activeTabIndex ? name : tab.doc.name}
+                  </span>
+                  {/* 클립스튜디오처럼: 저장되지 않은 변경이 있으면 닫기(X) 대신 원형
+                      점을 보여주고, 탭에 마우스를 올렸을 때만 X로 바뀌어 닫을 수 있다. */}
+                  {isTabDirty(i) ? (
+                    <span className="relative flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                      <span
+                        className="h-1.5 w-1.5 rounded-full bg-gray-500 group-hover:hidden"
+                        title="저장되지 않은 변경 사항"
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          requestCloseTab(i);
+                        }}
+                        className="hidden h-3.5 w-3.5 items-center justify-center text-gray-400 hover:text-gray-900 group-hover:flex"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        requestCloseTab(i);
+                      }}
+                      className="flex h-3.5 w-3.5 shrink-0 items-center justify-center text-gray-400 hover:text-gray-900"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {menuAnchor && (
+            <ContextMenu
+              x={menuAnchor.x}
+              y={menuAnchor.y}
+              items={menuAnchor.items}
+              onClose={() => setMenuAnchor(null)}
+            />
+          )}
+
+          {activeTabIndex >= 0 ? (
         <div
           className="flex flex-1 overflow-hidden"
           style={{ backgroundColor: canvasBgColor }}
@@ -3584,6 +3666,8 @@ export default function Editor({
             를 선택하세요
           </p>
         </div>
+      )}
+        </>
       )}
 
       {showNewCanvasDialog && (
