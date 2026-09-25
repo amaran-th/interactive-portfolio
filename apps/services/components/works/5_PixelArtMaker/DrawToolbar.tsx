@@ -119,7 +119,7 @@ const SCOPE_BADGE: Partial<Record<LayerScope, { icon: typeof Paintbrush; color: 
   all: { icon: Layers, color: "text-sky-600" },
 };
 
-function SegmentedControl({
+export function SegmentedControl({
   label,
   value,
   onChange,
@@ -130,10 +130,12 @@ function SegmentedControl({
 }) {
   return (
     <div className="flex items-center gap-1.5 text-[10px] text-gray-600">
-      <span className="flex shrink-0 items-center gap-1">
-        {label}
-        <HelpTip text={HELP.layerScope} />
-      </span>
+      {label && (
+        <span className="flex shrink-0 items-center gap-1">
+          {label}
+          <HelpTip text={HELP.layerScope} />
+        </span>
+      )}
       <div className="flex overflow-hidden rounded-sm border border-gray-200">
         {SCOPE_OPTIONS.map(([v, l]) => (
           <button
@@ -406,6 +408,7 @@ export default function DrawToolbar({
   onTransformScopeChange,
   secondaryPortalTarget,
   compact,
+  mobileLayout,
 }: {
   tool: Tool;
   onToolChange: (tool: Tool) => void;
@@ -464,6 +467,14 @@ export default function DrawToolbar({
   // 그라데이션 도구와 반전·회전을 "더보기" 뒤로 접어 도구 카드가 한 줄에
   // 유지되게 한다. Editor.tsx가 rootRef.clientWidth로 판정해 내려준다.
   compact: boolean;
+  // 모바일 셸("도구" 팝오버) 전용 — true면: (1) 그리기 카드에 선택 도구
+  // 4개(선택·올가미·이동·자동선택)가 합류해 별도 "선택·조작" 카드가
+  // 사라진다, (2) "편집" 카드(격자·십자선·지우기·반전·회전·정렬)를
+  // 렌더링하지 않는다(Editor.tsx가 그 값들을 더보기>편집 목록에 직접
+  // 그린다), (3) 도구별 하위 옵션(secondarySections)을 캔버스 포털이
+  // 아니라 이 컴포넌트 안에 바로 그린다. desktop은 이 prop이 없으니
+  // (undefined) 지금과 완전히 동일하게 동작한다.
+  mobileLayout?: boolean;
 }) {
   const showBrushSizeRow = BRUSH_SIZE_TOOLS.includes(tool);
   const showFillOptionsRow =
@@ -475,6 +486,13 @@ export default function DrawToolbar({
   const [showMoreEdit, setShowMoreEdit] = useState(false);
   // 창(편집기)이 좁아지면 도형·텍스트·그라데이션 도구도 같은 방식으로 접는다.
   const [showMoreDrawTools, setShowMoreDrawTools] = useState(false);
+
+  // mobileLayout이면 "선택·조작" 카드(SELECT_TOOLS)를 별도로 렌더링하지
+  // 않고 그리기 카드의 같은 줄에 합류시킨다 — desktop은 지금처럼 분리된
+  // 카드를 유지한다.
+  const drawCardTools = mobileLayout
+    ? [...PRIMARY_DRAW_TOOLS, ...SELECT_TOOLS]
+    : PRIMARY_DRAW_TOOLS;
 
   // 그라데이션 단계 수는 그라데이션 도구·도형(직선/사각형/원) 그라데이션
   // 채우기 둘 다에 쓰인다. 방향(각도)은 도형 채우기에만 의미가 있다 —
@@ -711,6 +729,22 @@ export default function DrawToolbar({
       ),
     });
   }
+  // desktop은 이 내용을 createPortal로 캔버스 하단에 보내고, mobileLayout은
+  // 이 컴포넌트 자신의 JSX 안(도구 행 바로 아래)에 그대로 그린다 — 내용은
+  // 완전히 동일하고 위치만 다르므로 노드 자체는 한 번만 만든다.
+  const secondarySectionsNode =
+    secondarySections.length > 0 ? (
+      <div className="pointer-events-auto flex flex-wrap items-end justify-center gap-3">
+        {secondarySections.map(({ key, node }) => (
+          <div
+            key={key}
+            className={`flex flex-col gap-1.5 p-2 ${FLOATING_PANEL}`}
+          >
+            {node}
+          </div>
+        ))}
+      </div>
+    ) : null;
   return (
     <div className="relative" style={{ backgroundColor: canvasBgColor }}>
       <div
@@ -721,7 +755,8 @@ export default function DrawToolbar({
         <div className="relative">
           <ToolCard title="그리기" compact={compact}>
             <div className="flex items-center gap-1">
-              {PRIMARY_DRAW_TOOLS.map(({ tool: t, icon, label, key }) => (
+              {/* 바뀐 부분: PRIMARY_DRAW_TOOLS.map(...) → drawCardTools.map(...) */}
+              {drawCardTools.map(({ tool: t, icon, label, key }) => (
                 <ToolButton
                   key={t}
                   active={tool === t}
@@ -730,7 +765,9 @@ export default function DrawToolbar({
                   icon={icon}
                 />
               ))}
+              {/* 바뀐 부분: !compact → !compact && !mobileLayout */}
               {!compact &&
+                !mobileLayout &&
                 COLLAPSIBLE_DRAW_TOOLS.map(({ tool: t, icon, label, key }) => (
                   <ToolButton
                     key={t}
@@ -740,7 +777,8 @@ export default function DrawToolbar({
                     icon={icon}
                   />
                 ))}
-              {compact && (
+              {/* 바뀐 부분: compact → compact || mobileLayout (아래 두 곳 모두) */}
+              {(compact || mobileLayout) && (
                 <button
                   onClick={() => setShowMoreDrawTools((v) => !v)}
                   title="도형·텍스트·그라데이션 도구 더보기"
@@ -758,7 +796,7 @@ export default function DrawToolbar({
               )}
             </div>
           </ToolCard>
-          {compact && showMoreDrawTools && (
+          {(compact || mobileLayout) && showMoreDrawTools && (
             <div
               className={`absolute top-full left-0 z-30 mt-1 flex items-center gap-1 p-2 ${FLOATING_PANEL}`}
             >
@@ -778,25 +816,29 @@ export default function DrawToolbar({
           )}
         </div>
 
-        <ToolCard title="선택 · 조작" compact={compact}>
-          <div className="flex gap-1">
-            {SELECT_TOOLS.map(({ tool: t, icon, label, key }) => (
-              <ToolButton
-                key={t}
-                active={tool === t}
-                onClick={() => onToolChange(t)}
-                title={`${label} (${key})`}
-                icon={icon}
-              />
-            ))}
-          </div>
-        </ToolCard>
+        {/* 바뀐 부분: 전체를 {!mobileLayout && (...)}로 감쌈 */}
+        {!mobileLayout && (
+          <ToolCard title="선택 · 조작" compact={compact}>
+            <div className="flex gap-1">
+              {SELECT_TOOLS.map(({ tool: t, icon, label, key }) => (
+                <ToolButton
+                  key={t}
+                  active={tool === t}
+                  onClick={() => onToolChange(t)}
+                  title={`${label} (${key})`}
+                  icon={icon}
+                />
+              ))}
+            </div>
+          </ToolCard>
+        )}
 
-        {/* 실행취소·격자·지우기는 항상 보이고, 가끔 쓰는 반전·회전·정렬은
-            그리기 카드와 같은 방식으로 "더보기" 뒤에 접는다. 각 변형 버튼은
-            자기 대상 레이어를 캐럿으로 고른다(지우기 포함). */}
-        <div className="relative">
-          <ToolCard title="편집" compact={compact}>
+        {/* 바뀐 부분: 전체를 {!mobileLayout && (...)}로 감쌈 — 안쪽은
+            원본 "편집" 카드 그대로(실행취소·다시실행·격자·십자선·
+            ScopedActionButton 지우기·더보기 버튼·TransformMoreButtons) */}
+        {!mobileLayout && (
+          <div className="relative">
+            <ToolCard title="편집" compact={compact}>
             <div className="flex items-center gap-1.5">
               <button
                 onClick={onUndo}
@@ -849,45 +891,32 @@ export default function DrawToolbar({
                 />
               </button>
             </div>
-          </ToolCard>
-          {showMoreEdit && (
-            <div
-              className={`absolute top-full right-0 z-30 mt-1 p-2 ${FLOATING_PANEL}`}
-            >
-              <TransformMoreButtons
-                transformScopes={transformScopes}
-                hasReferenceLayers={hasReferenceLayers}
-                onTransformScopeChange={onTransformScopeChange}
-                onFlipHorizontal={onFlipHorizontal}
-                onFlipVertical={onFlipVertical}
-                onRotate90={onRotate90}
-                onAlignContent={onAlignContent}
-              />
-            </div>
-          )}
-        </div>
+            </ToolCard>
+            {showMoreEdit && (
+              <div
+                className={`absolute top-full right-0 z-30 mt-1 p-2 ${FLOATING_PANEL}`}
+              >
+                <TransformMoreButtons
+                  transformScopes={transformScopes}
+                  hasReferenceLayers={hasReferenceLayers}
+                  onTransformScopeChange={onTransformScopeChange}
+                  onFlipHorizontal={onFlipHorizontal}
+                  onFlipVertical={onFlipVertical}
+                  onRotate90={onRotate90}
+                  onAlignContent={onAlignContent}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* 도구별 하위 옵션은 상단 바가 아니라 캔버스 영역 하단 중앙에 떠 있는
-          자리(Editor의 secondaryPortalTarget)에 포털로 그린다 — 상단 바를
-          두껍게 만들지 않고, 좌우 사이드바도 안 가린다. 캔버스 일부를 잠깐
-          덮지만, 캔버스는 스페이스+드래그로 자유롭게 밀 수 있어(패딩 확보됨)
-          가려지면 작업물을 그 밑에서 빼내면 된다. */}
-      {secondarySections.length > 0 &&
-        secondaryPortalTarget &&
-        createPortal(
-          <div className="pointer-events-auto flex flex-wrap items-end justify-center gap-3">
-            {secondarySections.map(({ key, node }) => (
-              <div
-                key={key}
-                className={`flex flex-col gap-1.5 p-2 ${FLOATING_PANEL}`}
-              >
-                {node}
-              </div>
-            ))}
-          </div>,
-          secondaryPortalTarget,
-        )}
+      {/* 바뀐 부분: mobileLayout이면 포털 대신 바로 렌더링 */}
+      {mobileLayout
+        ? secondarySectionsNode
+        : secondarySections.length > 0 &&
+          secondaryPortalTarget &&
+          createPortal(secondarySectionsNode, secondaryPortalTarget)}
     </div>
   );
 }
