@@ -1,11 +1,19 @@
 "use client";
 
 import {
+  Crosshair,
+  Focus,
+  FlipHorizontal2,
+  FlipVertical2,
+  Grid3x3,
   Image as ImageIcon,
   ImagePlus,
   Layers as LayersIcon,
+  Loader,
   Minus,
   Plus,
+  RotateCcw,
+  RotateCw,
   Save,
   Share,
   TriangleAlert,
@@ -27,7 +35,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import ContextMenu, { ContextMenuItem } from "./ContextMenu";
 import { CURSOR_NORMAL, CURSOR_POINTING, CURSOR_TEXT } from "./cursors";
 import { AlertModal, PromptModal } from "./Dialogs";
-import DrawToolbar from "./DrawToolbar";
+import DrawToolbar, { SegmentedControl } from "./DrawToolbar";
 import ExportPanel from "./ExportPanel";
 import {
   exportAsGIF,
@@ -86,6 +94,7 @@ import {
 } from "./pixelGrid";
 import { isMacPlatform } from "./platform";
 import ResizeCanvasDialog from "./ResizeCanvasDialog";
+import Switch from "./Switch";
 import { rasterizeText, rotateAlphaBuffer, Rotation } from "./textStamp";
 import {
   CANVAS_PAN_PADDING,
@@ -2840,7 +2849,8 @@ export default function Editor({
             transformScopes={transformScopes}
             onTransformScopeChange={handleTransformScopeChange}
             secondaryPortalTarget={secondaryToolbarPortal}
-            compact={toolbarCompact}
+            compact={toolbarCompact || narrow}
+            mobileLayout={narrow}
           />
   );
   const colorPanel = (
@@ -3102,6 +3112,123 @@ export default function Editor({
           <button onClick={() => selection.copy(history.present, doc.width)} disabled={activeTabIndex < 0} className="py-3 text-left text-sm text-gray-800 disabled:text-gray-300">복사</button>
           <button onClick={() => setResizingCanvas(true)} disabled={activeTabIndex < 0} className="py-3 text-left text-sm text-gray-800 disabled:text-gray-300">캔버스 크기 수정</button>
           <button onClick={handlePaste} disabled={activeTabIndex < 0 || !selection.clipboard} className="py-3 text-left text-sm text-gray-800 disabled:text-gray-300">붙여넣기</button>
+          <label className="flex items-center justify-between gap-2 py-3 text-sm text-gray-800">
+            <span className="flex items-center gap-2">
+              <Grid3x3 className="h-4 w-4 text-gray-500" />
+              격자 표시
+            </span>
+            <Switch checked={showGrid} onClick={() => setShowGrid((g) => !g)} />
+          </label>
+          <label className="flex items-center justify-between gap-2 py-3 text-sm text-gray-800">
+            <span className="flex items-center gap-2">
+              <Crosshair className="h-4 w-4 text-gray-500" />
+              십자선
+            </span>
+            <Switch checked={showCrosshair} onClick={() => setShowCrosshair((c) => !c)} />
+          </label>
+          <div className="flex items-center justify-between gap-3 py-3">
+            <button
+              onClick={handleClearCanvas}
+              disabled={
+                transformScopes.clear === "reference" && !hasReferenceLayers
+              }
+              className="flex items-center gap-2 text-sm text-red-500 disabled:text-gray-300"
+            >
+              <Loader className="h-4 w-4" />
+              지우기
+            </button>
+            <SegmentedControl
+              label=""
+              value={transformScopes.clear}
+              onChange={(s) => handleTransformScopeChange("clear", s)}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 py-3">
+            <button
+              onClick={handleFlipHorizontal}
+              disabled={
+                transformScopes.flipH === "reference" && !hasReferenceLayers
+              }
+              className="flex items-center gap-2 text-sm text-gray-800 disabled:text-gray-300"
+            >
+              <FlipHorizontal2 className="h-4 w-4 text-gray-500" />
+              반전(좌우)
+            </button>
+            <SegmentedControl
+              label=""
+              value={transformScopes.flipH}
+              onChange={(s) => handleTransformScopeChange("flipH", s)}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 py-3">
+            <button
+              onClick={handleFlipVertical}
+              disabled={
+                transformScopes.flipV === "reference" && !hasReferenceLayers
+              }
+              className="flex items-center gap-2 text-sm text-gray-800 disabled:text-gray-300"
+            >
+              <FlipVertical2 className="h-4 w-4 text-gray-500" />
+              반전(상하)
+            </button>
+            <SegmentedControl
+              label=""
+              value={transformScopes.flipV}
+              onChange={(s) => handleTransformScopeChange("flipV", s)}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 py-3">
+            <button
+              onClick={() => handleRotate90(-1)}
+              disabled={
+                transformScopes.rotateCcw === "reference" &&
+                !hasReferenceLayers
+              }
+              className="flex items-center gap-2 text-sm text-gray-800 disabled:text-gray-300"
+            >
+              <RotateCcw className="h-4 w-4 text-gray-500" />
+              회전(반시계)
+            </button>
+            <SegmentedControl
+              label=""
+              value={transformScopes.rotateCcw}
+              onChange={(s) => handleTransformScopeChange("rotateCcw", s)}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 py-3">
+            <button
+              onClick={() => handleRotate90(1)}
+              disabled={
+                transformScopes.rotateCw === "reference" && !hasReferenceLayers
+              }
+              className="flex items-center gap-2 text-sm text-gray-800 disabled:text-gray-300"
+            >
+              <RotateCw className="h-4 w-4 text-gray-500" />
+              회전(시계)
+            </button>
+            <SegmentedControl
+              label=""
+              value={transformScopes.rotateCw}
+              onChange={(s) => handleTransformScopeChange("rotateCw", s)}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 py-3">
+            <button
+              onClick={handleAlignLayers}
+              disabled={
+                transformScopes.align === "reference" && !hasReferenceLayers
+              }
+              className="flex items-center gap-2 text-sm text-gray-800 disabled:text-gray-300"
+            >
+              <Focus className="h-4 w-4 text-gray-500" />
+              정렬
+            </button>
+            <SegmentedControl
+              label=""
+              value={transformScopes.align}
+              onChange={(s) => handleTransformScopeChange("align", s)}
+            />
+          </div>
         </div>
       ),
     },
