@@ -755,7 +755,6 @@ export default function DrawToolbar({
         <div className="relative">
           <ToolCard title="그리기" compact={compact}>
             <div className="flex items-center gap-1">
-              {/* 바뀐 부분: PRIMARY_DRAW_TOOLS.map(...) → drawCardTools.map(...) */}
               {drawCardTools.map(({ tool: t, icon, label, key }) => (
                 <ToolButton
                   key={t}
@@ -765,7 +764,6 @@ export default function DrawToolbar({
                   icon={icon}
                 />
               ))}
-              {/* 바뀐 부분: !compact → !compact && !mobileLayout */}
               {!compact &&
                 !mobileLayout &&
                 COLLAPSIBLE_DRAW_TOOLS.map(({ tool: t, icon, label, key }) => (
@@ -777,7 +775,6 @@ export default function DrawToolbar({
                     icon={icon}
                   />
                 ))}
-              {/* 바뀐 부분: compact → compact || mobileLayout (아래 두 곳 모두) */}
               {(compact || mobileLayout) && (
                 <button
                   onClick={() => setShowMoreDrawTools((v) => !v)}
@@ -816,7 +813,6 @@ export default function DrawToolbar({
           )}
         </div>
 
-        {/* 바뀐 부분: 전체를 {!mobileLayout && (...)}로 감쌈 */}
         {!mobileLayout && (
           <ToolCard title="선택 · 조작" compact={compact}>
             <div className="flex gap-1">
@@ -833,9 +829,11 @@ export default function DrawToolbar({
           </ToolCard>
         )}
 
-        {/* 바뀐 부분: 전체를 {!mobileLayout && (...)}로 감쌈 — 안쪽은
-            원본 "편집" 카드 그대로(실행취소·다시실행·격자·십자선·
-            ScopedActionButton 지우기·더보기 버튼·TransformMoreButtons) */}
+        {/* 실행취소·격자·지우기는 항상 보이고, 가끔 쓰는 반전·회전·정렬은
+            그리기 카드와 같은 방식으로 "더보기" 뒤에 접는다. 각 변형 버튼은
+            자기 대상 레이어를 캐럿으로 고른다(지우기 포함). mobileLayout이면
+            이 카드 자체를 렌더링하지 않는다 — 같은 액션들을 Editor.tsx가
+            모바일 "더보기 > 편집" 목록에 직접 그린다. */}
         {!mobileLayout && (
           <div className="relative">
             <ToolCard title="편집" compact={compact}>
@@ -911,12 +909,19 @@ export default function DrawToolbar({
         )}
       </div>
 
-      {/* 바뀐 부분: mobileLayout이면 포털 대신 바로 렌더링 */}
-      {mobileLayout
-        ? secondarySectionsNode
-        : secondarySections.length > 0 &&
-          secondaryPortalTarget &&
-          createPortal(secondarySectionsNode, secondaryPortalTarget)}
+      {/* 도구별 하위 옵션은 상단 바가 아니라 캔버스 영역 하단 중앙에 떠 있는
+          자리(Editor의 secondaryPortalTarget)에 포털로 그린다 — 상단 바를
+          두껍게 만들지 않고, 좌우 사이드바도 안 가린다. 캔버스 일부를 잠깐
+          덮지만, 캔버스는 스페이스+드래그로 자유롭게 밀 수 있어(패딩 확보됨)
+          가려지면 작업물을 그 밑에서 빼내면 된다. mobileLayout이면 포털이
+          아니라 이 팝오버 자신의 하단에 바로 그린다(캔버스 자체가 따로 없다). */}
+      {mobileLayout ? (
+        <div className="px-3 pb-1.5">{secondarySectionsNode}</div>
+      ) : (
+        secondarySections.length > 0 &&
+        secondaryPortalTarget &&
+        createPortal(secondarySectionsNode, secondaryPortalTarget)
+      )}
     </div>
   );
 }
