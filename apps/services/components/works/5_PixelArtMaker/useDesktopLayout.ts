@@ -154,3 +154,9 @@ export function setMobileOrder(ids: string[]): void {
     localStorage.setItem(MOBILE_ORDER_KEY, JSON.stringify(ids));
   } catch {}
 }
+
+export function resetMobileOrder(): void {
+  try {
+    localStorage.removeItem(MOBILE_ORDER_KEY);
+  } catch {}
+}

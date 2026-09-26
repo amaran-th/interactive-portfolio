@@ -31,6 +31,7 @@ import {
   getStoredPosition,
   removeIconPositions,
   resetDesktopLayout,
+  resetMobileOrder,
   setIconPosition,
   setIconPositions,
   setMobileOrder,
@@ -48,6 +49,7 @@ import {
 import {
   getMobileWallpaper,
   getWallpaper,
+  resetMobileWallpaper,
   resetWallpaper,
   WALLPAPER_ID,
   WALLPAPER_ID_MOBILE,
@@ -239,6 +241,7 @@ export default function Desktop({
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
     // refreshSignal: 편집창이 이제 desktop 위에 겹쳐 뜨는 방식이라 desktop이 더 이상
     // 화면 전환마다 재마운트되지 않는다 — 편집창을 닫을 때마다 이 값이 바뀌어
@@ -492,6 +495,8 @@ export default function Desktop({
     resetAllPixelArt();
     resetDesktopLayout();
     resetWallpaper();
+    resetMobileWallpaper();
+    resetMobileOrder();
     setSelected(new Set());
     setPendingFormat(false);
     refresh();
@@ -576,6 +581,7 @@ export default function Desktop({
               }
               scale={effectiveScale}
               mobileLayout={isMobile}
+              dragging={mobileDrag?.id === art.id}
               selected={selected.has(art.id)}
               editing={renamingId === art.id}
               onPointerDownIcon={(e) =>
@@ -683,6 +689,7 @@ export default function Desktop({
                   width: ICON_BOX * effectiveScale,
                   padding: ICON_PADDING * effectiveScale,
                   gap: ICON_GAP * effectiveScale,
+                  zIndex: mobileDrag?.id === TRASH_ID ? 50 : undefined,
                 }
               : specialIconStyle(TRASH_ID)
           }
@@ -731,6 +738,7 @@ export default function Desktop({
                   width: ICON_BOX * effectiveScale,
                   padding: ICON_PADDING * effectiveScale,
                   gap: ICON_GAP * effectiveScale,
+                  zIndex: mobileDrag?.id === FORMAT_ID ? 50 : undefined,
                 }
               : specialIconStyle(FORMAT_ID)
           }
@@ -781,6 +789,7 @@ export default function Desktop({
                   width: ICON_BOX * effectiveScale,
                   padding: ICON_PADDING * effectiveScale,
                   gap: ICON_GAP * effectiveScale,
+                  zIndex: mobileDrag?.id === WALLPAPER_ID ? 50 : undefined,
                 }
               : specialIconStyle(WALLPAPER_ID)
           }
@@ -829,6 +838,7 @@ export default function Desktop({
                   width: ICON_BOX * effectiveScale,
                   padding: ICON_PADDING * effectiveScale,
                   gap: ICON_GAP * effectiveScale,
+                  zIndex: mobileDrag?.id === LAUNCHER_ID ? 50 : undefined,
                 }
               : specialIconStyle(LAUNCHER_ID)
           }

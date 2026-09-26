@@ -25,6 +25,7 @@ export default function DesktopIcon({
   onRenameConfirm,
   onRenameCancel,
   mobileLayout,
+  dragging,
 }: {
   art: PixelArt;
   // x, y는 기준(배율 1.0) 좌표 — 여기서 scale을 곱해 화면 좌표로 그린다.
@@ -42,6 +43,9 @@ export default function DesktopIcon({
   // 배경(MOBILE_ICON_CARD)으로 감싼다. desktop은 이 prop을 안 넘기므로
   // 지금과 동일하다.
   mobileLayout?: boolean;
+  // 모바일 격자 드래그 중인 아이콘인지 — true면 다른 아이콘 위로 올라오도록
+  // zIndex를 높인다.
+  dragging?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -101,6 +105,7 @@ export default function DesktopIcon({
         padding: ICON_PADDING * scale,
         gap: ICON_GAP * scale,
         cursor: editing ? undefined : CURSOR_POINTING,
+        zIndex: dragging ? 50 : undefined,
       }}
       className={`flex flex-col items-center ${selected ? "bg-violet-500/15" : "hover:bg-black/5"}`}
       onPointerDown={editing ? undefined : onPointerDownIcon}
