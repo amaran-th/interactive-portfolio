@@ -126,9 +126,12 @@ import { CanvasSize, useCanvasHistory } from "./useCanvasHistory";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { Clip, useSelection } from "./useSelection";
 import {
+  getMobileWallpaper,
   getWallpaper,
+  saveMobileWallpaper,
   saveWallpaper,
   WALLPAPER_ID,
+  WALLPAPER_ID_MOBILE,
   WALLPAPER_NAME,
 } from "./wallpaper";
 
@@ -280,6 +283,8 @@ function resolveInitialDoc(docId: string | null): {
   found: boolean;
 } {
   if (docId === WALLPAPER_ID) return { doc: getWallpaper(), found: true };
+  if (docId === WALLPAPER_ID_MOBILE)
+    return { doc: getMobileWallpaper(), found: true };
   if (docId) {
     const existing = getPixelArt(docId);
     if (existing) return { doc: existing, found: true };
@@ -867,7 +872,8 @@ export default function Editor({
         clearTimeout(saveErrorTimeoutRef.current);
     };
   }, []);
-  const isWallpaper = doc.id === WALLPAPER_ID;
+  const isWallpaper =
+    doc.id === WALLPAPER_ID || doc.id === WALLPAPER_ID_MOBILE;
   // 편집창이 데스크탑 위에 떠오르며 열리는 애니메이션 — 마운트 직후 한 프레임 뒤에
   // true로 바뀌면서 transition이 자연스럽게 재생된다(처음부터 true면 트랜지션 없이
   // 바로 켜진 상태로 나타난다).
@@ -2033,7 +2039,12 @@ export default function Editor({
       layers: history.presentLayers,
       activeLayerId: history.activeLayerId,
     };
-    const ok = isWallpaper ? saveWallpaper(toSave) : savePixelArt(toSave);
+    const ok =
+      doc.id === WALLPAPER_ID_MOBILE
+        ? saveMobileWallpaper(toSave)
+        : isWallpaper
+          ? saveWallpaper(toSave)
+          : savePixelArt(toSave);
     if (!ok) {
       flagSaveError();
       return;
@@ -2217,11 +2228,17 @@ export default function Editor({
   // 별도로 스냅샷을 직접 저장하는 경로가 필요하다.
   const saveTabSnapshot = useCallback(
     (tab: Tab) => {
-      const isWp = tab.doc.id === WALLPAPER_ID;
+      const isWp =
+        tab.doc.id === WALLPAPER_ID || tab.doc.id === WALLPAPER_ID_MOBILE;
       const toSave: PixelArt = isWp
         ? { ...tab.doc, name: WALLPAPER_NAME }
         : tab.doc;
-      const ok = isWp ? saveWallpaper(toSave) : savePixelArt(toSave);
+      const ok =
+        tab.doc.id === WALLPAPER_ID_MOBILE
+          ? saveMobileWallpaper(toSave)
+          : isWp
+            ? saveWallpaper(toSave)
+            : savePixelArt(toSave);
       if (!ok) flagSaveError();
     },
     [flagSaveError],

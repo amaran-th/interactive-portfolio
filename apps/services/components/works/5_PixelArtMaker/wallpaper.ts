@@ -15,10 +15,16 @@ const WALLPAPER_KEY = "pixel-art-desktop-wallpaper";
 // 삭제·이름 변경이 불가능하다 — 지울 수 없으므로 목록이 아니라 단일 문서로 다룬다.
 export const WALLPAPER_ID = "__wallpaper__";
 export const WALLPAPER_NAME = "배경화면";
+export const WALLPAPER_ID_MOBILE = "__wallpaper_mobile__";
 
 // 일반 새 캔버스 프리셋(CANVAS_PRESETS)과는 별도의, 배경에 어울리는 가로로 넓은 규격.
 const WALLPAPER_WIDTH = 32;
 const WALLPAPER_HEIGHT = 18;
+
+// 모바일용 배경화면 규격 — 세로(9:16에 가까운 비율)로, 데스크톱용과 완전히
+// 별개의 파일이다.
+const WALLPAPER_MOBILE_WIDTH = 18;
+const WALLPAPER_MOBILE_HEIGHT = 32;
 
 // 사용자가 직접 그려 준비한 기본 배경화면 픽셀 데이터(32×18, 576개) — 아래
 // 절차적 체크 패턴 대신 이 그림이 최초 배경화면으로 쓰인다.
@@ -109,6 +115,20 @@ function defaultWallpaper(): PixelArt {
   };
 }
 
+function defaultMobileWallpaper(): PixelArt {
+  return {
+    id: WALLPAPER_ID_MOBILE,
+    name: WALLPAPER_NAME,
+    width: WALLPAPER_MOBILE_WIDTH,
+    height: WALLPAPER_MOBILE_HEIGHT,
+    palette: [],
+    pixels: new Array<string | null>(
+      WALLPAPER_MOBILE_WIDTH * WALLPAPER_MOBILE_HEIGHT,
+    ).fill("#cbedff"),
+    createdAt: Date.now(),
+  };
+}
+
 type StoredWallpaperV3 = Omit<PixelArt, "pixels" | "layers"> & {
   pixels: PackedPixels;
   layers?: (Omit<PixelLayer, "pixels"> & { pixels: PackedPixels })[];
@@ -122,10 +142,14 @@ type StoredWallpaperV1 = Omit<PixelArt, "pixels"> & {
   pixels: string | number[];
 };
 
-export function getWallpaper(): PixelArt {
-  if (typeof window === "undefined") return defaultWallpaper();
+function getWallpaperFor(
+  key: string,
+  id: string,
+  buildDefault: () => PixelArt,
+): PixelArt {
+  if (typeof window === "undefined") return buildDefault();
   try {
-    const raw = localStorage.getItem(WALLPAPER_KEY);
+    const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw) as
         | StoredWallpaperV3
@@ -161,24 +185,53 @@ export function getWallpaper(): PixelArt {
       };
     }
   } catch {}
-  const fresh = defaultWallpaper();
-  saveWallpaper(fresh);
+  const fresh = buildDefault();
+  saveWallpaperFor(key, id, fresh);
   return fresh;
 }
 
-export function saveWallpaper(art: PixelArt): SaveResult {
-  // id·name은 항상 고정값으로 강제한다 — 편집기에서 실수로라도 바뀌지 않도록.
-  const locked: PixelArt = { ...art, id: WALLPAPER_ID, name: WALLPAPER_NAME };
+function saveWallpaperFor(key: string, id: string, art: PixelArt): SaveResult {
+  const locked: PixelArt = { ...art, id, name: WALLPAPER_NAME };
   try {
-    localStorage.setItem(WALLPAPER_KEY, JSON.stringify(encodeStored(locked)));
+    localStorage.setItem(key, JSON.stringify(encodeStored(locked)));
     return "ok";
   } catch (e) {
     return isQuotaExceededError(e) ? "quota" : "error";
   }
 }
 
-export function resetWallpaper(): void {
+function resetWallpaperFor(key: string): void {
   try {
-    localStorage.removeItem(WALLPAPER_KEY);
+    localStorage.removeItem(key);
   } catch {}
+}
+
+export function getWallpaper(): PixelArt {
+  return getWallpaperFor(WALLPAPER_KEY, WALLPAPER_ID, defaultWallpaper);
+}
+
+export function saveWallpaper(art: PixelArt): SaveResult {
+  return saveWallpaperFor(WALLPAPER_KEY, WALLPAPER_ID, art);
+}
+
+export function resetWallpaper(): void {
+  resetWallpaperFor(WALLPAPER_KEY);
+}
+
+const WALLPAPER_MOBILE_KEY = "pixel-art-desktop-wallpaper-mobile";
+
+export function getMobileWallpaper(): PixelArt {
+  return getWallpaperFor(
+    WALLPAPER_MOBILE_KEY,
+    WALLPAPER_ID_MOBILE,
+    defaultMobileWallpaper,
+  );
+}
+
+export function saveMobileWallpaper(art: PixelArt): SaveResult {
+  return saveWallpaperFor(WALLPAPER_MOBILE_KEY, WALLPAPER_ID_MOBILE, art);
+}
+
+export function resetMobileWallpaper(): void {
+  resetWallpaperFor(WALLPAPER_MOBILE_KEY);
 }

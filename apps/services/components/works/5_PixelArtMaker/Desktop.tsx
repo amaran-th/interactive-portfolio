@@ -39,7 +39,13 @@ import {
   ICON_GAP,
   ICON_PADDING,
 } from "./iconMetrics";
-import { getWallpaper, resetWallpaper, WALLPAPER_ID } from "./wallpaper";
+import {
+  getMobileWallpaper,
+  getWallpaper,
+  resetWallpaper,
+  WALLPAPER_ID,
+  WALLPAPER_ID_MOBILE,
+} from "./wallpaper";
 import { NARROW_BREAKPOINT } from "./types";
 
 type Menu = { x: number; y: number; items: ContextMenuItem[] } | null;
@@ -99,6 +105,9 @@ export default function Desktop({
 }) {
   const [items, setItems] = useState<PixelArt[]>([]);
   const [wallpaper, setWallpaper] = useState<PixelArt>(() => getWallpaper());
+  const [mobileWallpaper, setMobileWallpaper] = useState<PixelArt>(() =>
+    getMobileWallpaper(),
+  );
   const [positions, setPositions] = useState<
     Record<string, { x: number; y: number }>
   >({});
@@ -118,6 +127,7 @@ export default function Desktop({
     width: number;
     height: number;
   } | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // 특수 아이콘(트래시/포맷) 자체를 드래그하는 동안에는 pointerup이 그 위에서
@@ -136,6 +146,7 @@ export default function Desktop({
     const ratio = wallpaper.width / wallpaper.height;
     const compute = () => {
       const rect = wrapper.getBoundingClientRect();
+      setIsMobile(rect.width < NARROW_BREAKPOINT);
       if (rect.width < NARROW_BREAKPOINT) {
         setFittedSize({ width: rect.width, height: rect.height });
         onFittedSizeChange?.({ width: rect.width, height: rect.height });
@@ -165,6 +176,7 @@ export default function Desktop({
     const list = listPixelArt();
     setItems(list);
     setWallpaper(getWallpaper());
+    setMobileWallpaper(getMobileWallpaper());
     // getIconPosition은 기준 좌표를 다루므로 화면 폭이 아니라 배율로 나눈
     // 기준 폭을 넘긴다 — 그래야 배율과 무관하게 열 수가 일정하게 계산된다.
     const measuredWidth = containerRef.current?.getBoundingClientRect().width;
@@ -452,7 +464,7 @@ export default function Desktop({
           });
         }}
       >
-        <WallpaperBackground art={wallpaper} />
+        <WallpaperBackground art={isMobile ? mobileWallpaper : wallpaper} />
 
         {items.map((art) => {
           const p = positions[art.id];
@@ -576,7 +588,9 @@ export default function Desktop({
 
         <div
           onPointerDown={(e) => startIconDrag(WALLPAPER_ID, e)}
-          onDoubleClick={() => onOpen(WALLPAPER_ID)}
+          onDoubleClick={() =>
+            onOpen(isMobile ? WALLPAPER_ID_MOBILE : WALLPAPER_ID)
+          }
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -586,7 +600,7 @@ export default function Desktop({
           style={specialIconStyle(WALLPAPER_ID)}
           title="더블클릭하면 배경화면을 편집합니다 · 드래그해서 위치 이동 가능"
         >
-          <WallpaperIcon art={wallpaper} />
+          <WallpaperIcon art={isMobile ? mobileWallpaper : wallpaper} />
           <span className="w-full truncate text-center text-[10px] text-gray-600">
             배경화면
           </span>
