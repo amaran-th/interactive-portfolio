@@ -138,6 +138,11 @@ export default function Desktop({
   // 특수 아이콘(트래시/포맷) 자체를 드래그하는 동안에는 pointerup이 그 위에서
   // 발생해도(예: 휴지통 위로 아이콘을 놓는 삭제 동작) 위치 이동으로만 처리해야 한다.
   const draggingSpecialRef = useRef<string | null>(null);
+  const [mobileDrag, setMobileDrag] = useState<{
+    id: string;
+    dx: number;
+    dy: number;
+  } | null>(null);
 
   // 데스크탑 자체의 가로세로 비율을 배경화면 이미지 비율에 맞춘다 — 뷰포트를
   // 꽉 채우도록 배경화면을 늘리거나 자르는 대신, 데스크탑을 배경화면 비율의
@@ -188,6 +193,11 @@ export default function Desktop({
     TRASH_ID,
   ];
   const storedMobileOrder = getMobileOrder();
+  // mobileOrder는 매 렌더마다 새로 계산되는 파생 배열이라(Task 2 설계 그대로 유지),
+  // 아래 startMobileIconDrag의 의존성 배열에 넣으면 "매 렌더마다 바뀐다"는
+  // exhaustive-deps 경고가 뜬다 — 드롭 시점의 최신 순서를 정확히 참조해야 하므로
+  // (useMemo로 감싸는 건 이 태스크 범위 밖의 재선언이라) 의도적으로 무시한다.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const mobileOrder = [
     ...storedMobileOrder.filter((id) => defaultMobileOrder.includes(id)),
     ...defaultMobileOrder.filter((id) => !storedMobileOrder.includes(id)),
@@ -228,7 +238,6 @@ export default function Desktop({
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
     // refreshSignal: 편집창이 이제 desktop 위에 겹쳐 뜨는 방식이라 desktop이 더 이상
     // 화면 전환마다 재마운트되지 않는다 — 편집창을 닫을 때마다 이 값이 바뀌어
@@ -386,6 +395,57 @@ export default function Desktop({
     [selected, positions, scale],
   );
 
+  // 모바일 격자 전용 — 자유 좌표를 옮기는 대신, 놓은 위치가 속한 격자 칸의
+  // 인덱스로 순서를 바꾼다. 드래그 중에는 집은 아이콘만 포인터를 따라
+  // 보이고(다른 아이콘은 실시간 재배치 없이 그대로), 놓는 순간 한 번만
+  // 순서를 계산해 저장한다.
+  const startMobileIconDrag = useCallback(
+    (id: string, e: React.PointerEvent) => {
+      e.stopPropagation();
+      if (e.button !== 0) return;
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const MOVE_THRESHOLD = 4;
+      let moved = false;
+
+      const move = (ev: PointerEvent) => {
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
+        if (!moved && Math.hypot(dx, dy) < MOVE_THRESHOLD) return;
+        moved = true;
+        setMobileDrag({ id, dx, dy });
+      };
+      const up = (ev: PointerEvent) => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
+        if (moved) {
+          const rect = containerRef.current?.getBoundingClientRect();
+          const cellPx = effectiveScale * GRID_STEP;
+          const relX = ev.clientX - (rect?.left ?? 0);
+          const relY = ev.clientY - (rect?.top ?? 0);
+          const col = Math.min(
+            MOBILE_COLUMNS - 1,
+            Math.max(0, Math.floor(relX / cellPx)),
+          );
+          const row = Math.max(0, Math.floor(relY / cellPx));
+          const targetIndex = Math.min(
+            mobileOrder.length - 1,
+            row * MOBILE_COLUMNS + col,
+          );
+          const next = mobileOrder.filter((oid) => oid !== id);
+          next.splice(targetIndex, 0, id);
+          setMobileOrder(next);
+        }
+        setMobileDrag(null);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+    },
+    [mobileOrder, effectiveScale],
+  );
+
   const handleTrashDrop = useCallback(() => {
     setTrashHover(false);
     if (draggingSpecialRef.current === TRASH_ID) return;
@@ -503,12 +563,24 @@ export default function Desktop({
             <DesktopIcon
               key={art.id}
               art={art}
-              x={p.x}
-              y={p.y}
+              x={
+                mobileDrag?.id === art.id
+                  ? p.x + mobileDrag.dx / effectiveScale
+                  : p.x
+              }
+              y={
+                mobileDrag?.id === art.id
+                  ? p.y + mobileDrag.dy / effectiveScale
+                  : p.y
+              }
               scale={effectiveScale}
               selected={selected.has(art.id)}
               editing={renamingId === art.id}
-              onPointerDownIcon={(e) => startIconDrag(art.id, e)}
+              onPointerDownIcon={(e) =>
+                isMobile
+                  ? startMobileIconDrag(art.id, e)
+                  : startIconDrag(art.id, e)
+              }
               onDoubleClick={() => onOpen(art.id)}
               onRenameConfirm={(next) => {
                 renamePixelArt(art.id, next);
@@ -575,7 +647,9 @@ export default function Desktop({
         )}
 
         <div
-          onPointerDown={(e) => startIconDrag(TRASH_ID, e)}
+          onPointerDown={(e) =>
+            isMobile ? startMobileIconDrag(TRASH_ID, e) : startIconDrag(TRASH_ID, e)
+          }
           onPointerEnter={() =>
             draggingSpecialRef.current !== TRASH_ID && setTrashHover(true)
           }
@@ -592,8 +666,18 @@ export default function Desktop({
           style={
             isMobile
               ? {
-                  left: effectivePositions[TRASH_ID].x * effectiveScale,
-                  top: effectivePositions[TRASH_ID].y * effectiveScale,
+                  left:
+                    (effectivePositions[TRASH_ID].x +
+                      (mobileDrag?.id === TRASH_ID
+                        ? mobileDrag.dx / effectiveScale
+                        : 0)) *
+                    effectiveScale,
+                  top:
+                    (effectivePositions[TRASH_ID].y +
+                      (mobileDrag?.id === TRASH_ID
+                        ? mobileDrag.dy / effectiveScale
+                        : 0)) *
+                    effectiveScale,
                   width: ICON_BOX * effectiveScale,
                   padding: ICON_PADDING * effectiveScale,
                   gap: ICON_GAP * effectiveScale,
@@ -609,7 +693,11 @@ export default function Desktop({
         </div>
 
         <div
-          onPointerDown={(e) => startIconDrag(FORMAT_ID, e)}
+          onPointerDown={(e) =>
+            isMobile
+              ? startMobileIconDrag(FORMAT_ID, e)
+              : startIconDrag(FORMAT_ID, e)
+          }
           onDoubleClick={() => setPendingFormat(true)}
           onContextMenu={(e) => {
             e.preventDefault();
@@ -620,8 +708,18 @@ export default function Desktop({
           style={
             isMobile
               ? {
-                  left: effectivePositions[FORMAT_ID].x * effectiveScale,
-                  top: effectivePositions[FORMAT_ID].y * effectiveScale,
+                  left:
+                    (effectivePositions[FORMAT_ID].x +
+                      (mobileDrag?.id === FORMAT_ID
+                        ? mobileDrag.dx / effectiveScale
+                        : 0)) *
+                    effectiveScale,
+                  top:
+                    (effectivePositions[FORMAT_ID].y +
+                      (mobileDrag?.id === FORMAT_ID
+                        ? mobileDrag.dy / effectiveScale
+                        : 0)) *
+                    effectiveScale,
                   width: ICON_BOX * effectiveScale,
                   padding: ICON_PADDING * effectiveScale,
                   gap: ICON_GAP * effectiveScale,
@@ -637,7 +735,11 @@ export default function Desktop({
         </div>
 
         <div
-          onPointerDown={(e) => startIconDrag(WALLPAPER_ID, e)}
+          onPointerDown={(e) =>
+            isMobile
+              ? startMobileIconDrag(WALLPAPER_ID, e)
+              : startIconDrag(WALLPAPER_ID, e)
+          }
           onDoubleClick={() =>
             onOpen(isMobile ? WALLPAPER_ID_MOBILE : WALLPAPER_ID)
           }
@@ -650,8 +752,18 @@ export default function Desktop({
           style={
             isMobile
               ? {
-                  left: effectivePositions[WALLPAPER_ID].x * effectiveScale,
-                  top: effectivePositions[WALLPAPER_ID].y * effectiveScale,
+                  left:
+                    (effectivePositions[WALLPAPER_ID].x +
+                      (mobileDrag?.id === WALLPAPER_ID
+                        ? mobileDrag.dx / effectiveScale
+                        : 0)) *
+                    effectiveScale,
+                  top:
+                    (effectivePositions[WALLPAPER_ID].y +
+                      (mobileDrag?.id === WALLPAPER_ID
+                        ? mobileDrag.dy / effectiveScale
+                        : 0)) *
+                    effectiveScale,
                   width: ICON_BOX * effectiveScale,
                   padding: ICON_PADDING * effectiveScale,
                   gap: ICON_GAP * effectiveScale,
@@ -667,7 +779,11 @@ export default function Desktop({
         </div>
 
         <div
-          onPointerDown={(e) => startIconDrag(LAUNCHER_ID, e)}
+          onPointerDown={(e) =>
+            isMobile
+              ? startMobileIconDrag(LAUNCHER_ID, e)
+              : startIconDrag(LAUNCHER_ID, e)
+          }
           onDoubleClick={onOpenLauncher}
           onContextMenu={(e) => {
             e.preventDefault();
@@ -678,8 +794,18 @@ export default function Desktop({
           style={
             isMobile
               ? {
-                  left: effectivePositions[LAUNCHER_ID].x * effectiveScale,
-                  top: effectivePositions[LAUNCHER_ID].y * effectiveScale,
+                  left:
+                    (effectivePositions[LAUNCHER_ID].x +
+                      (mobileDrag?.id === LAUNCHER_ID
+                        ? mobileDrag.dx / effectiveScale
+                        : 0)) *
+                    effectiveScale,
+                  top:
+                    (effectivePositions[LAUNCHER_ID].y +
+                      (mobileDrag?.id === LAUNCHER_ID
+                        ? mobileDrag.dy / effectiveScale
+                        : 0)) *
+                    effectiveScale,
                   width: ICON_BOX * effectiveScale,
                   padding: ICON_PADDING * effectiveScale,
                   gap: ICON_GAP * effectiveScale,
