@@ -18,6 +18,21 @@ export const ICON_LABEL_PX = 10;
 export const ICON_CANVAS_PX = 48;
 export const ICON_CORNER_MARGIN = 16;
 
+// 아이콘 격자 한 칸의 기준(배율 1.0) 크기 — px. useDesktopLayout.ts(자유
+// 배치 스냅)와 모바일 격자 배치가 공유한다.
+export const GRID_STEP = 96;
+
+// 모바일 격자의 고정 열 수 — 실제 폰 홈스크린 관례에 맞춘 값.
+export const MOBILE_COLUMNS = 4;
+
+// 컨테이너 실제 폭(화면 px)을 4등분한 칸 하나가 GRID_STEP(기준 좌표계 칸
+// 크기)이 되게 하는 배율 — desktop의 getIconScale과 같은 자리(기준 좌표
+// × 배율 = 화면 좌표)에서 쓰인다.
+export function getMobileIconScale(containerWidth: number): number {
+  if (!containerWidth) return 1;
+  return containerWidth / (MOBILE_COLUMNS * GRID_STEP);
+}
+
 export function getIconScale(desktopWidth: number | undefined): number {
   if (!desktopWidth) return 1;
   const raw = desktopWidth / BASE_DESKTOP_WIDTH;

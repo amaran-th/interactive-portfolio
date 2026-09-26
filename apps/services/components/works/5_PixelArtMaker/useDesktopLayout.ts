@@ -1,8 +1,9 @@
+import { GRID_STEP } from "./iconMetrics";
+
 const LAYOUT_KEY = "pixel-art-desktop-layout";
 // 여기서 다루는 좌표는 전부 "기준(배율 1.0)" 좌표다 — 화면에 그릴 때 Desktop이
 // getIconScale로 구한 배율을 곱한다. 저장된 값도 기준 좌표이므로, 창 크기가
 // 달라져도(배율이 달라져도) 배치가 통째로 확대·축소될 뿐 서로 어긋나지 않는다.
-const GRID_STEP = 96;
 
 type Position = { x: number; y: number };
 
@@ -131,5 +132,25 @@ export function cleanUpLayout(
 export function resetDesktopLayout(): void {
   try {
     localStorage.removeItem(LAYOUT_KEY);
+  } catch {}
+}
+
+// 모바일 격자는 좌표 대신 "순서"만 저장한다 — 격자 칸 위치는 이 배열의
+// 인덱스에서 계산되므로 x/y를 따로 둘 필요가 없다.
+const MOBILE_ORDER_KEY = "pixel-art-desktop-order-mobile";
+
+export function getMobileOrder(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(MOBILE_ORDER_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function setMobileOrder(ids: string[]): void {
+  try {
+    localStorage.setItem(MOBILE_ORDER_KEY, JSON.stringify(ids));
   } catch {}
 }

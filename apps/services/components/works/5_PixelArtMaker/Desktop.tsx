@@ -27,17 +27,22 @@ import {
 import {
   cleanUpLayout,
   getIconPosition,
+  getMobileOrder,
   getStoredPosition,
   removeIconPositions,
   resetDesktopLayout,
   setIconPosition,
   setIconPositions,
+  setMobileOrder,
 } from "./useDesktopLayout";
 import {
   getIconScale,
+  getMobileIconScale,
+  GRID_STEP,
   ICON_BOX,
   ICON_GAP,
   ICON_PADDING,
+  MOBILE_COLUMNS,
 } from "./iconMetrics";
 import {
   getMobileWallpaper,
@@ -171,6 +176,31 @@ export default function Desktop({
   // positions는 기준(배율 1.0) 좌표이므로 화면에 그릴 때 이 값을 곱하고,
   // 드래그·박스선택처럼 화면 좌표를 다시 저장 좌표로 되돌릴 때는 나눈다.
   const scale = getIconScale(fittedSize?.width);
+
+  // 모바일 격자 순서 — 저장된 순서 중 지금도 존재하는 id만 먼저 그 순서로
+  // 쓰고, 저장된 적 없는 새 id(새 파일 등)는 기본 순서 그대로 뒤에 붙인다.
+  // 삭제된 파일은 defaultMobileOrder에 없으므로 자동으로 걸러진다.
+  const defaultMobileOrder = [
+    LAUNCHER_ID,
+    ...items.map((a) => a.id),
+    WALLPAPER_ID,
+    FORMAT_ID,
+    TRASH_ID,
+  ];
+  const storedMobileOrder = getMobileOrder();
+  const mobileOrder = [
+    ...storedMobileOrder.filter((id) => defaultMobileOrder.includes(id)),
+    ...defaultMobileOrder.filter((id) => !storedMobileOrder.includes(id)),
+  ];
+  const mobileScale = getMobileIconScale(fittedSize?.width ?? 0);
+  const mobilePositions: Record<string, { x: number; y: number }> = {};
+  mobileOrder.forEach((id, i) => {
+    const col = i % MOBILE_COLUMNS;
+    const row = Math.floor(i / MOBILE_COLUMNS);
+    mobilePositions[id] = { x: col * GRID_STEP, y: row * GRID_STEP };
+  });
+  const effectivePositions = isMobile ? mobilePositions : positions;
+  const effectiveScale = isMobile ? mobileScale : scale;
 
   const refresh = useCallback(() => {
     const list = listPixelArt();
@@ -451,7 +481,7 @@ export default function Desktop({
             ? { width: fittedSize.width, height: fittedSize.height }
             : { width: "100%", height: "100%" }
         }
-        onPointerDown={startBoxSelect}
+        onPointerDown={isMobile ? undefined : startBoxSelect}
         onContextMenu={(e) => {
           e.preventDefault();
           setMenu({
@@ -467,7 +497,7 @@ export default function Desktop({
         <WallpaperBackground art={isMobile ? mobileWallpaper : wallpaper} />
 
         {items.map((art) => {
-          const p = positions[art.id];
+          const p = effectivePositions[art.id];
           if (!p) return null;
           return (
             <DesktopIcon
@@ -475,7 +505,7 @@ export default function Desktop({
               art={art}
               x={p.x}
               y={p.y}
-              scale={scale}
+              scale={effectiveScale}
               selected={selected.has(art.id)}
               editing={renamingId === art.id}
               onPointerDownIcon={(e) => startIconDrag(art.id, e)}
@@ -558,8 +588,18 @@ export default function Desktop({
             e.stopPropagation();
             setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
           }}
-          className={`absolute flex flex-col items-center ${positions[TRASH_ID] ? "" : "bottom-4 right-4"}`}
-          style={specialIconStyle(TRASH_ID)}
+          className={`absolute flex flex-col items-center ${effectivePositions[TRASH_ID] ? "" : "bottom-4 right-4"}`}
+          style={
+            isMobile
+              ? {
+                  left: effectivePositions[TRASH_ID].x * effectiveScale,
+                  top: effectivePositions[TRASH_ID].y * effectiveScale,
+                  width: ICON_BOX * effectiveScale,
+                  padding: ICON_PADDING * effectiveScale,
+                  gap: ICON_GAP * effectiveScale,
+                }
+              : specialIconStyle(TRASH_ID)
+          }
           title="선택한 아이콘을 여기로 드래그해 삭제 · 드래그해서 위치 이동 가능"
         >
           <TrashIcon active={trashHover} />
@@ -576,8 +616,18 @@ export default function Desktop({
             e.stopPropagation();
             setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
           }}
-          className={`absolute flex flex-col items-center hover:bg-black/5 ${positions[FORMAT_ID] ? "" : "bottom-4 left-4"}`}
-          style={specialIconStyle(FORMAT_ID)}
+          className={`absolute flex flex-col items-center hover:bg-black/5 ${effectivePositions[FORMAT_ID] ? "" : "bottom-4 left-4"}`}
+          style={
+            isMobile
+              ? {
+                  left: effectivePositions[FORMAT_ID].x * effectiveScale,
+                  top: effectivePositions[FORMAT_ID].y * effectiveScale,
+                  width: ICON_BOX * effectiveScale,
+                  padding: ICON_PADDING * effectiveScale,
+                  gap: ICON_GAP * effectiveScale,
+                }
+              : specialIconStyle(FORMAT_ID)
+          }
           title="더블클릭하면 이 프로젝트의 저장된 모든 작품과 배치를 초기화합니다 · 드래그해서 위치 이동 가능"
         >
           <FormatIcon />
@@ -596,8 +646,18 @@ export default function Desktop({
             e.stopPropagation();
             setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
           }}
-          className={`absolute flex flex-col items-center hover:bg-black/5 ${positions[WALLPAPER_ID] ? "" : "top-4 right-4"}`}
-          style={specialIconStyle(WALLPAPER_ID)}
+          className={`absolute flex flex-col items-center hover:bg-black/5 ${effectivePositions[WALLPAPER_ID] ? "" : "top-4 right-4"}`}
+          style={
+            isMobile
+              ? {
+                  left: effectivePositions[WALLPAPER_ID].x * effectiveScale,
+                  top: effectivePositions[WALLPAPER_ID].y * effectiveScale,
+                  width: ICON_BOX * effectiveScale,
+                  padding: ICON_PADDING * effectiveScale,
+                  gap: ICON_GAP * effectiveScale,
+                }
+              : specialIconStyle(WALLPAPER_ID)
+          }
           title="더블클릭하면 배경화면을 편집합니다 · 드래그해서 위치 이동 가능"
         >
           <WallpaperIcon art={isMobile ? mobileWallpaper : wallpaper} />
@@ -614,8 +674,18 @@ export default function Desktop({
             e.stopPropagation();
             setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
           }}
-          className={`absolute flex flex-col items-center hover:bg-black/5 ${positions[LAUNCHER_ID] ? "" : "top-4 left-4"}`}
-          style={specialIconStyle(LAUNCHER_ID)}
+          className={`absolute flex flex-col items-center hover:bg-black/5 ${effectivePositions[LAUNCHER_ID] ? "" : "top-4 left-4"}`}
+          style={
+            isMobile
+              ? {
+                  left: effectivePositions[LAUNCHER_ID].x * effectiveScale,
+                  top: effectivePositions[LAUNCHER_ID].y * effectiveScale,
+                  width: ICON_BOX * effectiveScale,
+                  padding: ICON_PADDING * effectiveScale,
+                  gap: ICON_GAP * effectiveScale,
+                }
+              : specialIconStyle(LAUNCHER_ID)
+          }
           title="더블클릭하면 새로 만들기·기존 파일 열기·이미지 불러오기를 선택할 수 있습니다 · 드래그해서 위치 이동 가능"
         >
           <LauncherIcon />
