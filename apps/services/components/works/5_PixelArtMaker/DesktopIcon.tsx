@@ -9,6 +9,7 @@ import {
   ICON_GAP,
   ICON_LABEL_PX,
   ICON_PADDING,
+  MOBILE_ICON_CARD,
 } from "./iconMetrics";
 
 export default function DesktopIcon({
@@ -23,6 +24,7 @@ export default function DesktopIcon({
   onContextMenu,
   onRenameConfirm,
   onRenameCancel,
+  mobileLayout,
 }: {
   art: PixelArt;
   // x, y는 기준(배율 1.0) 좌표 — 여기서 scale을 곱해 화면 좌표로 그린다.
@@ -36,6 +38,10 @@ export default function DesktopIcon({
   onContextMenu: (e: React.MouseEvent) => void;
   onRenameConfirm: (name: string) => void;
   onRenameCancel: () => void;
+  // 모바일 셸(바탕화면 격자) 전용 — true면 썸네일 캔버스를 흰 카드
+  // 배경(MOBILE_ICON_CARD)으로 감싼다. desktop은 이 prop을 안 넘기므로
+  // 지금과 동일하다.
+  mobileLayout?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -101,11 +107,20 @@ export default function DesktopIcon({
       onDoubleClick={editing ? undefined : onDoubleClick}
       onContextMenu={editing ? undefined : onContextMenu}
     >
-      <canvas
-        ref={canvasRef}
-        className="shadow-sm"
-        style={{ imageRendering: "pixelated" }}
-      />
+      {mobileLayout ? (
+        <div className={`${MOBILE_ICON_CARD} p-2`}>
+          <canvas
+            ref={canvasRef}
+            style={{ imageRendering: "pixelated" }}
+          />
+        </div>
+      ) : (
+        <canvas
+          ref={canvasRef}
+          className="shadow-sm"
+          style={{ imageRendering: "pixelated" }}
+        />
+      )}
       {editing ? (
         <input
           ref={inputRef}

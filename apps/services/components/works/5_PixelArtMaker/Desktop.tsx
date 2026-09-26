@@ -43,6 +43,7 @@ import {
   ICON_GAP,
   ICON_PADDING,
   MOBILE_COLUMNS,
+  MOBILE_ICON_CARD,
 } from "./iconMetrics";
 import {
   getMobileWallpaper,
@@ -574,6 +575,7 @@ export default function Desktop({
                   : p.y
               }
               scale={effectiveScale}
+              mobileLayout={isMobile}
               selected={selected.has(art.id)}
               editing={renamingId === art.id}
               onPointerDownIcon={(e) =>
@@ -686,7 +688,13 @@ export default function Desktop({
           }
           title="선택한 아이콘을 여기로 드래그해 삭제 · 드래그해서 위치 이동 가능"
         >
-          <TrashIcon active={trashHover} />
+          {isMobile ? (
+            <div className={`${MOBILE_ICON_CARD} p-2`}>
+              <TrashIcon active={trashHover} />
+            </div>
+          ) : (
+            <TrashIcon active={trashHover} />
+          )}
           <span className="w-full truncate text-center text-[10px] text-gray-600">
             휴지통
           </span>
@@ -728,7 +736,13 @@ export default function Desktop({
           }
           title="더블클릭하면 이 프로젝트의 저장된 모든 작품과 배치를 초기화합니다 · 드래그해서 위치 이동 가능"
         >
-          <FormatIcon />
+          {isMobile ? (
+            <div className={`${MOBILE_ICON_CARD} p-2`}>
+              <FormatIcon />
+            </div>
+          ) : (
+            <FormatIcon />
+          )}
           <span className="w-full truncate text-center text-[10px] text-gray-600">
             포맷
           </span>
@@ -772,7 +786,13 @@ export default function Desktop({
           }
           title="더블클릭하면 배경화면을 편집합니다 · 드래그해서 위치 이동 가능"
         >
-          <WallpaperIcon art={isMobile ? mobileWallpaper : wallpaper} />
+          {isMobile ? (
+            <div className={`${MOBILE_ICON_CARD} p-2`}>
+              <WallpaperIcon art={isMobile ? mobileWallpaper : wallpaper} />
+            </div>
+          ) : (
+            <WallpaperIcon art={isMobile ? mobileWallpaper : wallpaper} />
+          )}
           <span className="w-full truncate text-center text-[10px] text-gray-600">
             배경화면
           </span>
@@ -814,7 +834,13 @@ export default function Desktop({
           }
           title="더블클릭하면 새로 만들기·기존 파일 열기·이미지 불러오기를 선택할 수 있습니다 · 드래그해서 위치 이동 가능"
         >
-          <LauncherIcon />
+          {isMobile ? (
+            <div className={`${MOBILE_ICON_CARD} p-2`}>
+              <LauncherIcon />
+            </div>
+          ) : (
+            <LauncherIcon />
+          )}
           <span className="w-full truncate text-center text-[10px] text-gray-600">
             편집기
           </span>
