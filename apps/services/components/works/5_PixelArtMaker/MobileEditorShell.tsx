@@ -4,7 +4,6 @@ import {
   Layers,
   Menu,
   Palette,
-  PenTool,
   Play,
   Redo2,
   Save,
@@ -54,7 +53,7 @@ export type MobileEditorShellProps = {
   onOpenExisting: () => void;
 };
 
-type PopoverKind = "tools" | "color" | "layers" | "more" | null;
+type PopoverKind = "color" | "layers" | "more" | null;
 
 const POPOVER_MARGIN = 8; // 화면 가장자리에서 최소로 띄우는 여백 — mb-2와 같은 0.5rem
 
@@ -86,19 +85,16 @@ export default function MobileEditorShell({
   const [popoverLeft, setPopoverLeft] = useState(0);
   const dockRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
-  const toolsBtnRef = useRef<HTMLButtonElement>(null);
   const colorBtnRef = useRef<HTMLButtonElement>(null);
   const layersBtnRef = useRef<HTMLButtonElement>(null);
   const moreBtnRef = useRef<HTMLButtonElement>(null);
 
   const btnRefFor = (kind: Exclude<PopoverKind, null>) =>
-    kind === "tools"
-      ? toolsBtnRef
-      : kind === "color"
-        ? colorBtnRef
-        : kind === "layers"
-          ? layersBtnRef
-          : moreBtnRef;
+    kind === "color"
+      ? colorBtnRef
+      : kind === "layers"
+        ? layersBtnRef
+        : moreBtnRef;
 
   const closeAll = () => {
     setOpenPopover(null);
@@ -198,8 +194,7 @@ export default function MobileEditorShell({
   );
 
   let popoverContent: React.ReactNode = null;
-  if (openPopover === "tools") popoverContent = toolPanel;
-  else if (openPopover === "color") popoverContent = colorPanel;
+  if (openPopover === "color") popoverContent = colorPanel;
   else if (openPopover === "layers") popoverContent = layerPanel;
   else if (openPopover === "more") {
     popoverContent = activeMoreItem ? (
@@ -314,8 +309,14 @@ export default function MobileEditorShell({
           빼먹으면 canvasArea가 내용 높이만큼만 차지해 캔버스가 아래로
           치우쳐 보인다 — canvasArea 내부의 safe-center 정렬이 제대로
           작동하려면 이 래퍼가 flex여야 한다. */}
+      {/* toolPanel(모바일에서는 MobileToolRail)은 더 이상 독 팝오버 콘텐츠가
+          아니라 캔버스 위에 항상 떠 있는 오버레이다 — 이 div가 relative라
+          MobileToolRail 내부의 absolute 포지셔닝이 이 캔버스 영역 기준으로
+          앉는다(화면 전체 기준 fixed가 아니라 상단 바·하단 독과 자동으로
+          안 겹친다). */}
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {canvas}
+        {toolPanel}
       </div>
 
       {/* 하단 독 + 그 위 팝오버 — Editor.tsx:3399의 FLOATING_PANEL 패턴 그대로.
@@ -337,16 +338,6 @@ export default function MobileEditorShell({
           </div>
         )}
         <div className="flex items-center justify-around border-t border-gray-200 bg-white py-1.5">
-          <button
-            ref={toolsBtnRef}
-            onClick={() => toggle("tools")}
-            className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
-              openPopover === "tools" ? "text-violet-600" : "text-gray-500"
-            }`}
-          >
-            <PenTool className="h-5 w-5" />
-            도구
-          </button>
           <button
             ref={colorBtnRef}
             onClick={() => toggle("color")}
