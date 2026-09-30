@@ -843,9 +843,7 @@ export default function DrawToolbar({
 
         {/* 실행취소·격자·지우기는 항상 보이고, 가끔 쓰는 반전·회전·정렬은
             그리기 카드와 같은 방식으로 "더보기" 뒤에 접는다. 각 변형 버튼은
-            자기 대상 레이어를 캐럿으로 고른다(지우기 포함). mobileLayout이면
-            이 카드 자체를 렌더링하지 않는다 — 같은 액션들을 Editor.tsx가
-            모바일 "더보기 > 편집" 목록에 직접 그린다. */}
+            자기 대상 레이어를 캐럿으로 고른다(지우기 포함). */}
         <div className="relative">
           <ToolCard title="편집" compact={compact}>
             <div className="flex items-center gap-1.5">

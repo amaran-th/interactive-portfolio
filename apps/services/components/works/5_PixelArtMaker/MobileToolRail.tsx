@@ -77,6 +77,7 @@ export default function MobileToolRail({
 
   const selectPrimary = (t: Tool) => {
     if (t === tool) {
+      if (optionsContent === null) return;
       setOpenFlyout((cur) => (cur === "tool" ? null : "tool"));
       return;
     }
@@ -85,6 +86,7 @@ export default function MobileToolRail({
 
   const selectFromMore = (t: Tool) => {
     if (t === tool) {
+      if (optionsContent === null) return;
       setOpenFlyout((cur) => (cur === "tool" ? null : "tool"));
       return;
     }
