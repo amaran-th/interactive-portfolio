@@ -321,7 +321,7 @@ export default function MobileEditorShell({
 
       {/* 하단 독 + 그 위 팝오버 — Editor.tsx:3399의 FLOATING_PANEL 패턴 그대로.
           레이어/프레임만 내용량 차이(레이어 2개 vs 10개)가 커서 최소 높이 +
-          고정 폭을 주고, 나머지(도구/색상/더보기)는 내용 크기 그대로 두되
+          고정 폭을 주고, 나머지(색상/더보기)는 내용 크기 그대로 두되
           화면 밖으로 넘치지 않게 최대 높이만 잡는다. */}
       <div ref={dockRef} className="relative">
         {openPopover && (

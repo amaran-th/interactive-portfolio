@@ -729,8 +729,8 @@ export default function DrawToolbar({
     });
   }
   // desktop은 이 내용을 createPortal로 캔버스 하단에 보내고, mobileLayout은
-  // 이 컴포넌트 자신의 JSX 안(도구 행 바로 아래)에 그대로 그린다 — 내용은
-  // 완전히 동일하고 위치만 다르므로 노드 자체는 한 번만 만든다.
+  // MobileToolRail의 플라이아웃으로 그대로 넘긴다 — 내용은 완전히 동일하고
+  // 그려지는 위치만 다르므로 노드 자체는 한 번만 만든다.
   const secondarySectionsNode =
     secondarySections.length > 0 ? (
       <div className="pointer-events-auto flex flex-wrap items-end justify-center gap-3">

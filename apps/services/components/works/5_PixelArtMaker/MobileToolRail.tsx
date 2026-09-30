@@ -75,16 +75,7 @@ export default function MobileToolRail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool]);
 
-  const selectPrimary = (t: Tool) => {
-    if (t === tool) {
-      if (optionsContent === null) return;
-      setOpenFlyout((cur) => (cur === "tool" ? null : "tool"));
-      return;
-    }
-    onToolChange(t);
-  };
-
-  const selectFromMore = (t: Tool) => {
+  const selectTool = (t: Tool) => {
     if (t === tool) {
       if (optionsContent === null) return;
       setOpenFlyout((cur) => (cur === "tool" ? null : "tool"));
@@ -97,24 +88,26 @@ export default function MobileToolRail({
     <>
       {openFlyout !== null && (
         <div
-          className="fixed inset-0 z-10"
+          className="absolute inset-0 z-10"
           onClick={() => setOpenFlyout(null)}
         />
       )}
       <div className="absolute left-2 top-1/2 z-20 -translate-y-1/2">
-        <div className={`flex flex-col gap-1.5 p-1.5 ${FLOATING_PANEL}`}>
+        <div
+          className={`flex max-h-[70vh] flex-col gap-1.5 overflow-y-auto p-1.5 ${FLOATING_PANEL}`}
+        >
           {primaryTools.map(({ tool: t, icon, label, key }) => (
             <RailButton
               key={t}
               active={tool === t}
-              onClick={() => selectPrimary(t)}
+              onClick={() => selectTool(t)}
               title={`${label} (${key})`}
               icon={icon}
             />
           ))}
           <div className="h-px bg-gray-200" />
           <RailButton
-            active={openFlyout === "more"}
+            active={openFlyout === "more" || moreTools.some((m) => m.tool === tool)}
             onClick={() =>
               setOpenFlyout((cur) => (cur === "more" ? null : "more"))
             }
@@ -135,7 +128,7 @@ export default function MobileToolRail({
               <RailButton
                 key={t}
                 active={tool === t}
-                onClick={() => selectFromMore(t)}
+                onClick={() => selectTool(t)}
                 title={`${label} (${key})`}
                 icon={icon}
               />
