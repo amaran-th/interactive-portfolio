@@ -138,6 +138,12 @@ export default function Desktop({
   const [isMobile, setIsMobile] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // 드래그 중인 아이콘(들)이 항상 마우스 포인터를 따라다니며 휴지통 위를
+  // 뒤덮어버려서, 드래그 도중에는 pointerenter/leave가 휴지통 자신이 아니라
+  // 그 위에 있는 드래그 중인 아이콘에서 발생한다 — 그래서 마우스로 직접
+  // 호버할 때는 잘 되던 휴지통 열림 애니메이션이 드래그 오버 중엔 안 켜졌다.
+  // 이 ref로 포인터 좌표와 직접 겹침을 계산해 우회한다.
+  const trashRef = useRef<HTMLDivElement>(null);
   // 특수 아이콘(트래시/포맷) 자체를 드래그하는 동안에는 pointerup이 그 위에서
   // 발생해도(예: 휴지통 위로 아이콘을 놓는 삭제 동작) 위치 이동으로만 처리해야 한다.
   const draggingSpecialRef = useRef<string | null>(null);
@@ -188,12 +194,15 @@ export default function Desktop({
   // 모바일 격자 순서 — 저장된 순서 중 지금도 존재하는 id만 먼저 그 순서로
   // 쓰고, 저장된 적 없는 새 id(새 파일 등)는 기본 순서 그대로 뒤에 붙인다.
   // 삭제된 파일은 defaultMobileOrder에 없으므로 자동으로 걸러진다.
+  // 휴지통은 모바일 홈 화면에 아예 노출하지 않는다 — 드래그로 올려서
+  // 삭제하는 상호작용 자체가 모바일 범위 밖이라 격자에 자리를 줄 필요가
+  // 없다. defaultMobileOrder에서 빼면 예전에 저장된 순서에 TRASH_ID가
+  // 남아있어도 위 필터(defaultMobileOrder.includes)에서 자동으로 걸러진다.
   const defaultMobileOrder = [
     LAUNCHER_ID,
     ...items.map((a) => a.id),
     WALLPAPER_ID,
     FORMAT_ID,
-    TRASH_ID,
   ];
   const storedMobileOrder = getMobileOrder();
   // mobileOrder는 매 렌더마다 새로 계산되는 파생 배열이라(Task 2 설계 그대로 유지),
@@ -374,6 +383,19 @@ export default function Desktop({
             next[sp.id] = { x: sp.x + dx / scale, y: sp.y + dy / scale };
           return next;
         });
+        // 드래그 중인 아이콘이 포인터를 따라다니며 휴지통을 뒤덮어 네이티브
+        // pointerenter/leave가 휴지통 자신에는 발생하지 않는다 — 실제 포인터
+        // 좌표와 휴지통 사각형을 직접 비교해 열림 상태를 갱신한다.
+        if (id !== TRASH_ID) {
+          const rect = trashRef.current?.getBoundingClientRect();
+          setTrashHover(
+            !!rect &&
+              ev.clientX >= rect.left &&
+              ev.clientX <= rect.right &&
+              ev.clientY >= rect.top &&
+              ev.clientY <= rect.bottom,
+          );
+        }
       };
       const up = () => {
         window.removeEventListener("pointermove", move);
@@ -389,6 +411,10 @@ export default function Desktop({
           });
         }
         if (isSpecial) draggingSpecialRef.current = null;
+        // 드래그가 어디서 끝나든(휴지통 위든 아니든) 열림 애니메이션은 항상
+        // 닫힌 상태로 돌아가야 한다 — 실제 삭제 처리는 기존 onPointerUp의
+        // handleTrashDrop이 그대로 맡는다.
+        if (id !== TRASH_ID) setTrashHover(false);
       };
       window.addEventListener("pointermove", move);
       window.addEventListener("pointerup", up);
@@ -448,6 +474,50 @@ export default function Desktop({
       window.addEventListener("pointercancel", up);
     },
     [mobileOrder, effectiveScale],
+  );
+
+  // 모바일에는 마우스 우클릭이 없으므로 꾹 누르기(길게 누르기)를 우클릭
+  // 메뉴의 모바일 대응 제스처로 추가한다. 드래그(startMobileIconDrag)와는
+  // 완전히 독립된 리스너로 동작해 기존 드래그·우클릭 로직은 건드리지
+  // 않는다 — 손가락이 일정 거리 이상 움직이면(드래그로 판정되는 것과 같은
+  // 임계값) 다음 우클릭 메뉴가 뜨지 않도록 스스로 취소한다.
+  const LONG_PRESS_MS = 500;
+  const LONG_PRESS_MOVE_THRESHOLD = 4;
+
+  const startLongPress = useCallback(
+    (e: React.PointerEvent, onFire: (x: number, y: number) => void) => {
+      const startX = e.clientX;
+      const startY = e.clientY;
+      let done = false;
+
+      const cleanup = () => {
+        clearTimeout(timer);
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", cancel);
+        window.removeEventListener("pointercancel", cancel);
+      };
+      const cancel = () => {
+        if (done) return;
+        done = true;
+        cleanup();
+      };
+      const move = (ev: PointerEvent) => {
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
+        if (Math.hypot(dx, dy) >= LONG_PRESS_MOVE_THRESHOLD) cancel();
+      };
+      const timer = window.setTimeout(() => {
+        if (done) return;
+        done = true;
+        cleanup();
+        onFire(startX, startY);
+      }, LONG_PRESS_MS);
+
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", cancel);
+      window.addEventListener("pointercancel", cancel);
+    },
+    [],
   );
 
   const handleTrashDrop = useCallback(() => {
@@ -547,7 +617,21 @@ export default function Desktop({
             ? { width: fittedSize.width, height: fittedSize.height }
             : { width: "100%", height: "100%" }
         }
-        onPointerDown={isMobile ? undefined : startBoxSelect}
+        onPointerDown={
+          isMobile
+            ? (e) =>
+                startLongPress(e, (x, y) =>
+                  setMenu({
+                    x,
+                    y,
+                    items: [
+                      { label: "새로 만들기", onClick: onCreate },
+                      { label: "정리하기", onClick: handleCleanUp },
+                    ],
+                  }),
+                )
+            : startBoxSelect
+        }
         onContextMenu={(e) => {
           e.preventDefault();
           setMenu({
@@ -584,11 +668,53 @@ export default function Desktop({
               dragging={mobileDrag?.id === art.id}
               selected={selected.has(art.id)}
               editing={renamingId === art.id}
-              onPointerDownIcon={(e) =>
-                isMobile
-                  ? startMobileIconDrag(art.id, e)
-                  : startIconDrag(art.id, e)
-              }
+              onPointerDownIcon={(e) => {
+                if (isMobile) {
+                  startMobileIconDrag(art.id, e);
+                  startLongPress(e, (x, y) =>
+                    setMenu({
+                      x,
+                      y,
+                      items: [
+                        {
+                          label: "이름 바꾸기",
+                          onClick: () => setRenamingId(art.id),
+                        },
+                        {
+                          label: "PNG로 내보내기",
+                          onClick: () => exportAsPNG(art),
+                        },
+                        {
+                          label: "SVG로 내보내기",
+                          onClick: () => exportAsSVG(art),
+                        },
+                        {
+                          label: "JSON으로 내보내기",
+                          onClick: () => exportAsJSON(art),
+                        },
+                        {
+                          label: "JPG로 내보내기 (손실 압축)",
+                          onClick: () => exportAsJPG(art),
+                        },
+                        {
+                          label: "복제",
+                          onClick: () => {
+                            duplicatePixelArt(art.id);
+                            refresh();
+                          },
+                        },
+                        {
+                          label: "삭제",
+                          danger: true,
+                          onClick: () => setPendingDelete([art.id]),
+                        },
+                      ],
+                    }),
+                  );
+                } else {
+                  startIconDrag(art.id, e);
+                }
+              }}
               onDoubleClick={() => onOpen(art.id)}
               onRenameConfirm={(next) => {
                 renamePixelArt(art.id, next);
@@ -654,65 +780,48 @@ export default function Desktop({
           />
         )}
 
-        <div
-          onPointerDown={(e) =>
-            isMobile ? startMobileIconDrag(TRASH_ID, e) : startIconDrag(TRASH_ID, e)
-          }
-          onPointerEnter={() =>
-            draggingSpecialRef.current !== TRASH_ID && setTrashHover(true)
-          }
-          onPointerLeave={() =>
-            draggingSpecialRef.current !== TRASH_ID && setTrashHover(false)
-          }
-          onPointerUp={handleTrashDrop}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setMenu({ x: e.clientX, y: e.clientY, items: systemIconMenuItems });
-          }}
-          className={`absolute flex flex-col items-center ${effectivePositions[TRASH_ID] ? "" : "bottom-4 right-4"}`}
-          style={
-            isMobile
-              ? {
-                  left:
-                    (effectivePositions[TRASH_ID].x +
-                      (mobileDrag?.id === TRASH_ID
-                        ? mobileDrag.dx / effectiveScale
-                        : 0)) *
-                    effectiveScale,
-                  top:
-                    (effectivePositions[TRASH_ID].y +
-                      (mobileDrag?.id === TRASH_ID
-                        ? mobileDrag.dy / effectiveScale
-                        : 0)) *
-                    effectiveScale,
-                  width: ICON_BOX * effectiveScale,
-                  padding: ICON_PADDING * effectiveScale,
-                  gap: ICON_GAP * effectiveScale,
-                  zIndex: mobileDrag?.id === TRASH_ID ? 50 : undefined,
-                }
-              : specialIconStyle(TRASH_ID)
-          }
-          title="선택한 아이콘을 여기로 드래그해 삭제 · 드래그해서 위치 이동 가능"
-        >
-          {isMobile ? (
-            <div className={`${MOBILE_ICON_CARD} p-2`}>
-              <TrashIcon active={trashHover} />
-            </div>
-          ) : (
+        {!isMobile && (
+          <div
+            ref={trashRef}
+            onPointerDown={(e) => startIconDrag(TRASH_ID, e)}
+            onPointerEnter={() =>
+              draggingSpecialRef.current !== TRASH_ID && setTrashHover(true)
+            }
+            onPointerLeave={() =>
+              draggingSpecialRef.current !== TRASH_ID && setTrashHover(false)
+            }
+            onPointerUp={handleTrashDrop}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setMenu({
+                x: e.clientX,
+                y: e.clientY,
+                items: systemIconMenuItems,
+              });
+            }}
+            className={`absolute flex flex-col items-center ${effectivePositions[TRASH_ID] ? "" : "bottom-4 right-4"}`}
+            style={specialIconStyle(TRASH_ID)}
+            title="선택한 아이콘을 여기로 드래그해 삭제 · 드래그해서 위치 이동 가능"
+          >
             <TrashIcon active={trashHover} />
-          )}
-          <span className="w-full truncate text-center text-[10px] text-gray-600">
-            휴지통
-          </span>
-        </div>
+            <span className="w-full truncate text-center text-[10px] text-gray-600">
+              휴지통
+            </span>
+          </div>
+        )}
 
         <div
-          onPointerDown={(e) =>
-            isMobile
-              ? startMobileIconDrag(FORMAT_ID, e)
-              : startIconDrag(FORMAT_ID, e)
-          }
+          onPointerDown={(e) => {
+            if (isMobile) {
+              startMobileIconDrag(FORMAT_ID, e);
+              startLongPress(e, (x, y) =>
+                setMenu({ x, y, items: systemIconMenuItems }),
+              );
+            } else {
+              startIconDrag(FORMAT_ID, e);
+            }
+          }}
           onDoubleClick={() => setPendingFormat(true)}
           onContextMenu={(e) => {
             e.preventDefault();
@@ -745,8 +854,8 @@ export default function Desktop({
           title="더블클릭하면 이 프로젝트의 저장된 모든 작품과 배치를 초기화합니다 · 드래그해서 위치 이동 가능"
         >
           {isMobile ? (
-            <div className={`${MOBILE_ICON_CARD} p-2`}>
-              <FormatIcon />
+            <div className={MOBILE_ICON_CARD}>
+              <FormatIcon scale={effectiveScale} />
             </div>
           ) : (
             <FormatIcon />
@@ -757,11 +866,16 @@ export default function Desktop({
         </div>
 
         <div
-          onPointerDown={(e) =>
-            isMobile
-              ? startMobileIconDrag(WALLPAPER_ID, e)
-              : startIconDrag(WALLPAPER_ID, e)
-          }
+          onPointerDown={(e) => {
+            if (isMobile) {
+              startMobileIconDrag(WALLPAPER_ID, e);
+              startLongPress(e, (x, y) =>
+                setMenu({ x, y, items: systemIconMenuItems }),
+              );
+            } else {
+              startIconDrag(WALLPAPER_ID, e);
+            }
+          }}
           onDoubleClick={() =>
             onOpen(isMobile ? WALLPAPER_ID_MOBILE : WALLPAPER_ID)
           }
@@ -796,8 +910,11 @@ export default function Desktop({
           title="더블클릭하면 배경화면을 편집합니다 · 드래그해서 위치 이동 가능"
         >
           {isMobile ? (
-            <div className={`${MOBILE_ICON_CARD} p-2`}>
-              <WallpaperIcon art={isMobile ? mobileWallpaper : wallpaper} />
+            <div className={MOBILE_ICON_CARD}>
+              <WallpaperIcon
+                art={isMobile ? mobileWallpaper : wallpaper}
+                scale={effectiveScale}
+              />
             </div>
           ) : (
             <WallpaperIcon art={isMobile ? mobileWallpaper : wallpaper} />
@@ -808,11 +925,16 @@ export default function Desktop({
         </div>
 
         <div
-          onPointerDown={(e) =>
-            isMobile
-              ? startMobileIconDrag(LAUNCHER_ID, e)
-              : startIconDrag(LAUNCHER_ID, e)
-          }
+          onPointerDown={(e) => {
+            if (isMobile) {
+              startMobileIconDrag(LAUNCHER_ID, e);
+              startLongPress(e, (x, y) =>
+                setMenu({ x, y, items: systemIconMenuItems }),
+              );
+            } else {
+              startIconDrag(LAUNCHER_ID, e);
+            }
+          }}
           onDoubleClick={onOpenLauncher}
           onContextMenu={(e) => {
             e.preventDefault();
@@ -845,8 +967,8 @@ export default function Desktop({
           title="더블클릭하면 새로 만들기·기존 파일 열기·이미지 불러오기를 선택할 수 있습니다 · 드래그해서 위치 이동 가능"
         >
           {isMobile ? (
-            <div className={`${MOBILE_ICON_CARD} p-2`}>
-              <LauncherIcon />
+            <div className={MOBILE_ICON_CARD}>
+              <LauncherIcon scale={effectiveScale} />
             </div>
           ) : (
             <LauncherIcon />
