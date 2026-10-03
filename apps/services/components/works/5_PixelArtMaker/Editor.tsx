@@ -11,6 +11,7 @@ import {
   Layers as LayersIcon,
   Loader,
   Minus,
+  Paintbrush,
   Plus,
   RotateCcw,
   RotateCw,
@@ -35,7 +36,13 @@ import ConfirmDialog from "./ConfirmDialog";
 import ContextMenu, { ContextMenuItem } from "./ContextMenu";
 import { CURSOR_NORMAL, CURSOR_POINTING, CURSOR_TEXT } from "./cursors";
 import { AlertModal, PromptModal } from "./Dialogs";
-import DrawToolbar, { SegmentedControl } from "./DrawToolbar";
+import DrawToolbar, {
+  buildSecondarySections,
+  COLLAPSIBLE_DRAW_TOOLS,
+  PRIMARY_DRAW_TOOLS,
+  SegmentedControl,
+  SELECT_TOOLS,
+} from "./DrawToolbar";
 import ExportPanel from "./ExportPanel";
 import {
   exportAsGIF,
@@ -832,12 +839,6 @@ export default function Editor({
   // 사이드바(색상환·내보내기)를 가리지 않게 한다. 콜백 ref로 상태에 담아야
   // 마운트된 실제 DOM 노드가 준비된 다음 렌더에서 DrawToolbar에 전달된다.
   const [secondaryToolbarPortal, setSecondaryToolbarPortal] =
-    useState<HTMLDivElement | null>(null);
-  // 모바일 도구 열(MobileToolRail)이 포털로 그려 넣을, 캔버스 옆 레이아웃
-  // 칸의 실제 DOM 노드 — MobileEditorShell이 콜백 ref로 올려준다(마운트
-  // 되기 전까지는 null). 위 secondaryToolbarPortal과 같은 "자식이 그린
-  // 노드를 상태로 받아 다음 렌더에 내려준다" 패턴.
-  const [mobileRailSlot, setMobileRailSlot] =
     useState<HTMLDivElement | null>(null);
   // "JSON 불러오기" 메뉴 항목은 화면에 보이지 않는 이 input을 대신 클릭시켜
   // 파일 선택 창을 띄운다.
@@ -2872,9 +2873,7 @@ export default function Editor({
             transformScopes={transformScopes}
             onTransformScopeChange={handleTransformScopeChange}
             secondaryPortalTarget={secondaryToolbarPortal}
-            compact={toolbarCompact || narrow}
-            mobileLayout={narrow}
-            railSlot={mobileRailSlot}
+            compact={toolbarCompact}
           />
   );
   const colorPanel = (
@@ -3110,6 +3109,61 @@ export default function Editor({
               )}
             </div>
   );
+
+  // 모바일 셸의 상단 모드 도구 줄·하단 "그리기 도구" 버튼·상시 옵션
+  // strip 전용 데이터 — desktop DrawToolbar와 완전히 같은 도구 목록·옵션
+  // 계산(buildSecondarySections)을 재사용하고, 감싸는 모양만 모바일 전용.
+  const mobileDrawToolButtonIcon =
+    [...PRIMARY_DRAW_TOOLS, ...COLLAPSIBLE_DRAW_TOOLS].find(
+      (t) => t.tool === tool,
+    )?.icon ?? Paintbrush;
+  const mobileDrawToolsPanel = (closeAll: () => void) => (
+    <div className="grid grid-cols-4 gap-1.5 p-2">
+      {[...PRIMARY_DRAW_TOOLS, ...COLLAPSIBLE_DRAW_TOOLS].map(
+        ({ tool: t, icon: Icon, label, key }) => (
+          <button
+            key={t}
+            onClick={() => {
+              setTool(t);
+              closeAll();
+            }}
+            title={`${label} (${key})`}
+            className={`flex h-12 w-12 flex-col items-center justify-center gap-0.5 ${
+              tool === t
+                ? "bg-violet-500 text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+          </button>
+        ),
+      )}
+    </div>
+  );
+  const mobileOptionsSections = buildSecondarySections({
+    tool,
+    brushSize,
+    onBrushSizeChange: setBrushSize,
+    filledShapes,
+    onToggleFilledShapes: () => setFilledShapes((f) => !f),
+    shapeGradientFill,
+    onToggleShapeGradientFill: () => setShapeGradientFill((g) => !g),
+    gradientSteps,
+    onGradientStepsChange: setGradientSteps,
+    gradientAngleDeg,
+    onGradientAngleChange: setGradientAngleDeg,
+    wandGlobal,
+    onToggleWandGlobal: () => setWandGlobal((g) => !g),
+    hasSelection: !!selection.mask && selection.mask.size > 0,
+    onFillSelection: handleFillSelection,
+    selectMode,
+    onSelectModeChange: setSelectMode,
+    onClearSelection: () => selection.setMask(null),
+    sampleScope: activeSampleScope,
+    onSampleScopeChange: handleSampleScopeChange,
+    transformScopes,
+    onTransformScopeChange: handleTransformScopeChange,
+  });
 
   // 모바일 셸 전용 데이터 — Editor.tsx의 기존 핸들러를 그대로 재사용한다.
   const mobileMoreItems: MobileMoreItem[] = [
@@ -3380,9 +3434,13 @@ export default function Editor({
           layerMode={layerMode}
           onLayerModeChange={handleLayerModeChange}
           canvas={canvasArea}
-          toolPanel={toolPanel}
+          tool={tool}
+          onToolChange={setTool}
+          modeTools={SELECT_TOOLS}
+          drawToolButtonIcon={mobileDrawToolButtonIcon}
+          drawToolsPanel={mobileDrawToolsPanel}
+          optionsSections={mobileOptionsSections}
           activeColorHex={activeColorHex}
-          onRailSlotMount={setMobileRailSlot}
           colorPanel={colorPanel}
           layerPanel={layerPanel}
           moreItems={mobileMoreItems}

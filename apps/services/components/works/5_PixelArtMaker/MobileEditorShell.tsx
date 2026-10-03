@@ -2,7 +2,9 @@
 
 import { Layers, Menu, Play, Redo2, Save, Undo2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ToolMeta } from "./DrawToolbar";
 import { FLOATING_PANEL } from "./panelStyles";
+import { Tool } from "./types";
 
 export type MobileMoreItem =
   | { id: string; label: string; kind: "action"; onSelect: () => void }
@@ -37,16 +39,31 @@ export type MobileEditorShellProps = {
   layerMode: "layers" | "frames";
   onLayerModeChange: (mode: "layers" | "frames") => void;
   canvas: React.ReactNode;
-  toolPanel: React.ReactNode;
+  // 지금 활성 도구 — 상단 모드 도구 줄의 활성 표시, 그리기 도구 그리드 안
+  // 선택 표시 둘 다에 필요하다.
+  tool: Tool;
+  onToolChange: (tool: Tool) => void;
+  // 캔버스 위 상단 우측에 떠 있는 모드 도구 줄 — 선택·올가미·이동·자동
+  // 선택 4개, 탭하면 즉시 전환된다(ibisPaint처럼 다시 탭해도 옵션이 열리지
+  // 않는다 — 옵션은 항상 아래 optionsSections에 떠 있으므로 따로 열 필요가
+  // 없다).
+  modeTools: ToolMeta[];
+  // 하단 독의 "그리기 도구" 버튼에 보여줄 아이콘 — 지금 활성 도구가 그리기
+  // 도구 8개 중 하나면 그 아이콘, 아니면(모드 도구가 활성이면) 고정 펜슬
+  // 아이콘(Editor.tsx가 계산해 내려준다).
+  drawToolButtonIcon: ToolMeta["icon"];
+  // "그리기 도구" 팝오버에 그려 넣을 8개 도구 그리드 — moreItems의 detail
+  // 항목과 같은 render-prop 패턴(골라서 팝오버를 닫는 동작까지 콘텐츠
+  // 쪽에서 하므로 콜백을 받는다).
+  drawToolsPanel: (closeAll: () => void) => React.ReactNode;
+  // 지금 활성 도구의 하위 옵션 섹션(buildSecondarySections 결과, Editor.tsx가
+  // 계산) — 하단 메인 줄 바로 위에 상시 노출되는 strip 하나로 모아 그린다.
+  // 빈 배열이면 strip 자체가 안 보인다(텍스트 도구처럼 옵션이 없는 도구).
+  optionsSections: { key: string; node: React.ReactNode }[];
   // 하단 독의 "색상" 탭 아이콘을 팔레트 모양 대신 지금 활성 색상 스와치로
   // 보여주기 위한 값 — 다른 드로잉 앱들처럼 탭을 열지 않아도 지금 어떤
   // 색을 쓰고 있는지 한눈에 보이게 한다.
   activeColorHex: string;
-  // 도구 열(MobileToolRail)이 포털로 그려 넣을 레이아웃 칸의 DOM 노드를
-  // Editor.tsx로 올려보내는 콜백 ref — 그 노드가 실제 레이아웃 폭을
-  // 차지해야 캔버스가 도구 열만큼 밀려난다(오버레이로 띄우면 캔버스를
-  // 가려서 그 자리를 탭해 그릴 수 없는 문제가 생긴다).
-  onRailSlotMount: (el: HTMLDivElement | null) => void;
   colorPanel: React.ReactNode;
   layerPanel: React.ReactNode;
   moreItems: MobileMoreItem[];
@@ -54,7 +71,7 @@ export type MobileEditorShellProps = {
   onOpenExisting: () => void;
 };
 
-type PopoverKind = "color" | "layers" | "more" | null;
+type PopoverKind = "tools" | "color" | "layers" | "more" | null;
 
 const POPOVER_MARGIN = 8; // 화면 가장자리에서 최소로 띄우는 여백 — mb-2와 같은 0.5rem
 
@@ -74,9 +91,13 @@ export default function MobileEditorShell({
   layerMode,
   onLayerModeChange,
   canvas,
-  toolPanel,
+  tool,
+  onToolChange,
+  modeTools,
+  drawToolButtonIcon,
+  drawToolsPanel,
+  optionsSections,
   activeColorHex,
-  onRailSlotMount,
   colorPanel,
   layerPanel,
   moreItems,
@@ -88,16 +109,19 @@ export default function MobileEditorShell({
   const [popoverLeft, setPopoverLeft] = useState(0);
   const dockRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const toolsBtnRef = useRef<HTMLButtonElement>(null);
   const colorBtnRef = useRef<HTMLButtonElement>(null);
   const layersBtnRef = useRef<HTMLButtonElement>(null);
   const moreBtnRef = useRef<HTMLButtonElement>(null);
 
   const btnRefFor = (kind: Exclude<PopoverKind, null>) =>
-    kind === "color"
-      ? colorBtnRef
-      : kind === "layers"
-        ? layersBtnRef
-        : moreBtnRef;
+    kind === "tools"
+      ? toolsBtnRef
+      : kind === "color"
+        ? colorBtnRef
+        : kind === "layers"
+          ? layersBtnRef
+          : moreBtnRef;
 
   const closeAll = () => {
     setOpenPopover(null);
@@ -197,7 +221,8 @@ export default function MobileEditorShell({
   );
 
   let popoverContent: React.ReactNode = null;
-  if (openPopover === "color") popoverContent = colorPanel;
+  if (openPopover === "tools") popoverContent = drawToolsPanel(closeAll);
+  else if (openPopover === "color") popoverContent = colorPanel;
   else if (openPopover === "layers") popoverContent = layerPanel;
   else if (openPopover === "more") {
     popoverContent = activeMoreItem ? (
@@ -235,9 +260,12 @@ export default function MobileEditorShell({
     );
   }
 
+  const DrawToolIcon = drawToolButtonIcon;
+
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-white">
-      {/* 상단 바 */}
+      {/* 상단 바 — 되돌리기/다시실행은 엄지가 닿기 먼 자리라는 피드백으로
+          여기서 빼고 캔버스 위 좌상단 오버레이로 옮겼다(아래 캔버스 래퍼). */}
       <div className="flex shrink-0 items-center gap-1 border-b border-gray-200 bg-white px-2 py-1.5">
         <button
           onClick={onExit}
@@ -288,52 +316,70 @@ export default function MobileEditorShell({
         >
           <Save className="h-4 w-4" />
         </button>
-        <button
-          onClick={onUndo}
-          disabled={!canUndo}
-          title="되돌리기"
-          className="flex h-8 w-8 shrink-0 items-center justify-center text-gray-500 disabled:opacity-30"
-        >
-          <Undo2 className="h-4 w-4" />
-        </button>
-        <button
-          onClick={onRedo}
-          disabled={!canRedo}
-          title="다시실행"
-          className="flex h-8 w-8 shrink-0 items-center justify-center text-gray-500 disabled:opacity-30"
-        >
-          <Redo2 className="h-4 w-4" />
-        </button>
       </div>
 
-      {/* 캔버스 — canvasArea 자신의 flex-1이 실제로 늘어나 세로 공간을
-          채우려면 부모가 flex 컨테이너여야 한다(데스크톱에서는 이 자리의
-          부모가 이미 `flex flex-1 overflow-hidden`이다). 여기 display:flex를
-          빼먹으면 canvasArea가 내용 높이만큼만 차지해 캔버스가 아래로
-          치우쳐 보인다 — canvasArea 내부의 safe-center 정렬이 제대로
-          작동하려면 이 래퍼가 flex여야 한다. */}
-      {/* 도구 열은 캔버스 위에 뜨는 오버레이가 아니라 실제 레이아웃 폭을
-          차지하는 칸(아래 railSlotRef)으로 둔다 — 오버레이로 띄우면 그
-          자리를 탭해서 그릴 수 없는 문제가 있어, 캔버스 쪽을 그만큼
-          밀어내는 쪽을 택했다. "+" 목록·옵션 패널은 반대로(열고 닫을 때마다
-          캔버스가 밀리면 안 되므로) toolPanel 안에서 여전히 오버레이로
-          뜬다 — 이 아래 캔버스 래퍼가 relative라 그 absolute 포지셔닝이
-          캔버스 영역 기준으로 앉는다. */}
-      <div className="flex min-h-0 flex-1 gap-2 overflow-hidden bg-gray-50 p-2">
-        <div
-          ref={onRailSlotMount}
-          className="relative flex h-full shrink-0 items-center"
-        />
+      {/* 캔버스 — 상단 좌측에 되돌리기/다시실행, 상단 우측에 모드 도구 줄을
+          오버레이로 띄운다. 기존 줌 컨트롤(canvasArea 안, bottom-2 left-2)과
+          같은 "relative 래퍼 안에 absolute" 관례를 그대로 따른다. 옵션
+          strip은 반대로 오버레이가 아니라 실제 레이아웃 높이를 차지하는
+          영역이라, 이 relative 래퍼 바깥(아래)에 형제로 둔다 — 이비스페인트의
+          브러시 크기/불투명도 슬라이더가 캔버스를 가리지 않고 항상 그 아래
+          고정 공간을 차지하는 것과 같다. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden bg-gray-50 p-2">
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
           {canvas}
-          {toolPanel}
+          <div className="pointer-events-none absolute left-2 top-2 z-20 flex items-center gap-1">
+            <button
+              onClick={onUndo}
+              disabled={!canUndo}
+              title="되돌리기"
+              className={`pointer-events-auto flex h-8 w-8 items-center justify-center text-gray-600 disabled:opacity-30 ${FLOATING_PANEL}`}
+            >
+              <Undo2 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={onRedo}
+              disabled={!canRedo}
+              title="다시실행"
+              className={`pointer-events-auto flex h-8 w-8 items-center justify-center text-gray-600 disabled:opacity-30 ${FLOATING_PANEL}`}
+            >
+              <Redo2 className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="pointer-events-none absolute right-2 top-2 z-20 flex items-center gap-1">
+            {modeTools.map(({ tool: t, icon: Icon, label, key }) => (
+              <button
+                key={t}
+                onClick={() => onToolChange(t)}
+                title={`${label} (${key})`}
+                className={`pointer-events-auto flex h-9 w-9 items-center justify-center ${FLOATING_PANEL} ${
+                  tool === t ? "bg-violet-500 text-white" : "text-gray-600"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+              </button>
+            ))}
+          </div>
         </div>
+        {/* 상시 노출 옵션 strip — 도구를 다시 탭해야 열리던 기존(세로 열)
+            방식과 달리, 하단 메인 줄 바로 위에 항상 떠 있는다. 섹션 계산
+            (buildSecondarySections) 자체는 desktop과 완전히 동일하게
+            공유하고, 패널 하나에 세로로 모으는 감싸는 방식만 여기 전용이다.
+            옵션이 없는 도구(텍스트)는 배열이 비어 있어 strip 자체가 렌더
+            되지 않는다. */}
+        {optionsSections.length > 0 && (
+          <div className={`flex flex-wrap items-start gap-2 p-2 ${FLOATING_PANEL}`}>
+            {optionsSections.map(({ key, node }) => (
+              <div key={key}>{node}</div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* 하단 독 + 그 위 팝오버 — Editor.tsx:3399의 FLOATING_PANEL 패턴 그대로.
-          레이어/프레임만 내용량 차이(레이어 2개 vs 10개)가 커서 최소 높이 +
-          고정 폭을 주고, 나머지(색상/더보기)는 내용 크기 그대로 두되
-          화면 밖으로 넘치지 않게 최대 높이만 잡는다. */}
+      {/* 하단 독 + 그 위 팝오버 — 기존 FLOATING_PANEL 패턴 그대로. 그리기
+          도구가 첫 번째 자리로 새로 들어오고, 레이어/프레임만 내용량 차이가
+          커서 최소 높이 + 고정 폭을 주고, 나머지(그리기 도구/색상/더보기)는
+          내용 크기 그대로 두되 화면 밖으로 넘치지 않게 최대 높이만 잡는다. */}
       <div ref={dockRef} className="relative">
         {openPopover && (
           <div
@@ -349,6 +395,16 @@ export default function MobileEditorShell({
           </div>
         )}
         <div className="flex items-center justify-around border-t border-gray-200 bg-white py-1.5">
+          <button
+            ref={toolsBtnRef}
+            onClick={() => toggle("tools")}
+            className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
+              openPopover === "tools" ? "text-violet-600" : "text-gray-500"
+            }`}
+          >
+            <DrawToolIcon className="h-5 w-5" />
+            그리기 도구
+          </button>
           <button
             ref={colorBtnRef}
             onClick={() => toggle("color")}

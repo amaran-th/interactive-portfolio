@@ -36,7 +36,6 @@ import { createPortal } from "react-dom";
 import GradientDial from "./GradientDial";
 import HelpTip from "./HelpTip";
 import { HELP } from "./helpTexts";
-import MobileToolRail from "./MobileToolRail";
 import { FLOATING_PANEL } from "./panelStyles";
 import Switch from "./Switch";
 import { LayerScope, SelectMode, Tool, TransformScopeKey } from "./types";
@@ -702,8 +701,6 @@ export default function DrawToolbar({
   onTransformScopeChange,
   secondaryPortalTarget,
   compact,
-  mobileLayout,
-  railSlot,
 }: {
   tool: Tool;
   onToolChange: (tool: Tool) => void;
@@ -762,17 +759,6 @@ export default function DrawToolbar({
   // 그라데이션 도구와 반전·회전을 "더보기" 뒤로 접어 도구 카드가 한 줄에
   // 유지되게 한다. Editor.tsx가 rootRef.clientWidth로 판정해 내려준다.
   compact: boolean;
-  // 모바일 셸(캔버스 왼쪽 세로 도구 열) 전용 — true면 이 함수는 desktop
-  // JSX를 렌더링하지 않고 MobileToolRail로 위임한다(아래 이른 return 참고).
-  // drawCardTools·secondarySections 계산은 desktop과 동일하게 이 함수
-  // 안에서 이뤄지고, MobileToolRail은 그 결과물만 받아 그린다. desktop은
-  // 이 prop이 없으니(undefined) 지금과 완전히 동일하게 동작한다.
-  mobileLayout?: boolean;
-  // mobileLayout 전용 — MobileToolRail이 도구 열 자체를 포털로 그려 넣을
-  // 레이아웃 칸의 DOM 노드. Editor.tsx가 MobileEditorShell로부터 콜백 ref로
-  // 받아 내려준다(마운트되기 전엔 null). desktop은 안 쓰지만 항상 받는다
-  // (secondaryPortalTarget과 같은 방식).
-  railSlot: HTMLDivElement | null;
 }) {
   // 반전·회전은 캔버스를 열어 둔 내내 계속 쓰는 조작이 아니라 가끔 한 번씩만
   // 쓴다 — 기본은 접어 두고 "더보기"를 눌러야 보이게 해, 매번 보이는 실행취소·
@@ -780,13 +766,6 @@ export default function DrawToolbar({
   const [showMoreEdit, setShowMoreEdit] = useState(false);
   // 창(편집기)이 좁아지면 도형·텍스트·그라데이션 도구도 같은 방식으로 접는다.
   const [showMoreDrawTools, setShowMoreDrawTools] = useState(false);
-
-  // mobileLayout이면 "선택·조작" 카드(SELECT_TOOLS)를 별도로 렌더링하지
-  // 않고 그리기 카드의 같은 줄에 합류시킨다 — desktop은 지금처럼 분리된
-  // 카드를 유지한다.
-  const drawCardTools = mobileLayout
-    ? [...PRIMARY_DRAW_TOOLS, ...SELECT_TOOLS]
-    : PRIMARY_DRAW_TOOLS;
 
   const secondarySections = buildSecondarySections({
     tool,
@@ -829,37 +808,6 @@ export default function DrawToolbar({
       </div>
     ) : null;
 
-  // mobileLayout 전용 — desktop처럼 섹션마다 따로 흰 패널로 나누면(예: 마법봉은
-  // "선택 옵션" + "대상 레이어" 2개 섹션) MobileToolRail의 좁은 플라이아웃
-  // 폭(max-w-[280px]) 안에서 두 패널이 줄바꿈되며 서로 다른 폭으로 떨어져
-  // 어색한 여백이 남는다 — 모든 섹션을 패널 하나에 세로로 모아 넣는다.
-  // 섹션별 콘텐츠 자체(어떤 도구가 어떤 옵션을 갖는지)는 위 secondarySections
-  // 계산을 그대로 재사용하고, 감싸는 모양만 다르다.
-  const mobileOptionsNode =
-    secondarySections.length > 0 ? (
-      <div className={`flex flex-col gap-2 p-2 ${FLOATING_PANEL}`}>
-        {secondarySections.map(({ key, node }) => (
-          <div key={key}>{node}</div>
-        ))}
-      </div>
-    ) : null;
-
-  // mobileLayout이면 desktop 전용 카드 레이아웃 대신 세로 도구 열로
-  // 위임한다 — drawCardTools는 위에서 이미 계산을 끝냈으므로 그대로
-  // 넘기기만 하고, 옵션 콘텐츠는 mobileOptionsNode(위 참고)를 쓴다.
-  if (mobileLayout) {
-    return (
-      <MobileToolRail
-        primaryTools={drawCardTools}
-        moreTools={COLLAPSIBLE_DRAW_TOOLS}
-        tool={tool}
-        onToolChange={onToolChange}
-        optionsContent={mobileOptionsNode}
-        railSlot={railSlot}
-      />
-    );
-  }
-
   return (
     <div className="relative" style={{ backgroundColor: canvasBgColor }}>
       <div
@@ -870,7 +818,7 @@ export default function DrawToolbar({
         <div className="relative">
           <ToolCard title="그리기" compact={compact}>
             <div className="flex items-center gap-1">
-              {drawCardTools.map(({ tool: t, icon, label, key }) => (
+              {PRIMARY_DRAW_TOOLS.map(({ tool: t, icon, label, key }) => (
                 <ToolButton
                   key={t}
                   active={tool === t}
