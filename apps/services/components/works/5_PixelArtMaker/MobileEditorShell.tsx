@@ -352,8 +352,8 @@ export default function MobileEditorShell({
                 key={t}
                 onClick={() => onToolChange(t)}
                 title={`${label} (${key})`}
-                className={`pointer-events-auto flex h-9 w-9 items-center justify-center ${FLOATING_PANEL} ${
-                  tool === t ? "bg-violet-500 text-white" : "text-gray-600"
+                className={`pointer-events-auto flex h-9 w-9 items-center justify-center ring-1 ring-gray-300 shadow-xl shadow-gray-900/15 ${
+                  tool === t ? "bg-violet-500 text-white" : "bg-white text-gray-600"
                 }`}
               >
                 <Icon className="h-4 w-4" />
@@ -364,7 +364,7 @@ export default function MobileEditorShell({
         {/* 상시 노출 옵션 strip — 도구를 다시 탭해야 열리던 기존(세로 열)
             방식과 달리, 하단 메인 줄 바로 위에 항상 떠 있는다. 섹션 계산
             (buildSecondarySections) 자체는 desktop과 완전히 동일하게
-            공유하고, 패널 하나에 세로로 모으는 감싸는 방식만 여기 전용이다.
+            공유하고, 패널 하나에 가로로(넘치면 줄바꿈) 모으는 감싸는 방식만 여기 전용이다.
             옵션이 없는 도구(텍스트)는 배열이 비어 있어 strip 자체가 렌더
             되지 않는다. */}
         {optionsSections.length > 0 && (

@@ -2829,9 +2829,9 @@ export default function Editor({
       pingPong={pingPong}
     />
   );
-  // 도구바 — wide/narrow 어디서든 인스턴스가 하나뿐이라 지금까지는 그 자리에
-  // 인라인으로 있었다. 모바일 셸의 "도구" 시트도 같은 노드를 써야 해서
-  // top-level 변수로 뺀다.
+  // 도구바 — desktop 전용(모바일 셸은 자체 모드 도구 줄·그리기 도구 피커·
+  // 옵션 strip을 직접 그린다). top-level 변수로 빼 둔 건 이 함수 본문이
+  // 길어 가독성을 위해 분리한 것뿐, 재사용 목적은 아니다.
   const toolPanel = (
           <DrawToolbar
             tool={tool}

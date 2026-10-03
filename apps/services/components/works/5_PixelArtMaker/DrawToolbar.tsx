@@ -423,14 +423,6 @@ export function buildSecondarySections(
     shapeGradientFill && GRADIENT_SHAPE_TOOLS.includes(tool);
   const showGradientControls = isGradientTool || showShapeGradientControls;
 
-  // 카드마다 따로 뜨던 팝오버를 하나로 모은다 — 전에는 각자 자기 카드 바로
-  // 아래에 떴는데, 카드가 가로로 늘어서다 보니 "그리기"는 왼쪽 끝, "선택
-  // 옵션"은 그보다 오른쪽에 뜨는 것처럼 보여 일관성이 없어 보였다. 게다가 줄이
-  // 길어져 두 번째 줄로 넘어가면 첫 줄 카드의 팝오버가 그 두 번째 줄 카드를
-  // 가려버렸다. 지금은 어느 카드에서 열렸든 항상 툴바 전체 맨 아래, 같은
-  // 자리 하나에만 뜨게 해 위치를 통일하고, 다른 카드 위를 덮는 일이 없도록
-  // 한다 — 툴바 아래 캔버스 일부를 잠깐 덮는 것은 팝오버 방식인 이상 피할 수
-  // 없지만, 그 정도는 열려 있는 동안만이라 감수할 만하다.
   const secondarySections: { key: string; node: React.ReactNode }[] = [];
   if (showBrushSizeRow || showFillOptionsRow || showGradientControls) {
     secondarySections.push({
@@ -543,8 +535,7 @@ export function buildSecondarySections(
   // 할 일이 없다 — 다른 도구로 그림을 그리는 동안은 접어 둔다. 다만 선택
   // 영역이 남아 있는 채로 펜슬 등으로 바꿔 그 안쪽만 칠하는 흐름도 흔하므로,
   // hasSelection이면 도구가 무엇이든 계속 보여준다(선택 해제·선택 영역
-  // 채우기가 갑자기 사라지면 안 된다). 그리기 하위 옵션과 같은 자리(캔버스
-  // 하단 중앙)에 뜨도록 여기서도 포털로 보낸다.
+  // 채우기가 갑자기 사라지면 안 된다).
   if (isSelectLikeTool || hasSelection) {
     secondarySections.push({
       key: "selectOptions",
@@ -622,8 +613,7 @@ export function buildSecondarySections(
   }
   // 스포이트·마법봉·페인트통: "무엇을 기준으로 색·영역을 판정할지" (클립스튜디오
   // "다중 참조"). "참조 레이어"인데 지정된 게 없을 때의 경고는 이 패널이 아니라
-  // Editor가 캔버스 위쪽에 따로 띄운다 — 여기서 한 줄 늘어나면 옵션 위치가
-  // 흔들려 쓰기 불편하다는 피드백이 있어, 패널 바로 위에 별도로 띄운다(레이아웃 영향 없음).
+  // Editor가 캔버스 위쪽에 따로 띄운다.
   if (SAMPLE_SCOPE_TOOLS.includes(tool)) {
     secondarySections.push({
       key: "sampleScope",
@@ -791,6 +781,14 @@ export default function DrawToolbar({
     transformScopes,
     onTransformScopeChange,
   });
+  // 카드마다 따로 뜨던 팝오버를 하나로 모은다 — 전에는 각자 자기 카드 바로
+  // 아래에 떴는데, 카드가 가로로 늘어서다 보니 "그리기"는 왼쪽 끝, "선택
+  // 옵션"은 그보다 오른쪽에 뜨는 것처럼 보여 일관성이 없어 보였다. 게다가 줄이
+  // 길어져 두 번째 줄로 넘어가면 첫 줄 카드의 팝오버가 그 두 번째 줄 카드를
+  // 가려버렸다. 지금은 어느 카드에서 열렸든 항상 툴바 전체 맨 아래, 같은
+  // 자리 하나에만 뜨게 해 위치를 통일하고, 다른 카드 위를 덮는 일이 없도록
+  // 한다 — 툴바 아래 캔버스 일부를 잠깐 덮는 것은 팝오버 방식인 이상 피할 수
+  // 없지만, 그 정도는 열려 있는 동안만이라 감수할 만하다.
   // desktop은 캔버스 하단에 createPortal로 보낸다 — 카드마다(선택 옵션·대상
   // 레이어 등) 따로 떨어진 흰 패널로 가로로 늘어놓아도 화면 폭이 넉넉해
   // 자연스럽다.
