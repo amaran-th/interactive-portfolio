@@ -24,19 +24,23 @@ const COLORS: Record<number, string> = {
   3: "#8b5cf6",
 };
 
-export default function LauncherIcon() {
+export default function LauncherIcon({ scale = 1 }: { scale?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.width = SIZE;
-    canvas.height = SIZE;
+    // 다른 특수 아이콘·파일 썸네일(DesktopIcon)과 같은 배율을 받아 그린다 —
+    // 고정 SIZE만 쓰면 모바일 격자 배율에 따라 파일 썸네일과 크기가
+    // 어긋난다.
+    const size = Math.max(1, Math.round(SIZE * scale));
+    canvas.width = size;
+    canvas.height = size;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, SIZE, SIZE);
-    const cell = SIZE / GRID;
+    ctx.clearRect(0, 0, size, size);
+    const cell = size / GRID;
     for (let y = 0; y < GRID; y++) {
       for (let x = 0; x < GRID; x++) {
         const v = GRID_DATA[y][x];
@@ -45,7 +49,7 @@ export default function LauncherIcon() {
         ctx.fillRect(x * cell, y * cell, cell, cell);
       }
     }
-  }, []);
+  }, [scale]);
 
   return (
     <canvas

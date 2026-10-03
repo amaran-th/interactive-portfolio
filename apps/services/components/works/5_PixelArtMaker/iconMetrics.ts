@@ -34,9 +34,11 @@ export function getMobileIconScale(containerWidth: number): number {
 }
 
 // 모바일 전용 — 아이콘 그래픽(썸네일 캔버스/특수 아이콘 SVG)을 감싸는
-// 흰 카드 배경. desktop은 이 클래스를 쓰지 않는다.
+// 흰 카드 배경. 패딩 없이 캔버스를 꽉 채우고 overflow-hidden으로 캔버스의
+// 직각 모서리를 카드의 둥근 모서리에 맞춰 잘라낸다. desktop은 이 클래스를
+// 쓰지 않는다.
 export const MOBILE_ICON_CARD =
-  "flex items-center justify-center rounded-2xl bg-white shadow-md";
+  "flex items-center justify-center overflow-hidden rounded-2xl bg-white shadow-md";
 
 export function getIconScale(desktopWidth: number | undefined): number {
   if (!desktopWidth) return 1;

@@ -113,7 +113,7 @@ export default function DesktopIcon({
       onContextMenu={editing ? undefined : onContextMenu}
     >
       {mobileLayout ? (
-        <div className={`${MOBILE_ICON_CARD} p-2`}>
+        <div className={MOBILE_ICON_CARD}>
           <canvas
             ref={canvasRef}
             style={{ imageRendering: "pixelated" }}
