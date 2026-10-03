@@ -416,11 +416,22 @@ export function buildSecondarySections(
   const showFillOptionsRow =
     SHAPE_TOOLS.includes(tool) || GRADIENT_SHAPE_TOOLS.includes(tool);
   const isSelectLikeTool = SELECT_LIKE_TOOLS.includes(tool);
+  // 그라데이션 단계 수는 그라데이션 도구·도형(직선/사각형/원) 그라데이션
+  // 채우기 둘 다에 쓰인다. 방향(각도)은 도형 채우기에만 의미가 있다 —
+  // 그라데이션 도구 자체는 드래그 방향을 그대로 쓰므로 이 각도를 따르지 않는다.
   const isGradientTool = tool === "gradient";
   const showShapeGradientControls =
     shapeGradientFill && GRADIENT_SHAPE_TOOLS.includes(tool);
   const showGradientControls = isGradientTool || showShapeGradientControls;
 
+  // 카드마다 따로 뜨던 팝오버를 하나로 모은다 — 전에는 각자 자기 카드 바로
+  // 아래에 떴는데, 카드가 가로로 늘어서다 보니 "그리기"는 왼쪽 끝, "선택
+  // 옵션"은 그보다 오른쪽에 뜨는 것처럼 보여 일관성이 없어 보였다. 게다가 줄이
+  // 길어져 두 번째 줄로 넘어가면 첫 줄 카드의 팝오버가 그 두 번째 줄 카드를
+  // 가려버렸다. 지금은 어느 카드에서 열렸든 항상 툴바 전체 맨 아래, 같은
+  // 자리 하나에만 뜨게 해 위치를 통일하고, 다른 카드 위를 덮는 일이 없도록
+  // 한다 — 툴바 아래 캔버스 일부를 잠깐 덮는 것은 팝오버 방식인 이상 피할 수
+  // 없지만, 그 정도는 열려 있는 동안만이라 감수할 만하다.
   const secondarySections: { key: string; node: React.ReactNode }[] = [];
   if (showBrushSizeRow || showFillOptionsRow || showGradientControls) {
     secondarySections.push({
@@ -440,6 +451,10 @@ export function buildSecondarySections(
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
+                  {/* 실제로 찍히는 도트 크기(size×size)를 그대로 정사각형으로 보여준다
+                      — 숫자만으로는 굵기가 한눈에 안 들어온다는 피드백. 정사각형은
+                      가장 큰 크기(16px) 높이의 고정 칸 안에 넣어, 크기가 달라져도
+                      아래 숫자의 세로 위치가 네 버튼에서 일정하게 맞도록 한다. */}
                   <span className="flex h-4 items-center justify-center">
                     <span
                       style={{
@@ -525,6 +540,12 @@ export function buildSecondarySections(
       ),
     });
   }
+  // 선택 도구를 쓰고 있지 않고 지금 선택된 영역도 없으면 이 카드 자체가
+  // 할 일이 없다 — 다른 도구로 그림을 그리는 동안은 접어 둔다. 다만 선택
+  // 영역이 남아 있는 채로 펜슬 등으로 바꿔 그 안쪽만 칠하는 흐름도 흔하므로,
+  // hasSelection이면 도구가 무엇이든 계속 보여준다(선택 해제·선택 영역
+  // 채우기가 갑자기 사라지면 안 된다). 그리기 하위 옵션과 같은 자리(캔버스
+  // 하단 중앙)에 뜨도록 여기서도 포털로 보낸다.
   if (isSelectLikeTool || hasSelection) {
     secondarySections.push({
       key: "selectOptions",
@@ -548,6 +569,8 @@ export function buildSecondarySections(
               <PaintBucket className="h-3.5 w-3.5" />
             </button>
           </div>
+          {/* 자주 안 쓰는 옵션이라고 "더보기" 뒤에 숨기지 않는다 — 구분선으로만
+              나눠서, 필요할 때 한 번 더 누르지 않고 바로 보이게 한다. */}
           <div className="h-7 w-px bg-gray-200" />
           <div className="flex gap-1">
             {(
@@ -598,6 +621,10 @@ export function buildSecondarySections(
       ),
     });
   }
+  // 스포이트·마법봉·페인트통: "무엇을 기준으로 색·영역을 판정할지" (클립스튜디오
+  // "다중 참조"). "참조 레이어"인데 지정된 게 없을 때의 경고는 이 패널이 아니라
+  // Editor가 캔버스 위쪽에 따로 띄운다 — 여기서 한 줄 늘어나면 옵션 위치가
+  // 흔들려 쓰기 불편하다는 피드백이 있어, 패널 바로 위에 별도로 띄운다(레이아웃 영향 없음).
   if (SAMPLE_SCOPE_TOOLS.includes(tool)) {
     secondarySections.push({
       key: "sampleScope",
@@ -610,6 +637,8 @@ export function buildSecondarySections(
       ),
     });
   }
+  // 이동 도구는 "변형" 카드가 멀어서(선택 카드에 있음) 여기서도 대상을 바꾼다 —
+  // 반전·회전 등과 다른 별개 상태(transformScopes.move)다.
   if (tool === "move") {
     secondarySections.push({
       key: "moveScope",
