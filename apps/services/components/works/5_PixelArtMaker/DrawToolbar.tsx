@@ -410,6 +410,7 @@ export default function DrawToolbar({
   secondaryPortalTarget,
   compact,
   mobileLayout,
+  railSlot,
 }: {
   tool: Tool;
   onToolChange: (tool: Tool) => void;
@@ -474,6 +475,11 @@ export default function DrawToolbar({
   // 안에서 이뤄지고, MobileToolRail은 그 결과물만 받아 그린다. desktop은
   // 이 prop이 없으니(undefined) 지금과 완전히 동일하게 동작한다.
   mobileLayout?: boolean;
+  // mobileLayout 전용 — MobileToolRail이 도구 열 자체를 포털로 그려 넣을
+  // 레이아웃 칸의 DOM 노드. Editor.tsx가 MobileEditorShell로부터 콜백 ref로
+  // 받아 내려준다(마운트되기 전엔 null). desktop은 안 쓰지만 항상 받는다
+  // (secondaryPortalTarget과 같은 방식).
+  railSlot: HTMLDivElement | null;
 }) {
   const showBrushSizeRow = BRUSH_SIZE_TOOLS.includes(tool);
   const showFillOptionsRow =
@@ -728,9 +734,9 @@ export default function DrawToolbar({
       ),
     });
   }
-  // desktop은 이 내용을 createPortal로 캔버스 하단에 보내고, mobileLayout은
-  // MobileToolRail의 플라이아웃으로 그대로 넘긴다 — 내용은 완전히 동일하고
-  // 그려지는 위치만 다르므로 노드 자체는 한 번만 만든다.
+  // desktop은 캔버스 하단에 createPortal로 보낸다 — 카드마다(선택 옵션·대상
+  // 레이어 등) 따로 떨어진 흰 패널로 가로로 늘어놓아도 화면 폭이 넉넉해
+  // 자연스럽다.
   const secondarySectionsNode =
     secondarySections.length > 0 ? (
       <div className="pointer-events-auto flex flex-wrap items-end justify-center gap-3">
@@ -745,9 +751,24 @@ export default function DrawToolbar({
       </div>
     ) : null;
 
+  // mobileLayout 전용 — desktop처럼 섹션마다 따로 흰 패널로 나누면(예: 마법봉은
+  // "선택 옵션" + "대상 레이어" 2개 섹션) MobileToolRail의 좁은 플라이아웃
+  // 폭(max-w-[280px]) 안에서 두 패널이 줄바꿈되며 서로 다른 폭으로 떨어져
+  // 어색한 여백이 남는다 — 모든 섹션을 패널 하나에 세로로 모아 넣는다.
+  // 섹션별 콘텐츠 자체(어떤 도구가 어떤 옵션을 갖는지)는 위 secondarySections
+  // 계산을 그대로 재사용하고, 감싸는 모양만 다르다.
+  const mobileOptionsNode =
+    secondarySections.length > 0 ? (
+      <div className={`flex flex-col gap-2 p-2 ${FLOATING_PANEL}`}>
+        {secondarySections.map(({ key, node }) => (
+          <div key={key}>{node}</div>
+        ))}
+      </div>
+    ) : null;
+
   // mobileLayout이면 desktop 전용 카드 레이아웃 대신 세로 도구 열로
-  // 위임한다 — drawCardTools·secondarySectionsNode는 위에서 이미 계산을
-  // 끝냈으므로 그대로 넘기기만 한다.
+  // 위임한다 — drawCardTools는 위에서 이미 계산을 끝냈으므로 그대로
+  // 넘기기만 하고, 옵션 콘텐츠는 mobileOptionsNode(위 참고)를 쓴다.
   if (mobileLayout) {
     return (
       <MobileToolRail
@@ -755,7 +776,8 @@ export default function DrawToolbar({
         moreTools={COLLAPSIBLE_DRAW_TOOLS}
         tool={tool}
         onToolChange={onToolChange}
-        optionsContent={secondarySectionsNode}
+        optionsContent={mobileOptionsNode}
+        railSlot={railSlot}
       />
     );
   }

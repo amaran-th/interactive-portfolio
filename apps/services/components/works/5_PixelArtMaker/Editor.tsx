@@ -833,6 +833,12 @@ export default function Editor({
   // 마운트된 실제 DOM 노드가 준비된 다음 렌더에서 DrawToolbar에 전달된다.
   const [secondaryToolbarPortal, setSecondaryToolbarPortal] =
     useState<HTMLDivElement | null>(null);
+  // 모바일 도구 열(MobileToolRail)이 포털로 그려 넣을, 캔버스 옆 레이아웃
+  // 칸의 실제 DOM 노드 — MobileEditorShell이 콜백 ref로 올려준다(마운트
+  // 되기 전까지는 null). 위 secondaryToolbarPortal과 같은 "자식이 그린
+  // 노드를 상태로 받아 다음 렌더에 내려준다" 패턴.
+  const [mobileRailSlot, setMobileRailSlot] =
+    useState<HTMLDivElement | null>(null);
   // "JSON 불러오기" 메뉴 항목은 화면에 보이지 않는 이 input을 대신 클릭시켜
   // 파일 선택 창을 띄운다.
   const jsonFileInputRef = useRef<HTMLInputElement>(null);
@@ -2868,6 +2874,7 @@ export default function Editor({
             secondaryPortalTarget={secondaryToolbarPortal}
             compact={toolbarCompact || narrow}
             mobileLayout={narrow}
+            railSlot={mobileRailSlot}
           />
   );
   const colorPanel = (
@@ -3374,6 +3381,8 @@ export default function Editor({
           onLayerModeChange={handleLayerModeChange}
           canvas={canvasArea}
           toolPanel={toolPanel}
+          activeColorHex={activeColorHex}
+          onRailSlotMount={setMobileRailSlot}
           colorPanel={colorPanel}
           layerPanel={layerPanel}
           moreItems={mobileMoreItems}

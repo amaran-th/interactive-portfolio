@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  Layers,
-  Menu,
-  Palette,
-  Play,
-  Redo2,
-  Save,
-  Undo2,
-} from "lucide-react";
+import { Layers, Menu, Play, Redo2, Save, Undo2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { FLOATING_PANEL } from "./panelStyles";
 
@@ -46,6 +38,15 @@ export type MobileEditorShellProps = {
   onLayerModeChange: (mode: "layers" | "frames") => void;
   canvas: React.ReactNode;
   toolPanel: React.ReactNode;
+  // 하단 독의 "색상" 탭 아이콘을 팔레트 모양 대신 지금 활성 색상 스와치로
+  // 보여주기 위한 값 — 다른 드로잉 앱들처럼 탭을 열지 않아도 지금 어떤
+  // 색을 쓰고 있는지 한눈에 보이게 한다.
+  activeColorHex: string;
+  // 도구 열(MobileToolRail)이 포털로 그려 넣을 레이아웃 칸의 DOM 노드를
+  // Editor.tsx로 올려보내는 콜백 ref — 그 노드가 실제 레이아웃 폭을
+  // 차지해야 캔버스가 도구 열만큼 밀려난다(오버레이로 띄우면 캔버스를
+  // 가려서 그 자리를 탭해 그릴 수 없는 문제가 생긴다).
+  onRailSlotMount: (el: HTMLDivElement | null) => void;
   colorPanel: React.ReactNode;
   layerPanel: React.ReactNode;
   moreItems: MobileMoreItem[];
@@ -74,6 +75,8 @@ export default function MobileEditorShell({
   onLayerModeChange,
   canvas,
   toolPanel,
+  activeColorHex,
+  onRailSlotMount,
   colorPanel,
   layerPanel,
   moreItems,
@@ -309,14 +312,22 @@ export default function MobileEditorShell({
           빼먹으면 canvasArea가 내용 높이만큼만 차지해 캔버스가 아래로
           치우쳐 보인다 — canvasArea 내부의 safe-center 정렬이 제대로
           작동하려면 이 래퍼가 flex여야 한다. */}
-      {/* toolPanel(모바일에서는 MobileToolRail)은 더 이상 독 팝오버 콘텐츠가
-          아니라 캔버스 위에 항상 떠 있는 오버레이다 — 이 div가 relative라
-          MobileToolRail 내부의 absolute 포지셔닝이 이 캔버스 영역 기준으로
-          앉는다(화면 전체 기준 fixed가 아니라 상단 바·하단 독과 자동으로
-          안 겹친다). */}
-      <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        {canvas}
-        {toolPanel}
+      {/* 도구 열은 캔버스 위에 뜨는 오버레이가 아니라 실제 레이아웃 폭을
+          차지하는 칸(아래 railSlotRef)으로 둔다 — 오버레이로 띄우면 그
+          자리를 탭해서 그릴 수 없는 문제가 있어, 캔버스 쪽을 그만큼
+          밀어내는 쪽을 택했다. "+" 목록·옵션 패널은 반대로(열고 닫을 때마다
+          캔버스가 밀리면 안 되므로) toolPanel 안에서 여전히 오버레이로
+          뜬다 — 이 아래 캔버스 래퍼가 relative라 그 absolute 포지셔닝이
+          캔버스 영역 기준으로 앉는다. */}
+      <div className="flex min-h-0 flex-1 gap-2 overflow-hidden bg-gray-50 p-2">
+        <div
+          ref={onRailSlotMount}
+          className="relative flex h-full shrink-0 items-center"
+        />
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
+          {canvas}
+          {toolPanel}
+        </div>
       </div>
 
       {/* 하단 독 + 그 위 팝오버 — Editor.tsx:3399의 FLOATING_PANEL 패턴 그대로.
@@ -345,7 +356,10 @@ export default function MobileEditorShell({
               openPopover === "color" ? "text-violet-600" : "text-gray-500"
             }`}
           >
-            <Palette className="h-5 w-5" />
+            <span
+              className="h-5 w-5 rounded-full ring-1 ring-inset ring-gray-300"
+              style={{ backgroundColor: activeColorHex }}
+            />
             색상
           </button>
           <button
