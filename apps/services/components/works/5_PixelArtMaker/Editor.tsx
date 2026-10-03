@@ -3086,7 +3086,11 @@ export default function Editor({
                   tool === "bucket") &&
                   activeSampleScope === "reference" &&
                   !hasReferenceLayers && (
-                    <div className="pointer-events-none absolute bottom-14 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1.5 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700 shadow-md ring-1 ring-amber-200">
+                    <div
+                      className={`pointer-events-none absolute left-1/2 z-30 flex -translate-x-1/2 items-center gap-1.5 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700 shadow-md ring-1 ring-amber-200 ${
+                        narrow ? "bottom-2" : "bottom-14"
+                      }`}
+                    >
                       <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
                       참조 레이어로 지정된 레이어가 없습니다 — 레이어 목록의 전구
                       아이콘을 켜주세요
