@@ -41,13 +41,17 @@ import { FLOATING_PANEL } from "./panelStyles";
 import Switch from "./Switch";
 import { LayerScope, SelectMode, Tool, TransformScopeKey } from "./types";
 
-// key는 useKeyboardShortcuts.ts의 TOOL_KEYS와 정확히 일치해야 한다.
-const SELECT_TOOLS: {
+// 세 배열이 공유하는 모양 — 모바일 ibisPaint 레이아웃(MobileEditorShell.tsx,
+// Editor.tsx)의 모드 도구 줄·그리기 도구 그리드에서도 그대로 재사용한다.
+export type ToolMeta = {
   tool: Tool;
   icon: typeof MousePointer2;
   label: string;
   key: string;
-}[] = [
+};
+
+// key는 useKeyboardShortcuts.ts의 TOOL_KEYS와 정확히 일치해야 한다.
+export const SELECT_TOOLS: ToolMeta[] = [
   { tool: "select", icon: MousePointer2, label: "선택", key: "M" },
   { tool: "lasso", icon: Lasso, label: "올가미", key: "L" },
   { tool: "move", icon: Move, label: "이동", key: "V" },
@@ -58,12 +62,7 @@ const SELECT_TOOLS: {
 const SELECT_LIKE_TOOLS: Tool[] = ["select", "lasso", "wand"];
 
 // 펜슬·지우개·채우기는 가장 자주 쓰는 핵심 도구라 창이 좁아져도 항상 보인다.
-const PRIMARY_DRAW_TOOLS: {
-  tool: Tool;
-  icon: typeof Paintbrush;
-  label: string;
-  key: string;
-}[] = [
+export const PRIMARY_DRAW_TOOLS: ToolMeta[] = [
   { tool: "pencil", icon: Paintbrush, label: "펜슬", key: "B" },
   { tool: "eraser", icon: Eraser, label: "지우개", key: "E" },
   { tool: "bucket", icon: PaintBucket, label: "채우기", key: "G" },
@@ -71,12 +70,7 @@ const PRIMARY_DRAW_TOOLS: {
 
 // 도형·텍스트·그라데이션은 그보다 덜 자주 쓰여, 창이 좁아지면 반전·회전처럼
 // "더보기" 뒤로 접힌다.
-const COLLAPSIBLE_DRAW_TOOLS: {
-  tool: Tool;
-  icon: typeof Paintbrush;
-  label: string;
-  key: string;
-}[] = [
+export const COLLAPSIBLE_DRAW_TOOLS: ToolMeta[] = [
   { tool: "line", icon: Minus, label: "직선", key: "U" },
   { tool: "rect", icon: Square, label: "사각형", key: "R" },
   { tool: "circle", icon: Circle, label: "원", key: "O" },
@@ -361,6 +355,276 @@ function ToolButton({
   );
 }
 
+export type SecondarySectionsParams = {
+  tool: Tool;
+  brushSize: number;
+  onBrushSizeChange: (size: number) => void;
+  filledShapes: boolean;
+  onToggleFilledShapes: () => void;
+  shapeGradientFill: boolean;
+  onToggleShapeGradientFill: () => void;
+  gradientSteps: number;
+  onGradientStepsChange: (steps: number) => void;
+  gradientAngleDeg: number;
+  onGradientAngleChange: (deg: number) => void;
+  wandGlobal: boolean;
+  onToggleWandGlobal: () => void;
+  hasSelection: boolean;
+  onFillSelection: () => void;
+  selectMode: SelectMode;
+  onSelectModeChange: (mode: SelectMode) => void;
+  onClearSelection: () => void;
+  sampleScope: LayerScope;
+  onSampleScopeChange: (scope: LayerScope) => void;
+  transformScopes: Record<TransformScopeKey, LayerScope>;
+  onTransformScopeChange: (key: TransformScopeKey, scope: LayerScope) => void;
+};
+
+// 도구별 하위 옵션 섹션 계산 — desktop(카드마다 흰 패널, DrawToolbar 본문)과
+// 모바일(strip 하나에 세로로 모음, MobileEditorShell 경유 Editor.tsx)이
+// "어떤 도구가 어떤 옵션을 갖는지"를 100% 똑같이 공유해야 해서 뺐다.
+// 감싸는 모양(패널을 몇 개로 나눌지)은 호출하는 쪽이 각자 정한다.
+export function buildSecondarySections(
+  params: SecondarySectionsParams,
+): { key: string; node: React.ReactNode }[] {
+  const {
+    tool,
+    brushSize,
+    onBrushSizeChange,
+    filledShapes,
+    onToggleFilledShapes,
+    shapeGradientFill,
+    onToggleShapeGradientFill,
+    gradientSteps,
+    onGradientStepsChange,
+    gradientAngleDeg,
+    onGradientAngleChange,
+    wandGlobal,
+    onToggleWandGlobal,
+    hasSelection,
+    onFillSelection,
+    selectMode,
+    onSelectModeChange,
+    onClearSelection,
+    sampleScope,
+    onSampleScopeChange,
+    transformScopes,
+    onTransformScopeChange,
+  } = params;
+
+  const showBrushSizeRow = BRUSH_SIZE_TOOLS.includes(tool);
+  const showFillOptionsRow =
+    SHAPE_TOOLS.includes(tool) || GRADIENT_SHAPE_TOOLS.includes(tool);
+  const isSelectLikeTool = SELECT_LIKE_TOOLS.includes(tool);
+  const isGradientTool = tool === "gradient";
+  const showShapeGradientControls =
+    shapeGradientFill && GRADIENT_SHAPE_TOOLS.includes(tool);
+  const showGradientControls = isGradientTool || showShapeGradientControls;
+
+  const secondarySections: { key: string; node: React.ReactNode }[] = [];
+  if (showBrushSizeRow || showFillOptionsRow || showGradientControls) {
+    secondarySections.push({
+      key: "draw",
+      node: (
+        <div className="flex items-center gap-2">
+          {showBrushSizeRow && (
+            <div className="flex gap-1">
+              {BRUSH_SIZES.map((size) => (
+                <button
+                  key={size}
+                  onClick={() => onBrushSizeChange(size)}
+                  title={`${size}×${size}px 브러시`}
+                  className={`flex h-8 w-8 flex-col items-center justify-center gap-0.5 ${
+                    brushSize === size
+                      ? "bg-violet-500 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  <span className="flex h-4 items-center justify-center">
+                    <span
+                      style={{
+                        width: size * 4,
+                        height: size * 4,
+                        backgroundColor: "currentColor",
+                      }}
+                    />
+                  </span>
+                  <span className="text-[8px] leading-none tabular-nums opacity-70">
+                    {size}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          {showFillOptionsRow && (
+            <div className="flex gap-1">
+              {SHAPE_TOOLS.includes(tool) && (
+                <button
+                  onClick={onToggleFilledShapes}
+                  title="도형 채우기 — 사각형·원을 채워서 그리기"
+                  className={`flex h-7 w-7 items-center justify-center ${
+                    filledShapes
+                      ? "bg-violet-500 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  <PaintBucket className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <button
+                onClick={onToggleShapeGradientFill}
+                title="그라데이션 채우기 — 직선·사각형·원을 그라데이션으로 채우기(그리기 시작점이 활성 색상, 끝점이 보조 색상이 되는 방향)"
+                className={`flex h-7 w-7 items-center justify-center ${
+                  shapeGradientFill
+                    ? "bg-violet-500 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                <Blend className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+          {showGradientControls && (
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1 text-[10px] text-gray-600">
+                <span className="flex items-center gap-1">
+                  단계
+                  <HelpTip text={HELP.gradientSteps} />
+                </span>
+                <input
+                  type="range"
+                  min={2}
+                  max={32}
+                  value={gradientSteps}
+                  onChange={(e) =>
+                    onGradientStepsChange(Number(e.target.value))
+                  }
+                />
+                <span className="w-5 text-right tabular-nums text-gray-400">
+                  {gradientSteps}
+                </span>
+              </label>
+              {!isGradientTool && (
+                <div
+                  className="flex items-center gap-1.5 text-[10px] text-gray-600"
+                  title="도형 그라데이션 채우기가 칠해지는 방향"
+                >
+                  <span>방향</span>
+                  <GradientDial
+                    angleDeg={gradientAngleDeg}
+                    onAngleChange={onGradientAngleChange}
+                  />
+                  <span className="w-7 text-right tabular-nums text-gray-400">
+                    {gradientAngleDeg}°
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ),
+    });
+  }
+  if (isSelectLikeTool || hasSelection) {
+    secondarySections.push({
+      key: "selectOptions",
+      node: (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-1">
+            <button
+              disabled={!hasSelection}
+              onClick={onClearSelection}
+              title="선택 영역 해제 (Esc)"
+              className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+            <button
+              disabled={!hasSelection}
+              onClick={onFillSelection}
+              title="선택 영역 채우기 — 선택 영역을 활성 색상으로 한 번에 칠하기(색상 일괄 수정)"
+              className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+            >
+              <PaintBucket className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="h-7 w-px bg-gray-200" />
+          <div className="flex gap-1">
+            {(
+              [
+                { mode: "new", label: "새 선택", icon: Square },
+                {
+                  mode: "add",
+                  label: "선택 영역에 추가 (Shift)",
+                  icon: SquarePlus,
+                },
+                {
+                  mode: "subtract",
+                  label: "선택 영역에서 제외 (Alt)",
+                  icon: SquareMinus,
+                },
+              ] as { mode: SelectMode; label: string; icon: typeof Square }[]
+            ).map(({ mode, label, icon: Icon }) => (
+              <button
+                key={mode}
+                disabled={!isSelectLikeTool}
+                onClick={() => onSelectModeChange(mode)}
+                title={label}
+                className={`flex h-8 w-8 items-center justify-center disabled:opacity-30 ${
+                  selectMode === mode
+                    ? "bg-violet-500 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+              </button>
+            ))}
+          </div>
+          <label
+            className={`flex items-center gap-1.5 text-[10px] ${
+              tool === "wand" ? "text-gray-600" : "text-gray-400"
+            }`}
+          >
+            <Globe className="h-3.5 w-3.5 shrink-0" />
+            전역 동일색
+            <HelpTip text={HELP.wandGlobal} />
+            <Switch
+              checked={wandGlobal}
+              onClick={onToggleWandGlobal}
+              disabled={tool !== "wand"}
+            />
+          </label>
+        </div>
+      ),
+    });
+  }
+  if (SAMPLE_SCOPE_TOOLS.includes(tool)) {
+    secondarySections.push({
+      key: "sampleScope",
+      node: (
+        <SegmentedControl
+          label="대상 레이어"
+          value={sampleScope}
+          onChange={onSampleScopeChange}
+        />
+      ),
+    });
+  }
+  if (tool === "move") {
+    secondarySections.push({
+      key: "moveScope",
+      node: (
+        <SegmentedControl
+          label="대상 레이어"
+          value={transformScopes.move}
+          onChange={(s) => onTransformScopeChange("move", s)}
+        />
+      ),
+    });
+  }
+  return secondarySections;
+}
+
 // 그리기 도구를 가장 왼쪽(가장 자주 씀)에 두고, 브러시 크기·채우기 옵션은
 // 독립된 카드가 아니라 "그리기" 카드에 속한 하위 설정으로 취급한다 — 같은
 // 카드 안에서 도구 아이콘 줄 아래에 두 번째 줄로 붙이고, 지금 고른 도구와
@@ -481,10 +745,6 @@ export default function DrawToolbar({
   // (secondaryPortalTarget과 같은 방식).
   railSlot: HTMLDivElement | null;
 }) {
-  const showBrushSizeRow = BRUSH_SIZE_TOOLS.includes(tool);
-  const showFillOptionsRow =
-    SHAPE_TOOLS.includes(tool) || GRADIENT_SHAPE_TOOLS.includes(tool);
-  const isSelectLikeTool = SELECT_LIKE_TOOLS.includes(tool);
   // 반전·회전은 캔버스를 열어 둔 내내 계속 쓰는 조작이 아니라 가끔 한 번씩만
   // 쓴다 — 기본은 접어 두고 "더보기"를 눌러야 보이게 해, 매번 보이는 실행취소·
   // 격자·지우기만 항상 눈에 띄게 한다.
@@ -499,241 +759,30 @@ export default function DrawToolbar({
     ? [...PRIMARY_DRAW_TOOLS, ...SELECT_TOOLS]
     : PRIMARY_DRAW_TOOLS;
 
-  // 그라데이션 단계 수는 그라데이션 도구·도형(직선/사각형/원) 그라데이션
-  // 채우기 둘 다에 쓰인다. 방향(각도)은 도형 채우기에만 의미가 있다 —
-  // 그라데이션 도구 자체는 드래그 방향을 그대로 쓰므로 이 각도를 따르지 않는다.
-  const isGradientTool = tool === "gradient";
-  const showShapeGradientControls =
-    shapeGradientFill && GRADIENT_SHAPE_TOOLS.includes(tool);
-  const showGradientControls = isGradientTool || showShapeGradientControls;
-
-  // 카드마다 따로 뜨던 팝오버를 하나로 모은다 — 전에는 각자 자기 카드 바로
-  // 아래에 떴는데, 카드가 가로로 늘어서다 보니 "그리기"는 왼쪽 끝, "선택
-  // 옵션"은 그보다 오른쪽에 뜨는 것처럼 보여 일관성이 없어 보였다. 게다가 줄이
-  // 길어져 두 번째 줄로 넘어가면 첫 줄 카드의 팝오버가 그 두 번째 줄 카드를
-  // 가려버렸다. 지금은 어느 카드에서 열렸든 항상 툴바 전체 맨 아래, 같은
-  // 자리 하나에만 뜨게 해 위치를 통일하고, 다른 카드 위를 덮는 일이 없도록
-  // 한다 — 툴바 아래 캔버스 일부를 잠깐 덮는 것은 팝오버 방식인 이상 피할 수
-  // 없지만, 그 정도는 열려 있는 동안만이라 감수할 만하다.
-  const secondarySections: { key: string; node: React.ReactNode }[] = [];
-  if (showBrushSizeRow || showFillOptionsRow || showGradientControls) {
-    secondarySections.push({
-      key: "draw",
-      node: (
-        <div className="flex items-center gap-2">
-          {showBrushSizeRow && (
-            <div className="flex gap-1">
-              {BRUSH_SIZES.map((size) => (
-                <button
-                  key={size}
-                  onClick={() => onBrushSizeChange(size)}
-                  title={`${size}×${size}px 브러시`}
-                  className={`flex h-8 w-8 flex-col items-center justify-center gap-0.5 ${
-                    brushSize === size
-                      ? "bg-violet-500 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {/* 실제로 찍히는 도트 크기(size×size)를 그대로 정사각형으로 보여준다
-                      — 숫자만으로는 굵기가 한눈에 안 들어온다는 피드백. 정사각형은
-                      가장 큰 크기(16px) 높이의 고정 칸 안에 넣어, 크기가 달라져도
-                      아래 숫자의 세로 위치가 네 버튼에서 일정하게 맞도록 한다. */}
-                  <span className="flex h-4 items-center justify-center">
-                    <span
-                      style={{
-                        width: size * 4,
-                        height: size * 4,
-                        backgroundColor: "currentColor",
-                      }}
-                    />
-                  </span>
-                  <span className="text-[8px] leading-none tabular-nums opacity-70">
-                    {size}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-          {showFillOptionsRow && (
-            <div className="flex gap-1">
-              {SHAPE_TOOLS.includes(tool) && (
-                <button
-                  onClick={onToggleFilledShapes}
-                  title="도형 채우기 — 사각형·원을 채워서 그리기"
-                  className={`flex h-7 w-7 items-center justify-center ${
-                    filledShapes
-                      ? "bg-violet-500 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  <PaintBucket className="h-3.5 w-3.5" />
-                </button>
-              )}
-              <button
-                onClick={onToggleShapeGradientFill}
-                title="그라데이션 채우기 — 직선·사각형·원을 그라데이션으로 채우기(그리기 시작점이 활성 색상, 끝점이 보조 색상이 되는 방향)"
-                className={`flex h-7 w-7 items-center justify-center ${
-                  shapeGradientFill
-                    ? "bg-violet-500 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                <Blend className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
-          {showGradientControls && (
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-1 text-[10px] text-gray-600">
-                <span className="flex items-center gap-1">
-                  단계
-                  <HelpTip text={HELP.gradientSteps} />
-                </span>
-                <input
-                  type="range"
-                  min={2}
-                  max={32}
-                  value={gradientSteps}
-                  onChange={(e) =>
-                    onGradientStepsChange(Number(e.target.value))
-                  }
-                />
-                <span className="w-5 text-right tabular-nums text-gray-400">
-                  {gradientSteps}
-                </span>
-              </label>
-              {!isGradientTool && (
-                <div
-                  className="flex items-center gap-1.5 text-[10px] text-gray-600"
-                  title="도형 그라데이션 채우기가 칠해지는 방향"
-                >
-                  <span>방향</span>
-                  <GradientDial
-                    angleDeg={gradientAngleDeg}
-                    onAngleChange={onGradientAngleChange}
-                  />
-                  <span className="w-7 text-right tabular-nums text-gray-400">
-                    {gradientAngleDeg}°
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      ),
-    });
-  }
-  // 선택 도구를 쓰고 있지 않고 지금 선택된 영역도 없으면 이 카드 자체가
-  // 할 일이 없다 — 다른 도구로 그림을 그리는 동안은 접어 둔다. 다만 선택
-  // 영역이 남아 있는 채로 펜슬 등으로 바꿔 그 안쪽만 칠하는 흐름도 흔하므로,
-  // hasSelection이면 도구가 무엇이든 계속 보여준다(선택 해제·선택 영역
-  // 채우기가 갑자기 사라지면 안 된다). 그리기 하위 옵션과 같은 자리(캔버스
-  // 하단 중앙)에 뜨도록 여기서도 포털로 보낸다.
-  if (isSelectLikeTool || hasSelection) {
-    secondarySections.push({
-      key: "selectOptions",
-      node: (
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-1">
-            <button
-              disabled={!hasSelection}
-              onClick={onClearSelection}
-              title="선택 영역 해제 (Esc)"
-              className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-            <button
-              disabled={!hasSelection}
-              onClick={onFillSelection}
-              title="선택 영역 채우기 — 선택 영역을 활성 색상으로 한 번에 칠하기(색상 일괄 수정)"
-              className="flex h-8 w-8 items-center justify-center bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
-            >
-              <PaintBucket className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          {/* 자주 안 쓰는 옵션이라고 "더보기" 뒤에 숨기지 않는다 — 구분선으로만
-              나눠서, 필요할 때 한 번 더 누르지 않고 바로 보이게 한다. */}
-          <div className="h-7 w-px bg-gray-200" />
-          <div className="flex gap-1">
-            {(
-              [
-                { mode: "new", label: "새 선택", icon: Square },
-                {
-                  mode: "add",
-                  label: "선택 영역에 추가 (Shift)",
-                  icon: SquarePlus,
-                },
-                {
-                  mode: "subtract",
-                  label: "선택 영역에서 제외 (Alt)",
-                  icon: SquareMinus,
-                },
-              ] as { mode: SelectMode; label: string; icon: typeof Square }[]
-            ).map(({ mode, label, icon: Icon }) => (
-              <button
-                key={mode}
-                disabled={!isSelectLikeTool}
-                onClick={() => onSelectModeChange(mode)}
-                title={label}
-                className={`flex h-8 w-8 items-center justify-center disabled:opacity-30 ${
-                  selectMode === mode
-                    ? "bg-violet-500 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-              </button>
-            ))}
-          </div>
-          <label
-            className={`flex items-center gap-1.5 text-[10px] ${
-              tool === "wand" ? "text-gray-600" : "text-gray-400"
-            }`}
-          >
-            <Globe className="h-3.5 w-3.5 shrink-0" />
-            전역 동일색
-            <HelpTip text={HELP.wandGlobal} />
-            <Switch
-              checked={wandGlobal}
-              onClick={onToggleWandGlobal}
-              disabled={tool !== "wand"}
-            />
-          </label>
-        </div>
-      ),
-    });
-  }
-  // 스포이트·마법봉·페인트통: "무엇을 기준으로 색·영역을 판정할지" (클립스튜디오
-  // "다중 참조"). "참조 레이어"인데 지정된 게 없을 때의 경고는 이 패널이 아니라
-  // Editor가 캔버스 위쪽에 따로 띄운다 — 여기서 한 줄 늘어나면 옵션 위치가
-  // 흔들려 쓰기 불편하다는 피드백.
-  if (SAMPLE_SCOPE_TOOLS.includes(tool)) {
-    secondarySections.push({
-      key: "sampleScope",
-      node: (
-        <SegmentedControl
-          label="대상 레이어"
-          value={sampleScope}
-          onChange={onSampleScopeChange}
-        />
-      ),
-    });
-  }
-  // 이동 도구는 "변형" 카드가 멀어서(선택 카드에 있음) 여기서도 대상을 바꾼다 —
-  // 반전·회전 등과 다른 별개 상태(transformScopes.move)다.
-  if (tool === "move") {
-    secondarySections.push({
-      key: "moveScope",
-      node: (
-        <SegmentedControl
-          label="대상 레이어"
-          value={transformScopes.move}
-          onChange={(s) => onTransformScopeChange("move", s)}
-        />
-      ),
-    });
-  }
+  const secondarySections = buildSecondarySections({
+    tool,
+    brushSize,
+    onBrushSizeChange,
+    filledShapes,
+    onToggleFilledShapes,
+    shapeGradientFill,
+    onToggleShapeGradientFill,
+    gradientSteps,
+    onGradientStepsChange,
+    gradientAngleDeg,
+    onGradientAngleChange,
+    wandGlobal,
+    onToggleWandGlobal,
+    hasSelection,
+    onFillSelection,
+    selectMode,
+    onSelectModeChange,
+    onClearSelection,
+    sampleScope,
+    onSampleScopeChange,
+    transformScopes,
+    onTransformScopeChange,
+  });
   // desktop은 캔버스 하단에 createPortal로 보낸다 — 카드마다(선택 옵션·대상
   // 레이어 등) 따로 떨어진 흰 패널로 가로로 늘어놓아도 화면 폭이 넉넉해
   // 자연스럽다.
