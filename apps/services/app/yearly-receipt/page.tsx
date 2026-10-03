@@ -1,5 +1,7 @@
 import YearlyReceipt from "@/components/works/4_YearlyReceipt/YearlyReceipt";
 import type { Metadata } from "next";
+import ToolGuide from "../_components/ToolGuide";
+import { yearlyReceiptGuide } from "./guide";
 
 export const metadata: Metadata = {
   title: `올해의 영수증 만들기`,
@@ -30,10 +32,13 @@ export const metadata: Metadata = {
 
 export default function YearlyReceiptPage() {
   return (
-    <main className="flex h-dvh justify-center overflow-hidden">
-      <div className="h-full w-full max-w-2xl">
-        <YearlyReceipt />
-      </div>
-    </main>
+    <>
+      <main className="flex h-dvh justify-center overflow-hidden">
+        <div className="h-full w-full max-w-2xl">
+          <YearlyReceipt />
+        </div>
+      </main>
+      <ToolGuide content={yearlyReceiptGuide} />
+    </>
   );
 }

@@ -1,5 +1,7 @@
 import KnitMuffler from "@/components/works/1_KnitMuffler/KnitMuffler";
 import type { Metadata } from "next";
+import ToolGuide from "../_components/ToolGuide";
+import { knitMufflerGuide } from "./guide";
 
 export const metadata: Metadata = {
   title: "뜨개뜨개",
@@ -30,10 +32,13 @@ export const metadata: Metadata = {
 
 export default function KnitMufflerPage() {
   return (
-    <main className="flex h-dvh justify-center overflow-hidden text-stone-900">
-      <div className="h-full w-full max-w-5xl">
-        <KnitMuffler />
-      </div>
-    </main>
+    <>
+      <main className="flex h-dvh justify-center overflow-hidden text-stone-900">
+        <div className="h-full w-full max-w-5xl">
+          <KnitMuffler />
+        </div>
+      </main>
+      <ToolGuide content={knitMufflerGuide} />
+    </>
   );
 }

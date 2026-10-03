@@ -1,5 +1,7 @@
 import VisualNovelStudio from "@/components/works/2_VisualNovelStudio/VisualNovelStudio";
 import type { Metadata } from "next";
+import ToolGuide from "../_components/ToolGuide";
+import { visualNovelStudioGuide } from "./guide";
 
 export const metadata: Metadata = {
   title: "비주얼 노벨 스튜디오",
@@ -29,10 +31,13 @@ export const metadata: Metadata = {
 
 export default function VisualNovelStudioPage() {
   return (
-    <main className="flex h-dvh justify-center overflow-hidden">
-      <div className="h-full w-full max-w-2xl">
-        <VisualNovelStudio />
-      </div>
-    </main>
+    <>
+      <main className="flex h-dvh justify-center overflow-hidden">
+        <div className="h-full w-full max-w-2xl">
+          <VisualNovelStudio />
+        </div>
+      </main>
+      <ToolGuide content={visualNovelStudioGuide} />
+    </>
   );
 }

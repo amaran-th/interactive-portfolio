@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import ToolGuide from "../_components/ToolGuide";
+import { assetSimulatorGuide } from "./guide";
 import AssetSimulator from "@/components/works/6_AssetSimulator/AssetSimulator";
 
 export const metadata: Metadata = {
@@ -20,8 +22,11 @@ export const metadata: Metadata = {
 
 export default function AssetSimulatorPage() {
   return (
-    <main className="h-dvh overflow-hidden bg-linear-to-br from-indigo-100 via-blue-50 to-purple-100 text-gray-800">
-      <AssetSimulator />
-    </main>
+    <>
+      <main className="h-dvh overflow-hidden bg-linear-to-br from-indigo-100 via-blue-50 to-purple-100 text-gray-800">
+        <AssetSimulator />
+      </main>
+      <ToolGuide content={assetSimulatorGuide} />
+    </>
   );
 }

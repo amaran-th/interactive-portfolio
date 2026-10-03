@@ -1,5 +1,7 @@
 import StellarForge from "@/components/works/3_StellarForge/StellarForge";
 import type { Metadata } from "next";
+import ToolGuide from "../_components/ToolGuide";
+import { stellarForgeGuide } from "./guide";
 
 export const metadata: Metadata = {
   title: "별들은 굉장한 빛메이커이다",
@@ -32,10 +34,13 @@ export const metadata: Metadata = {
 
 export default function StellarForgePage() {
   return (
-    <main className="flex h-dvh justify-center overflow-hidden">
-      <div className="h-full w-full max-w-2xl">
-        <StellarForge />
-      </div>
-    </main>
+    <>
+      <main className="flex h-dvh justify-center overflow-hidden">
+        <div className="h-full w-full max-w-2xl">
+          <StellarForge />
+        </div>
+      </main>
+      <ToolGuide content={stellarForgeGuide} />
+    </>
   );
 }

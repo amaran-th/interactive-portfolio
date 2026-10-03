@@ -1,6 +1,8 @@
 import PixelArtMaker from "@/components/works/5_PixelArtMaker/PixelArtMaker";
 import { CURSOR_NORMAL } from "@/components/works/5_PixelArtMaker/cursors";
 import type { Metadata } from "next";
+import ToolGuide from "../_components/ToolGuide";
+import { nemoNemoBeamGuide } from "./guide";
 
 export const metadata: Metadata = {
   title: "네모네모빔",
@@ -30,11 +32,14 @@ export const metadata: Metadata = {
 
 export default function PixelArtMakerPage() {
   return (
-    <main
-      className="h-dvh w-full overflow-hidden p-4"
-      style={{ cursor: CURSOR_NORMAL }}
-    >
-      <PixelArtMaker />
-    </main>
+    <>
+      <main
+        className="h-dvh w-full overflow-hidden p-4"
+        style={{ cursor: CURSOR_NORMAL }}
+      >
+        <PixelArtMaker />
+      </main>
+      <ToolGuide content={nemoNemoBeamGuide} />
+    </>
   );
 }

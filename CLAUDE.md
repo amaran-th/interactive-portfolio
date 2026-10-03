@@ -82,6 +82,13 @@ Each interaction follows a strict pattern (all paths under `apps/portfolio/app/(
 
 **동기화 규칙:** 위 데이터 타입(`WorkItem`, `ResearchRecord`, `EngineeringEntry`) 또는 컴포넌트 패턴(`InteractionCard` props 등)이 변경되면, 대응하는 커맨드 파일(`.claude/commands/new-*.md`)의 예시 코드도 함께 업데이트해야 한다. `WorkItem` 은 도메인 분리로 `content` 필드가 사라지고 `embedPath: string` 이 추가됐다(`path?` 는 유지).
 
+**서비스 앱 안내 문구 동기화 규칙 (AdSense 대응):** 서비스 앱의 설명 텍스트는 실제 동작을 그대로 옮긴 것이라, 기능이 바뀌면 함께 고쳐야 한다.
+
+- 도구의 기능·단축키·수치·UI 라벨·저장 방식이 바뀌면 → 그 라우트의 `apps/services/app/<service>/guide.ts`(사용 방법·알아 두면 좋은 점·FAQ)와 `apps/services/app/page.tsx`의 `about` 문구를 확인하고 고친다. 없는 기능은 쓰지 않는다.
+- `localStorage`/`IndexedDB` 키를 추가·변경·삭제하거나, 쿠키·외부 스크립트·외부 요청(CDN, 분석 도구 등)을 추가하면 → `apps/services/app/privacy/page.tsx`의 `STORAGE_ITEMS`와 "외부 서비스로 전송되는 정보" 항목을 갱신한다.
+- 새 서비스를 추가하면(`/new-work`) → `guide.ts`를 만들어 페이지의 `<main>` 뒤에 `<ToolGuide>`로 붙이고, 메인 `services` 목록에 `about`을 넣고, 저장 키가 있으면 개인정보처리방침에도 추가한다.
+- 도구 페이지의 `<main>`(인터랙션 영역)은 `h-dvh`를 유지하고, 설명 섹션은 그 아래에 둔다. 설명 텍스트는 서버 렌더링되어 초기 HTML에 들어가야 한다.
+
 ## Interaction Guidance Policy
 
 When the user asks about implementing a new interaction, **do not write the answer files directly**. Instead, provide a learning guide that covers:
