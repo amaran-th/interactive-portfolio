@@ -1584,6 +1584,14 @@ export default function PixelCanvas({
       if (!inside) return;
       pinchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pinchPointersRef.current.size === 2) {
+        // 두 번째 손가락 자신의 pointerdown이 캔버스의 기존 bubble 단계
+        // onPointerDown(React 루트 위임 리스너)까지 내려가 거기서 그대로
+        // 그리기를 시작해버리는 걸 막는다 — 이 리스너를 capture 단계로
+        // 등록해 둔 덕분에(아래 addEventListener 참고), 여기서
+        // stopPropagation을 부르면 이 이벤트는 캔버스까지 전혀 도달하지
+        // 않는다. 첫 번째 손가락의 pointerdown(카운트가 1이 되는 경우)은
+        // 이 분기를 타지 않으므로 평소처럼 그대로 캔버스에 전달된다.
+        e.stopPropagation();
         // 그리던 중이던 스트로크가 있다면 지금까지 그린 그대로 커밋하고
         // 핀치로 전환한다 — handlePointerCancel은 인자를 쓰지 않는 멱등
         // 함수라(handlePointerUp과 동일) 그냥 호출만 하면 된다.
@@ -1645,12 +1653,12 @@ export default function PixelCanvas({
       }
     };
 
-    window.addEventListener("pointerdown", handleDown);
+    window.addEventListener("pointerdown", handleDown, { capture: true });
     window.addEventListener("pointermove", handleMove, { passive: false });
     window.addEventListener("pointerup", handleUp);
     window.addEventListener("pointercancel", handleUp);
     return () => {
-      window.removeEventListener("pointerdown", handleDown);
+      window.removeEventListener("pointerdown", handleDown, { capture: true });
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
