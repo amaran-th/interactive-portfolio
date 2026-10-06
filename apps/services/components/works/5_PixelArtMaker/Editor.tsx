@@ -2991,6 +2991,12 @@ export default function Editor({
                   className={`flex flex-1 overflow-auto [align-items:safe_center] [justify-content:safe_center] ${
                     narrow ? COMPACT_SCROLLBAR : ""
                   }`}
+                  // 캔버스(touch-none) 바깥 여백에서도 핀치가 시작될 수 있는데,
+                  // 여백은 기본 touch-action(auto)이라 브라우저 자체의 페이지
+                  // 핀치줌이 JS 핀치와 동시에 발동해 서로 다툴 수 있었다.
+                  // pan-x/pan-y만 허용해 기존처럼 한 손가락 스크롤은 그대로
+                  // 되면서 네이티브 두 손가락 핀치만 막는다.
+                  style={{ touchAction: "pan-x pan-y" }}
                 >
                   {/* 캔버스 사방에 넉넉한 여백을 둬서, 확대하지 않아도
                       스페이스+드래그로 캔버스를 어느 방향으로든 자유롭게 밀
@@ -3100,7 +3106,7 @@ export default function Editor({
                       데스크탑에서만 보여준다. */}
                   {!narrow && (
                     <div className="w-10 bg-black/70 py-1 text-center text-[10px] font-semibold text-white tabular-nums">
-                      {Math.round(canvasZoom * 10) / 10}x
+                      {Math.round(canvasZoom * 100) / 100}x
                     </div>
                   )}
                   <button

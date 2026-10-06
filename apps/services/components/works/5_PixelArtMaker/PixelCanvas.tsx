@@ -452,6 +452,13 @@ export default function PixelCanvas({
     startDistance: number;
     startZoom: number;
     rect: DOMRect;
+    // 핀치 중심점 아래 있던 캔버스 좌표 — 제스처 시작 시점에 한 번만 구해
+    // 고정해 둔다(아래 handleDown 참고). 매 프레임 다시 구하면 zoomRef가
+    // React의 비동기 커밋을 한 프레임 뒤처져 읽거나(onZoomChange가 매
+    // 프레임 호출되므로), 직전 프레임에 브라우저가 클램프한 스크롤값을
+    // 또 읽어버려 오차가 누적될 위험이 있다.
+    docX: number;
+    docY: number;
   } | null>(null);
   // 핀치가 진행 중인 동안은 뒤쪽(캔버스 중앙 재정렬) effect가 핀치의 스크롤
   // 보정을 덮어쓰지 않도록 건너뛰게 한다.
@@ -1572,16 +1579,16 @@ export default function PixelCanvas({
   // onZoomChange]에만 의존해 마운트 시 한 번만 구독하고(둘 다 안정적인
   // 참조), zoom·fitScale·콜백은 위에서 만든 거울 ref로 최신값을 읽는다.
   useEffect(() => {
+    // cleanup에서 쓰는 Map 참조를 effect 시작 시점에 로컬 변수로 잡아둔다 —
+    // ref 자신은 이 effect 생애 동안 재할당되지 않으므로 값은 항상 같지만,
+    // lint(react-hooks/exhaustive-deps)가 cleanup 안에서 ref.current를 직접
+    // 읽는 패턴을 경고하므로 그 권고를 그대로 따른다.
+    const pinchPointers = pinchPointersRef.current;
     const handleDown = (e: PointerEvent) => {
+      if (e.pointerType === "mouse") return;
       const viewport = viewportRef.current;
       if (!viewport) return;
-      const rect = viewport.getBoundingClientRect();
-      const inside =
-        e.clientX >= rect.left &&
-        e.clientX <= rect.right &&
-        e.clientY >= rect.top &&
-        e.clientY <= rect.bottom;
-      if (!inside) return;
+      if (!viewport.contains(e.target as Node)) return;
       pinchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pinchPointersRef.current.size === 2) {
         // 두 번째 손가락 자신의 pointerdown이 캔버스의 기존 bubble 단계
@@ -1599,10 +1606,24 @@ export default function PixelCanvas({
         const points = [...pinchPointersRef.current.values()];
         const dx = points[0].x - points[1].x;
         const dy = points[0].y - points[1].y;
+        const startDistance = Math.max(Math.hypot(dx, dy), 1);
+        const rect = viewport.getBoundingClientRect();
+        const midClientX = (points[0].x + points[1].x) / 2;
+        const midClientY = (points[0].y + points[1].y) / 2;
+        const localMidX = midClientX - rect.left;
+        const localMidY = midClientY - rect.top;
+        const startZoom = zoomRef.current;
+        // 핀치 중심점 아래 있던 캔버스 좌표(docX/docY)를 제스처 시작
+        // 시점에 딱 한 번만 구해 둔다 — 매 프레임 다시 계산하지 않으므로
+        // zoomRef의 비동기 지연이나 직전 프레임의 스크롤 클램프가 다음
+        // 프레임으로 이어지지 않는다(아래 handleMove 참고).
+        const scale0 = fitScaleRef.current * startZoom;
         pinchStateRef.current = {
-          startDistance: Math.hypot(dx, dy),
-          startZoom: zoomRef.current,
+          startDistance,
+          startZoom,
           rect,
+          docX: (viewport.scrollLeft + localMidX - CANVAS_PAN_PADDING) / scale0,
+          docY: (viewport.scrollTop + localMidY - CANVAS_PAN_PADDING) / scale0,
         };
         isPinchingRef.current = true;
         onPinchActiveChangeRef.current?.(true);
@@ -1629,18 +1650,16 @@ export default function PixelCanvas({
       const midClientY = (points[0].y + points[1].y) / 2;
       const localMidX = midClientX - pinch.rect.left;
       const localMidY = midClientY - pinch.rect.top;
-      // 핀치 중심점 아래 있던 캔버스 좌표를 구해 두고, 배율을 바꾼 뒤 같은
-      // 좌표가 같은 화면 위치에 다시 오도록 스크롤을 보정한다 — 캔버스
-      // 좌상단은 스크롤 콘텐츠 안에서 항상 (CANVAS_PAN_PADDING,
-      // CANVAS_PAN_PADDING)에 있다(Editor.tsx의 artViewRect 계산, 820-822
-      // 번째 줄과 같은 공식).
-      const scale0 = fitScaleRef.current * zoomRef.current;
-      const docX = (viewport.scrollLeft + localMidX - CANVAS_PAN_PADDING) / scale0;
-      const docY = (viewport.scrollTop + localMidY - CANVAS_PAN_PADDING) / scale0;
+      // 핀치 중심점 아래 있던 캔버스 좌표(pinch.docX/docY, 제스처 시작
+      // 시점에 고정)가 지금 손가락 중심점 아래에 그대로 오도록 스크롤을
+      // 맞춘다 — React state(zoom)나 현재 scrollLeft를 다시 읽지 않고
+      // 제스처 시작 값만으로 매 프레임 독립적으로 계산하므로, 한 프레임이
+      // 어긋나도(예: 브라우저가 스크롤 범위를 클램프했어도) 다음 프레임이
+      // 그 오차를 이어받지 않는다.
       onZoomChange(nextZoom);
       const scale1 = fitScaleRef.current * nextZoom;
-      viewport.scrollLeft = docX * scale1 + CANVAS_PAN_PADDING - localMidX;
-      viewport.scrollTop = docY * scale1 + CANVAS_PAN_PADDING - localMidY;
+      viewport.scrollLeft = pinch.docX * scale1 + CANVAS_PAN_PADDING - localMidX;
+      viewport.scrollTop = pinch.docY * scale1 + CANVAS_PAN_PADDING - localMidY;
     };
 
     const handleUp = (e: PointerEvent) => {
@@ -1662,6 +1681,15 @@ export default function PixelCanvas({
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
+      // 핀치 도중 이 컴포넌트 자체가 사라지면(narrow 전환, 탭 닫기 등)
+      // isPinching이 영원히 true로 남아 배지가 안 사라질 수 있다 — 마운트
+      // 해제 시에도 핀치 중이었다면 끝났다고 알린다.
+      if (isPinchingRef.current) {
+        isPinchingRef.current = false;
+        pinchStateRef.current = null;
+        pinchPointers.clear();
+        onPinchActiveChangeRef.current?.(false);
+      }
     };
   }, [viewportRef, onZoomChange]);
 

@@ -388,8 +388,8 @@ export default function MobileEditorShell({
               잠깐 보인다(zoomBadgeVisible, Editor.tsx 계산). 좌하단에 항상
               떠 있던 배율 숫자를 모바일에서는 이걸로 대체했다. */}
           {zoomBadgeVisible && (
-            <div className="pointer-events-none absolute left-1/2 top-2 z-20 -translate-x-1/2 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-white tabular-nums">
-              {Math.round(canvasZoom * 10) / 10}x
+            <div className="pointer-events-none absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-white tabular-nums">
+              {Math.round(canvasZoom * 100) / 100}x
             </div>
           )}
           {/* 상시 노출 옵션 strip — 도구를 다시 탭해야 열리던 기존(세로 열)
