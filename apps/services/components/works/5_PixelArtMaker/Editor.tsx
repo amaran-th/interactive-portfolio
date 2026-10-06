@@ -69,7 +69,7 @@ import MobileEditorShell, { MobileMoreItem } from "./MobileEditorShell";
 import PreviewPanel from "./PreviewPanel";
 import TracingListPanel from "./TracingListPanel";
 import NewCanvasDialog from "./NewCanvasDialog";
-import { FLOATING_PANEL } from "./panelStyles";
+import { COMPACT_SCROLLBAR, FLOATING_PANEL } from "./panelStyles";
 import ReferenceWindow from "./ReferenceWindow";
 import PixelCanvas, {
   PendingImage,
@@ -469,6 +469,21 @@ export default function Editor({
   // hasMetaEdits가 다시 true가 되면) 자동으로 사라진다.
   const [showSavedNotice, setShowSavedNotice] = useState(false);
   const [tool, setTool] = useState<Tool>("pencil");
+  // 모바일 모드 도구 줄(선택·올가미·이동·자동 선택)에서 활성 도구를 다시
+  // 탭하면 선택 해제하고 그리기 도구로 되돌아가기 위해, 마지막으로 쓰던
+  // 그리기 도구를 따로 기억해 둔다 — 그리기 도구로 바뀔 때마다 갱신된다.
+  const [lastDrawTool, setLastDrawTool] = useState<Tool>("pencil");
+  useEffect(() => {
+    if ([...PRIMARY_DRAW_TOOLS, ...COLLAPSIBLE_DRAW_TOOLS].some((t) => t.tool === tool)) {
+      setLastDrawTool(tool);
+    }
+  }, [tool]);
+  // 하단 독의 펜/지우개 토글 버튼 — 펜·지우개를 오가고, 그 외의 도구가
+  // 활성일 때 누르면 펜으로 바뀐다(마지막으로 쓰던 도구를 기억하지 않고
+  // 항상 "펜"으로 고정 — 이 버튼은 펜/지우개 두 상태만 나타내므로).
+  const handleToggleEraser = () => {
+    setTool(tool === "pencil" ? "eraser" : "pencil");
+  };
   // 편집기 세션 안에서 열고 닫는 일회성 레퍼런스 창 — 캔버스(탭)별이 아니라
   // 편집기 자체에서 열리고, 여러 개를 동시에 띄울 수 있다. zIndex는 창을
   // 클릭할 때마다 올려 마지막으로 만지작거린 창이 항상 맨 앞에 오게 하고,
@@ -713,6 +728,26 @@ export default function Editor({
   // 캔버스 전체가 꽉 차게 보이는 배율"이라 탭마다(캔버스 크기가 다르므로)
   // 새로 열 때 1로 되돌려 항상 화면 맞춤으로 시작하게 한다.
   const [canvasZoom, setCanvasZoom] = useState(1);
+  // 모바일 전용 — 좌하단 상시 노출 숫자 대신 캔버스 위 상단 중앙에 배율을
+  // 잠깐 보여주는 배지의 표시 여부. 핀치 중이거나(isPinching) +/- 버튼을
+  // 막 눌렀을 때(zoomFlashing, 900ms 타이머) 보인다.
+  const [isPinching, setIsPinching] = useState(false);
+  const [zoomFlashing, setZoomFlashing] = useState(false);
+  const zoomFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashZoomBadge = useCallback(() => {
+    setZoomFlashing(true);
+    if (zoomFlashTimerRef.current) clearTimeout(zoomFlashTimerRef.current);
+    zoomFlashTimerRef.current = setTimeout(() => setZoomFlashing(false), 900);
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (zoomFlashTimerRef.current) clearTimeout(zoomFlashTimerRef.current);
+    };
+  }, []);
+  const handlePinchActiveChange = useCallback((active: boolean) => {
+    setIsPinching(active);
+  }, []);
+  const zoomBadgeVisible = isPinching || zoomFlashing;
   // 편집기 작업 영역(캔버스가 놓인 주변 여백)의 배경색 — 캔버스 자체가 아니라
   // 그 바깥을 칠한다. 탭이나 저장 데이터와는 무관한 순수 보기 설정이며, 항상
   // 불투명 단색이다.
@@ -2953,7 +2988,9 @@ export default function Editor({
                   // 직후 캔버스 왼쪽·위쪽이 보이지 않았다. safe center는 내용이
                   // 넘칠 때만 자동으로 시작 정렬로 바뀌어 스크롤로 전체 영역에
                   // 닿을 수 있게 한다(들어갈 때는 그대로 가운데 정렬 유지).
-                  className="flex flex-1 overflow-auto [align-items:safe_center] [justify-content:safe_center]"
+                  className={`flex flex-1 overflow-auto [align-items:safe_center] [justify-content:safe_center] ${
+                    narrow ? COMPACT_SCROLLBAR : ""
+                  }`}
                 >
                   {/* 캔버스 사방에 넉넉한 여백을 둬서, 확대하지 않아도
                       스페이스+드래그로 캔버스를 어느 방향으로든 자유롭게 밀
@@ -3019,6 +3056,7 @@ export default function Editor({
                     zoom={canvasZoom}
                     onZoomChange={setCanvasZoom}
                     viewportRef={canvasViewportRef}
+                    onPinchActiveChange={handlePinchActiveChange}
                     wandGlobal={wandGlobal}
                     pendingImage={pendingImage}
                     onPendingImageMove={handlePendingImageMove}
@@ -3046,7 +3084,10 @@ export default function Editor({
                     스크롤과 무관하게 항상 같은 자리에 떠 있다. */}
                 <div className="absolute bottom-2 left-2 flex items-center gap-0.5">
                   <button
-                    onClick={() => setCanvasZoom((z) => nextZoomStep(z, -1))}
+                    onClick={() => {
+                      setCanvasZoom((z) => nextZoomStep(z, -1));
+                      flashZoomBadge();
+                    }}
                     disabled={canvasZoom <= ZOOM_STEPS[0]}
                     title="축소"
                     className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
@@ -3054,12 +3095,19 @@ export default function Editor({
                     <Minus className="h-3 w-3" />
                   </button>
                   {/* 너비 고정 — 1x / 1.5x 처럼 자릿수가 달라도 +/- 버튼이
-                      흔들리지 않게 한다. */}
-                  <div className="w-10 bg-black/70 py-1 text-center text-[10px] font-semibold text-white tabular-nums">
-                    {canvasZoom}x
-                  </div>
+                      흔들리지 않게 한다. 모바일은 이 숫자를 상단 중앙 배지로
+                      대체했으므로(좁은 하단과 자리 다툼하던 문제) 여기서는
+                      데스크탑에서만 보여준다. */}
+                  {!narrow && (
+                    <div className="w-10 bg-black/70 py-1 text-center text-[10px] font-semibold text-white tabular-nums">
+                      {Math.round(canvasZoom * 10) / 10}x
+                    </div>
+                  )}
                   <button
-                    onClick={() => setCanvasZoom((z) => nextZoomStep(z, 1))}
+                    onClick={() => {
+                      setCanvasZoom((z) => nextZoomStep(z, 1));
+                      flashZoomBadge();
+                    }}
                     disabled={canvasZoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]}
                     title="확대"
                     className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
@@ -3438,8 +3486,12 @@ export default function Editor({
           layerMode={layerMode}
           onLayerModeChange={handleLayerModeChange}
           canvas={canvasArea}
+          canvasBgColor={canvasBgColor}
+          zoomBadgeVisible={zoomBadgeVisible}
+          canvasZoom={canvasZoom}
           tool={tool}
-          onToolChange={setTool}
+          onToolChange={(t) => setTool(tool === t ? lastDrawTool : t)}
+          onToggleEraser={handleToggleEraser}
           modeTools={SELECT_TOOLS}
           drawToolButtonIcon={mobileDrawToolButtonIcon}
           drawToolsPanel={mobileDrawToolsPanel}

@@ -3,7 +3,8 @@
 import { Layers, Menu, Play, Redo2, Save, Undo2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ToolMeta } from "./DrawToolbar";
-import { FLOATING_PANEL } from "./panelStyles";
+import { COMPACT_SCROLLBAR, FLOATING_PANEL } from "./panelStyles";
+import PenEraserIcon from "./PenEraserIcon";
 import { Tool } from "./types";
 
 export type MobileMoreItem =
@@ -39,10 +40,26 @@ export type MobileEditorShellProps = {
   layerMode: "layers" | "frames";
   onLayerModeChange: (mode: "layers" | "frames") => void;
   canvas: React.ReactNode;
+  // 캔버스 뒤에 깔리는 배경색 — 데스크톱은 캔버스·툴바를 감싸는 행 전체에
+  // 이 색을 깐다(ColorWheel에서 바꿀 수 있는 설정). 모바일도 같은 자리
+  // (캔버스 래퍼)에 똑같이 적용해야 설정이 반영된다.
+  canvasBgColor: string;
+  // 캔버스 위 상단 중앙에 잠깐 떠 있는 배율 배지 — 핀치 줌 중이거나 좌하단
+  // +/- 버튼을 막 눌렀을 때만 true(Editor.tsx가 계산해 내려준다). 좌하단에
+  // 항상 떠 있던 배율 숫자를 모바일에서는 이 배지로 대체했다.
+  zoomBadgeVisible: boolean;
+  canvasZoom: number;
   // 지금 활성 도구 — 상단 모드 도구 줄의 활성 표시, 그리기 도구 그리드 안
   // 선택 표시 둘 다에 필요하다.
   tool: Tool;
   onToolChange: (tool: Tool) => void;
+  // 하단 독 맨 앞 "펜/지우개" 토글 버튼 — 이비스페인트처럼 펜·지우개를 한
+  // 번 탭으로 오간다(그리기 도구 그리드를 열지 않아도 되는 지름길). 펜도
+  // 지우개도 아닌 다른 도구가 활성일 때 누르면 펜으로 바뀐다. 아이콘
+  // (PenEraserIcon)은 상태와 무관하게 항상 고정이고, 라벨·강조색만 지금
+  // 활성 도구에 따라 바뀐다 — 선택할 때마다 아이콘이 다른 모양으로
+  // 바뀌면 헷갈린다는 피드백으로, 아이콘을 바꾸는 대신 색으로만 구분한다.
+  onToggleEraser: () => void;
   // 캔버스 위 상단 우측에 떠 있는 모드 도구 줄 — 선택·올가미·이동·자동
   // 선택 4개, 탭하면 즉시 전환된다(ibisPaint처럼 다시 탭해도 옵션이 열리지
   // 않는다 — 옵션은 항상 아래 optionsSections에 떠 있으므로 따로 열 필요가
@@ -91,8 +108,12 @@ export default function MobileEditorShell({
   layerMode,
   onLayerModeChange,
   canvas,
+  canvasBgColor,
+  zoomBadgeVisible,
+  canvasZoom,
   tool,
   onToolChange,
+  onToggleEraser,
   modeTools,
   drawToolButtonIcon,
   drawToolsPanel,
@@ -318,14 +339,17 @@ export default function MobileEditorShell({
         </button>
       </div>
 
-      {/* 캔버스 — 상단 좌측에 되돌리기/다시실행, 상단 우측에 모드 도구 줄을
-          오버레이로 띄운다. 기존 줌 컨트롤(canvasArea 안, bottom-2 left-2)과
-          같은 "relative 래퍼 안에 absolute" 관례를 그대로 따른다. 옵션
-          strip은 반대로 오버레이가 아니라 실제 레이아웃 높이를 차지하는
-          영역이라, 이 relative 래퍼 바깥(아래)에 형제로 둔다 — 이비스페인트의
-          브러시 크기/불투명도 슬라이더가 캔버스를 가리지 않고 항상 그 아래
-          고정 공간을 차지하는 것과 같다. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden bg-gray-50 p-2">
+      {/* 캔버스 — 상단 좌측에 되돌리기/다시실행, 상단 우측에 모드 도구 줄,
+          하단 중앙에 상시 노출 옵션 strip을 전부 오버레이로 띄운다. 기존
+          줌 컨트롤(canvasArea 안, bottom-2 left-2)과 같은 "relative 래퍼
+          안에 absolute" 관례를 그대로 따른다. 캔버스를 가리지 않도록 각
+          오버레이의 바깥 래퍼는 pointer-events-none으로 두고, 실제 컨트롤이
+          있는 안쪽 패널에만 pointer-events-auto를 되돌려 그 자리만 탭을
+          가로채게 한다 — 패널 바깥(빈 캔버스)은 그대로 탭해서 그릴 수 있다. */}
+      <div
+        className="flex min-h-0 flex-1 overflow-hidden p-2"
+        style={{ backgroundColor: canvasBgColor }}
+      >
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
           {canvas}
           <div className="pointer-events-none absolute left-2 top-2 z-20 flex items-center gap-1">
@@ -360,20 +384,31 @@ export default function MobileEditorShell({
               </button>
             ))}
           </div>
+          {/* 배율 배지 — 핀치 줌 중이거나 좌하단 +/- 버튼을 막 눌렀을 때만
+              잠깐 보인다(zoomBadgeVisible, Editor.tsx 계산). 좌하단에 항상
+              떠 있던 배율 숫자를 모바일에서는 이걸로 대체했다. */}
+          {zoomBadgeVisible && (
+            <div className="pointer-events-none absolute left-1/2 top-2 z-20 -translate-x-1/2 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-white tabular-nums">
+              {Math.round(canvasZoom * 10) / 10}x
+            </div>
+          )}
+          {/* 상시 노출 옵션 strip — 도구를 다시 탭해야 열리던 기존(세로 열)
+              방식과 달리, 하단에 항상 떠 있는다. 섹션 계산
+              (buildSecondarySections) 자체는 desktop과 완전히 동일하게
+              공유하고, 패널 하나에 가로로(넘치면 줄바꿈) 모으는 감싸는
+              방식과 캔버스 위에 오버레이로 띄우는 위치만 여기 전용이다.
+              옵션이 없는 도구(텍스트)는 배열이 비어 있어 strip 자체가
+              렌더되지 않아 캔버스 하단이 그만큼 그대로 드러난다. */}
+          {optionsSections.length > 0 && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-2 z-20 flex justify-center px-2">
+              <div className="pointer-events-auto flex max-w-full flex-wrap items-start justify-center gap-2 bg-white/70 p-2 ring-1 ring-gray-300 shadow-xl shadow-gray-900/15">
+                {optionsSections.map(({ key, node }) => (
+                  <div key={key}>{node}</div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-        {/* 상시 노출 옵션 strip — 도구를 다시 탭해야 열리던 기존(세로 열)
-            방식과 달리, 하단 메인 줄 바로 위에 항상 떠 있는다. 섹션 계산
-            (buildSecondarySections) 자체는 desktop과 완전히 동일하게
-            공유하고, 패널 하나에 가로로(넘치면 줄바꿈) 모으는 감싸는 방식만 여기 전용이다.
-            옵션이 없는 도구(텍스트)는 배열이 비어 있어 strip 자체가 렌더
-            되지 않는다. */}
-        {optionsSections.length > 0 && (
-          <div className={`flex flex-wrap items-start gap-2 p-2 ${FLOATING_PANEL}`}>
-            {optionsSections.map(({ key, node }) => (
-              <div key={key}>{node}</div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* 하단 독 + 그 위 팝오버 — 기존 FLOATING_PANEL 패턴 그대로. 그리기
@@ -388,27 +423,37 @@ export default function MobileEditorShell({
             className={`absolute bottom-full z-40 mb-2 flex max-w-[calc(100vw-1rem)] flex-col overflow-y-auto ${
               openPopover === "layers"
                 ? "min-h-[280px] max-h-[65vh] w-72"
-                : "max-h-[70vh]"
-            } ${FLOATING_PANEL}`}
+                : openPopover === "more"
+                  ? "max-h-[70vh] w-64"
+                  : "max-h-[70vh]"
+            } ${FLOATING_PANEL} ${COMPACT_SCROLLBAR}`}
           >
             {popoverContent}
           </div>
         )}
         <div className="flex items-center justify-around border-t border-gray-200 bg-white py-1.5">
           <button
+            onClick={onToggleEraser}
+            title={tool === "eraser" ? "지우개" : "펜"}
+            className="flex h-10 w-10 items-center justify-center text-gray-500"
+          >
+            <PenEraserIcon className="h-5 w-5" />
+          </button>
+          <button
             ref={toolsBtnRef}
             onClick={() => toggle("tools")}
-            className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
+            title="그리기 도구"
+            className={`flex h-10 w-10 items-center justify-center ${
               openPopover === "tools" ? "text-violet-600" : "text-gray-500"
             }`}
           >
             <DrawToolIcon className="h-5 w-5" />
-            그리기 도구
           </button>
           <button
             ref={colorBtnRef}
             onClick={() => toggle("color")}
-            className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
+            title="색상"
+            className={`flex h-10 w-10 items-center justify-center ${
               openPopover === "color" ? "text-violet-600" : "text-gray-500"
             }`}
           >
@@ -416,12 +461,12 @@ export default function MobileEditorShell({
               className="h-5 w-5 rounded-full ring-1 ring-inset ring-gray-300"
               style={{ backgroundColor: activeColorHex }}
             />
-            색상
           </button>
           <button
             ref={layersBtnRef}
             onClick={() => toggle("layers")}
-            className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
+            title={layerMode === "frames" ? "프레임" : "레이어"}
+            className={`flex h-10 w-10 items-center justify-center ${
               openPopover === "layers" ? "text-violet-600" : "text-gray-500"
             }`}
           >
@@ -430,17 +475,16 @@ export default function MobileEditorShell({
             ) : (
               <Layers className="h-5 w-5" />
             )}
-            {layerMode === "frames" ? "프레임" : "레이어"}
           </button>
           <button
             ref={moreBtnRef}
             onClick={() => toggle("more")}
-            className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${
+            title="더보기"
+            className={`flex h-10 w-10 items-center justify-center ${
               openPopover === "more" ? "text-violet-600" : "text-gray-500"
             }`}
           >
             <Menu className="h-5 w-5" />
-            더보기
           </button>
         </div>
       </div>
