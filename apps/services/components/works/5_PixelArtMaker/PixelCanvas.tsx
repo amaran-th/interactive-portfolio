@@ -49,12 +49,14 @@ import {
 } from "./pixelGrid";
 import { rasterizeText, Rotation, rotateAlphaBuffer } from "./textStamp";
 import {
+  CANVAS_PAN_PADDING,
   MIN_TRACING_SIZE,
   nextZoomStep,
   Point,
   SelectMode,
   Tool,
   TracingImage,
+  ZOOM_STEPS,
 } from "./types";
 import type { BlendMode, PixelLayer } from "../_shared/assetLibrary";
 
@@ -191,6 +193,7 @@ export default function PixelCanvas({
   onGradientAngleChange,
   zoom,
   onZoomChange,
+  onPinchActiveChange,
   viewportRef,
   wandGlobal,
   pendingImage,
@@ -284,6 +287,10 @@ export default function PixelCanvas({
   onGradientAngleChange: (deg: number) => void;
   zoom: number;
   onZoomChange: (zoom: number) => void;
+  // 핀치 줌이 시작/끝날 때 알려준다 — 모바일 셸이 상단 중앙 배율 배지를
+  // 띄우고 내리는 데만 쓴다. 데스크탑처럼 안 받아도(undefined) 핀치 감지
+  // 자체는 그대로 동작한다.
+  onPinchActiveChange?: (active: boolean) => void;
   // 확대 상태에서 스페이스+드래그로 스크롤할 대상 — 이 캔버스를 감싼 overflow-auto
   // 뷰포트 컨테이너의 ref를 Editor가 그대로 내려준다.
   viewportRef: RefObject<HTMLDivElement | null>;
@@ -359,6 +366,17 @@ export default function PixelCanvas({
   useEffect(() => {
     onLiveEditRef.current = onLiveEdit;
   }, [onLiveEdit]);
+  // 핀치 줌 window 리스너(아래)가 재구독 없이 항상 최신 zoom·콜백을 읽도록
+  // 거울처럼 반영해 둔다 — 위 onLiveEditRef와 같은 패턴. 이 리스너의 effect
+  // 자체는 [viewportRef, onZoomChange]에만 의존해 마운트 시 한 번만 구독한다.
+  const zoomRef = useRef(zoom);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+  const onPinchActiveChangeRef = useRef(onPinchActiveChange);
+  useEffect(() => {
+    onPinchActiveChangeRef.current = onPinchActiveChange;
+  }, [onPinchActiveChange]);
   const liveFlushRef = useRef<{ raf: number; data: PixelValue[] | null }>({
     raf: 0,
     data: null,
@@ -425,6 +443,23 @@ export default function PixelCanvas({
     scrollLeft: number;
     scrollTop: number;
   } | null>(null);
+  // 핀치 줌 — 지금 떠 있는 포인터(pointerId → 화면 좌표)를 추적한다. 두 개가
+  // 되는 순간 핀치 모드로 들어간다(뒤쪽 window 리스너 effect 참고).
+  const pinchPointersRef = useRef<Map<number, { x: number; y: number }>>(
+    new Map(),
+  );
+  const pinchStateRef = useRef<{
+    startDistance: number;
+    startZoom: number;
+    rect: DOMRect;
+  } | null>(null);
+  // 핀치가 진행 중인 동안은 뒤쪽(캔버스 중앙 재정렬) effect가 핀치의 스크롤
+  // 보정을 덮어쓰지 않도록 건너뛰게 한다.
+  const isPinchingRef = useRef(false);
+  // handlePointerCancel은 파일 뒤쪽에서 정의되므로(handlePointerUp 다음),
+  // 핀치 window 리스너가 그 정의보다 앞에서도 최신 함수를 참조할 수 있도록
+  // 거울 ref로 둔다 — 실제 값은 handlePointerCancel 선언 직후에 채워진다.
+  const handlePointerCancelRef = useRef<() => void>(() => {});
   // 그라데이션 도구는 드래그 중 실제 픽셀은 건드리지 않는다(실제 채우기는 커밋
   // 시점에 Editor가 처리) — 드래그 축만 얇은 선으로 미리 보여준다.
   const gradientPreviewRef = useRef<{
@@ -490,15 +525,23 @@ export default function PixelCanvas({
   }, [viewportRef, width, height]);
   // 텍스트 도구의 인라인 입력을 캔버스 좌표계에 절대 위치시키는 데도 쓰인다.
   const scale = fitScale * zoom;
+  // 핀치 줌 window 리스너가 재구독 없이 최신 fitScale을 읽도록 거울 ref.
+  const fitScaleRef = useRef(fitScale);
+  useEffect(() => {
+    fitScaleRef.current = fitScale;
+  }, [fitScale]);
 
   // 캔버스 사방에 뷰포트만큼의 여백(Editor의 p-[38vmin] 래퍼)이 있어 스크롤로
   // 캔버스를 자유롭게 밀 수 있는데, 그만큼 기본 상태에서는 스크롤이 0(좌상단)에
   // 놓여 캔버스가 화면 밖으로 밀려 보인다 — 캔버스 크기·뷰포트 크기·배율이
   // 바뀔 때마다 스크롤을 가운데로 되돌려 캔버스가 뷰포트 중앙에 오게 한다.
   // (그 사이 사용자가 직접 밀어 둔 위치는, 다음에 이 값들이 바뀔 때 초기화된다.)
+  // 핀치 진행 중에는 건너뛴다 — 안 그러면 핀치 중 매 프레임 zoom이 바뀔 때마다
+  // 이 effect가 다시 돌아 핀치가 맞춘 스크롤 위치를 중앙으로 되돌려 버린다.
   useEffect(() => {
     const container = viewportRef.current;
     if (!container) return;
+    if (isPinchingRef.current) return;
     const id = requestAnimationFrame(() => {
       container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
       container.scrollTop = (container.scrollHeight - container.clientHeight) / 2;
@@ -1516,6 +1559,103 @@ export default function PixelCanvas({
   // handlePointerUp과 도구별 분기가 완전히 같아야 하고, 위쪽의 drawingRef 가드 덕분에 pointerup
   // 이후 뒤늦게 발생하는 lostpointercapture에 대해서도 안전하게(중복 커밋 없이) 재사용할 수 있다.
   const handlePointerCancel = handlePointerUp;
+
+  useEffect(() => {
+    handlePointerCancelRef.current = handlePointerCancel;
+  }, [handlePointerCancel]);
+
+  // 핀치 줌 — 두 손가락 핀치 제스처. 도구별 포인터 핸들러(handlePointerDown 등)는
+  // <canvas> 자신에게만 붙어 있어 한쪽 손가락이 캔버스 바깥 여백에 닿으면
+  // 놓친다. 그래서 핀치 감지는 그 로직과 완전히 분리된 window 레벨 리스너로
+  // 구현한다 — 지금 몇 개의 포인터가 떠 있는지만 추적하고, 뷰포트 안에서
+  // 시작한 포인터가 2개가 되는 순간 핀치로 전환한다. [viewportRef,
+  // onZoomChange]에만 의존해 마운트 시 한 번만 구독하고(둘 다 안정적인
+  // 참조), zoom·fitScale·콜백은 위에서 만든 거울 ref로 최신값을 읽는다.
+  useEffect(() => {
+    const handleDown = (e: PointerEvent) => {
+      const viewport = viewportRef.current;
+      if (!viewport) return;
+      const rect = viewport.getBoundingClientRect();
+      const inside =
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom;
+      if (!inside) return;
+      pinchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinchPointersRef.current.size === 2) {
+        // 그리던 중이던 스트로크가 있다면 지금까지 그린 그대로 커밋하고
+        // 핀치로 전환한다 — handlePointerCancel은 인자를 쓰지 않는 멱등
+        // 함수라(handlePointerUp과 동일) 그냥 호출만 하면 된다.
+        handlePointerCancelRef.current();
+        const points = [...pinchPointersRef.current.values()];
+        const dx = points[0].x - points[1].x;
+        const dy = points[0].y - points[1].y;
+        pinchStateRef.current = {
+          startDistance: Math.hypot(dx, dy),
+          startZoom: zoomRef.current,
+          rect,
+        };
+        isPinchingRef.current = true;
+        onPinchActiveChangeRef.current?.(true);
+      }
+    };
+
+    const handleMove = (e: PointerEvent) => {
+      if (!pinchPointersRef.current.has(e.pointerId)) return;
+      pinchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const pinch = pinchStateRef.current;
+      const viewport = viewportRef.current;
+      if (!pinch || !viewport || pinchPointersRef.current.size !== 2) return;
+      e.preventDefault();
+      const points = [...pinchPointersRef.current.values()];
+      const dx = points[0].x - points[1].x;
+      const dy = points[0].y - points[1].y;
+      const distance = Math.hypot(dx, dy);
+      const scaleRatio = distance / pinch.startDistance;
+      const nextZoom = Math.min(
+        ZOOM_STEPS[ZOOM_STEPS.length - 1],
+        Math.max(ZOOM_STEPS[0], pinch.startZoom * scaleRatio),
+      );
+      const midClientX = (points[0].x + points[1].x) / 2;
+      const midClientY = (points[0].y + points[1].y) / 2;
+      const localMidX = midClientX - pinch.rect.left;
+      const localMidY = midClientY - pinch.rect.top;
+      // 핀치 중심점 아래 있던 캔버스 좌표를 구해 두고, 배율을 바꾼 뒤 같은
+      // 좌표가 같은 화면 위치에 다시 오도록 스크롤을 보정한다 — 캔버스
+      // 좌상단은 스크롤 콘텐츠 안에서 항상 (CANVAS_PAN_PADDING,
+      // CANVAS_PAN_PADDING)에 있다(Editor.tsx의 artViewRect 계산, 820-822
+      // 번째 줄과 같은 공식).
+      const scale0 = fitScaleRef.current * zoomRef.current;
+      const docX = (viewport.scrollLeft + localMidX - CANVAS_PAN_PADDING) / scale0;
+      const docY = (viewport.scrollTop + localMidY - CANVAS_PAN_PADDING) / scale0;
+      onZoomChange(nextZoom);
+      const scale1 = fitScaleRef.current * nextZoom;
+      viewport.scrollLeft = docX * scale1 + CANVAS_PAN_PADDING - localMidX;
+      viewport.scrollTop = docY * scale1 + CANVAS_PAN_PADDING - localMidY;
+    };
+
+    const handleUp = (e: PointerEvent) => {
+      if (!pinchPointersRef.current.has(e.pointerId)) return;
+      pinchPointersRef.current.delete(e.pointerId);
+      if (pinchStateRef.current && pinchPointersRef.current.size < 2) {
+        pinchStateRef.current = null;
+        isPinchingRef.current = false;
+        onPinchActiveChangeRef.current?.(false);
+      }
+    };
+
+    window.addEventListener("pointerdown", handleDown);
+    window.addEventListener("pointermove", handleMove, { passive: false });
+    window.addEventListener("pointerup", handleUp);
+    window.addEventListener("pointercancel", handleUp);
+    return () => {
+      window.removeEventListener("pointerdown", handleDown);
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      window.removeEventListener("pointercancel", handleUp);
+    };
+  }, [viewportRef, onZoomChange]);
 
   // pendingImage 오버레이는 캔버스의 도구별 pointer 처리와 완전히 분리된 독립
   // 요소다 — 텍스트와 달리 크기 조절 손잡이까지 있어 별도 상태(ref)로 다룬다.
