@@ -9,3 +9,9 @@ export const FLOATING_PANEL =
 // 패널 본문과 border-b 로 나눠 "떠 있는 작은 창"으로 읽히게 한다.
 export const FLOATING_PANEL_HEADER =
   "border-b border-gray-200 bg-gray-100 px-2.5 py-1.5 text-[11px] font-semibold text-gray-600";
+
+// 모바일 팝오버처럼 좁은 영역 안에서 스크롤될 때 쓰는 컴팩트 스크롤바 —
+// 기본 스크롤바는 두껍고 트랙 배경까지 있어 작은 팝오버 안에서 거슬린다.
+// 트랙은 투명하게 비우고 얇은 썸만 보이게 한다.
+export const COMPACT_SCROLLBAR =
+  "[scrollbar-width:thin] [scrollbar-color:#d1d5db_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300";

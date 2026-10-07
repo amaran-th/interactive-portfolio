@@ -428,7 +428,7 @@ export function buildSecondarySections(
     secondarySections.push({
       key: "draw",
       node: (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2">
           {showBrushSizeRow && (
             <div className="flex gap-1">
               {BRUSH_SIZES.map((size) => (
@@ -491,7 +491,7 @@ export function buildSecondarySections(
             </div>
           )}
           {showGradientControls && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-center gap-2">
               <label className="flex items-center gap-1 text-[10px] text-gray-600">
                 <span className="flex items-center gap-1">
                   단계
@@ -593,20 +593,17 @@ export function buildSecondarySections(
               </button>
             ))}
           </div>
-          <label
-            className={`flex items-center gap-1.5 text-[10px] ${
-              tool === "wand" ? "text-gray-600" : "text-gray-400"
-            }`}
-          >
-            <Globe className="h-3.5 w-3.5 shrink-0" />
-            전역 동일색
-            <HelpTip text={HELP.wandGlobal} />
-            <Switch
-              checked={wandGlobal}
-              onClick={onToggleWandGlobal}
-              disabled={tool !== "wand"}
-            />
-          </label>
+          {/* 마법봉 전용 옵션이라 다른 선택 도구일 때는 disabled로 흐리게
+              두지 않고 아예 숨긴다 — 눌러도 아무 일도 안 나는 컨트롤을
+              계속 보여줄 이유가 없다. */}
+          {tool === "wand" && (
+            <label className="flex items-center gap-1.5 text-[10px] text-gray-600">
+              <Globe className="h-3.5 w-3.5 shrink-0" />
+              전역 동일색
+              <HelpTip text={HELP.wandGlobal} />
+              <Switch checked={wandGlobal} onClick={onToggleWandGlobal} />
+            </label>
+          )}
         </div>
       ),
     });

@@ -728,26 +728,14 @@ export default function Editor({
   // 캔버스 전체가 꽉 차게 보이는 배율"이라 탭마다(캔버스 크기가 다르므로)
   // 새로 열 때 1로 되돌려 항상 화면 맞춤으로 시작하게 한다.
   const [canvasZoom, setCanvasZoom] = useState(1);
-  // 모바일 전용 — 좌하단 상시 노출 숫자 대신 캔버스 위 상단 중앙에 배율을
-  // 잠깐 보여주는 배지의 표시 여부. 핀치 중이거나(isPinching) +/- 버튼을
-  // 막 눌렀을 때(zoomFlashing, 900ms 타이머) 보인다.
+  // 모바일 전용 — 좌하단 확대/축소 컨트롤 자체가 모바일에는 없고, 두 손가락
+  // 핀치로만 배율을 바꾼다. 그 핀치 중에만 캔버스 위 상단 중앙에 지금 배율을
+  // 배지로 잠깐 띄운다.
   const [isPinching, setIsPinching] = useState(false);
-  const [zoomFlashing, setZoomFlashing] = useState(false);
-  const zoomFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flashZoomBadge = useCallback(() => {
-    setZoomFlashing(true);
-    if (zoomFlashTimerRef.current) clearTimeout(zoomFlashTimerRef.current);
-    zoomFlashTimerRef.current = setTimeout(() => setZoomFlashing(false), 900);
-  }, []);
-  useEffect(() => {
-    return () => {
-      if (zoomFlashTimerRef.current) clearTimeout(zoomFlashTimerRef.current);
-    };
-  }, []);
   const handlePinchActiveChange = useCallback((active: boolean) => {
     setIsPinching(active);
   }, []);
-  const zoomBadgeVisible = isPinching || zoomFlashing;
+  const zoomBadgeVisible = isPinching;
   // 편집기 작업 영역(캔버스가 놓인 주변 여백)의 배경색 — 캔버스 자체가 아니라
   // 그 바깥을 칠한다. 탭이나 저장 데이터와는 무관한 순수 보기 설정이며, 항상
   // 불투명 단색이다.
@@ -3087,40 +3075,35 @@ export default function Editor({
                     래퍼)에 둔다 — 그 안에 있으면 확대되어 스크롤이 생길 때
                     align-items/justify-content:safe 조합에 따라 컨트롤 위치
                     계산이 흔들릴 수 있다. 여기서는 뷰포트 자체에 고정돼 확대·
-                    스크롤과 무관하게 항상 같은 자리에 떠 있다. */}
-                <div className="absolute bottom-2 left-2 flex items-center gap-0.5">
-                  <button
-                    onClick={() => {
-                      setCanvasZoom((z) => nextZoomStep(z, -1));
-                      flashZoomBadge();
-                    }}
-                    disabled={canvasZoom <= ZOOM_STEPS[0]}
-                    title="축소"
-                    className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
-                  >
-                    <Minus className="h-3 w-3" />
-                  </button>
-                  {/* 너비 고정 — 1x / 1.5x 처럼 자릿수가 달라도 +/- 버튼이
-                      흔들리지 않게 한다. 모바일은 이 숫자를 상단 중앙 배지로
-                      대체했으므로(좁은 하단과 자리 다툼하던 문제) 여기서는
-                      데스크탑에서만 보여준다. */}
-                  {!narrow && (
+                    스크롤과 무관하게 항상 같은 자리에 떠 있다.
+                    모바일에는 띄우지 않는다 — 두 손가락 핀치로 확대/축소하고
+                    배율은 상단 중앙 배지로 잠깐 보여주므로 이 컨트롤이 필요
+                    없고, 하단 옵션 strip과 자리를 다투던 문제도 함께 사라진다. */}
+                {!narrow && (
+                  <div className="absolute bottom-2 left-2 flex items-center gap-0.5">
+                    <button
+                      onClick={() => setCanvasZoom((z) => nextZoomStep(z, -1))}
+                      disabled={canvasZoom <= ZOOM_STEPS[0]}
+                      title="축소"
+                      className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
+                    >
+                      <Minus className="h-3 w-3" />
+                    </button>
+                    {/* 너비 고정 — 1x / 1.5x 처럼 자릿수가 달라도 +/- 버튼이
+                        흔들리지 않게 한다. */}
                     <div className="w-10 bg-black/70 py-1 text-center text-[10px] font-semibold text-white tabular-nums">
                       {Math.round(canvasZoom * 100) / 100}x
                     </div>
-                  )}
-                  <button
-                    onClick={() => {
-                      setCanvasZoom((z) => nextZoomStep(z, 1));
-                      flashZoomBadge();
-                    }}
-                    disabled={canvasZoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]}
-                    title="확대"
-                    className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
-                  >
-                    <Plus className="h-3 w-3" />
-                  </button>
-                </div>
+                    <button
+                      onClick={() => setCanvasZoom((z) => nextZoomStep(z, 1))}
+                      disabled={canvasZoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]}
+                      title="확대"
+                      className="flex h-5 w-5 items-center justify-center bg-black/70 text-white hover:bg-black/90 disabled:opacity-30"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
                 {/* DrawToolbar가 도구별 하위 옵션을, PixelCanvas가 텍스트 도구의
                     임시 입력 컨트롤을 포털로 그려 넣는 자리 — 캔버스 하단 중앙에
                     둬서 좌우 사이드바를 가리지 않는다. 전체 너비를 차지하는 빈
