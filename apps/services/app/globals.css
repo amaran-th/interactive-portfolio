@@ -21,6 +21,16 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* 사이트 공통 UI(메인·개인정보처리방침·상단 바·사용 안내) 색 —
+   amaran-th.github.io의 하늘색(hydrangea) 테마를 따른다. */
+@theme {
+  --color-main: #79a2e0;
+  --color-point: #0c3675;
+  --color-sub: #a8cce3;
+  --color-shade: #d9f0ff;
+  --color-ink: #2e353f;
+}
+
 @utility font-knit-muffler {
   font-family: "SchoolSafeOuting", sans-serif;
 }

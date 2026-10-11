@@ -1,11 +1,11 @@
 import KnitMuffler from "@/components/works/1_KnitMuffler/KnitMuffler";
 import type { Metadata } from "next";
-import ToolGuide from "../_components/ToolGuide";
+import ToolShell from "../_components/ToolShell";
 import { knitMufflerGuide } from "./guide";
 
 export const metadata: Metadata = {
   title: "뜨개뜨개",
-  description: "도안을 따라 나만의 뜨개질 작품을 만들어보세요!",
+  description: "정확하고 빠르게 뜨개 도안을 완성해봅시다!",
 
   icons: {
     icon: "/playground/knit-muffler.svg",
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
   openGraph: {
     title: "뜨개뜨개",
-    description: "도안을 따라 나만의 뜨개질 작품을 만들어보세요!",
+    description: "정확하고 빠르게 뜨개 도안을 완성해봅시다!",
     images: [
       {
         url: "/playground/knit-muffler.png",
@@ -25,20 +25,19 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "뜨개뜨개",
-    description: "도안을 따라 나만의 뜨개질 작품을 만들어보세요!",
+    description: "정확하고 빠르게 뜨개 도안을 완성해봅시다!",
     images: ["/playground/knit-muffler.png"],
   },
 };
 
 export default function KnitMufflerPage() {
   return (
-    <>
-      <main className="flex h-dvh justify-center overflow-hidden text-stone-900">
+    <ToolShell guide={knitMufflerGuide}>
+      <main className="flex min-h-0 flex-1 justify-center overflow-hidden text-stone-900">
         <div className="h-full w-full max-w-5xl">
           <KnitMuffler />
         </div>
       </main>
-      <ToolGuide content={knitMufflerGuide} />
-    </>
+    </ToolShell>
   );
 }

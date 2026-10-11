@@ -1,11 +1,11 @@
 import YearlyReceipt from "@/components/works/4_YearlyReceipt/YearlyReceipt";
 import type { Metadata } from "next";
-import ToolGuide from "../_components/ToolGuide";
+import ToolShell from "../_components/ToolShell";
 import { yearlyReceiptGuide } from "./guide";
 
 export const metadata: Metadata = {
   title: `올해의 영수증 만들기`,
-  description: "올해의 목표 달성 현황을 나만의 영수증으로 만들어보세요~!",
+  description: "올해 목표, 얼마나 달성했나요? 영수증을 출력하시겠습니까?",
 
   icons: {
     icon: "/playground/yearly-receipt.svg",
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
   openGraph: {
     title: `올해의 영수증 만들기`,
-    description: "올해의 목표 달성 현황을 나만의 영수증으로 만들어보세요~!",
+    description: "올해 목표, 얼마나 달성했나요? 영수증을 출력하시겠습니까?",
     images: [
       {
         url: "/playground/yearly-receipt.png",
@@ -25,20 +25,19 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: `올해의 영수증 만들기`,
-    description: "올해의 목표 달성 현황을 나만의 영수증으로 만들어보세요~!",
+    description: "올해 목표, 얼마나 달성했나요? 영수증을 출력하시겠습니까?",
     images: ["/playground/yearly-receipt.png"],
   },
 };
 
 export default function YearlyReceiptPage() {
   return (
-    <>
-      <main className="flex h-dvh justify-center overflow-hidden">
+    <ToolShell guide={yearlyReceiptGuide}>
+      <main className="flex min-h-0 flex-1 justify-center overflow-hidden">
         <div className="h-full w-full max-w-2xl">
           <YearlyReceipt />
         </div>
       </main>
-      <ToolGuide content={yearlyReceiptGuide} />
-    </>
+    </ToolShell>
   );
 }
