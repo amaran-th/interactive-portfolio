@@ -35,9 +35,9 @@ export default function RootLayout({
   return (
     <html
       lang="ko"
-      className={`dark bg-gray-950 ${pretendard.variable} ${geistMono.variable}`}
+      className={`bg-shade ${pretendard.variable} ${geistMono.variable}`}
     >
-      <body className="antialiased bg-gray-950 text-white">
+      <body className="antialiased bg-shade text-ink">
         <AdSenseLoader />
         {children}
       </body>

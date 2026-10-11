@@ -35,6 +35,12 @@
 - amaranth는 운영자 닉네임이라 사이트 이름으로 쓰지 않는다. 문구에서는 "도구" 대신 "서비스"라고 쓴다.
 - 서비스 페이지 metadata의 description은 메인 `services` 배열의 `desc`와 같게 맞췄다.
 
+## 사이트 기본 배경과 404
+
+- 사이트 기본 배경은 루트 layout에서 하늘색(`shade`)이다.
+- 서비스 페이지만 `ToolShell` 루트에서 어두운 배경(`gray-950`)과 흰 글자를 다시 지정한다. 폭이 좁은 서비스의 양옆 여백과, 글자색을 정하지 않은 서비스의 흰 글자가 이 설정에 기대고 있다.
+- Next 기본 404는 자체 흰 배경을 깔기 때문에 `app/not-found.tsx`를 사이트 스타일로 직접 만들었다. 안내 문구, '서비스 목록으로' 버튼, 푸터가 들어 있다.
+
 ## 관련 코드
 - `apps/services/app/_components/ToolShell.tsx` — 서비스 페이지 공통 틀(상단 바 + 광고 칸 + 서비스)
 - `apps/services/app/_components/GuideDialog.tsx` — 사용 안내 드로어(키 전파 차단, 포커스 해제)
@@ -42,3 +48,5 @@
 - `apps/services/app/_components/ServiceThumbFallback.tsx` — 공통 기본 썸네일
 - `apps/services/app/page.tsx` — 메인 페이지 카드
 - `apps/services/app/globals.css` — 테마 색 토큰
+- `apps/services/app/layout.tsx` — 사이트 기본 배경
+- `apps/services/app/not-found.tsx` — 사이트 스타일 404

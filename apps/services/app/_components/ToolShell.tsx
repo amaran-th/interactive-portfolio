@@ -17,7 +17,9 @@ export default function ToolShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-dvh flex-col overflow-hidden">
+    // 서비스 페이지는 사이트 기본 배경(하늘색) 대신 어두운 배경을 쓴다 — 폭이 좁은
+    // 서비스의 양옆 여백과, 글자색을 따로 지정하지 않은 서비스의 흰 글자를 유지한다.
+    <div className="flex h-dvh flex-col overflow-hidden bg-gray-950 text-white">
       <header className="flex h-10 shrink-0 items-center gap-3 border-b border-white/10 bg-neutral-900 px-3 text-white sm:px-4">
         <p className="flex min-w-0 items-center gap-2 text-sm">
           <Link
