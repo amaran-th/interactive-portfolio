@@ -4,6 +4,7 @@ import { activeCategories, toolsIn } from "@/lib/tools";
 import CategoryChips from "./_components/CategoryChips";
 import SiteFooter from "./_components/SiteFooter";
 import ToolGrid from "./_components/ToolGrid";
+import ToolSearch from "./_components/ToolSearch";
 
 export const metadata: Metadata = {
   title: "Amaranth Site",
@@ -22,26 +23,32 @@ export default function Home() {
         </header>
 
         <div className="mt-6">
-          <CategoryChips />
-        </div>
-
-        <div className="mt-6 flex flex-col gap-8">
-          {activeCategories().map((c) => (
-            <section key={c.id} aria-labelledby={`category-${c.id}`}>
-              <div className="mb-3 flex items-baseline justify-between gap-3">
-                <h2 id={`category-${c.id}`} className="font-bold text-point">
-                  {c.label}
-                </h2>
-                <Link
-                  href={`/category/${c.id}`}
-                  className="text-xs font-bold text-main hover:text-point"
-                >
-                  전체 보기 →
-                </Link>
-              </div>
-              <ToolGrid tools={toolsIn(c.id)} />
-            </section>
-          ))}
+          <ToolSearch>
+            <div className="mt-4">
+              <CategoryChips />
+            </div>
+            <div className="mt-6 flex flex-col gap-8">
+              {activeCategories().map((c) => (
+                <section key={c.id} aria-labelledby={`category-${c.id}`}>
+                  <div className="mb-3 flex items-baseline justify-between gap-3">
+                    <h2
+                      id={`category-${c.id}`}
+                      className="font-bold text-point"
+                    >
+                      {c.label}
+                    </h2>
+                    <Link
+                      href={`/category/${c.id}`}
+                      className="text-xs font-bold text-main hover:text-point"
+                    >
+                      전체 보기 →
+                    </Link>
+                  </div>
+                  <ToolGrid tools={toolsIn(c.id)} />
+                </section>
+              ))}
+            </div>
+          </ToolSearch>
         </div>
 
         <section
