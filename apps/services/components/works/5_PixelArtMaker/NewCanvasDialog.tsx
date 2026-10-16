@@ -3,7 +3,7 @@
 import { Link2, Link2Off } from "lucide-react";
 import { RefObject, useEffect, useRef, useState } from "react";
 import { getApplePixelColor } from "./applePreview";
-import ImportPanel from "./ImportPanel";
+import ImportPanel, { ImportPanelHandle } from "./ImportPanel";
 import { PixelValue } from "./pixelGrid";
 import { CANVAS_PRESET_GROUPS, MAX_CANVAS_SIZE } from "./types";
 
@@ -83,6 +83,12 @@ export default function NewCanvasDialog({
   // 동안에는 그 값 그대로 고정된다.
   const [lockAspect, setLockAspect] = useState(false);
   const aspectRatioRef = useRef(width / height);
+
+  // 이미지 불러오기 모드의 "생성"은 빈 캔버스 모드와 마찬가지로 하단 고정
+  // 바에 둔다(스크롤 영역 안에 있으면 파일을 고르고 나서 버튼을 찾아
+  // 내려야 했다) — ImportPanel 내부 확인 로직을 이 ref로 대신 호출한다.
+  const importPanelRef = useRef<ImportPanelHandle>(null);
+  const [importReady, setImportReady] = useState(false);
 
   const clamp = (v: number) => Math.max(1, Math.min(MAX_CANVAS_SIZE, v || 1));
 
@@ -345,7 +351,10 @@ export default function NewCanvasDialog({
             </>
           ) : (
             <ImportPanel
+              ref={importPanelRef}
               containerRef={containerRef}
+              hideConfirmButton
+              onReadyChange={setImportReady}
               onConfirm={(imported) =>
                 onImportImage({ ...imported, name: name || "제목 없음" })
               }
@@ -360,13 +369,21 @@ export default function NewCanvasDialog({
           >
             취소
           </button>
-          {mode === "blank" && (
+          {mode === "blank" ? (
             <button
               onClick={() => {
                 saveLastSize(width, height);
                 onSelect(width, height, name || "제목 없음");
               }}
               className="flex-1 bg-violet-500 py-2 text-sm font-semibold text-white hover:bg-violet-600"
+            >
+              생성
+            </button>
+          ) : (
+            <button
+              onClick={() => importPanelRef.current?.confirm()}
+              disabled={!importReady}
+              className="flex-1 bg-violet-500 py-2 text-sm font-semibold text-white hover:bg-violet-600 disabled:opacity-40"
             >
               생성
             </button>
