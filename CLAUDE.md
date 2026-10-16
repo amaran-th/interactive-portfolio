@@ -91,7 +91,7 @@ Each interaction follows a strict pattern (all paths under `apps/portfolio/app/(
 - `localStorage`/`IndexedDB` 키를 추가·변경·삭제하거나, 쿠키·외부 스크립트·외부 요청(CDN, 분석 도구 등)을 추가하면 → `apps/services/app/privacy/page.tsx`의 `STORAGE_ITEMS`와 "외부 서비스로 전송되는 정보" 항목을 갱신한다.
 - 새 서비스를 추가하면(`/new-work`) → `guide.ts`를 만들어 페이지를 `<ToolShell guide={...}>`로 감싸고, `lib/tools.ts`의 `TOOLS`에 `slug`·`category`·`title`·`desc`·`about`·`tags`·`thumb`를 넣고(새 카테고리가 필요하면 `CATEGORIES`에 추가), 저장 키가 있으면 개인정보처리방침에도 추가한다.
 - 도구 페이지는 `ToolShell`(상단 40px 바: 홈 링크·개인정보처리방침·'사용 안내' 버튼) 아래로 `<main className="min-h-0 flex-1 ...">`이 남은 화면을 채우고, 페이지는 스크롤하지 않는다. 설명은 '사용 안내' 드로어(`GuideDialog`, `<dialog>`) 안의 `ToolGuide`로 보이며, 닫혀 있어도 서버 렌더링되어 초기 HTML에 들어간다. 화면에 안 보이는 크롤러 전용 텍스트는 Google 스팸 정책(숨겨진 텍스트) 위반이므로 쓰지 않는다.
-- 공통 푸터(`SiteFooter`)는 콘텐츠 페이지(메인·`/privacy`)에만 둔다 — 루트 layout에 넣으면 도구 페이지가 다시 스크롤된다.
+- 공통 푸터(`SiteFooter`)는 콘텐츠 페이지(메인·`/category/[id]`·`/privacy`)에만 둔다 — 루트 layout에 넣으면 도구 페이지가 다시 스크롤된다.
 - 서비스 페이지 광고는 `ToolShell`의 `AdSlot`(헤더 바로 아래, 모바일 전용 320×50 칸) 한 곳에만 둔다. 광고 단위 ID는 `NEXT_PUBLIC_ADSENSE_TOOL_SLOT` 환경 변수로 켜며, 비어 있으면 렌더하지 않는다. 실수 클릭 정책 때문에 서비스 하단·조작 UI 옆에 광고를 두지 않고, '광고' 라벨·높이 예약·미채움 시 접기·낮은 화면/iframe에서 숨김을 유지한다. 자동 광고는 서비스 페이지에서 끄거나 오버레이 형식(앵커·전면)을 꺼야 서비스를 덮지 않는다.
 
 ## Interaction Guidance Policy
