@@ -1,7 +1,7 @@
 // 서비스 앱의 도구 목록. 메인·카테고리 페이지가 모두 이 파일을 읽는다.
 // node:test가 그대로 실행하도록 다른 모듈을 import하지 않는다.
 
-export type CategoryId = "life" | "text" | "creative" | "dev" | "game";
+export type CategoryId = "life" | "productivity" | "text" | "creative" | "dev" | "game";
 
 export type Category = {
   id: CategoryId;
@@ -25,6 +25,12 @@ export const CATEGORIES: Category[] = [
   {
     id: "life",
     label: "생활·계산",
+    description: "생활 속 숫자를 계산하고 기록하는 도구를 모았습니다.",
+    badgeClass: "bg-sub",
+  },
+  {
+    id: "productivity",
+    label: "생산성",
     description: "올해 목표 달성도와 앞으로의 자산처럼 시간이 지날수록 쌓이는 숫자를 정리합니다. 한 해를 돌아보거나 돈이 어떻게 모일지 미리 가늠할 때 씁니다. 결과는 영수증 이미지와 그래프로 확인합니다.",
     badgeClass: "bg-sub",
   },
@@ -36,7 +42,7 @@ export const CATEGORIES: Category[] = [
   },
   {
     id: "creative",
-    label: "이미지·창작",
+    label: "창작",
     description: "그림과 이야기를 만드는 두 도구가 서로 이어집니다. 픽셀아트로 그린 그림을 캐릭터와 배경으로 불러와 컷을 이어 붙이면 짧은 이야기가 됩니다. 그림 한 장에서 이야기 한 편까지 한 사이트에서 만들고 싶을 때 씁니다.",
     badgeClass: "bg-[#e7a6bc]",
   },
@@ -87,7 +93,7 @@ export const TOOLS: Tool[] = [
   },
   {
     slug: "yearly-receipt",
-    category: "life",
+    category: "productivity",
     title: "올해의 영수증 만들기",
     desc: "올해 목표, 얼마나 달성했나요? 영수증을 출력하시겠습니까?",
     about:
@@ -107,7 +113,7 @@ export const TOOLS: Tool[] = [
   },
   {
     slug: "asset-simulator",
-    category: "life",
+    category: "productivity",
     title: "자산 시뮬레이터",
     desc: "내 작고 귀여운 돈, 잘 모이고 있나?",
     about:
