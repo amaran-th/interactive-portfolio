@@ -25,7 +25,7 @@ export const CATEGORIES: Category[] = [
   {
     id: "life",
     label: "생활·계산",
-    description: "생활 속 숫자를 계산하고 기록하는 도구를 모았습니다.",
+    description: "올해 목표 달성도와 앞으로의 자산처럼 시간이 지날수록 쌓이는 숫자를 정리합니다. 한 해를 돌아보거나 돈이 어떻게 모일지 미리 가늠할 때 씁니다. 결과는 영수증 이미지와 그래프로 확인합니다.",
     badgeClass: "bg-sub",
   },
   {
@@ -37,7 +37,7 @@ export const CATEGORIES: Category[] = [
   {
     id: "creative",
     label: "이미지·창작",
-    description: "그림을 그리고 이야기를 만드는 창작 도구를 모았습니다.",
+    description: "그림과 이야기를 만드는 두 도구가 서로 이어집니다. 픽셀아트로 그린 그림을 캐릭터와 배경으로 불러와 컷을 이어 붙이면 짧은 이야기가 됩니다. 그림 한 장에서 이야기 한 편까지 한 사이트에서 만들고 싶을 때 씁니다.",
     badgeClass: "bg-[#e7a6bc]",
   },
   {
@@ -49,7 +49,7 @@ export const CATEGORIES: Category[] = [
   {
     id: "game",
     label: "게임",
-    description: "브라우저에서 바로 하는 게임을 모았습니다.",
+    description: "차근차근 쌓아 올리는 과정이 중심인 게임입니다. 뜨개 도안의 코를 채우거나 원소를 한 단계씩 합성하며 결과물을 만들어 갑니다. 한 판에 집중해 보고 싶을 때 알맞습니다.",
     badgeClass: "bg-[#ffdd94]",
   },
 ];
