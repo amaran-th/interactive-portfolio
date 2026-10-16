@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  ChevronDown,
-  Copy,
-  GitCompare,
-  Pencil,
-  Plus,
-  X,
-} from "lucide-react";
+import { ChevronDown, Copy, GitCompare, Pencil, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Scenario } from "./types";
 
@@ -69,7 +62,10 @@ export default function ScenarioTabs({
 
   return (
     <div className="flex flex-wrap items-center gap-2.5">
-      <div ref={mobileRootRef} className="relative min-w-32 @min-[500px]:hidden">
+      <div
+        ref={mobileRootRef}
+        className="relative min-w-32 @min-[500px]:hidden"
+      >
         <button
           type="button"
           onClick={() => setMobileOpen((prev) => !prev)}
@@ -106,7 +102,7 @@ export default function ScenarioTabs({
               }}
               className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm text-gray-600 hover:bg-gray-100"
             >
-              <Copy className="h-3.5 w-3.5" /> 현재 탭 복제
+              <Copy className="h-3.5 w-3.5" /> 현재 시나리오 복제
             </button>
             <button
               type="button"
@@ -195,7 +191,7 @@ export default function ScenarioTabs({
         onClick={() => onDuplicate(activeScenarioId)}
         className="hidden h-7 items-center gap-1 rounded-full bg-white/80 px-3 text-xs text-gray-600 hover:bg-white @min-[500px]:inline-flex"
       >
-        <Copy className="h-3.5 w-3.5" /> 현재 탭 복제
+        <Copy className="h-3.5 w-3.5" /> 현재 시나리오 복제
       </button>
       <button
         type="button"
