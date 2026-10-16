@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getCategory, type Tool } from "@/lib/tools";
+import type { Tool } from "@/lib/tools";
 import ServiceThumbFallback from "./ServiceThumbFallback";
 
 // 굵은 외곽선 + 어긋난 단색 그림자 — 썸네일의 손그림 톤에 맞춘 "스티커" 카드
@@ -8,7 +8,6 @@ export const STICKER =
   "rounded-lg border-2 border-point bg-white shadow-[3px_3px_0_0_var(--color-point)]";
 
 export default function ToolCard({ tool }: { tool: Tool }) {
-  const category = getCategory(tool.category);
   return (
     <Link
       href={`/${tool.slug}`}
@@ -27,17 +26,10 @@ export default function ToolCard({ tool }: { tool: Tool }) {
           <ServiceThumbFallback title={tool.title} />
         )}
       </div>
-      {/* 모바일: 썸네일 오른쪽에 유형·이름·한 줄 소개, 설명은 그 아래 전체 폭
+      {/* 모바일: 썸네일 오른쪽에 이름·한 줄 소개, 설명은 그 아래 전체 폭
           sm 이상: 썸네일 아래로 모두 세로로 쌓는다 */}
       <div className="flex flex-col justify-center p-3 sm:justify-start sm:px-3 sm:pt-3 sm:pb-0 sm:pointer-fine:pb-3">
-        <div className="flex items-center gap-1.5">
-          <span
-            className={`shrink-0 rounded-full border-[1.5px] border-point px-1.5 py-px text-[11px] font-bold text-point ${category?.badgeClass ?? ""}`}
-          >
-            {category?.label}
-          </span>
-          <p className="min-w-0 font-bold text-point">{tool.title}</p>
-        </div>
+        <p className="min-w-0 font-bold text-point">{tool.title}</p>
         <p className="mt-0.5 text-xs font-medium text-main">{tool.desc}</p>
       </div>
       {/* 설명: 모바일·터치 기기는 카드 아래에, 마우스가 있는 데스크톱은
