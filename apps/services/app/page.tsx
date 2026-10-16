@@ -39,6 +39,7 @@ export default function Home() {
                     </h2>
                     <Link
                       href={`/category/${c.id}`}
+                      aria-label={`${c.label} 전체 보기`}
                       className="text-xs font-bold text-main hover:text-point"
                     >
                       전체 보기 →

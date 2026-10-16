@@ -8,9 +8,11 @@ import ToolGrid from "./ToolGrid";
 
 /** 검색어가 없으면 서버가 그린 children(카테고리 섹션)을, 있으면 결과 그리드를 보여 준다. */
 export default function ToolSearch({ children }: { children: ReactNode }) {
+  // input에 보이는 값과 검색에 쓰는 값을 나눈다. 한글 조합 중에는 검색값을 갱신하지 않는다.
   const [query, setQuery] = useState("");
-  const searching = normalizeQuery(query) !== "";
-  const results = searching ? searchTools(query) : [];
+  const [searchQuery, setSearchQuery] = useState("");
+  const searching = normalizeQuery(searchQuery) !== "";
+  const results = searching ? searchTools(searchQuery) : [];
 
   return (
     <>
@@ -26,22 +28,31 @@ export default function ToolSearch({ children }: { children: ReactNode }) {
           id="tool-search"
           type="search"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (!(e.nativeEvent as InputEvent).isComposing) {
+              setSearchQuery(e.target.value);
+            }
+          }}
+          onCompositionEnd={(e) => setSearchQuery(e.currentTarget.value)}
           placeholder="도구 검색 (예: 픽셀, 목표, 게임)"
           autoComplete="off"
-          className={`w-full py-2.5 pr-3 pl-9 text-sm text-ink placeholder:text-ink/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-main ${STICKER}`}
+          className={`w-full py-2.5 pr-3 pl-9 text-base sm:text-sm text-ink placeholder:text-ink/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-main ${STICKER}`}
         />
       </div>
 
+      <p
+        aria-live="polite"
+        className={searching ? "mt-6 mb-3 text-sm break-all text-ink/80" : "sr-only"}
+      >
+        {!searching
+          ? ""
+          : results.length > 0
+            ? `검색 결과 ${results.length}개`
+            : `'${searchQuery.trim()}'에 맞는 도구가 없습니다.`}
+      </p>
       {searching ? (
-        <div className="mt-6">
-          <p aria-live="polite" className="mb-3 text-sm text-ink/80">
-            {results.length > 0
-              ? `검색 결과 ${results.length}개`
-              : `'${query.trim()}'에 맞는 도구가 없습니다.`}
-          </p>
-          {results.length > 0 && <ToolGrid tools={results} />}
-        </div>
+        results.length > 0 && <ToolGrid tools={results} />
       ) : (
         children
       )}
