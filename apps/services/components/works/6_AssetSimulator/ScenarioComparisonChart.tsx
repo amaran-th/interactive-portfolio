@@ -45,7 +45,6 @@ export default function ScenarioComparisonChart({
           incomes: scenario.incomes,
           expenses: scenario.expenses,
           transferRules: scenario.transferRules,
-          exchangeRate: scenario.exchangeRate,
         };
         return {
           id: scenario.id,

@@ -1,5 +1,3 @@
-export type Currency = "KRW" | "USD";
-
 export type Group = {
   id: string;
   name: string;
@@ -17,7 +15,6 @@ export type AssetClass = {
   id: string;
   name: string;
   groupId?: string;
-  currency: Currency;
   initialBalance: number;
   annualReturnRate: number;
   interestCycle: InterestCycle;
@@ -43,20 +40,13 @@ export type InterestCycle =
   | { mode: "monthly" }
   | { mode: "yearly"; month: number }; // 1-12
 
-/** 값 변동은 항상 지속적(한 번 적용되면 계속 유지)이며, 단발/반복을 별도
- * 필드로 나누지 않고 반복 구조 하나로 표현한다 — until을 count:1로 두면
- * "한 번만 적용되고 계속 유지되는" 단발 변동과 수학적으로 동일하기 때문.
- * (예: 대출 상환 완료로 지출이 한 번 줄어든 뒤 유지 = 횟수 1회.
- * 연봉 인상률처럼 매년 오르는 경우 = 주기 매년 + 무기한/N회/특정 날짜까지.)
- * until은 RepeatSchedule과 동일한 RepeatUntil을 그대로 쓴다. */
+/** 금액 변동은 연봉 인상률처럼 fromDate부터 매년 같은 값만큼 무기한
+ * 인상되는 경우 하나만 다룬다. 인상분은 계속 누적·유지된다. */
 export type AmountAdjustment = {
   id: string;
   type: "percent" | "amount";
-  direction: "increase" | "decrease";
   value: number;
   fromDate: string; // "YYYY-MM"
-  frequency: "monthly" | "yearly";
-  until: RepeatUntil;
 };
 
 export type IncomeItem = {
@@ -108,7 +98,6 @@ export type Scenario = {
   incomes: IncomeItem[];
   expenses: ExpenseItem[];
   transferRules: TransferRule[];
-  exchangeRate: number;
   goal: Goal | null;
   inflationEnabled: boolean;
   inflationRate: number;
@@ -120,7 +109,6 @@ export type SimulationInput = {
   incomes: IncomeItem[];
   expenses: ExpenseItem[];
   transferRules: TransferRule[];
-  exchangeRate: number;
 };
 
 export type MonthFlow = {
@@ -148,9 +136,8 @@ export type MonthFlow = {
 export type MonthSnapshot = {
   monthIndex: number;
   assetBalances: Record<string, number>;
-  assetBalancesKRW: Record<string, number>;
   groupTotals: Record<string, number>;
-  ungroupedTotalKRW: number;
+  ungroupedTotal: number;
   totalBalance: number;
   flow: MonthFlow;
 };
@@ -160,7 +147,6 @@ export type MonthSnapshot = {
 export type NewAssetClassInput = {
   name: string;
   groupId?: string;
-  currency: Currency;
   initialBalance: number;
   annualReturnRate: number;
   interestCycle: InterestCycle;
@@ -265,7 +251,7 @@ export function toRealValue(
   return nominal / Math.pow(1 + annualRatePercent / 100, months / 12);
 }
 
-/** Discounts every KRW money value in a snapshot to today's purchasing
+/** Discounts every money value in a snapshot to today's purchasing
  * power (using the snapshot's own monthIndex), so chart panels can show
  * consistent real values instead of raw future-nominal simulation output
  * when 물가상승률 반영 is on. A no-op (returns the same snapshot) when
@@ -282,13 +268,10 @@ export function realValueSnapshot(
     assetBalances: Object.fromEntries(
       Object.entries(snapshot.assetBalances).map(([id, v]) => [id, at(v)]),
     ),
-    assetBalancesKRW: Object.fromEntries(
-      Object.entries(snapshot.assetBalancesKRW).map(([id, v]) => [id, at(v)]),
-    ),
     groupTotals: Object.fromEntries(
       Object.entries(snapshot.groupTotals).map(([id, v]) => [id, at(v)]),
     ),
-    ungroupedTotalKRW: at(snapshot.ungroupedTotalKRW),
+    ungroupedTotal: at(snapshot.ungroupedTotal),
     totalBalance: at(snapshot.totalBalance),
     flow: {
       ...snapshot.flow,

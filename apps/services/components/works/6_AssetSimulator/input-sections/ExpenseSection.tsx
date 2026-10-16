@@ -311,7 +311,7 @@ export default function ExpenseSection({
         />
         {schedule.mode === "recurring" && (
           <div className="flex flex-col gap-1.5">
-            <p className="text-xs text-gray-500">금액 변동</p>
+            <p className="text-xs text-gray-500">연간 인상률</p>
             <AmountAdjustmentEditor
               value={adjustments}
               onChange={setAdjustments}

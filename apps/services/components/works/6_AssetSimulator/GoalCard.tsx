@@ -98,7 +98,7 @@ export default function GoalCard({
     if (metricType === "total") return snapshot.totalBalance;
     if (!targetId) return 0;
     return metricType === "asset"
-      ? (snapshot.assetBalancesKRW[targetId] ?? 0)
+      ? (snapshot.assetBalances[targetId] ?? 0)
       : (snapshot.groupTotals[targetId] ?? 0);
   }, [snapshots, metricType, targetId]);
 

@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { HelpCircle, Inbox, Landmark, Plus, Settings, X } from "lucide-react";
 import {
   AssetClass,
-  Currency,
   GROUP_PALETTE,
   Group,
   InterestCycle,
@@ -15,11 +14,6 @@ import {
 import GroupPicker from "./GroupPicker";
 import FloatingFormPanel from "./FloatingFormPanel";
 import CustomSelect from "../CustomSelect";
-
-const CURRENCY_OPTIONS = [
-  { value: "KRW", label: "KRW(원)" },
-  { value: "USD", label: "USD(달러)" },
-];
 
 const INTEREST_CYCLE_OPTIONS = [
   { value: "monthly", label: "매월" },
@@ -63,7 +57,6 @@ export default function GroupAssetSection({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [groupId, setGroupId] = useState("");
-  const [currency, setCurrency] = useState<Currency>("KRW");
   const [balance, setBalance] = useState("");
   const [returnRate, setReturnRate] = useState("0");
   const [interestCycleMode, setInterestCycleMode] = useState<
@@ -120,7 +113,6 @@ export default function GroupAssetSection({
     setEditingId(null);
     setName("");
     setGroupId("");
-    setCurrency("KRW");
     setBalance("");
     setReturnRate("0");
     setInterestCycleMode("monthly");
@@ -143,7 +135,6 @@ export default function GroupAssetSection({
     setEditingId(asset.id);
     setName(asset.name);
     setGroupId(asset.groupId ?? "");
-    setCurrency(asset.currency);
     setBalance(String(Math.abs(asset.initialBalance)));
     setReturnRate(String(asset.annualReturnRate));
     setInterestCycleMode(asset.interestCycle.mode);
@@ -168,7 +159,6 @@ export default function GroupAssetSection({
     const input: NewAssetClassInput = {
       name: name.trim(),
       groupId: groupId || undefined,
-      currency,
       initialBalance: (isLiability ? -1 : 1) * (Number(balance) || 0),
       annualReturnRate: Number(returnRate) || 0,
       interestCycle,
@@ -281,9 +271,7 @@ export default function GroupAssetSection({
                         : "text-gray-400"
                     }
                   >
-                    {asset.currency === "USD"
-                      ? `$${asset.initialBalance.toLocaleString()}`
-                      : `${asset.initialBalance.toLocaleString()}원`}
+                    {`${asset.initialBalance.toLocaleString()}원`}
                   </span>
                   {asset.isPrimary && (
                     <span
@@ -454,13 +442,6 @@ export default function GroupAssetSection({
           </p>
         )}
         <div className="flex gap-2">
-          <CustomSelect
-            value={currency}
-            onChange={(v) => setCurrency(v as Currency)}
-            options={CURRENCY_OPTIONS}
-            borderClassName="border-indigo-200"
-            className="w-32 shrink-0"
-          />
           <input
             value={balance}
             onChange={(e) => setBalance(e.target.value)}

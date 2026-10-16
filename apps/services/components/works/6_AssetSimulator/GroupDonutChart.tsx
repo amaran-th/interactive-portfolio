@@ -77,7 +77,7 @@ export default function GroupDonutChart({
     ? selectedTabId
     : tabs[0]?.id;
   const hasLiabilities = assetClasses.some(
-    (a) => (snapshot.assetBalancesKRW[a.id] ?? 0) < 0,
+    (a) => (snapshot.assetBalances[a.id] ?? 0) < 0,
   );
   const [includeLiabilities, setIncludeLiabilities] = useState(false);
   const [legendMode, setLegendMode] = useState<"ratio" | "amount">("ratio");
@@ -107,7 +107,7 @@ export default function GroupDonutChart({
               amount: assetClasses
                 .filter((a) => a.groupId === g.id)
                 .reduce(
-                  (sum, a) => sum + (snapshot.assetBalancesKRW[a.id] ?? 0),
+                  (sum, a) => sum + (snapshot.assetBalances[a.id] ?? 0),
                   0,
                 ),
               color: g.color,
@@ -117,7 +117,7 @@ export default function GroupDonutChart({
             .map((a) => ({
               id: a.id,
               name: a.name,
-              amount: snapshot.assetBalancesKRW[a.id] ?? 0,
+              amount: snapshot.assetBalances[a.id] ?? 0,
               color: a.color,
             })),
         ]
@@ -126,7 +126,7 @@ export default function GroupDonutChart({
           .map((a, i) => ({
             id: a.id,
             name: a.name,
-            amount: snapshot.assetBalancesKRW[a.id] ?? 0,
+            amount: snapshot.assetBalances[a.id] ?? 0,
             color: GROUP_PALETTE[i % GROUP_PALETTE.length],
           }));
 

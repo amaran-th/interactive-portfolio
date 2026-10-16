@@ -100,7 +100,7 @@ function buildRawSegments(
       fill: g.color,
       value: assetClasses
         .filter((a) => a.groupId === g.id)
-        .reduce((sum, a) => sum + (snapshot.assetBalancesKRW[a.id] ?? 0), 0),
+        .reduce((sum, a) => sum + (snapshot.assetBalances[a.id] ?? 0), 0),
     }));
   const ungroupedItems = assetClasses
     .filter((a) => !a.groupId)
@@ -108,7 +108,7 @@ function buildRawSegments(
       id: a.id,
       name: a.name,
       fill: a.color,
-      value: snapshot.assetBalancesKRW[a.id] ?? 0,
+      value: snapshot.assetBalances[a.id] ?? 0,
     }));
 
   // The segment holding the primary asset stacks at the bottom of the

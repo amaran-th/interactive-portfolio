@@ -4,64 +4,33 @@ import {
   ExpenseItem,
   IncomeItem,
   MonthSnapshot,
-  RepeatUntil,
   Scenario,
   TransferRule,
   newId,
 } from "./types";
 
-/** kind/persist 필드를 쓰던 옛 형식(effect 축 도입 전)의 금액 변동. */
+/** 예전 형식의 금액 변동. direction(인상/인하), frequency(매월/매년),
+ * until(종료 조건)을 가졌고, 그보다 더 옛 형식은 kind/persist 필드와
+ * startDate를 썼다. */
 type LegacyAmountAdjustment = {
   id: string;
   type: "percent" | "amount";
-  direction: "increase" | "decrease";
   value: number;
-} & (
-  | { kind: "period"; fromDate: string; toDate?: string }
-  | {
-      kind: "recurring";
-      startDate: string;
-      frequency: "monthly" | "yearly";
-      until: RepeatUntil;
-      persist: boolean;
-    }
-);
+  direction?: "increase" | "decrease";
+  fromDate?: string;
+  startDate?: string;
+};
 
-function isLegacyAdjustment(
-  adj: AmountAdjustment | LegacyAmountAdjustment,
-): adj is LegacyAmountAdjustment {
-  return "kind" in adj;
-}
-
-/** 옛 kind/persist 필드를 지금의 단일 구조로 변환한다. 값 변동은 이제
- * 항상 지속적이고, 단발/반복 구분도 없다(반복 구조 하나로 통일, 횟수
- * 1회 = 옛 단발 변동과 동일). period는 fromDate만 남기고 toDate(원복
- * 기한)는 버린 뒤 횟수 1회로 채운다. recurring은 startDate→fromDate로
- * 이름만 바꾸면 나머지(frequency, until)는 그대로 옮겨 담을 수 있다. */
+/** 금액 변동은 이제 "fromDate부터 매년 무기한 인상" 하나만 표현한다.
+ * 옛 형식의 인하 변동은 표현할 수 없으므로 버리고, 나머지는 시작월·
+ * 단위·값만 남긴다(주기·종료 조건은 무시). */
 function migrateAdjustment(
-  adj: AmountAdjustment | LegacyAmountAdjustment,
-): AmountAdjustment {
-  if (!isLegacyAdjustment(adj)) return adj;
-  const shared = {
-    id: adj.id,
-    type: adj.type,
-    direction: adj.direction,
-    value: adj.value,
-  };
-  if (adj.kind === "period") {
-    return {
-      ...shared,
-      fromDate: adj.fromDate,
-      frequency: "yearly",
-      until: { type: "count", count: 1 },
-    };
-  }
-  return {
-    ...shared,
-    fromDate: adj.startDate,
-    frequency: adj.frequency,
-    until: adj.until,
-  };
+  adj: LegacyAmountAdjustment,
+): AmountAdjustment | null {
+  if (adj.direction === "decrease") return null;
+  const fromDate = adj.fromDate ?? adj.startDate;
+  if (!fromDate) return null;
+  return { id: adj.id, type: adj.type, value: adj.value, fromDate };
 }
 
 export function todayStamp(): string {
@@ -114,19 +83,23 @@ export function parseScenarioJson(text: string): Scenario | null {
   ) {
     return null;
   }
-  const scenario = parsed as Scenario;
-  const normalizeAsset = (a: AssetClass): AssetClass =>
-    Object.assign({ interestCycle: { mode: "monthly" } }, a);
+  // 달러 자산 기능을 없애면서 쓰지 않게 된 환율·통화 필드는 버린다.
+  const scenario = { ...(parsed as Scenario & { exchangeRate?: number }) };
+  delete scenario.exchangeRate;
+  const normalizeAsset = (a: AssetClass & { currency?: string }): AssetClass => {
+    const asset = Object.assign({ interestCycle: { mode: "monthly" } }, a);
+    delete asset.currency;
+    return asset;
+  };
   // 금액 변동은 이제 항목당 1개만 허용하므로, 옛 시나리오에 여러 개가
   // 있었다면 첫 번째만 남긴다.
   const normalizeAdjustments = <T extends { adjustments?: unknown[] }>(
     item: T,
   ): T & { adjustments: AmountAdjustment[] } => ({
     ...item,
-    adjustments: (
-      (item.adjustments ?? []) as (AmountAdjustment | LegacyAmountAdjustment)[]
-    )
+    adjustments: ((item.adjustments ?? []) as LegacyAmountAdjustment[])
       .map(migrateAdjustment)
+      .filter((adj): adj is AmountAdjustment => adj !== null)
       .slice(0, 1),
   });
   return {
@@ -180,7 +153,7 @@ export function exportSnapshotsCsv(
       snapshot.monthIndex,
       dateLabel,
       ...assetClasses.map((a) =>
-        Math.round(snapshot.assetBalancesKRW[a.id] ?? 0),
+        Math.round(snapshot.assetBalances[a.id] ?? 0),
       ),
       Math.round(snapshot.totalBalance),
       Math.round(snapshot.flow.incomeIn),

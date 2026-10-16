@@ -20,7 +20,6 @@ type FlowDiagramProps = {
   primaryAsset: AssetClass | undefined;
   assetClasses: AssetClass[];
   groups: Group[];
-  exchangeRate: number;
   inflationEnabled: boolean;
   inflationRate: number;
   exportMode?: boolean;
@@ -186,7 +185,6 @@ export default function FlowDiagram({
   primaryAsset,
   assetClasses,
   groups,
-  exchangeRate,
   inflationEnabled,
   inflationRate,
   exportMode = false,
@@ -210,13 +208,9 @@ export default function FlowDiagram({
   const destinationTotals = new Map<string, number>();
   for (const transfer of snapshot.flow.transfers) {
     if (transfer.fromAssetId !== primaryAsset.id) continue;
-    const amountKRW =
-      primaryAsset.currency === "USD"
-        ? transfer.amount * exchangeRate
-        : transfer.amount;
     destinationTotals.set(
       transfer.toAssetId,
-      (destinationTotals.get(transfer.toAssetId) ?? 0) + amountKRW,
+      (destinationTotals.get(transfer.toAssetId) ?? 0) + transfer.amount,
     );
   }
 
@@ -269,7 +263,7 @@ export default function FlowDiagram({
           id: assetId,
           label: asset.name,
           amount,
-          balance: snapshot.assetBalancesKRW[assetId] ?? 0,
+          balance: snapshot.assetBalances[assetId] ?? 0,
           color: assetColor(asset, groups),
         });
       }
@@ -292,7 +286,7 @@ export default function FlowDiagram({
           id: asset.id,
           label: asset.name,
           amount,
-          balance: snapshot.assetBalancesKRW[asset.id] ?? 0,
+          balance: snapshot.assetBalances[asset.id] ?? 0,
           color: assetColor(asset, groups),
         });
       }
@@ -302,7 +296,7 @@ export default function FlowDiagram({
       if (!group) continue;
       const balance = assetClasses
         .filter((a) => a.groupId === groupId)
-        .reduce((sum, a) => sum + (snapshot.assetBalancesKRW[a.id] ?? 0), 0);
+        .reduce((sum, a) => sum + (snapshot.assetBalances[a.id] ?? 0), 0);
       transferEntries.push({
         id: groupId,
         label: group.name,

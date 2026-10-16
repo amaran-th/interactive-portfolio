@@ -6,7 +6,6 @@ import {
   Group,
   MonthSnapshot,
   RepeatSchedule,
-  RepeatUntil,
   SimulationInput,
   formatMonthsFromNow,
 } from "./types";
@@ -40,62 +39,34 @@ export function fires(
   return true;
 }
 
-/** 금액 변동의 반복(frequency 주기로 발생)이 month(포함)까지 총 몇 번
- * 발생했는지 센다. until이 date면 그 시점을 넘어서는 month를 넣어도 그
- * 시점 기준 발생 횟수에서 더 늘지 않는다 — 변동이 반복 종료 후 마지막
- * 수준에서 멈추는 데 쓴다. */
+/** 금액 변동이 month(포함)까지 몇 번 적용됐는지 센다. fromDate부터
+ * 12개월마다 한 번씩 무기한 인상된다. */
 export function adjustmentOccurrences(
   fromDate: string,
-  frequency: "monthly" | "yearly",
-  until: RepeatUntil,
   month: number,
   today: Date,
 ): number {
   const start = monthIndexFromTargetDate(fromDate, today);
-  const periodEnd =
-    until.type === "date" ? monthIndexFromTargetDate(until.date, today) : Infinity;
-  const cappedMonth = Math.min(month, periodEnd);
-  if (cappedMonth < start) return 0;
-  const period = frequency === "monthly" ? 1 : 12;
-  let count = Math.floor((cappedMonth - start) / period) + 1;
-  if (until.type === "count") {
-    count = Math.min(count, until.count);
-  }
-  return Math.max(0, count);
+  if (month < start) return 0;
+  return Math.floor((month - start) / 12) + 1;
 }
 
-/** 금액 변동을 시작일 오름차순으로 baseAmount에 순서대로 적용한 최종 금액을
- * 계산한다. 반복 발생 횟수만큼 누적 적용되므로(until: count:1이면 한 번만),
- * 단발/반복 변동 모두 이 하나의 경로로 처리된다. */
+/** 금액 변동을 시작일 오름차순으로 baseAmount에 누적 적용한 금액을
+ * 계산한다. 퍼센트 인상은 복리처럼 쌓이고, 금액 인상은 회차마다 더해진다. */
 export function effectiveAmount(
   baseAmount: number,
   adjustments: AmountAdjustment[],
   month: number,
   today: Date,
 ): number {
-  const steps: {
-    sortKey: number;
-    type: "percent" | "amount";
-    direction: "increase" | "decrease";
-    value: number;
-  }[] = [];
+  const steps: { sortKey: number; type: "percent" | "amount"; value: number }[] =
+    [];
 
   for (const adj of adjustments) {
     const start = monthIndexFromTargetDate(adj.fromDate, today);
-    const count = adjustmentOccurrences(
-      adj.fromDate,
-      adj.frequency,
-      adj.until,
-      month,
-      today,
-    );
+    const count = adjustmentOccurrences(adj.fromDate, month, today);
     for (let i = 0; i < count; i++) {
-      steps.push({
-        sortKey: start,
-        type: adj.type,
-        direction: adj.direction,
-        value: adj.value,
-      });
+      steps.push({ sortKey: start, type: adj.type, value: adj.value });
     }
   }
 
@@ -103,11 +74,10 @@ export function effectiveAmount(
 
   let amount = baseAmount;
   for (const step of steps) {
-    const sign = step.direction === "increase" ? 1 : -1;
     amount =
       step.type === "percent"
-        ? amount * (1 + (sign * step.value) / 100)
-        : amount + sign * step.value;
+        ? amount * (1 + step.value / 100)
+        : amount + step.value;
   }
   return Math.max(0, amount);
 }
@@ -151,7 +121,7 @@ export function validateAdjustments(
 
   for (const adj of adjustments) {
     if (!Number.isFinite(adj.value) || adj.value <= 0) {
-      return "금액 변동 값은 0보다 커야 합니다.";
+      return "인상 값은 0보다 커야 합니다.";
     }
     const from = monthIndexFromTargetDate(adj.fromDate, today);
     // 하한(1개월 후)은 검사하지 않는다 — 이미 저장된 항목을 나중에 수정할
@@ -161,50 +131,33 @@ export function validateAdjustments(
     if (!Number.isFinite(from) || from > horizonMonths) {
       return rangeMessage;
     }
-    if (adj.until.type === "date") {
-      const to = monthIndexFromTargetDate(adj.until.date, today);
-      if (!Number.isFinite(to) || to < from) {
-        return "금액 변동 반복 종료 날짜는 시작 날짜보다 이후여야 합니다.";
-      }
-    }
-    if (adj.until.type === "count" && adj.until.count < 1) {
-      return "금액 변동 반복 횟수는 1 이상이어야 합니다.";
-    }
   }
   return null;
 }
 
-function toKRW(
-  asset: AssetClass,
-  nativeBalance: number,
-  exchangeRate: number,
-): number {
-  return asset.currency === "USD" ? nativeBalance * exchangeRate : nativeBalance;
-}
-
 function computeGroupTotals(
-  balancesKRW: Record<string, number>,
+  balances: Record<string, number>,
   assetClasses: AssetClass[],
   groups: Group[],
-): { groupTotals: Record<string, number>; ungroupedTotalKRW: number } {
+): { groupTotals: Record<string, number>; ungroupedTotal: number } {
   const groupTotals: Record<string, number> = {};
   for (const group of groups) {
     groupTotals[group.id] = 0;
   }
-  let ungroupedTotalKRW = 0;
+  let ungroupedTotal = 0;
   for (const asset of assetClasses) {
-    const value = balancesKRW[asset.id] ?? 0;
+    const value = balances[asset.id] ?? 0;
     if (asset.groupId && groupTotals[asset.groupId] !== undefined) {
       groupTotals[asset.groupId] += value;
     } else {
-      ungroupedTotalKRW += value;
+      ungroupedTotal += value;
     }
   }
-  return { groupTotals, ungroupedTotalKRW };
+  return { groupTotals, ungroupedTotal };
 }
 
-function sumBalances(balancesKRW: Record<string, number>): number {
-  return Object.values(balancesKRW).reduce((sum, value) => sum + value, 0);
+function sumBalances(balances: Record<string, number>): number {
+  return Object.values(balances).reduce((sum, value) => sum + value, 0);
 }
 
 function buildSnapshot(
@@ -212,29 +165,23 @@ function buildSnapshot(
   balances: Record<string, number>,
   assetClasses: AssetClass[],
   groups: Group[],
-  exchangeRate: number,
   flow: MonthSnapshot["flow"],
 ): MonthSnapshot {
-  const assetBalancesKRW: Record<string, number> = {};
+  const assetBalances = { ...balances };
   for (const asset of assetClasses) {
-    assetBalancesKRW[asset.id] = toKRW(
-      asset,
-      balances[asset.id] ?? 0,
-      exchangeRate,
-    );
+    assetBalances[asset.id] ??= 0;
   }
-  const { groupTotals, ungroupedTotalKRW } = computeGroupTotals(
-    assetBalancesKRW,
+  const { groupTotals, ungroupedTotal } = computeGroupTotals(
+    assetBalances,
     assetClasses,
     groups,
   );
   return {
     monthIndex,
-    assetBalances: { ...balances },
-    assetBalancesKRW,
+    assetBalances,
     groupTotals,
-    ungroupedTotalKRW,
-    totalBalance: sumBalances(assetBalancesKRW),
+    ungroupedTotal,
+    totalBalance: sumBalances(assetBalances),
     flow,
   };
 }
@@ -244,7 +191,7 @@ export function runSimulation(
   today: Date,
   horizonMonths: number,
 ): MonthSnapshot[] {
-  const { groups, assetClasses, transferRules, exchangeRate } = input;
+  const { groups, assetClasses, transferRules } = input;
   const primary = assetClasses.find((asset) => asset.isPrimary);
 
   const balances: Record<string, number> = {};
@@ -253,7 +200,7 @@ export function runSimulation(
   }
 
   const snapshots: MonthSnapshot[] = [
-    buildSnapshot(0, balances, assetClasses, groups, exchangeRate, {
+    buildSnapshot(0, balances, assetClasses, groups, {
       incomeIn: 0,
       expenseOut: 0,
       transfers: [],
@@ -362,7 +309,7 @@ export function runSimulation(
     }
 
     snapshots.push(
-      buildSnapshot(month, balances, assetClasses, groups, exchangeRate, flow),
+      buildSnapshot(month, balances, assetClasses, groups, flow),
     );
   }
 
@@ -372,7 +319,7 @@ export function runSimulation(
 function goalMetricValue(goal: Goal, snapshot: MonthSnapshot): number {
   if (goal.metric.type === "total") return snapshot.totalBalance;
   if (goal.metric.type === "asset") {
-    return snapshot.assetBalancesKRW[goal.metric.assetId] ?? 0;
+    return snapshot.assetBalances[goal.metric.assetId] ?? 0;
   }
   return snapshot.groupTotals[goal.metric.groupId] ?? 0;
 }

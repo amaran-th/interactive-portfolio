@@ -117,7 +117,7 @@ export default function AssetAreaChart({
     let negCursor = 0;
     const byAsset = new Map<string, { bottom: number; top: number }>();
     for (const asset of assets) {
-      const value = snapshot.assetBalancesKRW[asset.id] ?? 0;
+      const value = snapshot.assetBalances[asset.id] ?? 0;
       if (value >= 0) {
         const bottom = posCursor;
         posCursor += value;
@@ -240,7 +240,7 @@ export default function AssetAreaChart({
             `총자산 ${formatKRW(hoverSnapshot.totalBalance)}`,
             ...assets.map(
               (asset) =>
-                `${asset.name} ${formatKRW(hoverSnapshot.assetBalancesKRW[asset.id] ?? 0)}`,
+                `${asset.name} ${formatKRW(hoverSnapshot.assetBalances[asset.id] ?? 0)}`,
             ),
           ]
         : []

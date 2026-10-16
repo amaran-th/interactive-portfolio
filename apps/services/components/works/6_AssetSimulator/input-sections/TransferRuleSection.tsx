@@ -103,14 +103,11 @@ export default function TransferRuleSection({
     assetClasses.find((a) => a.id === id)?.name ?? "?";
 
   const effectiveFrom = fromAssetId || assetClasses[0]?.id || "";
-  const fromAsset = assetClasses.find((a) => a.id === effectiveFrom);
-  const sameCurrencyAssets = assetClasses.filter(
-    (a) => a.id !== effectiveFrom && a.currency === fromAsset?.currency,
-  );
+  const targetAssets = assetClasses.filter((a) => a.id !== effectiveFrom);
   const effectiveTo =
-    toAssetId && sameCurrencyAssets.some((a) => a.id === toAssetId)
+    toAssetId && targetAssets.some((a) => a.id === toAssetId)
       ? toAssetId
-      : sameCurrencyAssets[0]?.id || "";
+      : targetAssets[0]?.id || "";
 
   const resetForm = () => {
     setEditingId(null);
@@ -145,7 +142,7 @@ export default function TransferRuleSection({
 
   const handleSubmit = () => {
     if (!effectiveFrom || !effectiveTo || effectiveFrom === effectiveTo) {
-      setError("이체할 수 있는 같은 통화의 자산이 2개 이상 필요합니다.");
+      setError("이체하려면 자산이 2개 이상 필요합니다.");
       return;
     }
     if (!amount || Number(amount) === 0) {
@@ -296,7 +293,7 @@ export default function TransferRuleSection({
               }}
               options={assetClasses.map((asset) => ({
                 value: asset.id,
-                label: `${asset.name}(${asset.currency})`,
+                label: asset.name,
               }))}
               borderClassName="border-amber-200"
               className="min-w-0 flex-1"
@@ -305,12 +302,12 @@ export default function TransferRuleSection({
             <CustomSelect
               value={effectiveTo}
               onChange={setToAssetId}
-              options={sameCurrencyAssets.map((asset) => ({
+              options={targetAssets.map((asset) => ({
                 value: asset.id,
-                label: `${asset.name}(${asset.currency})`,
+                label: asset.name,
               }))}
-              placeholder="같은 통화 자산이 없습니다"
-              disabled={sameCurrencyAssets.length === 0}
+              placeholder="이체할 자산이 없습니다"
+              disabled={targetAssets.length === 0}
               borderClassName="border-amber-200"
               className="min-w-0 flex-1"
             />
@@ -345,7 +342,7 @@ export default function TransferRuleSection({
           />
           {mode === "fixed" && schedule.mode === "recurring" && (
             <div className="flex flex-col gap-1.5">
-              <p className="text-xs text-gray-500">금액 변동</p>
+              <p className="text-xs text-gray-500">연간 인상률</p>
               <AmountAdjustmentEditor
                 value={adjustments}
                 onChange={setAdjustments}
@@ -358,7 +355,7 @@ export default function TransferRuleSection({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={sameCurrencyAssets.length === 0}
+              disabled={targetAssets.length === 0}
               className="inline-flex items-center gap-1.5 self-start rounded-full bg-amber-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {editingId ? (

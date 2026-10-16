@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Settings, X } from "lucide-react";
+import { ChevronDown, Info, Settings, X } from "lucide-react";
 import { toPng } from "html-to-image";
 import Image from "next/image";
 import AssetAreaChart from "./AssetAreaChart";
@@ -121,7 +121,6 @@ function emptyScenario(name: string): Scenario {
       {
         id: newId(),
         name: "기본 자산",
-        currency: "KRW",
         initialBalance: 0,
         annualReturnRate: 0,
         interestCycle: { mode: "monthly" },
@@ -132,7 +131,6 @@ function emptyScenario(name: string): Scenario {
     incomes: [],
     expenses: [],
     transferRules: [],
-    exchangeRate: 1350,
     goal: null,
     inflationEnabled: false,
     inflationRate: 3,
@@ -172,7 +170,6 @@ function seedScenario(name: string, today: Date): Scenario {
       {
         id: primaryId,
         name: "파킹통장",
-        currency: "KRW",
         initialBalance: 1_000_000,
         annualReturnRate: 0,
         interestCycle: { mode: "monthly" },
@@ -183,7 +180,6 @@ function seedScenario(name: string, today: Date): Scenario {
         id: savingsId,
         name: "청년미래적금",
         groupId: savingsGroupId,
-        currency: "KRW",
         initialBalance: 0,
         annualReturnRate: 0,
         interestCycle: { mode: "monthly" },
@@ -194,7 +190,6 @@ function seedScenario(name: string, today: Date): Scenario {
         id: spId,
         name: "S&P500",
         groupId: investGroupId,
-        currency: "KRW",
         initialBalance: 0,
         annualReturnRate: 0,
         interestCycle: { mode: "monthly" },
@@ -205,7 +200,6 @@ function seedScenario(name: string, today: Date): Scenario {
         id: samsungId,
         name: "삼성전자",
         groupId: investGroupId,
-        currency: "KRW",
         initialBalance: 0,
         annualReturnRate: 0,
         interestCycle: { mode: "monthly" },
@@ -323,7 +317,6 @@ function seedScenario(name: string, today: Date): Scenario {
         adjustments: [],
       },
     ],
-    exchangeRate: 1350,
     goal: null,
     inflationEnabled: false,
     inflationRate: 3,
@@ -393,7 +386,6 @@ function duplicateScenario(scenario: Scenario): Scenario {
     incomes,
     expenses,
     transferRules,
-    exchangeRate: scenario.exchangeRate,
     goal,
     inflationEnabled: scenario.inflationEnabled,
     inflationRate: scenario.inflationRate,
@@ -767,16 +759,7 @@ export default function AssetSimulator() {
           : input.initialBalance;
         return { ...a, ...input, initialBalance };
       });
-      const nextTransferRules = s.transferRules.filter((r) => {
-        const from = nextAssetClasses.find((a) => a.id === r.fromAssetId);
-        const to = nextAssetClasses.find((a) => a.id === r.toAssetId);
-        return from && to && from.currency === to.currency;
-      });
-      return {
-        ...s,
-        assetClasses: nextAssetClasses,
-        transferRules: nextTransferRules,
-      };
+      return { ...s, assetClasses: nextAssetClasses };
     });
   };
   const handleChangeAssetColor = (id: string, color: string) => {
@@ -901,7 +884,6 @@ export default function AssetSimulator() {
       incomes: activeScenario.incomes,
       expenses: activeScenario.expenses,
       transferRules: activeScenario.transferRules,
-      exchangeRate: activeScenario.exchangeRate,
     }),
     [activeScenario],
   );
@@ -961,21 +943,6 @@ export default function AssetSimulator() {
               </button>
             </div>
             <div className="hidden items-center gap-3 @min-[500px]:flex">
-              <label className="flex items-center gap-2 text-xs text-gray-600">
-                환율(1달러 = 원)
-                <input
-                  type="number"
-                  min={1}
-                  value={activeScenario.exchangeRate}
-                  onChange={(e) =>
-                    updateActiveScenario((s) => ({
-                      ...s,
-                      exchangeRate: Math.max(1, Number(e.target.value) || 1),
-                    }))
-                  }
-                  className="w-24 rounded-full border border-white/60 bg-white/80 px-2 py-1 text-sm"
-                />
-              </label>
               <div className="flex items-center gap-2 rounded-full border border-white/60 bg-white/50 px-3 py-1.5 text-xs text-gray-600">
                 <Switch
                   checked={activeScenario.inflationEnabled}
@@ -1049,21 +1016,6 @@ export default function AssetSimulator() {
               </button>
             </div>
             <div className="flex flex-col gap-3">
-              <label className="flex items-center justify-between gap-2 text-sm text-gray-600">
-                환율(1달러 = 원)
-                <input
-                  type="number"
-                  min={1}
-                  value={activeScenario.exchangeRate}
-                  onChange={(e) =>
-                    updateActiveScenario((s) => ({
-                      ...s,
-                      exchangeRate: Math.max(1, Number(e.target.value) || 1),
-                    }))
-                  }
-                  className="w-28 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm"
-                />
-              </label>
               <div className="flex flex-col gap-2 text-sm text-gray-600">
                 <div className="flex items-center justify-between gap-2">
                   <span>물가상승률 반영</span>
@@ -1216,14 +1168,21 @@ export default function AssetSimulator() {
       )}
 
       <div className="mx-auto max-w-400 @container px-4 pt-4 pb-4">
-        <div className="relative z-30 mb-3 flex items-center justify-end gap-1.5">
-          <ImportScenarioButton onImportJson={handleImportScenarioJson} />
-          <ExportMenu
-            onExportJson={handleExportScenarioJson}
-            onExportCsv={handleExportCsv}
-            onExportImage={handleExportChartImage}
-            isExportingImage={isExportingImage}
-          />
+        <div className="relative z-30 mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <p className="flex items-start gap-1 break-keep text-xs text-gray-500">
+            <Info className="mt-px h-3.5 w-3.5 shrink-0" />
+            세금·수수료·수익률 변동을 빼고 단순하게 계산한 추정치라 실제와 다를
+            수 있어요. 참고용으로만 봐 주세요.
+          </p>
+          <div className="ml-auto flex items-center gap-1.5">
+            <ImportScenarioButton onImportJson={handleImportScenarioJson} />
+            <ExportMenu
+              onExportJson={handleExportScenarioJson}
+              onExportCsv={handleExportCsv}
+              onExportImage={handleExportChartImage}
+              isExportingImage={isExportingImage}
+            />
+          </div>
         </div>
 
         {showComparison && (
@@ -1374,7 +1333,6 @@ export default function AssetSimulator() {
                     primaryAsset={primaryAsset}
                     assetClasses={activeScenario.assetClasses}
                     groups={activeScenario.groups}
-                    exchangeRate={activeScenario.exchangeRate}
                     inflationEnabled={activeScenario.inflationEnabled}
                     inflationRate={activeScenario.inflationRate}
                     exportMode={isExportingImage}
@@ -1471,7 +1429,6 @@ export default function AssetSimulator() {
                       primaryAsset={primaryAsset}
                       assetClasses={activeScenario.assetClasses}
                       groups={activeScenario.groups}
-                      exchangeRate={activeScenario.exchangeRate}
                       inflationEnabled={activeScenario.inflationEnabled}
                       inflationRate={activeScenario.inflationRate}
                     />
