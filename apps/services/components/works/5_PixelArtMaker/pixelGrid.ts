@@ -786,7 +786,11 @@ function pointInPolygon(px: number, py: number, points: Point[]): boolean {
 
 // 올가미(자유 선택) — 드래그 경로(픽셀 격자 좌표)를 다각형으로 보고 내부에
 // 속한 칸을 모두 고른다. 경로의 바운딩 박스 안에서만 판정해, 캔버스 전체를
-// 훑지 않고도 충분히 빠르게 동작한다.
+// 훑지 않고도 충분히 빠르게 동작한다. 화면의 올가미 선은 칸 중앙을 이으므로
+// 판정도 칸 중앙 좌표계(경로 점 (x, y) = 칸 (x, y)의 중앙)에서 한다 — 예전엔
+// 칸 중앙(x+0.5)을 칸 모서리 기준 다각형에 대어 반 칸 어긋나, 오른쪽·아래
+// 가장자리 칸이 빠졌다. 선이 지나가는 칸(경계)은 선 위라 판정이 애매하므로
+// 닫는 선분까지 포함해 따로 모두 넣는다.
 export function lassoMask(
   width: number,
   height: number,
@@ -810,7 +814,14 @@ export function lassoMask(
   maxY = Math.min(height - 1, maxY);
   for (let y = minY; y <= maxY; y++) {
     for (let x = minX; x <= maxX; x++) {
-      if (pointInPolygon(x + 0.5, y + 0.5, points)) mask.add(y * width + x);
+      if (pointInPolygon(x, y, points)) mask.add(y * width + x);
+    }
+  }
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    for (const q of linePoints(a.x, a.y, b.x, b.y)) {
+      if (inBounds(width, height, q.x, q.y)) mask.add(q.y * width + q.x);
     }
   }
   return mask;
