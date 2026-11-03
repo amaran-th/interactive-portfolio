@@ -110,6 +110,25 @@ export default function PixelArtMaker() {
     <div
       ref={appRef}
       className={`pam-app ${monaFont.className} relative h-full w-full overflow-hidden`}
+      // 직접 만든 우클릭 메뉴(바탕화면·캔버스·색상환 등) 말고는 브라우저
+      // 기본 메뉴를 띄우지 않는다. 단, 글자 입력칸(이름 바꾸기 등)은 복사·
+      // 붙여넣기 메뉴가 필요해 그대로 둔다. React 이벤트는 포털을 거쳐서도
+      // 여기로 올라오므로 body로 보낸 패널도 함께 막힌다. 자체 핸들러는 더
+      // 안쪽에서 먼저 실행되므로 영향이 없다.
+      onContextMenu={(e) => {
+        const t = e.target as HTMLElement;
+        if (
+          t.isContentEditable ||
+          t instanceof HTMLTextAreaElement ||
+          (t instanceof HTMLInputElement &&
+            ["text", "search", "number", "url", "email", ""].includes(
+              t.getAttribute("type") ?? "",
+            ))
+        ) {
+          return;
+        }
+        e.preventDefault();
+      }}
     >
       {/* 데스크탑(바탕화면)은 편집기 밖에 있어 .pam-editor의 커서 규칙이 닿지
           않는다 — 여기서 기본 커서를 따로 깔아준다. 아이콘 등 개별 상호작용
