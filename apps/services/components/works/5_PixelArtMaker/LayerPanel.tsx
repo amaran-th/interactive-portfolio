@@ -38,11 +38,7 @@ import {
 } from "./types";
 
 type AdjustmentField =
-  | "brightness"
-  | "contrast"
-  | "saturation"
-  | "temperature"
-  | "tint";
+  "brightness" | "contrast" | "saturation" | "temperature" | "tint";
 
 // 슬라이더 5개를 하나씩 반복해 적지 않고 이 목록을 map으로 그린다 —
 // ExportPanel.tsx의 FORMATS/SCALE_OPTIONS와 같은 패턴.
@@ -261,6 +257,24 @@ export default function LayerPanel({
       onFrameDurationChange(activeLayer.id, ms);
     }
     setDurationDraft(null);
+  };
+
+  // ▲▼ 버튼·방향키로 0.1초씩 올리고 내린다. 입력 중인 값이 있으면 그 값에서
+  // 출발한다(소수 둘째 자리 값도 그대로 0.1씩 움직인다).
+  const stepFrameDuration = (deltaSec: number) => {
+    const draftSec = durationDraft === null ? NaN : Number(durationDraft);
+    const baseMs = Number.isFinite(draftSec)
+      ? draftSec * 1000
+      : (activeLayer.frameDurationMs ?? DEFAULT_FRAME_DURATION_MS);
+    const ms = Math.min(
+      MAX_FRAME_DURATION_MS,
+      Math.max(
+        MIN_FRAME_DURATION_MS,
+        Math.round((baseMs + deltaSec * 1000) / 10) * 10,
+      ),
+    );
+    onFrameDurationChange(activeLayer.id, ms);
+    if (durationDraft !== null) setDurationDraft(formatFrameSeconds(ms));
   };
 
   return (
@@ -731,9 +745,35 @@ export default function LayerPanel({
                 onKeyDown={(e) => {
                   if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                   if (e.key === "Escape") setDurationDraft(null);
+                  if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                    e.preventDefault();
+                    stepFrameDuration(e.key === "ArrowUp" ? 0.1 : -0.1);
+                  }
                 }}
                 className="w-14 border border-gray-200 px-1 py-0.5 text-center text-[10px] text-gray-700 outline-none disabled:opacity-50"
               />
+              <span className="flex shrink-0 flex-col">
+                <button
+                  type="button"
+                  onClick={() => stepFrameDuration(0.1)}
+                  disabled={isPlaying}
+                  title="0.1초 늘리기"
+                  aria-label="지속시간 0.1초 늘리기"
+                  className="flex h-2.5 w-4 items-center justify-center text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                >
+                  <ChevronUp className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => stepFrameDuration(-0.1)}
+                  disabled={isPlaying}
+                  title="0.1초 줄이기"
+                  aria-label="지속시간 0.1초 줄이기"
+                  className="flex h-2.5 w-4 items-center justify-center text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+              </span>
               <span className="shrink-0 text-gray-400">초</span>
             </label>
           </div>
