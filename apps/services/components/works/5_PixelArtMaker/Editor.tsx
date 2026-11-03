@@ -1072,10 +1072,15 @@ export default function Editor({
 
   // LayerScope 값 하나를 실제 대상 레이어 id 집합으로 푼다. "active"면 활성
   // 레이어, "reference"면 참조 레이어(비어 있을 수 있음), "all"이면 보이는
-  // 레이어 전부. 프레임 모드에선 항상 현재 프레임 하나뿐이다.
+  // 레이어 전부. 프레임 모드엔 참조 개념이 없어 "reference"는 현재 프레임
+  // 하나로, "all"은 보이는 프레임 전부로 푼다(모든 프레임을 한꺼번에 이동·
+  // 반전·회전·지우기·정렬).
   const resolveScopeIds = useCallback(
     (scope: LayerScope): Set<string> => {
-      if (layerMode === "frames" || scope === "active") {
+      if (
+        scope === "active" ||
+        (layerMode === "frames" && scope === "reference")
+      ) {
         return new Set([history.activeLayerId]);
       }
       const visible = history.presentLayers.filter((l) => l.visible);
@@ -1594,8 +1599,8 @@ export default function Editor({
       // 이동의 대상(transformScopes.move)에 활성 레이어 말고도 있으면(대상=
       // "참조"나 "전체"), 같은 선택 영역·같은 이동량으로 나머지도 함께 옮긴다.
       // 활성 레이어는 캔버스 드래그가 이미 옮긴 결과(next)를 그대로 쓴다. 잠긴
-      // 레이어는 건드리지 않는다. 프레임 모드에선 대상이 현재 프레임 하나뿐이라
-      // peerIds가 비어 활성 프레임만 옮긴다.
+      // 레이어는 건드리지 않는다. 프레임 모드에서 대상이 "전체"면 보이는
+      // 프레임이 모두 함께 옮겨진다.
       const moved =
         moveOriginalMask &&
         moveDelta &&
