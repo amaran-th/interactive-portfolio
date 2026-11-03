@@ -125,7 +125,11 @@ export default function PreviewPanel({
           vis[frameAt(localIdx, vis.length, pingPongRef.current)]
             .frameDurationMs ?? DEFAULT_FRAME_DURATION_MS;
         if (elapsed >= dur) {
+          // 탭이 숨겨지면 rAF가 멈춰 그동안의 시간이 한 번에 들어온다.
+          // 밀린 시간을 남기면 매 프레임 한 칸씩 따라잡느라 빨리 감기처럼
+          // 보이므로, 한 칸 넘을 만큼 밀렸으면 버린다.
           elapsed -= dur;
+          if (elapsed >= dur) elapsed = 0;
           localIdx += 1;
           setFrameIdx(localIdx);
         }
