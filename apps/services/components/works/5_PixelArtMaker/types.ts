@@ -189,3 +189,7 @@ export const PREVIEW_MIN_WIDTH = 1280;
 // 밀 수 있게 스크롤 여유를 확보한다. 미리보기의 뷰파인더 사각형 계산도 이
 // 값을 기준으로 한다(캔버스 좌상단이 스크롤 콘텐츠에서 이만큼 안쪽에 있음).
 export const CANVAS_PAN_PADDING = 320;
+
+// JSON 내보내기·불러오기 메뉴를 화면에 띄울지 — 기능(exportAsJSON·
+// handleImportJSONFile)은 그대로 두고 진입점만 숨긴다. 다시 열려면 true.
+export const SHOW_JSON_IO = false;

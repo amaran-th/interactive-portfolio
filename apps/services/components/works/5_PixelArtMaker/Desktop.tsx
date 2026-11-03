@@ -54,7 +54,7 @@ import {
   WALLPAPER_ID,
   WALLPAPER_ID_MOBILE,
 } from "./wallpaper";
-import { NARROW_BREAKPOINT } from "./types";
+import { NARROW_BREAKPOINT, SHOW_JSON_IO } from "./types";
 
 type Menu = { x: number; y: number; items: ContextMenuItem[] } | null;
 
@@ -688,10 +688,14 @@ export default function Desktop({
                           label: "SVG로 내보내기",
                           onClick: () => exportAsSVG(art),
                         },
-                        {
-                          label: "JSON으로 내보내기",
-                          onClick: () => exportAsJSON(art),
-                        },
+                        ...(SHOW_JSON_IO
+                          ? [
+                              {
+                                label: "JSON으로 내보내기",
+                                onClick: () => exportAsJSON(art),
+                              },
+                            ]
+                          : []),
                         {
                           label: "JPG로 내보내기 (손실 압축)",
                           onClick: () => exportAsJPG(art),
@@ -741,10 +745,14 @@ export default function Desktop({
                       label: "SVG로 내보내기",
                       onClick: () => exportAsSVG(art),
                     },
-                    {
-                      label: "JSON으로 내보내기",
-                      onClick: () => exportAsJSON(art),
-                    },
+                    ...(SHOW_JSON_IO
+                      ? [
+                          {
+                            label: "JSON으로 내보내기",
+                            onClick: () => exportAsJSON(art),
+                          },
+                        ]
+                      : []),
                     {
                       label: "JPG로 내보내기 (손실 압축)",
                       onClick: () => exportAsJPG(art),

@@ -123,6 +123,7 @@ import {
   SampleScopeTool,
   SELECT_TOOL_CATEGORY,
   SelectMode,
+  SHOW_JSON_IO,
   TOOLBAR_COMPACT_WIDTH,
   Tool,
   TracingImage,
@@ -414,6 +415,12 @@ function computeFitTracingGeometry(
   };
 }
 
+const DEFAULT_SAMPLE_SCOPES: Record<SampleScopeTool, LayerScope> = {
+  eyedropper: "all",
+  wand: "active",
+  bucket: "active",
+};
+
 export default function Editor({
   docId,
   startMode = "empty",
@@ -477,6 +484,12 @@ export default function Editor({
     if ([...PRIMARY_DRAW_TOOLS, ...COLLAPSIBLE_DRAW_TOOLS].some((t) => t.tool === tool)) {
       setLastDrawTool(tool);
     }
+  }, [tool]);
+  // 스포이트로 색을 하나 집으면 스포이트를 켜기 직전 도구로 돌아간다 — 그
+  // 도구를 기억해 둔다(스포이트가 아닌 도구로 바뀔 때마다 갱신).
+  const toolBeforeEyedropperRef = useRef<Tool>("pencil");
+  useEffect(() => {
+    if (tool !== "eyedropper") toolBeforeEyedropperRef.current = tool;
   }, [tool]);
   // 하단 독의 펜/지우개 토글 버튼 — 펜·지우개를 오가고, 그 외의 도구가
   // 활성일 때 누르면 펜으로 바뀐다(마지막으로 쓰던 도구를 기억하지 않고
@@ -940,10 +953,12 @@ export default function Editor({
   // 전체 화면에서 뽑고, 마법봉은 편집 레이어만 보고, 반전은 참조 레이어에만…
   // 처럼 따로 설정할 수 있다(CSP도 도구별 Tool Property에 저장). 3지는
   // 활성(활성 레이어) / reference(레이어 행 전구로 지정한 참조 레이어) / all
-  // (보이는 레이어 전부). 세션 전용이라 문서를 열 때 전부 "active"로 초기화.
+  // (보이는 레이어 전부). 세션 전용이라 문서를 열 때 초기화 — 스포이트는 눈에
+  // 보이는 색을 집는 게 자연스러워 "all", 나머지는 "active"(프레임 모드는
+  // 합성이 없어 스포이트도 현재 프레임만 본다).
   const [sampleScopes, setSampleScopes] = useState<
     Record<SampleScopeTool, LayerScope>
-  >(() => ({ eyedropper: "active", wand: "active", bucket: "active" }));
+  >(() => ({ ...DEFAULT_SAMPLE_SCOPES }));
   const [transformScopes, setTransformScopes] = useState<
     Record<TransformScopeKey, LayerScope>
   >(() => ({
@@ -1457,7 +1472,7 @@ export default function Editor({
       setReferenceWindows(tab.referenceWindows);
       setReferenceItems(tab.referenceItems);
       setActiveReferenceId(tab.activeReferenceId);
-      setSampleScopes({ eyedropper: "active", wand: "active", bucket: "active" });
+      setSampleScopes({ ...DEFAULT_SAMPLE_SCOPES });
       setTransformScopes({
         clear: "active",
         flipH: "active",
@@ -2373,9 +2388,13 @@ export default function Editor({
     setHasMetaEdits(true);
   }, []);
 
-  const handlePickColor = useCallback((hex: string) => {
-    setActiveColorHex(hex);
-  }, []);
+  const handlePickColor = useCallback(
+    (hex: string) => {
+      setActiveColorHex(hex);
+      if (tool === "eyedropper") setTool(toolBeforeEyedropperRef.current);
+    },
+    [tool],
+  );
 
   const handleSelectLayer = useCallback(
     (id: string) => {
@@ -2701,12 +2720,16 @@ export default function Editor({
       const exportSubmenu: ContextMenuItem[] = [
         { label: "PNG", onClick: () => exportAsPNG(exportDoc) },
         { label: "SVG", onClick: () => exportAsSVG(exportDoc) },
-        {
-          label: "JSON",
-          title:
-            "다른 기기에서도 그림을 그대로 이어 그리고 싶을 때 씁니다 — 저장된 이 파일을 그 기기의 파일 > JSON 불러오기로 열면 됩니다.",
-          onClick: () => exportAsJSON(exportDoc),
-        },
+        ...(SHOW_JSON_IO
+          ? [
+              {
+                label: "JSON",
+                title:
+                  "다른 기기에서도 그림을 그대로 이어 그리고 싶을 때 씁니다 — 저장된 이 파일을 그 기기의 파일 > JSON 불러오기로 열면 됩니다.",
+                onClick: () => exportAsJSON(exportDoc),
+              },
+            ]
+          : []),
         { label: "JPG (손실 압축)", onClick: () => exportAsJPG(exportDoc) },
       ];
       if (layerMode === "frames") {
@@ -2731,12 +2754,16 @@ export default function Editor({
         items: [
           { label: "새로 만들기", onClick: () => setShowNewCanvasDialog(true) },
           { label: "열기", onClick: () => setShowOpenDialog(true) },
-          {
-            label: "JSON 불러오기",
-            title:
-              "다른 기기에서 이 편집기로 만든 작품을 내보내기 > JSON으로 저장해뒀다면, 그 파일을 여기서 다시 불러올 수 있습니다.",
-            onClick: () => jsonFileInputRef.current?.click(),
-          },
+          ...(SHOW_JSON_IO
+            ? [
+                {
+                  label: "JSON 불러오기",
+                  title:
+                    "다른 기기에서 이 편집기로 만든 작품을 내보내기 > JSON으로 저장해뒀다면, 그 파일을 여기서 다시 불러올 수 있습니다.",
+                  onClick: () => jsonFileInputRef.current?.click(),
+                },
+              ]
+            : []),
           {
             label: "저장",
             onClick: handleSave,
@@ -3221,7 +3248,7 @@ export default function Editor({
         <div className="flex flex-col divide-y divide-gray-100">
           <button onClick={() => setShowNewCanvasDialog(true)} className="py-3 text-left text-sm text-gray-800">새로 만들기</button>
           <button onClick={() => setShowOpenDialog(true)} className="py-3 text-left text-sm text-gray-800">열기</button>
-          <button onClick={() => jsonFileInputRef.current?.click()} className="py-3 text-left text-sm text-gray-800">JSON 불러오기</button>
+          {SHOW_JSON_IO && <button onClick={() => jsonFileInputRef.current?.click()} className="py-3 text-left text-sm text-gray-800">JSON 불러오기</button>}
           <button onClick={handleSave} disabled={activeTabIndex < 0} className="py-3 text-left text-sm text-gray-800 disabled:text-gray-300">저장</button>
           <button onClick={handleSaveAs} disabled={activeTabIndex < 0} className="py-3 text-left text-sm text-gray-800 disabled:text-gray-300">다른 이름으로 저장</button>
         </div>
@@ -3564,11 +3591,7 @@ export default function Editor({
               <button
                 onClick={openReferenceWindow}
                 title="참고 이미지 창을 새로 엽니다. 참고 모드(뷰포트로 보기)와 트레이싱 모드(캔버스 배경에 깔아 따라 그리기)를 창 안에서 오갈 수 있습니다. 여러 개를 동시에 띄울 수 있습니다(저장되지 않음)"
-                className={`px-2 py-1 text-xs ${
-                  referenceWindows.length > 0
-                    ? "bg-violet-50 text-violet-700"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
+                className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
               >
                 레퍼런스
               </button>
@@ -4013,7 +4036,14 @@ export default function Editor({
       )}
 
       {showHelpDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+        // 바깥(어두운 배경)을 눌러도 닫는다. 창 안에서 누르고 바깥에서 떼는
+        // 드래그로 닫히지 않도록 click이 아니라 누른 지점(pointerdown)으로 본다.
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onPointerDown={(e) => {
+            if (e.target === e.currentTarget) setShowHelpDialog(false);
+          }}
+        >
           {/* 헤더와 하단 액션(닫기)은 고정하고, 그 사이 본문(단축키 목록)만
               스크롤한다 — 모달 전체가 overflow-y-auto면 내용이 길어질 때
               헤더는 물론 닫기 버튼까지 스크롤해야 보이게 된다(NewCanvasDialog와

@@ -21,16 +21,19 @@ import {
   exportAsSVG,
 } from "./exportPixelArt";
 import Switch from "./Switch";
+import { SHOW_JSON_IO } from "./types";
 
 type Format = "png" | "svg" | "json" | "jpg" | "gif";
 
 // 래스터 형식(PNG·JPG)을 나란히, 그 다음 벡터/데이터 형식(SVG·JSON) 순으로 배치한다.
-const FORMATS: { id: Format; label: string }[] = [
+// JSON은 SHOW_JSON_IO가 꺼져 있으면 목록에서 뺀다(기능은 남겨 둔다).
+const ALL_FORMATS: { id: Format; label: string }[] = [
   { id: "png", label: "PNG" },
   { id: "jpg", label: "JPG" },
   { id: "svg", label: "SVG" },
   { id: "json", label: "JSON" },
 ];
+const FORMATS = ALL_FORMATS.filter((f) => SHOW_JSON_IO || f.id !== "json");
 
 // PNG·JPG는 래스터라 배율만큼 실제 출력 해상도가 달라진다 — SVG·JSON은
 // 벡터/데이터라 해상도 개념이 없어 이 옵션 자체를 보여주지 않는다.
