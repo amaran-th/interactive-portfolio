@@ -50,6 +50,12 @@ export default function OpacitySlider({
     setEditing(false);
   };
 
+  const endDrag = () => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    onChangeEnd?.();
+  };
+
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1.5">
       <div
@@ -58,6 +64,7 @@ export default function OpacitySlider({
           disabled
             ? undefined
             : (e) => {
+                if (e.button !== 0) return;
                 draggingRef.current = true;
                 e.currentTarget.setPointerCapture(e.pointerId);
                 apply(e.clientX);
@@ -67,7 +74,15 @@ export default function OpacitySlider({
           disabled
             ? undefined
             : (e) => {
-                if (draggingRef.current) apply(e.clientX);
+                if (!draggingRef.current) return;
+                // pointerup을 놓쳐 남은 드래그 상태는 버튼이 떼어진 걸 보고
+                // 끝낸다.
+                if (e.buttons === 0) {
+                  draggingRef.current = false;
+                  onChangeEnd?.();
+                  return;
+                }
+                apply(e.clientX);
               }
         }
         onPointerUp={
@@ -79,11 +94,8 @@ export default function OpacitySlider({
                 onChangeEnd?.();
               }
         }
-        onPointerCancel={() => {
-          if (!draggingRef.current) return;
-          draggingRef.current = false;
-          onChangeEnd?.();
-        }}
+        onPointerCancel={endDrag}
+        onLostPointerCapture={endDrag}
         className={`relative h-4 min-w-0 flex-1 touch-none ${
           disabled ? "opacity-40" : "cursor-pointer"
         }`}

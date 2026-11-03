@@ -188,6 +188,7 @@ export default function ColorPicker({
 
   const handleSquareDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
+      if (e.button !== 0) return;
       draggingRef.current = "square";
       squareRef.current?.setPointerCapture(e.pointerId);
       applySquarePoint(e.clientX, e.clientY);
@@ -198,6 +199,10 @@ export default function ColorPicker({
   const handleSquareMove = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
       if (draggingRef.current !== "square") return;
+      if (e.buttons === 0) {
+        draggingRef.current = null;
+        return;
+      }
       applySquarePoint(e.clientX, e.clientY);
     },
     [applySquarePoint],
@@ -215,6 +220,7 @@ export default function ColorPicker({
 
   const handleHueDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return;
       draggingRef.current = "hue";
       hueTrackRef.current?.setPointerCapture(e.pointerId);
       applyHuePoint(e.clientY);
@@ -225,6 +231,10 @@ export default function ColorPicker({
   const handleHueMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (draggingRef.current !== "hue") return;
+      if (e.buttons === 0) {
+        draggingRef.current = null;
+        return;
+      }
       applyHuePoint(e.clientY);
     },
     [applyHuePoint],
@@ -242,6 +252,7 @@ export default function ColorPicker({
 
   const handleAlphaDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return;
       draggingRef.current = "alpha";
       alphaTrackRef.current?.setPointerCapture(e.pointerId);
       applyAlphaPoint(e.clientY);
@@ -252,11 +263,19 @@ export default function ColorPicker({
   const handleAlphaMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (draggingRef.current !== "alpha") return;
+      if (e.buttons === 0) {
+        draggingRef.current = null;
+        return;
+      }
       applyAlphaPoint(e.clientY);
     },
     [applyAlphaPoint],
   );
 
+  // 버튼을 뗀 pointerup을 놓치면(우클릭 메뉴·창 밖에서 놓기·포인터 캡처
+  // 해제 등) 드래그 상태가 남아, 손을 뗀 뒤에도 커서만 지나가면 색이 따라
+  // 바뀐다. 그래서 왼쪽 버튼으로만 드래그를 시작하고, 이동 중 버튼이 눌려
+  // 있지 않으면(buttons === 0) 드래그를 끝내며, 캡처를 잃어도 끝낸다.
   const handleDragEnd = useCallback(() => {
     draggingRef.current = null;
   }, []);
@@ -283,6 +302,7 @@ export default function ColorPicker({
             onPointerMove={handleSquareMove}
             onPointerUp={handleDragEnd}
             onPointerCancel={handleDragEnd}
+            onLostPointerCapture={handleDragEnd}
           />
           <div
             className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[0_0_0_2px_#ffffff,0_1px_3px_rgba(0,0,0,0.35)]"
@@ -314,6 +334,7 @@ export default function ColorPicker({
               onPointerMove={handleHueMove}
               onPointerUp={handleDragEnd}
               onPointerCancel={handleDragEnd}
+              onLostPointerCapture={handleDragEnd}
               className="relative h-full w-3.5 touch-none shadow-sm"
               style={{
                 cursor: CURSOR_POINTING,
@@ -336,6 +357,7 @@ export default function ColorPicker({
               onPointerMove={alphaDisabled ? undefined : handleAlphaMove}
               onPointerUp={handleDragEnd}
               onPointerCancel={handleDragEnd}
+              onLostPointerCapture={handleDragEnd}
               title={alphaDisabled ? "이 대상은 항상 불투명합니다" : undefined}
               className={`relative h-full w-3.5 touch-none shadow-sm ${
                 alphaDisabled ? "opacity-40" : ""

@@ -33,6 +33,7 @@ export default function GradientDial({
 
   const handleDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return;
       draggingRef.current = true;
       dialRef.current?.setPointerCapture(e.pointerId);
       applyPoint(e.clientX, e.clientY);
@@ -42,6 +43,11 @@ export default function GradientDial({
   const handleMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (!draggingRef.current) return;
+      // pointerup을 놓쳐 남은 드래그 상태는 버튼이 떼어진 걸 보고 끝낸다.
+      if (e.buttons === 0) {
+        draggingRef.current = false;
+        return;
+      }
       applyPoint(e.clientX, e.clientY);
     },
     [applyPoint],
@@ -57,6 +63,7 @@ export default function GradientDial({
       onPointerMove={handleMove}
       onPointerUp={handleUp}
       onPointerCancel={handleUp}
+      onLostPointerCapture={handleUp}
       className="relative h-7 w-7 shrink-0 touch-none rounded-full bg-gray-100 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.12)]"
       style={{ cursor: CURSOR_POINTING }}
     >
