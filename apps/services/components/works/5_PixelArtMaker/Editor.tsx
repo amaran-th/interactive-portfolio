@@ -987,19 +987,23 @@ export default function Editor({
   const belowComposite = useMemo(() => {
     if (layerMode === "frames") {
       if (!onionSkin) return null;
-      const prevFrames = prevVisibleFrames(
+      // 어니언 스킨: 다음 프레임은 현재 프레임 밑에, 이전 프레임은 위에
+      // 깐다(aboveLayers 참고) — 그리는 기준이 되는 이전 동작이 현재 그림에
+      // 가려지지 않고 보여야 하므로. 예전엔 반대로 깔려, 겹치는 곳에선 다음
+      // 프레임만 보이고 이전 프레임은 가려졌다.
+      const nextFrames = nextVisibleFrames(
         history.presentLayers,
         history.activeLayerId,
         onionSkinRange,
       );
-      if (prevFrames.length === 0) return null;
+      if (nextFrames.length === 0) return null;
       // 어니언 스킨 유령 이미지는 항상 흐린 미리보기일 뿐이다 — 각 프레임
       // 자신에 블렌드 모드·보정이 걸려 있어도 무시하고 일반 겹치기로만
       // 보여준다(프레임 모드에서는 블렌드·보정을 편집 화면에 반영하지
       // 않기로 했다). 가까운 프레임이 먼 프레임보다 위에 오도록(더 잘
       // 보이도록) 배열을 뒤집어(먼 프레임 → 가까운 프레임 순으로) 합성한다.
       return compositeLayers(
-        [...prevFrames].reverse().map((frame) => ({
+        [...nextFrames].reverse().map((frame) => ({
           ...frame,
           blendMode: "normal" as const,
           brightness: undefined,
@@ -1034,18 +1038,18 @@ export default function Editor({
   const aboveLayers = useMemo((): PixelLayer[] | null => {
     if (layerMode === "frames") {
       if (!onionSkin) return null;
-      const nextFrames = nextVisibleFrames(
+      const prevFrames = prevVisibleFrames(
         history.presentLayers,
         history.activeLayerId,
         onionSkinRange,
       );
-      if (nextFrames.length === 0) return null;
+      if (prevFrames.length === 0) return null;
       // 어니언 스킨 유령 이미지는 항상 흐린 미리보기일 뿐이다 — 각 프레임
       // 자신에 블렌드 모드·보정이 걸려 있어도 무시하고 일반 겹치기로만
       // 보여준다(프레임 모드에서는 블렌드·보정을 편집 화면에 반영하지
       // 않기로 했다). 가까운 프레임이 먼 프레임보다 위에 오도록(더 잘
       // 보이도록) 배열을 뒤집어(먼 프레임 → 가까운 프레임 순으로) 넘긴다.
-      return [...nextFrames].reverse().map((frame) => ({
+      return [...prevFrames].reverse().map((frame) => ({
         ...frame,
         blendMode: "normal" as const,
         brightness: undefined,
