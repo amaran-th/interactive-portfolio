@@ -88,7 +88,7 @@ const linkClass =
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-dvh bg-shade">
+    <div className="min-h-dvh bg-white">
       <main className="mx-auto max-w-3xl px-6 py-16 text-ink">
         <h1 className="text-3xl font-extrabold tracking-tight text-point">
           개인정보처리방침

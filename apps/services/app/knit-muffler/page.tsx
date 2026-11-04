@@ -5,7 +5,7 @@ import { knitMufflerGuide } from "./guide";
 
 export const metadata: Metadata = {
   title: "뜨개뜨개",
-  description: "정확하고 빠르게 뜨개 도안을 완성해봅시다!",
+  description: "한 코 한 코, 틀리지 말고 빠르게!",
 
   icons: {
     icon: "/playground/knit-muffler.svg",
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
   openGraph: {
     title: "뜨개뜨개",
-    description: "정확하고 빠르게 뜨개 도안을 완성해봅시다!",
+    description: "한 코 한 코, 틀리지 말고 빠르게!",
     images: [
       {
         url: "/playground/knit-muffler.png",
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "뜨개뜨개",
-    description: "정확하고 빠르게 뜨개 도안을 완성해봅시다!",
+    description: "한 코 한 코, 틀리지 말고 빠르게!",
     images: ["/playground/knit-muffler.png"],
   },
 };

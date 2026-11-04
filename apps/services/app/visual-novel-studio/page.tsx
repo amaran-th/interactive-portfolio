@@ -5,14 +5,14 @@ import { visualNovelStudioGuide } from "./guide";
 
 export const metadata: Metadata = {
   title: "비주얼 노벨 스튜디오",
-  description: "캐릭터 시트와 대사를 입력해 나만의 이야기를 만들어봅시다!",
+  description: "내가 그린 캐릭터가 말을 하기 시작했다",
   icons: {
     icon: "/playground/visual-novel-studio.svg",
   },
 
   openGraph: {
     title: `비주얼 노벨 스튜디오`,
-    description: "캐릭터 시트와 대사를 입력해 나만의 이야기를 만들어봅시다!",
+    description: "내가 그린 캐릭터가 말을 하기 시작했다",
     images: [
       {
         url: "/playground/visual-novel-studio.png",
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: `비주얼 노벨 스튜디오`,
-    description: "캐릭터 시트와 대사를 입력해 나만의 이야기를 만들어봅시다!",
+    description: "내가 그린 캐릭터가 말을 하기 시작했다",
     images: ["/playground/visual-novel-studio.png"],
   },
 };

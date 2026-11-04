@@ -33,28 +33,29 @@ export default async function CategoryPage({ params }: Props) {
   if (tools.length === 0) notFound();
 
   return (
-    <div className="min-h-dvh bg-shade text-ink">
-      <main className="mx-auto max-w-6xl px-5 pt-8 pb-12">
-        <Link
-          href="/"
-          className="text-xs font-bold text-main hover:text-point"
-        >
-          ← 전체 도구
-        </Link>
-        <header className="mt-2">
-          <h1 className="text-xl font-extrabold tracking-tight break-keep text-point sm:text-2xl">
+    <div className="flex min-h-dvh flex-col bg-white text-ink">
+      <header className="border-b-2 border-point bg-shade">
+        <div className="mx-auto max-w-6xl px-5 pt-8 pb-8">
+          <Link
+            href="/"
+            className="text-xs font-bold text-point/70 hover:text-point"
+          >
+            ← 전체 도구
+          </Link>
+          <h1 className="mt-2 text-xl font-extrabold tracking-tight break-keep text-point sm:text-2xl">
             {category.label} 도구
           </h1>
-          <p className="mt-1.5 text-sm break-keep text-ink/80">
+          <p className="mt-1.5 max-w-2xl text-sm break-keep text-ink/80">
             {category.description}
           </p>
-        </header>
-
-        <div className="mt-6">
-          <CategoryChips current={category.id} />
+          <div className="mt-6">
+            <CategoryChips current={category.id} />
+          </div>
         </div>
+      </header>
 
-        <section aria-label={`${category.label} 도구 목록`} className="mt-6">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-5 pt-8 pb-12">
+        <section aria-label={`${category.label} 도구 목록`}>
           <ToolGrid tools={tools} />
         </section>
       </main>

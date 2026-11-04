@@ -38,9 +38,9 @@ The two apps share no code. Portfolio Work demos are shown by iframe-embedding t
 **Services app structure (`apps/services/`):**
 
 - `lib/tools.ts` — 도구 레지스트리(`CATEGORIES`, `TOOLS`)와 `searchTools`/`activeCategories`/`toolsIn`/`getCategory`. 메인·카테고리 페이지가 모두 읽는다. 테스트: `node --test apps/services/lib/tools.test.mts`
-- `app/page.tsx` — 포털 메인: `ToolSearch` 검색창 + `CategoryChips` + 카테고리별 `ToolGrid` 섹션 + "이 사이트에 대해"
+- `app/page.tsx` — 포털 메인: 하늘색 상단 띠(제목·`ToolSearchInput`) + 흰 본문(카테고리마다 왼쪽 제목 칸·오른쪽 `ToolGrid` 한 줄, `ToolSearchResults`가 검색 중엔 결과로 교체) + 남색 `SiteFooter` 안의 "이 사이트에 대해"
 - `app/category/[id]/page.tsx` — 도구가 있는 카테고리만 정적 생성(`dynamicParams = false`)
-- `app/_components/ToolCard.tsx`·`ToolGrid.tsx`·`CategoryChips.tsx`·`ToolSearch.tsx` — 카드(`STICKER` 스타일)·그리드·카테고리 칩·검색
+- `app/_components/ToolCard.tsx`·`ToolGrid.tsx`·`CategoryChips.tsx`·`ToolSearch.tsx` — 카드(썸네일만 `STICKER` 타일로 띄운 아이콘형)·그리드·카테고리 칩(카테고리 페이지)·검색(Provider/Input/Results)
 - `app/<service>/page.tsx` — One route per service (`knit-muffler`, `visual-novel-studio`, `stellar-forge`, `yearly-receipt`, `nemo-nemo-beam`, `asset-simulator`), each renders its Work component full-page with route `metadata`
 - `components/works/1_KnitMuffler/` … `6_AssetSimulator/`, `_shared/` — the 6 Work components
 - `components/SVG.tsx` — shared SVG (`KnitMufflerIcon` etc.)

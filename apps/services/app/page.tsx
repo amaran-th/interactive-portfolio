@@ -1,90 +1,105 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { activeCategories, toolsIn } from "@/lib/tools";
-import CategoryChips from "./_components/CategoryChips";
+import { activeCategories, TOOLS, toolsIn } from "@/lib/tools";
 import SiteFooter from "./_components/SiteFooter";
 import ToolGrid from "./_components/ToolGrid";
-import ToolSearch from "./_components/ToolSearch";
+import {
+  ToolSearchInput,
+  ToolSearchProvider,
+  ToolSearchResults,
+} from "./_components/ToolSearch";
 
 export const metadata: Metadata = {
   title: "Amaranth Site",
-  description: "간단 웹 서비스 모음",
+  description: "설치·가입 없이 브라우저에서 바로 여는 작은 도구 모음",
 };
+
+// 카테고리마다 한 줄: 왼쪽 제목 칸 + 오른쪽 도구 목록,
+// 줄 사이는 옅은 구분선. 모바일에서는 제목이 위로 올라간다.
+const ROW = "py-6 sm:grid sm:grid-cols-[8rem_1fr] sm:gap-6";
 
 export default function Home() {
   return (
-    <div className="min-h-dvh bg-shade text-ink">
-      <main className="mx-auto max-w-6xl px-5 pt-8 pb-12">
-        <header>
-          <h1 className="text-xl font-extrabold tracking-tight break-keep text-point sm:text-2xl">
-            Amaranth Site
-          </h1>
-          <p className="mt-1.5 text-sm text-ink/80">간단 웹서비스 모음</p>
+    <div className="flex min-h-dvh flex-col bg-white text-ink">
+      <ToolSearchProvider>
+        {/* 소개·검색만 하늘색 띠에 두고 목록은 물방울 무늬 흰 바탕에 놓는다 */}
+        <header className="border-b-2 border-point bg-shade">
+          <div className="mx-auto max-w-6xl px-5 pt-8 pb-8">
+            <h1 className="text-xl font-extrabold tracking-tight break-keep text-point sm:text-2xl">
+              Amaranth Site
+            </h1>
+            <p className="mt-1.5 text-sm break-keep text-ink/80">
+              브라우저에서 바로 쓰는 작은 도구 {TOOLS.length}개
+            </p>
+            <div className="mt-6">
+              <ToolSearchInput />
+            </div>
+          </div>
         </header>
 
-        <div className="mt-6">
-          <ToolSearch>
-            <div className="mt-4">
-              <CategoryChips />
-            </div>
-            <div className="mt-6 flex flex-col gap-8">
-              {activeCategories().map((c) => (
-                <section key={c.id} aria-labelledby={`category-${c.id}`}>
-                  <div className="mb-3 flex items-baseline justify-between gap-3">
-                    <h2
-                      id={`category-${c.id}`}
-                      className="font-bold text-point"
-                    >
-                      {c.label}
+        {/* 물방울 점무늬는 기본 썸네일(ServiceThumbFallback)의 배경과 같은 무늬다 */}
+        <div className="flex-1 bg-[radial-gradient(var(--color-shade)_2.5px,transparent_2.5px)] bg-size-[22px_22px]">
+          <main className="mx-auto w-full max-w-6xl px-5 pb-12">
+            <ToolSearchResults>
+              <div className="divide-y-2 divide-dashed divide-point/20">
+                {activeCategories().map((c) => (
+                  <section
+                    key={c.id}
+                    aria-labelledby={`category-${c.id}`}
+                    className={ROW}
+                  >
+                    <h2 id={`category-${c.id}`} className="mb-4 sm:mb-0">
+                      {/* 카테고리 색 스티커를 살짝 기울여 붙인다 */}
+                      <Link
+                        href={`/category/${c.id}`}
+                        className={`inline-flex -rotate-2 items-center gap-1.5 rounded-full border-2 border-point py-0.5 pr-1 pl-3 text-sm font-bold text-point shadow-[2px_2px_0_0_var(--color-point)] transition-transform hover:rotate-0 ${c.badgeClass}`}
+                      >
+                        {c.label}
+                        <span className="rounded-full bg-white px-1.5 text-[11px] tabular-nums">
+                          {toolsIn(c.id).length}
+                        </span>
+                      </Link>
                     </h2>
-                    <Link
-                      href={`/category/${c.id}`}
-                      aria-label={`${c.label} 전체 보기`}
-                      className="text-xs font-bold text-main hover:text-point"
-                    >
-                      전체 보기 →
-                    </Link>
-                  </div>
-                  <ToolGrid tools={toolsIn(c.id)} />
-                </section>
-              ))}
-            </div>
-          </ToolSearch>
+                    <ToolGrid
+                      tools={toolsIn(c.id)}
+                      cols="sm:grid-cols-3 lg:grid-cols-5"
+                    />
+                  </section>
+                ))}
+              </div>
+            </ToolSearchResults>
+          </main>
         </div>
-
-        <section
-          aria-labelledby="about-title"
-          className={`mt-10 max-w-3xl p-2 break-keep`}
-        >
-          <h2 id="about-title" className="font-bold text-point">
+      </ToolSearchProvider>
+      <SiteFooter>
+        <section aria-labelledby="about-title" className="max-w-2xl break-keep">
+          <h2 id="about-title" className="font-bold">
             이 사이트에 대해
           </h2>
-          <div className="mt-2 flex flex-col gap-2 text-sm leading-relaxed">
+          <div className="mt-2 flex flex-col gap-1.5 leading-relaxed text-white/80">
             <p>
-              본 페이지는 웹 서비스를 제공하고 있습니다. 별도의 설치나 회원가입
-              절차를 필요로 하지 않습니다.
+              설치도 가입도 필요 없어요. 만든 건 이 브라우저에만 저장되고 서버로
+              가지 않아요.
             </p>
             <p>
-              서비스에 저장되는 데이터는 사용자의 브라우저에 저장됩니다. 사용
-              방법과 자주 묻는 질문은 각 서비스 화면 위쪽의 &lsquo;사용
-              안내&rsquo; 버튼을 누르면 볼 수 있습니다.
+              쓰는 법이 궁금하면 각 도구 위쪽의 &lsquo;사용 안내&rsquo;를 눌러
+              보세요.
             </p>
             <p>
-              사이트는 개발자 개인이 직접 만들고 운영합니다. 다른 작업물은{" "}
+              혼자 만들고 운영하는 사이트예요. 다른 작업은{" "}
               <a
                 href="https://amaranth-portfolio.vercel.app"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-bold text-point underline decoration-main decoration-2 underline-offset-4 hover:text-main"
+                className="font-bold text-white underline decoration-white/40 decoration-2 underline-offset-4 hover:decoration-white"
               >
                 포트폴리오
               </a>
-              에서 볼 수 있습니다.
+              에 있어요.
             </p>
           </div>
         </section>
-      </main>
-      <SiteFooter />
+      </SiteFooter>
     </div>
   );
 }
