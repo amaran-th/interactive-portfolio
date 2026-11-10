@@ -21,7 +21,7 @@ test("모든 도구의 카테고리가 CATEGORIES에 있고 slug가 겹치지 �
 test("activeCategories는 도구가 있는 카테고리만 순서대로 돌려준다", () => {
   assert.deepEqual(
     activeCategories().map((c) => c.id),
-    ["productivity", "creative", "game"],
+    ["productivity", "text", "creative", "game"],
   );
 });
 
@@ -30,7 +30,7 @@ test("toolsIn은 카테고리의 도구를 TOOLS 순서로 돌려준다", () => 
   assert.deepEqual(slugs(toolsIn("productivity")), ["yearly-receipt", "asset-simulator"]);
   assert.deepEqual(toolsIn("life"), []);
   assert.deepEqual(slugs(toolsIn("creative")), ["visual-novel-studio", "nemo-nemo-beam"]);
-  assert.deepEqual(toolsIn("text"), []);
+  assert.deepEqual(slugs(toolsIn("text")), ["text-encoding"]);
 });
 
 test("getCategory는 없는 id에 undefined", () => {
@@ -54,6 +54,7 @@ test("제목·설명·태그·카테고리 이름으로 찾는다", () => {
   assert.deepEqual(slugs(searchTools("뜨개 뜨개")), ["knit-muffler"]);
   assert.deepEqual(slugs(searchTools("png")), ["nemo-nemo-beam"]);
   assert.deepEqual(slugs(searchTools("재테크")), ["asset-simulator"]);
+  assert.deepEqual(slugs(searchTools("utf-8")), ["text-encoding"]);
 });
 
 test("맞는 도구가 없거나 특수문자만 있으면 빈 배열, 예외 없음", () => {

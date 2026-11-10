@@ -37,7 +37,7 @@ export const CATEGORIES: Category[] = [
   {
     id: "text",
     label: "텍스트",
-    description: "글을 세고, 바꾸고, 정리하는 도구를 모았습니다.",
+    description: "글자가 컴퓨터 안에서 어떤 숫자로 저장되는지 들여다보는 도구예요.",
     badgeClass: "bg-[#c5e3b5]",
   },
   {
@@ -119,6 +119,16 @@ export const TOOLS: Tool[] = [
     about:
       "지금 가진 돈과 앞으로 들어오고 나갈 돈을 넣으면, 30년 뒤까지 달마다 얼마가 될지 계산해 줘요. 이자와 물가도 반영하고, ‘이렇게 하면 어떨까’ 싶은 경우를 여러 개 만들어 비교해요.",
     tags: ["돈", "재테크", "저축", "가계부", "복리", "계산기"],
+    thumb: null,
+  },
+  {
+    slug: "text-encoding",
+    category: "text",
+    title: "문자 인코딩 변환기",
+    desc: "'가'는 UTF-8로 EA B0 80",
+    about:
+      "글자를 넣으면 UTF-8·UTF-16·EUC-KR·ASCII로 각각 몇 바이트, 어떤 값인지 표로 보여 줘요. 반대로 바이트나 U+AC00 같은 코드를 넣으면 글자로 되돌려요.",
+    tags: ["인코딩", "유니코드", "UTF-8", "EUC-KR", "아스키", "ASCII", "바이트", "16진수"],
     thumb: null,
   },
 ];
