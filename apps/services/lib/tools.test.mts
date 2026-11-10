@@ -35,7 +35,7 @@ test("toolsIn은 카테고리의 도구를 TOOLS 순서로 돌려준다", () => 
     "palette-extractor",
   ]);
   assert.deepEqual(toolsIn("life"), []);
-  assert.deepEqual(slugs(toolsIn("creative")), ["visual-novel-studio", "nemo-nemo-beam"]);
+  assert.deepEqual(slugs(toolsIn("creative")), ["visual-novel-studio", "nemo-nemo-beam", "monorism"]);
   assert.deepEqual(toolsIn("text"), []);
   assert.deepEqual(toolsIn("dev"), []);
 });
@@ -56,7 +56,7 @@ test("빈 검색어·공백만 있는 검색어는 전체를 돌려준다", () =
 });
 
 test("제목·설명·태그·카테고리 이름으로 찾는다", () => {
-  assert.deepEqual(slugs(searchTools("픽셀")), ["nemo-nemo-beam"]);
+  assert.deepEqual(slugs(searchTools("픽셀")), ["nemo-nemo-beam", "monorism"]);
   assert.deepEqual(slugs(searchTools("게임")), ["knit-muffler", "stellar-forge"]);
   assert.deepEqual(slugs(searchTools("뜨개 뜨개")), ["knit-muffler"]);
   assert.deepEqual(slugs(searchTools("png")), ["nemo-nemo-beam"]);
@@ -64,6 +64,7 @@ test("제목·설명·태그·카테고리 이름으로 찾는다", () => {
   assert.deepEqual(slugs(searchTools("utf-8")), ["text-encoding"]);
   assert.deepEqual(slugs(searchTools("스포이트")), ["color-picker"]);
   assert.deepEqual(slugs(searchTools("팔레트 추출")), ["palette-extractor"]);
+  assert.deepEqual(slugs(searchTools("스팽글")), ["monorism"]);
 });
 
 test("맞는 도구가 없거나 특수문자만 있으면 빈 배열, 예외 없음", () => {

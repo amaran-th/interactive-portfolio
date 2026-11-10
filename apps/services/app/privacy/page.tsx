@@ -66,6 +66,12 @@ const STORAGE_ITEMS: {
     keys: ["asset-simulator-onboarding-seen"],
     what: "사용법 안내를 이미 봤는지 여부(입력한 자산 정보는 저장하지 않음)",
   },
+  {
+    tool: "모노리즘",
+    where: "localStorage",
+    keys: ["monorism-board"],
+    what: "판 크기, 앞면·뒷면 색, 칩 상태, 음소거 여부",
+  },
 ];
 
 function Section({

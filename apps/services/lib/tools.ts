@@ -151,6 +151,16 @@ export const TOOLS: Tool[] = [
     tags: ["팔레트", "색상", "컬러", "색 조합", "추출", "CSS"],
     thumb: null,
   },
+  {
+    slug: "monorism",
+    category: "creative",
+    title: "모노리즘",
+    desc: "딱, 딱, 뒤집어서 그리는 모자이크",
+    about:
+      "얇은 원형 칩이 촘촘히 깔린 판에서 칩을 뒤집거나 빼고 놓아 그림을 만들어요. 앞뒤 색이 다른 칩이 딱 소리를 내며 뒤집히고, 만든 판은 알아서 저장돼요.",
+    tags: ["모자이크", "스팽글", "도트", "3D", "픽셀아트", "칩"],
+    thumb: null,
+  },
 ];
 
 export function getCategory(id: string): Category | undefined {
