@@ -31,7 +31,7 @@ export const CATEGORIES: Category[] = [
   {
     id: "productivity",
     label: "생산성",
-    description: "올해 목표는 얼마나 이뤘는지, 돈은 얼마나 모일지 궁금할 때 쓰는 도구예요.",
+    description: "목표 정리, 돈 계산, 인코딩 확인, 색 뽑기처럼 일하다 자주 손이 가는 도구예요.",
     badgeClass: "bg-sub",
   },
   {
@@ -123,7 +123,7 @@ export const TOOLS: Tool[] = [
   },
   {
     slug: "text-encoding",
-    category: "text",
+    category: "productivity",
     title: "문자 인코딩 변환기",
     desc: "'가'는 UTF-8로 EA B0 80",
     about:
@@ -133,7 +133,7 @@ export const TOOLS: Tool[] = [
   },
   {
     slug: "color-picker",
-    category: "dev",
+    category: "productivity",
     title: "색상 스포이트",
     desc: "그 색, 코드가 뭐였더라?",
     about:
@@ -143,7 +143,7 @@ export const TOOLS: Tool[] = [
   },
   {
     slug: "palette-extractor",
-    category: "dev",
+    category: "productivity",
     title: "팔레트 추출기",
     desc: "사진 한 장에서 색 조합 뽑기",
     about:
