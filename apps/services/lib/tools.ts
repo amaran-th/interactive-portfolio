@@ -141,6 +141,16 @@ export const TOOLS: Tool[] = [
     tags: ["색상", "컬러", "스포이트", "HEX", "RGB", "HSL", "색상코드"],
     thumb: null,
   },
+  {
+    slug: "palette-extractor",
+    category: "dev",
+    title: "팔레트 추출기",
+    desc: "사진 한 장에서 색 조합 뽑기",
+    about:
+      "이미지를 넣으면 많이 쓰인 색을 3~12개 골라 비율과 함께 보여 줘요. 색을 누르면 HEX가 복사되고, CSS 변수나 JSON으로도 한 번에 가져갈 수 있어요.",
+    tags: ["팔레트", "색상", "컬러", "색 조합", "추출", "CSS"],
+    thumb: null,
+  },
 ];
 
 export function getCategory(id: string): Category | undefined {

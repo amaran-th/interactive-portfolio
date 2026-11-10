@@ -31,7 +31,7 @@ test("toolsIn은 카테고리의 도구를 TOOLS 순서로 돌려준다", () => 
   assert.deepEqual(toolsIn("life"), []);
   assert.deepEqual(slugs(toolsIn("creative")), ["visual-novel-studio", "nemo-nemo-beam"]);
   assert.deepEqual(slugs(toolsIn("text")), ["text-encoding"]);
-  assert.deepEqual(slugs(toolsIn("dev")), ["color-picker"]);
+  assert.deepEqual(slugs(toolsIn("dev")), ["color-picker", "palette-extractor"]);
 });
 
 test("getCategory는 없는 id에 undefined", () => {
@@ -57,6 +57,7 @@ test("제목·설명·태그·카테고리 이름으로 찾는다", () => {
   assert.deepEqual(slugs(searchTools("재테크")), ["asset-simulator"]);
   assert.deepEqual(slugs(searchTools("utf-8")), ["text-encoding"]);
   assert.deepEqual(slugs(searchTools("스포이트")), ["color-picker"]);
+  assert.deepEqual(slugs(searchTools("팔레트 추출")), ["palette-extractor"]);
 });
 
 test("맞는 도구가 없거나 특수문자만 있으면 빈 배열, 예외 없음", () => {
