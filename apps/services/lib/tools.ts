@@ -49,7 +49,7 @@ export const CATEGORIES: Category[] = [
   {
     id: "dev",
     label: "개발·웹",
-    description: "웹 개발과 웹 작업에 쓰는 도구를 모았습니다.",
+    description: "이미지에서 색을 뽑거나 팔레트를 만드는 것처럼, 웹 작업하다 자주 찾게 되는 도구예요.",
     badgeClass: "bg-[#d4c4f0]",
   },
   {
@@ -129,6 +129,16 @@ export const TOOLS: Tool[] = [
     about:
       "글자를 넣으면 UTF-8·UTF-16·EUC-KR·ASCII로 각각 몇 바이트, 어떤 값인지 표로 보여 줘요. 반대로 바이트나 U+AC00 같은 코드를 넣으면 글자로 되돌려요.",
     tags: ["인코딩", "유니코드", "UTF-8", "EUC-KR", "아스키", "ASCII", "바이트", "16진수"],
+    thumb: null,
+  },
+  {
+    slug: "color-picker",
+    category: "dev",
+    title: "색상 스포이트",
+    desc: "그 색, 코드가 뭐였더라?",
+    about:
+      "이미지를 붙여 넣고 원하는 곳을 누르면 HEX·RGB·HSL 코드를 알려 줘요. 크롬·엣지에서는 화면 어디서든 색을 뽑을 수 있어요.",
+    tags: ["색상", "컬러", "스포이트", "HEX", "RGB", "HSL", "색상코드"],
     thumb: null,
   },
 ];
