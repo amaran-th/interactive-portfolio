@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PATH_STEP, ROW_GAP, boardSize, cellAt, cellCenter, interpolate } from "./layout.ts";
+import { PATH_STEP, ROW_GAP, boardSize, cellAt, cellCenter, interpolate, nearBoard } from "./layout.ts";
 
 test("칸 중심 → 칸 왕복이 판 전체에서 맞는다", () => {
   for (const [w, h] of [[24, 24], [5, 4]]) {
@@ -53,4 +53,12 @@ test("interpolate는 a를 빼고 b를 포함하며 간격이 PATH_STEP 이하", 
     prev = p;
   }
   assert.deepEqual(interpolate({ x: 1, y: 1 }, { x: 1, y: 1 }), [{ x: 1, y: 1 }]);
+});
+
+test("nearBoard는 판 크기만큼의 여유 안쪽만 참", () => {
+  const { width, height } = boardSize(40, 40);
+  assert.equal(nearBoard({ x: 0, y: 0 }, 40, 40), true);
+  assert.equal(nearBoard({ x: width * 1.4, y: 0 }, 40, 40), true);
+  assert.equal(nearBoard({ x: 0, y: -height * 2 }, 40, 40), false);
+  assert.equal(nearBoard({ x: 1e6, y: 1e6 }, 40, 40), false);
 });

@@ -17,10 +17,8 @@ const REMOVE_MS = 150;
 const PLACE_MS = 150;
 const FLIP_LIFT = 0.08;
 const DROP_HEIGHT = 0.15;
-const TEXTURE_PX = 24; // 바닥 텍스처: 칩 지름 1당 픽셀
 const BACKGROUND = "#d9f0ff";
 const BASE_COLOR = "#2b2f38";
-const HOLE_COLOR = "#3c414d";
 
 export type SceneApi = {
   setBoard(b: Board): void;
@@ -46,14 +44,28 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 
 // three.js 장면을 container 안에 만들고, 조작용 API를 ref로 돌려준다.
 // 칩 전체가 InstancedMesh 하나이고, 애니메이션 중인 칩만 매 프레임 행렬을 고친다.
-export function useChipScene(containerRef: RefObject<HTMLDivElement | null>) {
+// WebGL을 쓸 수 없으면 장면을 만들지 않고 onError를 부른다.
+export function useChipScene(
+  containerRef: RefObject<HTMLDivElement | null>,
+  onError?: () => void,
+) {
   const apiRef = useRef<SceneApi | null>(null);
+  const onErrorRef = useRef(onError);
+  useEffect(() => {
+    onErrorRef.current = onError;
+  });
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+    } catch {
+      onErrorRef.current?.();
+      return;
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.domElement.style.display = "block";
@@ -81,11 +93,10 @@ export function useChipScene(containerRef: RefObject<HTMLDivElement | null>) {
     const sideMat = chipMaterial();
     const frontMat = chipMaterial();
     const backMat = chipMaterial();
-    const baseMat = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0 });
+    const baseMat = new THREE.MeshStandardMaterial({ color: BASE_COLOR, roughness: 0.9, metalness: 0 });
     const baseMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), baseMat);
     baseMesh.rotation.x = -Math.PI / 2;
     scene.add(baseMesh);
-    let baseTexture: THREE.CanvasTexture | null = null;
     let chips: THREE.InstancedMesh | null = null;
     let board: Board | null = null;
     const anims = new Map<number, Anim>();
@@ -114,33 +125,10 @@ export function useChipScene(containerRef: RefObject<HTMLDivElement | null>) {
       setChipMatrix(i, s === BACK ? Math.PI : 0, 0, s === EMPTY ? 0 : 1);
     }
 
-    // 판 바닥과 칩이 없는 자리의 홈을 캔버스 텍스처 한 장에 그린다.
-    function buildBase(b: Board) {
+    // 판 바닥은 무늬 없는 단색이다 — 칩을 빼면 흔적 없이 바닥만 보인다.
+    function sizeBase(b: Board) {
       const { width, height } = boardSize(b.w, b.h);
-      const W = width + 1;
-      const H = height + 1;
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.ceil(W * TEXTURE_PX);
-      canvas.height = Math.ceil(H * TEXTURE_PX);
-      const ctx = canvas.getContext("2d")!;
-      ctx.fillStyle = BASE_COLOR;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = HOLE_COLOR;
-      for (let row = 0; row < b.h; row++) {
-        for (let col = 0; col < b.w; col++) {
-          const c = cellCenter(col, row, b.w, b.h);
-          ctx.beginPath();
-          ctx.arc((c.x + W / 2) * TEXTURE_PX, (c.y + H / 2) * TEXTURE_PX, 0.42 * TEXTURE_PX, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-      baseTexture?.dispose();
-      baseTexture = new THREE.CanvasTexture(canvas);
-      baseTexture.colorSpace = THREE.SRGBColorSpace;
-      baseTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-      baseMat.map = baseTexture;
-      baseMat.needsUpdate = true;
-      baseMesh.scale.set(W, H, 1);
+      baseMesh.scale.set(width + 1, height + 1, 1);
     }
 
     function updateCamera() {
@@ -223,7 +211,7 @@ export function useChipScene(containerRef: RefObject<HTMLDivElement | null>) {
       }
       for (let i = 0; i < n; i++) restMatrix(i);
       chips.instanceMatrix.needsUpdate = true;
-      buildBase(b);
+      sizeBase(b);
       needsRender = true;
     }
 
@@ -313,7 +301,6 @@ export function useChipScene(containerRef: RefObject<HTMLDivElement | null>) {
       geometry.dispose();
       for (const m of [sideMat, frontMat, backMat, baseMat]) m.dispose();
       baseMesh.geometry.dispose();
-      baseTexture?.dispose();
       envTexture.dispose();
       pmrem.dispose();
       renderer.dispose();

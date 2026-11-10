@@ -57,3 +57,11 @@ export function interpolate(a: Point, b: Point, step = PATH_STEP): Point[] {
   }
   return out;
 }
+
+// 판에서 판 한 변 길이 이상 떨어진 점은 버린다. 시점이 기울어 있어 지평선 근처를
+// 가리키면 교점이 아주 멀리 생기는데, 그 사이를 보간하면 점이 수백만 개가 된다.
+export function nearBoard(p: Point, w: number, h: number): boolean {
+  const { width, height } = boardSize(w, h);
+  const margin = Math.max(width, height);
+  return Math.abs(p.x) <= width / 2 + margin && Math.abs(p.y) <= height / 2 + margin;
+}

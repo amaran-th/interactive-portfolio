@@ -31,7 +31,7 @@ import {
   undo,
 } from "./board";
 import { createChipSound } from "./chipSound";
-import { type Point, cellAt, interpolate } from "./layout";
+import { type Point, cellAt, interpolate, nearBoard } from "./layout";
 import { PALETTES } from "./palettes";
 import { useChipScene } from "./useChipScene";
 
@@ -65,11 +65,14 @@ function timestamp(): string {
 
 export default function Monorism() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const scene = useChipScene(containerRef);
+  const [webglFailed, setWebglFailed] = useState(false);
+  const scene = useChipScene(containerRef, () => setWebglFailed(true));
   const [sound] = useState(createChipSound);
   const boardRef = useRef(createBoard(DEFAULT_SIZE, DEFAULT_SIZE));
   const historyRef = useRef(createHistory());
   const strokeRef = useRef<Stroke | null>(null);
+  // 긋기를 시작한 포인터. 다른 포인터(손바닥 터치 등)가 그 획을 덮거나 끝내지 못하게 한다.
+  const strokePointerRef = useRef<number | null>(null);
   const lastPointRef = useRef<Point | null>(null);
   const panRef = useRef<{ x: number; y: number } | null>(null);
   const touchesRef = useRef(new Map<number, { x: number; y: number }>());
@@ -120,31 +123,54 @@ export default function Monorism() {
 
   useEffect(() => () => sound.dispose(), [sound]);
 
+  // 저장은 타이머·페이지 이탈 시점에 일어나므로 최신 설정을 ref로 읽는다.
+  const settingsRef = useRef({ front, back, muted, hydrated });
+  useEffect(() => {
+    settingsRef.current = { front, back, muted, hydrated };
+  });
+
+  const saveNow = useCallback(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    const { front: f, back: bk, muted: m, hydrated: ready } = settingsRef.current;
+    // 저장값을 읽기 전에 쓰면 저장된 판을 기본 판으로 덮어쓴다
+    if (!ready) return;
+    const b = boardRef.current;
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        serialize({ w: b.w, h: b.h, cells: b.cells, front: f, back: bk, muted: m }),
+      );
+    } catch {
+      // 저장 공간이 없거나 막혀 있으면 조용히 넘어간다
+    }
+  }, []);
+
   const scheduleSave = useCallback(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      const b = boardRef.current;
-      try {
-        localStorage.setItem(
-          STORAGE_KEY,
-          serialize({ w: b.w, h: b.h, cells: b.cells, front, back, muted }),
-        );
-      } catch {
-        // 저장 공간이 없거나 막혀 있으면 조용히 넘어간다
-      }
-    }, SAVE_DELAY_MS);
-  }, [front, back, muted]);
+    saveTimer.current = setTimeout(saveNow, SAVE_DELAY_MS);
+  }, [saveNow]);
 
   useEffect(() => {
     if (hydrated) scheduleSave();
-  }, [hydrated, scheduleSave]);
+  }, [hydrated, front, back, muted, scheduleSave]);
 
-  useEffect(
-    () => () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    },
-    [],
-  );
+  // 기다리던 저장이 있으면 페이지를 떠나거나 가려질 때·언마운트될 때 바로 쓴다.
+  useEffect(() => {
+    const flush = () => {
+      if (saveTimer.current) saveNow();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+      flush();
+    };
+  }, [saveNow]);
 
   const refreshHistory = useCallback(() => {
     const h = historyRef.current;
@@ -161,37 +187,15 @@ export default function Monorism() {
     sound.play(kind);
   }
 
-  function doUndo() {
-    const changes = undo(boardRef.current, historyRef.current);
-    if (!changes) return;
-    showChanges(changes, "flip");
-    refreshHistory();
-    scheduleSave();
-  }
-
-  function doRedo() {
-    const changes = redo(boardRef.current, historyRef.current);
-    if (!changes) return;
-    showChanges(changes, "flip");
-    refreshHistory();
-    scheduleSave();
-  }
-
-  // 키보드 리스너는 한 번만 달고, 매 렌더의 최신 실행 취소 함수를 ref로 부른다.
-  const keyActions = useRef({ doUndo, doRedo });
-  useEffect(() => {
-    keyActions.current = { doUndo, doRedo };
-  });
-
   function strokeTo(p: Point | null) {
     const stroke = strokeRef.current;
     if (!stroke) return;
-    // 포인터가 판 평면을 벗어나면 경로를 끊는다 — 돌아왔을 때 사이를 잇지 않는다
-    if (!p) {
+    const b = boardRef.current;
+    // 포인터가 판 평면을 벗어나거나 판에서 너무 멀어지면 경로를 끊는다 — 돌아왔을 때 사이를 잇지 않는다
+    if (!p || !nearBoard(p, b.w, b.h)) {
       lastPointRef.current = null;
       return;
     }
-    const b = boardRef.current;
     const points = lastPointRef.current ? interpolate(lastPointRef.current, p) : [p];
     const changed: Change[] = [];
     for (const q of points) {
@@ -207,12 +211,38 @@ export default function Monorism() {
   function endStroke() {
     const stroke = strokeRef.current;
     strokeRef.current = null;
+    strokePointerRef.current = null;
     lastPointRef.current = null;
     if (!stroke || stroke.changes.length === 0) return;
     commit(historyRef.current, stroke.changes);
     refreshHistory();
     scheduleSave();
   }
+
+  function doUndo() {
+    // 긋는 중이면 그 획부터 기록에 넣는다 — 안 그러면 획이 되돌린 상태 위에 기록된다
+    endStroke();
+    const changes = undo(boardRef.current, historyRef.current);
+    if (!changes) return;
+    showChanges(changes, "flip");
+    refreshHistory();
+    scheduleSave();
+  }
+
+  function doRedo() {
+    endStroke();
+    const changes = redo(boardRef.current, historyRef.current);
+    if (!changes) return;
+    showChanges(changes, "flip");
+    refreshHistory();
+    scheduleSave();
+  }
+
+  // 키보드 리스너는 한 번만 달고, 매 렌더의 최신 실행 취소 함수를 ref로 부른다.
+  const keyActions = useRef({ doUndo, doRedo });
+  useEffect(() => {
+    keyActions.current = { doUndo, doRedo };
+  });
 
   function runBulk(op: BulkOp) {
     const b = boardRef.current;
@@ -285,6 +315,8 @@ export default function Monorism() {
         return;
       }
     }
+    // 이미 다른 포인터로 긋는 중이면(펜을 쓰는데 손바닥이 닿는 경우 등) 새 포인터는 무시한다
+    if (strokeRef.current) return;
     if (e.button === 1 || e.button === 2) {
       panRef.current = { x: e.clientX, y: e.clientY };
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -294,6 +326,7 @@ export default function Monorism() {
     e.currentTarget.setPointerCapture(e.pointerId);
     sound.unlock();
     strokeRef.current = beginStroke(tool);
+    strokePointerRef.current = e.pointerId;
     lastPointRef.current = null;
     strokeTo(scene.current?.boardPoint(e.clientX, e.clientY) ?? null);
   }
@@ -322,13 +355,14 @@ export default function Monorism() {
       panRef.current = { x: e.clientX, y: e.clientY };
       return;
     }
-    if (strokeRef.current) strokeTo(scene.current?.boardPoint(e.clientX, e.clientY) ?? null);
+    if (strokeRef.current && e.pointerId === strokePointerRef.current)
+      strokeTo(scene.current?.boardPoint(e.clientX, e.clientY) ?? null);
   }
 
   function onPointerEnd(e: React.PointerEvent<HTMLDivElement>) {
     touchesRef.current.delete(e.pointerId);
     panRef.current = null;
-    endStroke();
+    if (e.pointerId === strokePointerRef.current) endStroke();
   }
 
   return (
@@ -473,7 +507,17 @@ export default function Monorism() {
         onPointerUp={onPointerEnd}
         onPointerCancel={onPointerEnd}
         onContextMenu={(e) => e.preventDefault()}
-      />
+      >
+        {webglFailed && (
+          <p
+            role="alert"
+            className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm font-bold text-point"
+          >
+            이 브라우저에서는 3D 화면을 그릴 수 없어요. 브라우저 설정에서 WebGL(하드웨어
+            가속)을 켜거나 다른 브라우저로 열어 주세요.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
