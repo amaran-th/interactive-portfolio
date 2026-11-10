@@ -7,6 +7,7 @@ import { type Rgb, formatHex, formatHsl, formatRgb, isDark, parseColor } from ".
 import CopyToast from "../_shared/CopyToast";
 import ImageDropZone from "../_shared/ImageDropZone";
 import { useCopyFeedback } from "../_shared/useCopyFeedback";
+import { fitWithin } from "../_shared/imageInput";
 import { useImageInput } from "../_shared/useImageInput";
 
 const MAX_RECENT = 10;
@@ -42,14 +43,16 @@ export default function ColorPicker() {
     () => false,
   );
 
-  // 원본 해상도 그대로 캔버스에 그려 두고 거기서 픽셀을 읽는다.
+  // 캔버스에 그려 두고 거기서 픽셀을 읽는다. 아주 큰 사진은 브라우저 캔버스
+  // 한도를 넘지 않게 줄여 그린다(좌표는 pixelAt이 캔버스 크기 기준으로 맞춘다).
   useEffect(() => {
     const canvas = canvasRef.current;
     const img = input.image;
     if (!canvas || !img) return;
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    canvas.getContext("2d", { willReadFrequently: true })!.drawImage(img, 0, 0);
+    const { width, height } = fitWithin(img.naturalWidth, img.naturalHeight);
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext("2d", { willReadFrequently: true })!.drawImage(img, 0, 0, width, height);
   }, [input.image]);
 
   // 돋보기: 포인터 주변 11×11 픽셀을 칸마다 10px로 키워 그린다.
