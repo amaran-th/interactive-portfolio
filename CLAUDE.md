@@ -13,7 +13,7 @@ npm run lint          # Lint both workspaces (--workspaces --if-present)
 
 Run all commands from the repo root. This is an npm workspaces monorepo (`"workspaces": ["apps/*"]`); `npm install` at the root installs both apps.
 
-No test suite is configured; pure modules have node:test files: `node --test apps/services/lib/tools.test.mts apps/services/components/works/_shared/*.test.mts apps/services/components/works/7_TextEncoding/encoding.test.mts`
+No test suite is configured; pure modules have node:test files: `node --test apps/services/lib/tools.test.mts apps/services/components/works/_shared/*.test.mts apps/services/components/works/7_TextEncoding/encoding.test.mts apps/services/components/works/10_Monorism/*.test.mts`
 
 ## Architecture
 
@@ -41,8 +41,8 @@ The two apps share no code. Portfolio Work demos are shown by iframe-embedding t
 - `app/page.tsx` — 포털 메인: 하늘색 상단 띠(제목·`ToolSearchInput`) + 흰 본문(카테고리마다 왼쪽 제목 칸·오른쪽 `ToolGrid` 한 줄, `ToolSearchResults`가 검색 중엔 결과로 교체) + 남색 `SiteFooter` 안의 "이 사이트에 대해"
 - `app/category/[id]/page.tsx` — 도구가 있는 카테고리만 정적 생성(`dynamicParams = false`)
 - `app/_components/ToolCard.tsx`·`ToolGrid.tsx`·`CategoryChips.tsx`·`ToolSearch.tsx` — 카드(썸네일만 `STICKER` 타일로 띄운 아이콘형)·그리드·카테고리 칩(카테고리 페이지)·검색(Provider/Input/Results)
-- `app/<service>/page.tsx` — One route per service (`knit-muffler`, `visual-novel-studio`, `stellar-forge`, `yearly-receipt`, `nemo-nemo-beam`, `asset-simulator`, `text-encoding`, `color-picker`, `palette-extractor`), each renders its Work component full-page with route `metadata`
-- `components/works/1_KnitMuffler/` … `9_PaletteExtractor/`, `_shared/` — Work components (6 original services + text encoding, color picker, palette extractor). `_shared/` holds cross-tool modules: `color.ts`, `quantize.ts`, `imageInput.ts`, `useImageInput.ts`, `ImageDropZone.tsx`, `useCopyFeedback.ts`, `CopyToast.tsx`
+- `app/<service>/page.tsx` — One route per service (`knit-muffler`, `visual-novel-studio`, `stellar-forge`, `yearly-receipt`, `nemo-nemo-beam`, `asset-simulator`, `text-encoding`, `color-picker`, `palette-extractor`, `monorism`), each renders its Work component full-page with route `metadata`
+- `components/works/1_KnitMuffler/` … `10_Monorism/`, `_shared/` — Work components (6 original services + text encoding, color picker, palette extractor, monorism). `_shared/` holds cross-tool modules: `color.ts`, `quantize.ts`, `imageInput.ts`, `useImageInput.ts`, `ImageDropZone.tsx`, `useCopyFeedback.ts`, `CopyToast.tsx`
 - `components/SVG.tsx` — shared SVG (`KnitMufflerIcon` etc.)
 - `next.config.ts` sets a CSP `frame-ancestors` header allowing the portfolio origin to embed these pages.
 
