@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   BACK,
+  DEFAULT_BASE,
   EMPTY,
   FRONT,
   MAX_HISTORY,
@@ -15,6 +16,7 @@ import {
   redo,
   serialize,
   strokeApply,
+  toggleTool,
   undo,
 } from "./board.ts";
 
@@ -106,19 +108,20 @@ test("전체 뒤집기·모두 채우기·모두 빼기", () => {
 test("저장 형식 왕복", () => {
   const b = createBoard(24, 24);
   for (let i = 0; i < b.cells.length; i++) b.cells[i] = i % 3;
-  const json = serialize({ ...b, front: "#c9ced6", back: "#d8b24a", muted: true });
+  const json = serialize({ ...b, front: "#c9ced6", back: "#d8b24a", base: "#2b2f38", muted: true });
   const s = deserialize(json)!;
   assert.equal(s.w, 24);
   assert.equal(s.h, 24);
   assert.deepEqual([...s.cells], [...b.cells]);
   assert.equal(s.front, "#c9ced6");
   assert.equal(s.back, "#d8b24a");
+  assert.equal(s.base, "#2b2f38");
   assert.equal(s.muted, true);
 });
 
 test("잘못된 저장값은 null", () => {
   const ok = JSON.parse(
-    serialize({ ...createBoard(24, 24), front: "#000000", back: "#ffffff", muted: false }),
+    serialize({ ...createBoard(24, 24), front: "#000000", back: "#ffffff", base: "#111111", muted: false }),
   );
   const bad = (patch: object) => deserialize(JSON.stringify({ ...ok, ...patch }));
   assert.equal(deserialize(null), null);
@@ -127,9 +130,24 @@ test("잘못된 저장값은 null", () => {
   assert.equal(bad({ w: 30, h: 30 }), null);
   assert.equal(bad({ h: 40 }), null);
   assert.equal(bad({ front: "red" }), null);
+  assert.equal(bad({ base: "dark" }), null);
   assert.equal(bad({ muted: "no" }), null);
   assert.equal(bad({ cells: ok.cells.slice(0, 8) }), null);
   assert.equal(bad({ cells: "%%%" }), null);
   // 2비트 값 3(존재하지 않는 상태)
   assert.equal(bad({ cells: btoa(String.fromCharCode(0xff).repeat(144)) }), null);
+});
+
+test("우클릭 획은 처음 누른 칸에 칩이 있으면 빼기, 비어 있으면 놓기", () => {
+  assert.equal(toggleTool(FRONT), "remove");
+  assert.equal(toggleTool(BACK), "remove");
+  assert.equal(toggleTool(EMPTY), "place");
+});
+
+test("판 색이 없는 예전 저장값은 기본 판 색으로 읽는다", () => {
+  const old = JSON.parse(
+    serialize({ ...createBoard(24, 24), front: "#000000", back: "#ffffff", base: "#123456", muted: false }),
+  );
+  delete old.base;
+  assert.equal(deserialize(JSON.stringify(old))!.base, DEFAULT_BASE);
 });

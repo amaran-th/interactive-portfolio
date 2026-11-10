@@ -18,12 +18,11 @@ const PLACE_MS = 150;
 const FLIP_LIFT = 0.08;
 const DROP_HEIGHT = 0.15;
 const BACKGROUND = "#d9f0ff";
-const BASE_COLOR = "#2b2f38";
 
 export type SceneApi = {
   setBoard(b: Board): void;
   animateChanges(changes: Change[], delayOf?: (c: Change, i: number) => number): void;
-  setColors(front: string, back: string): void;
+  setColors(front: string, back: string, base: string): void;
   boardPoint(clientX: number, clientY: number): Point | null;
   zoomAt(clientX: number, clientY: number, factor: number): void;
   panBy(dx: number, dy: number): void;
@@ -93,7 +92,7 @@ export function useChipScene(
     const sideMat = chipMaterial();
     const frontMat = chipMaterial();
     const backMat = chipMaterial();
-    const baseMat = new THREE.MeshStandardMaterial({ color: BASE_COLOR, roughness: 0.9, metalness: 0 });
+    const baseMat = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0 });
     const baseMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), baseMat);
     baseMesh.rotation.x = -Math.PI / 2;
     scene.add(baseMesh);
@@ -235,7 +234,8 @@ export function useChipScene(
       needsRender = true;
     }
 
-    function setColors(front: string, back: string) {
+    function setColors(front: string, back: string, base: string) {
+      baseMat.color.set(base);
       frontMat.color.set(front);
       backMat.color.set(back);
       sideMat.color.set(front).lerp(new THREE.Color(back), 0.5).multiplyScalar(0.55);

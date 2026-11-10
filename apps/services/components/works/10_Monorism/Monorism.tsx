@@ -1,10 +1,7 @@
 "use client";
 
 import {
-  CirclePlus,
   Download,
-  Eraser,
-  FlipVertical2,
   Maximize,
   Redo2,
   Undo2,
@@ -18,6 +15,7 @@ import {
   type Change,
   type Stroke,
   type Tool,
+  DEFAULT_BASE,
   SIZES,
   beginStroke,
   bulk,
@@ -28,6 +26,7 @@ import {
   redo,
   serialize,
   strokeApply,
+  toggleTool,
   undo,
 } from "./board";
 import { createChipSound } from "./chipSound";
@@ -41,12 +40,9 @@ const DEFAULT_SIZE = 40;
 const STROKE_STAGGER_MS = 12;
 const BULK_ROW_STAGGER_MS = 12;
 const WHEEL_ZOOM_SPEED = 0.0015;
-
-const TOOL_BUTTONS: { id: Tool; label: string; key: string; Icon: typeof Eraser }[] = [
-  { id: "flip", label: "뒤집기", key: "1", Icon: FlipVertical2 },
-  { id: "remove", label: "빼기", key: "2", Icon: Eraser },
-  { id: "place", label: "놓기", key: "3", Icon: CirclePlus },
-];
+// 터치: 이만큼 누르고 있으면 빼기/놓기, 그 전에 이만큼 움직이면 뒤집기 긋기
+const LONG_PRESS_MS = 450;
+const TOUCH_SLOP_PX = 8;
 
 const BULK_BUTTONS: { op: BulkOp; label: string }[] = [
   { op: "flipAll", label: "전체 뒤집기" },
@@ -73,16 +69,27 @@ export default function Monorism() {
   const strokeRef = useRef<Stroke | null>(null);
   // 긋기를 시작한 포인터. 다른 포인터(손바닥 터치 등)가 그 획을 덮거나 끝내지 못하게 한다.
   const strokePointerRef = useRef<number | null>(null);
+  // 오른쪽 버튼·길게 누르기 획은 처음 닿은 칸을 보고 빼기/놓기를 정한다
+  const toggleStrokeRef = useRef(false);
+  // 터치는 누르자마자 그리지 않고, 탭·긋기·길게 누르기 중 무엇인지 정해질 때까지 기다린다
+  const pendingTouchRef = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
+  const spaceDownRef = useRef(false);
   const lastPointRef = useRef<Point | null>(null);
   const panRef = useRef<{ x: number; y: number } | null>(null);
   const touchesRef = useRef(new Map<number, { x: number; y: number }>());
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [tool, setTool] = useState<Tool>("flip");
   const [front, setFront] = useState(PALETTES[0].front);
   const [back, setBack] = useState(PALETTES[0].back);
+  const [base, setBase] = useState(DEFAULT_BASE);
   const [muted, setMuted] = useState(false);
-  const [newSize, setNewSize] = useState<number>(DEFAULT_SIZE);
+  const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
+  const sizeMenuRef = useRef<HTMLDivElement>(null);
   const [boardVersion, setBoardVersion] = useState(0);
   const [hydrated, setHydrated] = useState(false);
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
@@ -100,8 +107,8 @@ export default function Monorism() {
       boardRef.current = { w: saved.w, h: saved.h, cells: saved.cells };
       setFront(saved.front);
       setBack(saved.back);
+      setBase(saved.base);
       setMuted(saved.muted);
-      setNewSize(saved.w);
     }
     setHydrated(true);
     /* eslint-enable react-hooks/set-state-in-effect */
@@ -114,8 +121,8 @@ export default function Monorism() {
   }, [hydrated, boardVersion, scene]);
 
   useEffect(() => {
-    scene.current?.setColors(front, back);
-  }, [front, back, scene]);
+    scene.current?.setColors(front, back, base);
+  }, [front, back, base, scene]);
 
   useEffect(() => {
     sound.setMuted(muted);
@@ -124,22 +131,22 @@ export default function Monorism() {
   useEffect(() => () => sound.dispose(), [sound]);
 
   // 저장은 타이머·페이지 이탈 시점에 일어나므로 최신 설정을 ref로 읽는다.
-  const settingsRef = useRef({ front, back, muted, hydrated });
+  const settingsRef = useRef({ front, back, base, muted, hydrated });
   useEffect(() => {
-    settingsRef.current = { front, back, muted, hydrated };
+    settingsRef.current = { front, back, base, muted, hydrated };
   });
 
   const saveNow = useCallback(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = null;
-    const { front: f, back: bk, muted: m, hydrated: ready } = settingsRef.current;
+    const { front: f, back: bk, base: bs, muted: m, hydrated: ready } = settingsRef.current;
     // 저장값을 읽기 전에 쓰면 저장된 판을 기본 판으로 덮어쓴다
     if (!ready) return;
     const b = boardRef.current;
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        serialize({ w: b.w, h: b.h, cells: b.cells, front: f, back: bk, muted: m }),
+        serialize({ w: b.w, h: b.h, cells: b.cells, front: f, back: bk, base: bs, muted: m }),
       );
     } catch {
       // 저장 공간이 없거나 막혀 있으면 조용히 넘어간다
@@ -153,7 +160,7 @@ export default function Monorism() {
 
   useEffect(() => {
     if (hydrated) scheduleSave();
-  }, [hydrated, front, back, muted, scheduleSave]);
+  }, [hydrated, front, back, base, muted, scheduleSave]);
 
   // 기다리던 저장이 있으면 페이지를 떠나거나 가려질 때·언마운트될 때 바로 쓴다.
   useEffect(() => {
@@ -201,7 +208,12 @@ export default function Monorism() {
     for (const q of points) {
       const cell = cellAt(q, b.w, b.h);
       if (!cell) continue;
-      const change = strokeApply(b, stroke, cell.row * b.w + cell.col);
+      const index = cell.row * b.w + cell.col;
+      if (toggleStrokeRef.current) {
+        stroke.tool = toggleTool(b.cells[index]);
+        toggleStrokeRef.current = false;
+      }
+      const change = strokeApply(b, stroke, index);
       if (change) changed.push(change);
     }
     lastPointRef.current = p;
@@ -212,6 +224,7 @@ export default function Monorism() {
     const stroke = strokeRef.current;
     strokeRef.current = null;
     strokePointerRef.current = null;
+    toggleStrokeRef.current = false;
     lastPointRef.current = null;
     if (!stroke || stroke.changes.length === 0) return;
     commit(historyRef.current, stroke.changes);
@@ -257,9 +270,10 @@ export default function Monorism() {
     scheduleSave();
   }
 
-  function newBoard() {
-    if (!window.confirm("지금 판을 지우고 새 판을 만들까요?")) return;
-    boardRef.current = createBoard(newSize, newSize);
+  function newBoard(size: number) {
+    setSizeMenuOpen(false);
+    endStroke();
+    boardRef.current = createBoard(size, size);
     historyRef.current = createHistory();
     refreshHistory();
     setBoardVersion((v) => v + 1);
@@ -277,13 +291,30 @@ export default function Monorism() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  // 휠 확대는 기본 스크롤을 막아야 해서 passive가 아닌 리스너로 단다.
+  // 크기 메뉴 바깥을 누르면 닫는다
+  useEffect(() => {
+    if (!sizeMenuOpen) return;
+    const onDown = (e: PointerEvent) => {
+      if (!sizeMenuRef.current?.contains(e.target as Node)) setSizeMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [sizeMenuOpen]);
+
+  // 휠·트랙패드 두 손가락 쓸기는 판 이동, 핀치(ctrlKey가 붙어 온다)나 Ctrl/⌘+휠은 확대.
+  // 기본 스크롤을 막아야 해서 passive가 아닌 리스너로 단다.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      scene.current?.zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * WHEEL_ZOOM_SPEED));
+      // deltaMode 1(줄 단위, 일부 마우스)은 픽셀로 바꾼다
+      const unit = e.deltaMode === 1 ? 16 : 1;
+      if (e.ctrlKey || e.metaKey) {
+        scene.current?.zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * unit * WHEEL_ZOOM_SPEED * 4));
+      } else {
+        scene.current?.panBy(-e.deltaX * unit, -e.deltaY * unit);
+      }
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
@@ -299,36 +330,73 @@ export default function Monorism() {
         else keyActions.current.doUndo();
         return;
       }
-      const picked = TOOL_BUTTONS.find((b) => b.key === e.key);
-      if (picked && !e.metaKey && !e.ctrlKey && !e.altKey) setTool(picked.id);
+      if (e.key === "Escape") setSizeMenuOpen(false);
+      if (e.code === "Space") {
+        e.preventDefault();
+        spaceDownRef.current = true;
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") spaceDownRef.current = false;
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+    };
   }, []);
+
+  function startStroke(pointerId: number, kind: "flip" | "toggle", clientX: number, clientY: number) {
+    sound.unlock();
+    strokeRef.current = beginStroke("flip");
+    strokePointerRef.current = pointerId;
+    toggleStrokeRef.current = kind === "toggle";
+    lastPointRef.current = null;
+    strokeTo(scene.current?.boardPoint(clientX, clientY) ?? null);
+  }
+
+  function cancelPendingTouch() {
+    if (pendingTouchRef.current) clearTimeout(pendingTouchRef.current.timer);
+    pendingTouchRef.current = null;
+  }
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (e.pointerType === "touch") {
       touchesRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
       // 두 번째 손가락이 닿으면 긋기를 끝내고 확대·이동으로 넘어간다
       if (touchesRef.current.size >= 2) {
+        cancelPendingTouch();
         endStroke();
         return;
       }
     }
     // 이미 다른 포인터로 긋는 중이면(펜을 쓰는데 손바닥이 닿는 경우 등) 새 포인터는 무시한다
-    if (strokeRef.current) return;
-    if (e.button === 1 || e.button === 2) {
+    if (strokeRef.current || pendingTouchRef.current) return;
+    // 가운데 버튼, 또는 Space를 누른 채 끌면 판을 옮긴다
+    if (e.button === 1 || (e.button === 0 && spaceDownRef.current)) {
+      e.preventDefault();
       panRef.current = { x: e.clientX, y: e.clientY };
       e.currentTarget.setPointerCapture(e.pointerId);
       return;
     }
-    if (e.button !== 0) return;
+    if (e.button !== 0 && e.button !== 2) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    sound.unlock();
-    strokeRef.current = beginStroke(tool);
-    strokePointerRef.current = e.pointerId;
-    lastPointRef.current = null;
-    strokeTo(scene.current?.boardPoint(e.clientX, e.clientY) ?? null);
+    if (e.pointerType === "touch") {
+      const { pointerId, clientX, clientY } = e;
+      sound.unlock();
+      pendingTouchRef.current = {
+        pointerId,
+        x: clientX,
+        y: clientY,
+        timer: setTimeout(() => {
+          pendingTouchRef.current = null;
+          startStroke(pointerId, "toggle", clientX, clientY);
+        }, LONG_PRESS_MS),
+      };
+      return;
+    }
+    startStroke(e.pointerId, e.button === 2 ? "toggle" : "flip", e.clientX, e.clientY);
   }
 
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
@@ -350,6 +418,13 @@ export default function Monorism() {
       }
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     }
+    const pending = pendingTouchRef.current;
+    if (pending && pending.pointerId === e.pointerId) {
+      // 길게 누르기 전에 움직이면 뒤집기 긋기로 시작한다
+      if (Math.hypot(e.clientX - pending.x, e.clientY - pending.y) < TOUCH_SLOP_PX) return;
+      cancelPendingTouch();
+      startStroke(e.pointerId, "flip", pending.x, pending.y);
+    }
     if (panRef.current) {
       scene.current?.panBy(e.clientX - panRef.current.x, e.clientY - panRef.current.y);
       panRef.current = { x: e.clientX, y: e.clientY };
@@ -362,6 +437,16 @@ export default function Monorism() {
   function onPointerEnd(e: React.PointerEvent<HTMLDivElement>) {
     touchesRef.current.delete(e.pointerId);
     panRef.current = null;
+    const pending = pendingTouchRef.current;
+    if (pending && pending.pointerId === e.pointerId) {
+      // 길게 누르기 전에 뗀 탭은 칩 하나 뒤집기
+      cancelPendingTouch();
+      if (e.type === "pointerup") {
+        startStroke(e.pointerId, "flip", pending.x, pending.y);
+        endStroke();
+      }
+      return;
+    }
     if (e.pointerId === strokePointerRef.current) endStroke();
   }
 
@@ -372,23 +457,11 @@ export default function Monorism() {
         aria-label="모노리즘 도구"
         className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b-2 border-point bg-white px-3 py-2"
       >
-        <div className="flex gap-1 rounded-lg border-2 border-point p-0.5">
-          {TOOL_BUTTONS.map(({ id, label, key, Icon }) => (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={tool === id}
-              title={`${label} (${key})`}
-              onClick={() => setTool(id)}
-              className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-bold ${
-                tool === id ? "bg-point text-white" : "text-point hover:bg-shade"
-              }`}
-            >
-              <Icon aria-hidden className="size-4" />
-              {label}
-            </button>
-          ))}
-        </div>
+        <p className="text-xs text-ink/70">
+          <span className="font-bold text-point">클릭</span> 뒤집기 ·{" "}
+          <span className="font-bold text-point">우클릭</span> 빼기/놓기 ·{" "}
+          <span className="font-bold text-point">Space+드래그</span> 이동
+        </p>
 
         <div className="flex gap-1">
           <button
@@ -451,24 +524,48 @@ export default function Monorism() {
             onChange={(e) => setBack(e.target.value)}
             className="h-6 w-7 cursor-pointer rounded border-2 border-point"
           />
+          <label className="ml-1 flex items-center gap-1 text-xs font-bold text-point">
+            판
+            <input
+              type="color"
+              aria-label="판 색"
+              value={base}
+              onChange={(e) => setBase(e.target.value)}
+              className="h-6 w-7 cursor-pointer rounded border-2 border-point"
+            />
+          </label>
         </div>
 
-        <div className="flex items-center gap-1">
-          <select
-            aria-label="새 판 크기"
-            value={newSize}
-            onChange={(e) => setNewSize(Number(e.target.value))}
-            className="rounded-md border-2 border-point bg-white px-1 py-0.5 text-xs font-bold text-point"
+        <div ref={sizeMenuRef} className="relative">
+          <button
+            type="button"
+            aria-expanded={sizeMenuOpen}
+            aria-haspopup="menu"
+            onClick={() => setSizeMenuOpen((o) => !o)}
+            className={BUTTON}
           >
-            {SIZES.map((s) => (
-              <option key={s} value={s}>
-                {s}×{s}
-              </option>
-            ))}
-          </select>
-          <button type="button" onClick={newBoard} className={BUTTON}>
             새 판
           </button>
+          {sizeMenuOpen && (
+            <div
+              role="menu"
+              aria-label="새 판 크기"
+              className="absolute top-full left-0 z-20 mt-1 flex w-max flex-col gap-1 rounded-lg border-2 border-point bg-white p-2 shadow-[3px_3px_0_0_var(--color-point)]"
+            >
+              <p className="text-[11px] text-ink/70">크기를 고르면 지금 판은 지워져요</p>
+              {SIZES.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => newBoard(size)}
+                  className="rounded-md px-2 py-1 text-left text-xs font-bold text-point hover:bg-shade"
+                >
+                  {size}×{size}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="ml-auto flex gap-1">

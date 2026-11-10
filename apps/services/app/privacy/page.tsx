@@ -70,7 +70,7 @@ const STORAGE_ITEMS: {
     tool: "모노리즘",
     where: "localStorage",
     keys: ["monorism-board"],
-    what: "판 크기, 앞면·뒷면 색, 칩 상태, 음소거 여부",
+    what: "판 크기, 칩 앞면·뒷면 색, 판 색, 칩 상태, 음소거 여부",
   },
 ];
 

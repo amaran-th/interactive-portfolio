@@ -6,6 +6,8 @@ export const FRONT = 1;
 export const BACK = 2;
 export const SIZES = [24, 40, 64] as const;
 export const MAX_HISTORY = 100;
+// 판 바닥 기본 색. 판 색이 없던 예전 저장값도 이 색으로 읽는다.
+export const DEFAULT_BASE = "#2b2f38";
 
 export type Tool = "flip" | "remove" | "place";
 export type BulkOp = "flipAll" | "fillAll" | "clearAll";
@@ -19,6 +21,7 @@ export type SavedState = {
   cells: Uint8Array;
   front: string;
   back: string;
+  base: string;
   muted: boolean;
 };
 
@@ -113,6 +116,7 @@ export function serialize(s: SavedState): string {
     h: s.h,
     front: s.front,
     back: s.back,
+    base: s.base,
     cells: btoa(bin),
     muted: s.muted,
   });
@@ -127,6 +131,8 @@ export function deserialize(json: string | null): SavedState | null {
     if (!(SIZES as readonly number[]).includes(d.w) || d.h !== d.w) return null;
     if (typeof d.front !== "string" || !HEX_COLOR.test(d.front)) return null;
     if (typeof d.back !== "string" || !HEX_COLOR.test(d.back)) return null;
+    const base = d.base === undefined ? DEFAULT_BASE : d.base;
+    if (typeof base !== "string" || !HEX_COLOR.test(base)) return null;
     if (typeof d.muted !== "boolean" || typeof d.cells !== "string") return null;
     const bin = atob(d.cells);
     const n = d.w * d.h;
@@ -137,8 +143,13 @@ export function deserialize(json: string | null): SavedState | null {
       if (v > BACK) return null;
       cells[i] = v;
     }
-    return { w: d.w, h: d.h, cells, front: d.front, back: d.back, muted: d.muted };
+    return { w: d.w, h: d.h, cells, front: d.front, back: d.back, base, muted: d.muted };
   } catch {
     return null;
   }
+}
+
+// 우클릭 획의 도구. 처음 누른 칸에 칩이 있으면 그 획 내내 빼고, 비어 있으면 놓는다.
+export function toggleTool(state: number): Tool {
+  return state === EMPTY ? "place" : "remove";
 }
