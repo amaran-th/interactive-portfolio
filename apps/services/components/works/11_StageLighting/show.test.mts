@@ -175,3 +175,16 @@ test("v1 저장본 변환", () => {
   assert.ok(Math.abs(rr.softness - 0.1) < 0.01);
   assert.equal(r.show.version, 2);
 });
+
+test("잔광: 기본 0.3, 범위 0–1, 저장본에 없으면 기본값", async () => {
+  const { setAmbient } = await import("./show.ts");
+  const s = defaultShow();
+  assert.equal(s.ambient, 0.3);
+  assert.equal(setAmbient(s, 2).ambient, 1);
+  assert.equal(setAmbient(s, -1).ambient, 0);
+  const noAmbient: Record<string, unknown> = { ...s };
+  delete noAmbient.ambient;
+  assert.equal(deserialize(JSON.stringify(noAmbient))!.show.ambient, 0.3);
+  assert.equal(deserialize(JSON.stringify(setAmbient(s, 0.7)))!.show.ambient, 0.7);
+  assert.equal(deserialize(JSON.stringify(V1))!.show.ambient, 0.3);
+});

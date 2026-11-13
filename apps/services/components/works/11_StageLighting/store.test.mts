@@ -63,3 +63,12 @@ test("store: 같은 참조 set은 알리지 않음, 빈 checkpoint는 쌓이지 
   st.checkpoint(); st.checkpoint();
   assert.equal(st.canUndo(), false);
 });
+
+test("잔광 → ambient만, 무대·그림자 아님", async () => {
+  const { setAmbient } = await import("./show.ts");
+  const s = defaultShow();
+  const d = diffShow(s, setAmbient(s, 0.8));
+  assert.equal(d.ambient, true);
+  assert.equal(d.stage, false);
+  assert.equal(d.shadowsDirty, false);
+});

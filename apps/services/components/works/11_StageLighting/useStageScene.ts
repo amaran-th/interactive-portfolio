@@ -63,6 +63,11 @@ const RESTORE_MS = 150;
 const DRAG_SHADOW_EVERY = 4;
 const HANDLE_RADIUS = 0.4;
 const HOUSE_FADE_MS = 2000;
+// 잔광: 유도등·통로등처럼 늘 남아 있는 약한 빛(잔광 100%일 때 세기).
+const RESIDUAL = 1.5;
+// 반사광: 켜진 조명기 밝기 합(최대 6대분)에 비례하는 환경광. 무대에서 튕겨 나온 빛을 흉내 낸다.
+const BOUNCE_K = 0.15;
+const BOUNCE_MAX = 6;
 const DEG = Math.PI / 180;
 
 type FixtureView = { fixture: Fixture; light: THREE.SpotLight; beam: THREE.Mesh; body: THREE.Mesh; res: Resolved };
@@ -129,6 +134,14 @@ export function useStageScene(
     const houseDir = new THREE.DirectionalLight(0xfff4e0, 0);
     scene.add(houseHemi, houseDir, houseDir.target);
     let houseLevel = 0;
+
+    // 잔광과 반사광. 광원 개수는 고정이고 세기·색만 바꾼다(셰이더 재컴파일 없음).
+    const residual = new THREE.HemisphereLight(0xb0bccc, 0x2a2622, 0);
+    const bounce = new THREE.HemisphereLight(0xffffff, 0xffffff, 0);
+    scene.add(residual, bounce);
+    let ambient = show.ambient;
+    const bounceSum = new THREE.Color();
+    const tmpColor = new THREE.Color();
     let houseFade: { from: number; to: number; start: number } | null = null;
 
     // ── 카메라 ──
@@ -309,6 +322,29 @@ export function useStageScene(
     function applyAll(look: LookState) {
       currentLook = look;
       for (const v of fixtures.values()) apply(v, look);
+      updateAmbient();
+    }
+
+    /** 켜진 조명기의 밝기·색을 합쳐 반사광을 정한다. 바닥에서 올라오는 빛이라 아래쪽 색이 더 진하다. */
+    function updateAmbient() {
+      // 어두운 빛은 세기만큼 어둡게 느껴지지 않아서, 슬라이더 값에 제곱근을 씌운다(30% → 세기 약 55%).
+      residual.intensity = RESIDUAL * Math.sqrt(ambient);
+      let w = 0;
+      bounceSum.setRGB(0, 0, 0);
+      for (const v of fixtures.values()) {
+        const i = v.res.intensity;
+        if (i <= 0) continue;
+        tmpColor.setStyle(v.res.color);
+        bounceSum.r += tmpColor.r * i;
+        bounceSum.g += tmpColor.g * i;
+        bounceSum.b += tmpColor.b * i;
+        w += i;
+      }
+      if (w > 0) {
+        bounce.groundColor.setRGB(bounceSum.r / w, bounceSum.g / w, bounceSum.b / w);
+        bounce.color.copy(bounce.groundColor).multiplyScalar(0.4);
+      }
+      bounce.intensity = ambient * BOUNCE_K * Math.min(w, BOUNCE_MAX);
     }
 
     function addFixture(f: Fixture) {
@@ -337,6 +373,7 @@ export function useStageScene(
       fixtures.delete(id);
     }
     for (const f of show.fixtures) addFixture(f);
+    updateAmbient();
 
     function applyShadows() {
       const ids = new Set(shadowFixtureIds(show.fixtures, TIERS[tier].shadows));
@@ -597,6 +634,8 @@ export function useStageScene(
       const touched = new Set([...d.levels, ...d.fixtures.changed]);
       for (const [id, v] of fixtures) if (d.stage || touched.has(id)) apply(v, next.live);
       if (d.fixtures.added.length + d.fixtures.removed.length + d.fixtures.changed.length > 0) applyShadows();
+      ambient = next.ambient;
+      updateAmbient();
       // 실행 취소·슬라이더처럼 store에서 바로 바뀐 헤이즈는 즉시 반영한다.
       // (큐 재생은 setHazeTarget으로 목표를 먼저 정하므로 여기서는 그대로다.)
       if (d.haze && next.live.haze !== hazeTarget) setHazeTarget(next.live.haze, true);

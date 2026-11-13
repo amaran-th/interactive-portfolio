@@ -20,6 +20,7 @@ import {
   addProp,
   removeEntity,
   resolve,
+  setAmbient,
   setHaze,
   updateActor,
   updateFocus,
@@ -74,6 +75,7 @@ export default function StageLighting() {
   };
   const selectedId = useShow(store, (s) => (pickedId && exists(s, pickedId) ? pickedId : null));
   const haze = useShow(store, (s) => s.live.haze);
+  const ambient = useShow(store, (s) => s.ambient);
   const [view, setView] = useState<ViewMode>("edit");
   const [workLight, setWorkLight] = useState(true);
   const [quality, setQuality] = useState<Quality>(loadQuality);
@@ -315,6 +317,8 @@ export default function StageLighting() {
         tier={tier}
         onQuality={setQuality}
         haze={haze}
+        ambient={ambient}
+        onAmbient={(v) => store.set(setAmbient(store.get(), v))}
         onBegin={beginEdit}
         hazeStatus={hazeStatus}
         houseLights={houseLights}

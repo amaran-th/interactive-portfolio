@@ -32,6 +32,8 @@ type Props = {
   tier: Tier;
   onQuality: (q: Quality) => void;
   haze: number;
+  ambient: number;
+  onAmbient: (v: number) => void;
   hazeStatus: "rising" | "falling" | null;
   houseLights: boolean;
   onHouseLights: (on: boolean) => void;
@@ -124,6 +126,14 @@ export default function Toolbar(p: Props) {
           객석등
         </span>
       </button>
+
+      <label className="flex items-center gap-1.5" title="유도등·통로등 같은 약한 불빛과, 무대에서 튕겨 나온 빛의 세기. 큐에는 들어가지 않아요">
+        <span className={LABEL}>잔광</span>
+        <input type="range" min={0} max={1} step={0.01} value={p.ambient} aria-label="잔광 세기"
+          onPointerDown={p.onBegin} onKeyDown={p.onBegin} onChange={(e) => p.onAmbient(Number(e.target.value))}
+          className="w-16 accent-point" />
+        <span className="w-8 text-[11px] tabular-nums text-ink/70">{Math.round(p.ambient * 100)}%</span>
+      </label>
 
       <label className="flex items-center gap-1.5">
         <span className={LABEL}>헤이즈</span>

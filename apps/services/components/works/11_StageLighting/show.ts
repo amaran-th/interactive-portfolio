@@ -85,6 +85,7 @@ export type Show = {
   version: 2;
   stage: Stage;
   venue: Venue;
+  ambient: number; // 잔광 0..1. 유도등·통로등과 반사광 세기. 큐에는 들어가지 않는다.
   props: Prop[];
   actors: Actor[];
   fixtures: Fixture[];
@@ -429,6 +430,7 @@ function makeFixture(
   };
 }
 
+const AMBIENT_DEFAULT = 0.3;
 const STAGE_DEFAULT: Stage = { shape: "proscenium", width: 10, depth: 8, height: 6, floorColor: "#3a3a40", backdropColor: "#202028" };
 
 export function defaultShow(): Show {
@@ -474,6 +476,7 @@ export function defaultShow(): Show {
     version: 2,
     stage: STAGE_DEFAULT,
     venue: { blocks: defaultBlocks(STAGE_DEFAULT) },
+    ambient: AMBIENT_DEFAULT,
     props: [],
     actors: [makeActor("인물 1", -1, -3, "#7a2e3a"), makeActor("인물 2", 1, -3, "#2e4a7a")],
     fixtures: fx,
@@ -619,6 +622,10 @@ export function updateLevel(show: Show, fixtureId: string, patch: Partial<Fixtur
   if (!f) return show;
   const level = cleanLevel(f.kind, { ...levelOf(show.live, f), ...patch });
   return { ...show, live: { ...show.live, levels: { ...show.live.levels, [fixtureId]: level } } };
+}
+
+export function setAmbient(show: Show, ambient: number): Show {
+  return { ...show, ambient: clamp(ambient, 0, 1) };
 }
 
 export function setHaze(show: Show, haze: number): Show {
@@ -845,6 +852,7 @@ function readV2(o: Obj): Show {
     version: 2,
     stage,
     venue: { blocks: readBlocks(o.venue, stage) },
+    ambient: o.ambient === undefined ? AMBIENT_DEFAULT : clamp(num(o.ambient), 0, 1),
     props: readProps(o.props),
     actors: readActors(o.actors),
     fixtures,
@@ -951,6 +959,7 @@ function migrateV1(o: Obj): Show {
     version: 2,
     stage,
     venue: { blocks: defaultBlocks(stage) },
+    ambient: AMBIENT_DEFAULT,
     props: readProps(o.props),
     actors: readActors(o.actors),
     fixtures,

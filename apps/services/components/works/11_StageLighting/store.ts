@@ -6,6 +6,7 @@ export type Delta = { added: string[]; changed: string[]; removed: string[] };
 export type ShowDiff = {
   stage: boolean;
   venue: boolean;
+  ambient: boolean;
   props: Delta;
   actors: Delta;
   fixtures: Delta;
@@ -59,6 +60,7 @@ export function diffShow(prev: Show, next: Show): ShowDiff {
   return {
     stage,
     venue: prev.venue !== next.venue,
+    ambient: prev.ambient !== next.ambient,
     props,
     actors,
     fixtures,
