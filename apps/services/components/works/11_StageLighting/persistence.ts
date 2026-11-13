@@ -18,8 +18,8 @@ export function loadShow(): { show: Show; notice: string | null } {
     return { show: defaultShow(), notice: "이 브라우저에서는 저장을 쓸 수 없어요." };
   }
   if (text === null) return { show: defaultShow(), notice: null };
-  const show = deserialize(text);
-  if (show) return { show, notice: null };
+  const r = deserialize(text);
+  if (r) return { show: r.show, notice: r.migrated ? "예전 형식의 무대를 새 형식으로 바꿨어요." : null };
   return {
     show: defaultShow(),
     notice: "저장된 무대를 읽지 못해 기본 무대로 시작했어요. 무언가 고치면 새로 저장돼요.",

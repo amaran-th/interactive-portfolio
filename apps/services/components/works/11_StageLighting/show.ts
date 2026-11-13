@@ -158,10 +158,10 @@ export const KNOBS: Record<
   FixtureKind,
   { zoom?: [string, number, number]; sharp?: [string, number, number]; softness?: number; angle?: number }
 > = {
-  profile: { zoom: ["줌", 15, 50], sharp: ["포커스", 0.6, 0.05] },
+  profile: { zoom: ["줌", 15, 50], sharp: ["초점", 0.6, 0.05] },
   fresnel: { zoom: ["스팟 ↔ 플러드", 15, 70], softness: 0.75 },
   par: { softness: 0.5 },
-  follow: { zoom: ["아이리스", 4, 20], sharp: ["포커스", 0.5, 0.05] },
+  follow: { zoom: ["아이리스", 4, 20], sharp: ["초점", 0.5, 0.05] },
   ledpar: { zoom: ["렌즈", 15, 40], softness: 0.5 },
   cyc: { angle: 90, softness: 0.9 },
 };

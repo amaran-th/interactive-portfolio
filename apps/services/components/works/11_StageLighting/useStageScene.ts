@@ -36,7 +36,7 @@ export type SceneApi = {
   setSeat(row: number, side: SeatSide): void;
   setSolo(fixtureId: string | null): void;
   setHazeTarget(target: number, immediate: boolean): void;
-  onHaze(fn: (actual: number) => void): void;
+  onHaze(fn: (actual: number, target: number) => void): () => void;
   setQuality(q: Quality): void;
   setSelected(id: string | null): void;
   pick(clientX: number, clientY: number): Pick;
@@ -44,7 +44,7 @@ export type SceneApi = {
   previewEntity(id: string, pos: Vec3): void;
   previewAim(fixtureId: string, target: Vec3): void;
   fixtureScreenPoints(): ScreenPoint[];
-  onCamera(fn: () => void): void;
+  onCamera(fn: () => void): () => void;
   beginInteraction(): void;
   endInteraction(): void;
   onTierChange(fn: (t: Tier) => void): void;
@@ -421,7 +421,7 @@ export function useStageScene(
     let restoreTimer = 0;
     let cameraMoved = true;
     const tierListeners = new Set<(t: Tier) => void>();
-    const hazeListeners = new Set<(v: number) => void>();
+    const hazeListeners = new Set<(actual: number, target: number) => void>();
     const cameraListeners = new Set<() => void>();
 
     function requestRender() {
@@ -433,7 +433,7 @@ export function useStageScene(
         (v.beam.material as THREE.ShaderMaterial).uniforms.uHaze.value = hazeActual;
         v.beam.visible = beamVisible(v);
       }
-      for (const fn of hazeListeners) fn(hazeActual);
+      for (const fn of hazeListeners) fn(hazeActual, hazeTarget);
       if (stats) stats.hazeActual = hazeActual;
     }
 
@@ -550,8 +550,8 @@ export function useStageScene(
       if (immediate) {
         hazeActual = target;
         hazeLast = 0;
-        setBeamHaze();
       }
+      setBeamHaze();
       requestRender();
     }
 
@@ -721,6 +721,8 @@ export function useStageScene(
       setHazeTarget,
       onHaze(fn) {
         hazeListeners.add(fn);
+        fn(hazeActual, hazeTarget);
+        return () => hazeListeners.delete(fn);
       },
       setQuality(q) {
         quality = q;
@@ -774,6 +776,7 @@ export function useStageScene(
       },
       onCamera(fn) {
         cameraListeners.add(fn);
+        return () => cameraListeners.delete(fn);
       },
       beginInteraction,
       endInteraction,

@@ -57,14 +57,16 @@ export function useCuePlayback(
     const fixtures = show.fixtures;
     const shadows = aimChanged(from, to, fixtures);
     const start = performance.now();
-    const run: Run = { raf: 0, last: from };
+    // 헤이즈는 머신이 정한 속도로 따라가므로 목표만 먼저 넘긴다. 중간에 멈춰도 목표는 그대로다.
+    sceneRef.current?.setHazeTarget(to.haze, false);
+    const run: Run = { raf: 0, last: { ...from, haze: to.haze } };
     runRef.current = run;
     setCurrent(cue.id);
     setPlaying(true);
     const step = (now: number) => {
       if (runRef.current !== run) return;
       const t = fadeProgress(now - start, cue.fadeSec);
-      run.last = lerpLook(from, to, t, fixtures);
+      run.last = { ...lerpLook(from, to, t, fixtures), haze: to.haze };
       sceneRef.current?.applyLook(run.last, shadows);
       setProgress(t);
       if (t >= 1) {
@@ -94,7 +96,9 @@ export function useCuePlayback(
   function jump(cueId: string) {
     stop();
     const show = store.get();
-    if (!show.cues.some((c) => c.id === cueId)) return;
+    const cue = show.cues.find((c) => c.id === cueId);
+    if (!cue) return;
+    sceneRef.current?.setHazeTarget(cue.look.haze, false);
     store.set(recallCue(show, cueId));
     setCurrent(cueId);
   }

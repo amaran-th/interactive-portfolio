@@ -3,29 +3,35 @@
 // 조명 연습실 본체. StageLightingLoader가 SSR 없이 불러오므로 첫 렌더부터 localStorage를 읽는다.
 import { useEffect, useRef, useState } from "react";
 import { isTextEntryTarget } from "@/components/works/_shared/imageInput";
+import ChannelPanel from "./ChannelPanel";
 import CueBar from "./CueBar";
 import Inspector from "./Inspector";
+import PlotLabels from "./PlotLabels";
 import { loadQuality, loadShow, saveQuality, useAutoSave } from "./persistence";
 import type { Quality, Tier } from "./quality";
 import { stageBounds } from "./scene/stage";
 import {
+  CUE_PARAMS,
   type Show,
   type Vec3,
   addActor,
   addFixture,
   addProp,
-  levelOf,
   removeEntity,
+  resolve,
   setHaze,
   updateActor,
+  updateFocus,
   updateLevel,
   updateProp,
 } from "./show";
 import { createStore } from "./store";
 import Toolbar, { type AddItem } from "./Toolbar";
 import { useCuePlayback } from "./useCuePlayback";
+import { SEGMENT } from "./ui";
 import { useShow } from "./useShow";
 import { type ViewMode, useStageScene } from "./useStageScene";
+import type { SeatSide } from "./venue";
 
 type Drag = {
   type: "prop" | "actor" | "aim";
@@ -57,7 +63,13 @@ export default function StageLighting() {
   useAutoSave(store, setNotice);
   const playback = useCuePlayback(store, sceneRef, progressRef);
 
-  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [pickedId, setPickedIdRaw] = useState<string | null>(null);
+  const [soloId, setSoloId] = useState<string | null>(null);
+  // 다른 대상을 고르면 솔로는 풀린다.
+  const setPickedId = (id: string | null) => {
+    setPickedIdRaw(id);
+    setSoloId(null);
+  };
   const selectedId = useShow(store, (s) => (pickedId && exists(s, pickedId) ? pickedId : null));
   const haze = useShow(store, (s) => s.live.haze);
   const [view, setView] = useState<ViewMode>("edit");
@@ -65,6 +77,11 @@ export default function StageLighting() {
   const [quality, setQuality] = useState<Quality>(loadQuality);
   const [tier, setTier] = useState<Tier>(0);
   const [audienceOnGo, setAudienceOnGo] = useState(true);
+  const [houseLights, setHouseLights] = useState(false);
+  const [seat, setSeat] = useState<{ row: number; side: SeatSide }>({ row: 5, side: "center" });
+  const [tab, setTab] = useState<"props" | "channels">("props");
+  const [hazeStatus, setHazeStatus] = useState<"rising" | "falling" | null>(null);
+  const solo = soloId && soloId === selectedId ? soloId : null;
 
   // ── 씬에 UI 상태 반영 ──
   useEffect(() => sceneRef.current?.setSelected(selectedId), [sceneRef, selectedId]);
@@ -75,6 +92,16 @@ export default function StageLighting() {
     saveQuality(quality);
   }, [sceneRef, quality]);
   useEffect(() => sceneRef.current?.onTierChange(setTier), [sceneRef]);
+  useEffect(() => sceneRef.current?.setHouseLights(houseLights), [sceneRef, houseLights]);
+  useEffect(() => sceneRef.current?.setSeat(seat.row, seat.side), [sceneRef, seat]);
+  useEffect(() => sceneRef.current?.setSolo(solo), [sceneRef, solo]);
+  useEffect(
+    () =>
+      sceneRef.current?.onHaze((actual, target) =>
+        setHazeStatus(Math.abs(actual - target) <= 0.01 ? null : actual < target ? "rising" : "falling"),
+      ),
+    [sceneRef],
+  );
 
   useEffect(() => {
     if (!notice) return;
@@ -84,6 +111,7 @@ export default function StageLighting() {
 
   // ── 편집 ──
   const beginEdit = () => {
+    setSoloId(null);
     playback.stop();
     store.checkpoint();
   };
@@ -105,6 +133,7 @@ export default function StageLighting() {
   };
 
   const go = () => {
+    setSoloId(null);
     if (audienceOnGo) changeView("audience");
     playback.go();
   };
@@ -164,7 +193,7 @@ export default function StageLighting() {
     if (hit.type === "aim") {
       const f = s.fixtures.find((x) => x.id === hit.id);
       if (!f) return;
-      base = levelOf(s.live, f).target;
+      base = resolve(s.stage, f, s.live.levels[f.id]).target;
     } else {
       const ent = hit.type === "prop" ? s.props.find((x) => x.id === hit.id) : s.actors.find((x) => x.id === hit.id);
       if (!ent) return;
@@ -213,7 +242,12 @@ export default function StageLighting() {
       const s = store.get();
       if (d.type === "prop") store.set(updateProp(s, d.id, { position: pos }));
       else if (d.type === "actor") store.set(updateActor(s, d.id, { position: pos }));
-      else store.set(updateLevel(s, d.id, { target: pos }));
+      else {
+        // 팔로우는 큐마다 대상을 따라가고, 나머지는 포커스(고정 조준)를 옮긴다.
+        const f = s.fixtures.find((x) => x.id === d.id);
+        if (f && CUE_PARAMS[f.kind].includes("target")) store.set(updateLevel(s, d.id, { target: pos }));
+        else store.set(updateFocus(s, d.id, { target: pos }));
+      }
     }
     sceneRef.current?.endInteraction();
     return true;
@@ -275,7 +309,17 @@ export default function StageLighting() {
         onQuality={setQuality}
         haze={haze}
         onBegin={beginEdit}
-        onHaze={(v) => store.set(setHaze(store.get(), v))}
+        hazeStatus={hazeStatus}
+        houseLights={houseLights}
+        onHouseLights={setHouseLights}
+        seatRow={seat.row}
+        seatSide={seat.side}
+        onSeat={(row, side) => setSeat({ row, side })}
+        onHaze={(v) => {
+          // 슬라이더로 정한 농도는 바로 보이게 한다(큐 재생 때만 천천히 차오른다).
+          sceneRef.current?.setHazeTarget(v, true);
+          store.set(setHaze(store.get(), v));
+        }}
         onAdd={add}
         onUndo={undo}
         onRedo={redo}
@@ -291,6 +335,7 @@ export default function StageLighting() {
           onPointerCancel={finishDrag}
           onContextMenu={(e) => e.preventDefault()}
         >
+          {view === "plot" && !fatal && <PlotLabels store={store} sceneRef={sceneRef} selectedId={selectedId} />}
           {fatal && (
             <p role="alert" className="absolute inset-0 z-10 flex items-center justify-center p-6 text-center text-sm font-bold text-white">
               {fatal}
@@ -303,7 +348,21 @@ export default function StageLighting() {
           )}
         </div>
         <aside aria-label="속성" className="max-h-[40%] shrink-0 overflow-auto border-t-2 border-point bg-white md:max-h-none md:w-72 md:border-t-0 md:border-l-2">
-          <Inspector store={store} selectedId={selectedId} tier={tier} onBegin={beginEdit} onDeleted={() => setPickedId(null)} />
+          <div role="tablist" aria-label="패널" className="sticky top-0 z-10 flex gap-1 border-b-2 border-point bg-white px-3 py-2">
+            {(["props", "channels"] as const).map((t) => (
+              <button key={t} type="button" role="tab" aria-selected={tab === t}
+                onClick={() => setTab(t)} className={`${SEGMENT} aria-selected:bg-point aria-selected:text-white`}>
+                {t === "props" ? "속성" : "채널"}
+              </button>
+            ))}
+          </div>
+          {tab === "props" ? (
+            <Inspector store={store} selectedId={selectedId} tier={tier} solo={solo !== null}
+              onSolo={() => setSoloId(solo ? null : selectedId)} onBegin={beginEdit} onDeleted={() => setPickedId(null)} />
+          ) : (
+            <ChannelPanel store={store} selectedId={selectedId} onBegin={beginEdit}
+              onPick={(id) => { setPickedId(id); setTab("props"); }} />
+          )}
         </aside>
       </div>
       <CueBar
