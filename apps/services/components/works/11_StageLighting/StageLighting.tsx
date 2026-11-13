@@ -62,7 +62,7 @@ export default function StageLighting() {
   const progressRef = useRef<HTMLDivElement>(null);
   const [notice, setNotice] = useState<string | null>(loaded.notice);
   const [fatal, setFatal] = useState<string | null>(null);
-  const sceneRef = useStageScene(viewRef, store, setFatal);
+  const sceneRef = useStageScene(viewRef, store, setFatal, setNotice);
   useAutoSave(store, setNotice);
   const playback = useCuePlayback(store, sceneRef, progressRef);
 
@@ -82,10 +82,11 @@ export default function StageLighting() {
   const [tier, setTier] = useState<Tier>(0);
   const [audienceOnGo, setAudienceOnGo] = useState(true);
   const [houseLights, setHouseLights] = useState(false);
-  const [seatPick, setSeatPick] = useState<SeatRef | null>(() => defaultSeat(loaded.show.venue));
+  const [seatPick, setSeatPick] = useState<SeatRef | null>(() => defaultSeat(loaded.show.stage, loaded.show.venue));
   const venue = useShow(store, (s) => s.venue);
-  // 블록이 지워지거나 줄어도 남아 있는 좌석으로 맞춘다.
-  const seat = useMemo(() => clampSeat(venue, seatPick), [venue, seatPick]);
+  const stageForSeat = useShow(store, (s) => s.stage);
+  // 템플릿이 바뀌어 블록이 없어지거나 줄어도 남아 있는 좌석으로 맞춘다.
+  const seat = useMemo(() => clampSeat(stageForSeat, venue, seatPick), [stageForSeat, venue, seatPick]);
   const [tab, setTab] = useState<"props" | "channels" | "seats">("props");
   const [hazeStatus, setHazeStatus] = useState<"rising" | "falling" | null>(null);
   const solo = soloId && soloId === selectedId ? soloId : null;
@@ -323,7 +324,7 @@ export default function StageLighting() {
         hazeStatus={hazeStatus}
         houseLights={houseLights}
         onHouseLights={setHouseLights}
-        seatLabel={seatLabel(venue, seat)}
+        seatLabel={seatLabel(stageForSeat, venue, seat)}
         onSeatMap={() => setTab("seats")}
         onHaze={(v) => {
           // 슬라이더로 정한 농도는 바로 보이게 한다(큐 재생 때만 천천히 차오른다).

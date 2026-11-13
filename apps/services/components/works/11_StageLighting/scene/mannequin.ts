@@ -1,5 +1,7 @@
-// 인물 마네킹: 부위를 캡슐·구로 만들어 하나로 합친다(인물당 드로우콜 1).
+// 절차적 마네킹: 사람 모델(scene/humans.ts)을 받는 동안·받지 못했을 때 대신 그린다.
+// 부위를 캡슐·구로 만들어 하나로 합친다(인물당 드로우콜 1).
 // groups[0] = 옷, groups[1] = 피부(머리·목·손). 원점은 발바닥, +z가 정면.
+// 자세 14가지를 뼈대 4가지(서기·앉기·팔 벌리기·걷기)로 줄여 그리고, 눕기는 서기를 바닥에 눕힌다.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Build, Pose } from "../show";
@@ -8,9 +10,26 @@ const BASE = 1.7;
 const WIDTH: Record<Build, number> = { slim: 0.85, average: 1, stocky: 1.25 };
 
 type V = [number, number, number];
+type Basic = "stand" | "sit" | "armsOpen" | "walk";
+const BASIC: Record<Pose, Basic> = {
+  stand: "stand",
+  talk: "stand",
+  walk: "walk",
+  formalWalk: "walk",
+  run: "walk",
+  sit: "sit",
+  sitTalk: "sit",
+  crouch: "sit",
+  kneel: "sit",
+  dance: "armsOpen",
+  push: "walk",
+  reach: "stand",
+  lie: "stand",
+  armsOpen: "armsOpen",
+};
 type Joints = { hipY: number; knee: [V, V]; ankle: [V, V]; elbow: [V, V]; wrist: [V, V] };
 
-function joints(pose: Pose): Joints {
+function joints(pose: Basic): Joints {
   switch (pose) {
     case "sit":
       return {
@@ -65,7 +84,7 @@ function ball(c: V, r: number): THREE.BufferGeometry {
 }
 
 export function buildMannequinGeometry(height: number, build: Build, pose: Pose): THREE.BufferGeometry {
-  const j = joints(pose);
+  const j = joints(BASIC[pose]);
   // 앉은 자세는 상체가 엉덩이 높이를 따라 내려온다.
   const top = j.hipY - 0.92;
   const shoulderY = 1.42 + top;
@@ -90,6 +109,7 @@ export function buildMannequinGeometry(height: number, build: Build, pose: Pose)
   const s = height / BASE;
   const w = s * WIDTH[build];
   merged.scale(w, s, w);
+  if (pose === "lie") merged.rotateX(-Math.PI / 2).translate(0, 0.12 * s, height / 2); // 머리가 -z, 가운데 정렬
   merged.computeBoundingSphere();
   return merged;
 }
@@ -97,6 +117,8 @@ export function buildMannequinGeometry(height: number, build: Build, pose: Pose)
 /** 선택·레이캐스트에 쓰는 상자 크기(폭, 키, 두께). */
 export function mannequinBox(height: number, build: Build, pose: Pose): { x: number; y: number; z: number } {
   const w = WIDTH[build];
-  const wide = pose === "armsOpen" ? 1.6 : 0.6;
-  return { x: wide * w * (height / BASE), y: pose === "sit" ? height * 0.75 : height, z: (pose === "sit" ? 0.7 : 0.4) * w };
+  const b = BASIC[pose];
+  const wide = b === "armsOpen" ? 1.6 : 0.6;
+  if (pose === "lie") return { x: wide * w * (height / BASE), y: 0.35, z: height };
+  return { x: wide * w * (height / BASE), y: b === "sit" ? height * 0.75 : height, z: (b === "sit" ? 0.7 : 0.4) * w };
 }

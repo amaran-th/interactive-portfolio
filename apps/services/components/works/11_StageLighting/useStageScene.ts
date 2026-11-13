@@ -15,6 +15,7 @@ import { type Quality, type Tier, TIERS, effectiveTier, nextTier, shadowFixtureI
 import { angleBoost, buildBeamGeometry, createBeamMaterial } from "./scene/beam";
 import { disposeGroup } from "./scene/dispose";
 import { buildFixtureBodyGeometry } from "./scene/fixtureBody";
+import { type HumanMaterial, HumanLibrary, createHumanMaterial } from "./scene/humans";
 import { buildMannequinGeometry, mannequinBox } from "./scene/mannequin";
 import { PropLayer } from "./scene/props";
 import { buildStage } from "./scene/stage";
@@ -71,7 +72,18 @@ const BOUNCE_MAX = 6;
 const DEG = Math.PI / 180;
 
 type FixtureView = { fixture: Fixture; light: THREE.SpotLight; beam: THREE.Mesh; body: THREE.Mesh; res: Resolved };
-type ActorView = { actor: Actor; key: string; mesh: THREE.Mesh; materials: THREE.MeshStandardMaterial[] };
+// 사람 모델이 준비되면 human(지오메트리는 라이브러리 공유), 아니면 절차적 마네킹(인물마다 지오메트리).
+// box는 group 로컬 좌표의 피킹 상자.
+type ActorView = {
+  actor: Actor;
+  key: string;
+  group: THREE.Group;
+  human: boolean;
+  box: THREE.Box3;
+  skin: HumanMaterial;
+  hairMat: THREE.MeshStandardMaterial;
+  mannequin: THREE.MeshStandardMaterial[];
+};
 
 const DOWN = new THREE.Vector3(0, -1, 0);
 const UP = new THREE.Vector3(0, 1, 0);
@@ -80,17 +92,20 @@ const UNIT_MAX = new THREE.Vector3(0.5, 1, 0.5);
 const CENTER_MIN = new THREE.Vector3(-0.5, -0.5, -0.5);
 const CENTER_MAX = new THREE.Vector3(0.5, 0.5, 0.5);
 
-const actorKey = (a: Actor) => `${a.height}|${a.build}|${a.pose}`;
+const actorKey = (a: Actor, ready: boolean) => `${ready}|${a.gender}|${a.pose}|${a.build}|${a.hair}|${a.height}`;
 
 export function useStageScene(
   containerRef: RefObject<HTMLDivElement | null>,
   store: Store,
   onError: (msg: string) => void,
+  onNotice: (msg: string) => void,
 ): RefObject<SceneApi | null> {
   const apiRef = useRef<SceneApi | null>(null);
   const onErrorRef = useRef(onError);
+  const onNoticeRef = useRef(onNotice);
   useEffect(() => {
     onErrorRef.current = onError;
+    onNoticeRef.current = onNotice;
   });
 
   useEffect(() => {
@@ -231,31 +246,82 @@ export function useStageScene(
 
     // ── 인물 ──
     const actors = new Map<string, ActorView>();
+    const tmpSize = new THREE.Vector3();
+    const humans = new HumanLibrary((state) => {
+      if (state === "failed") onNoticeRef.current("사람 모델을 받지 못해 단순한 마네킹으로 그려요.");
+      for (const v of actors.values()) rebuildActor(v);
+      updateSelection();
+      shadowsPending = true;
+      requestRender();
+    });
+    function clearActorMeshes(v: ActorView) {
+      for (const child of [...v.group.children]) {
+        v.group.remove(child);
+        // 사람 모델 지오메트리는 라이브러리가 함께 쓰므로 마네킹 것만 지운다.
+        if (!v.human) (child as THREE.Mesh).geometry.dispose();
+      }
+    }
+    function rebuildActor(v: ActorView) {
+      const a = v.actor;
+      clearActorMeshes(v);
+      const parts = humans.parts(a.gender, a.pose, a.build, a.hair);
+      v.human = !!parts;
+      v.key = actorKey(a, !!parts);
+      if (parts) {
+        const body = new THREE.Mesh(parts.body, v.skin);
+        v.group.add(body);
+        if (parts.hair) v.group.add(new THREE.Mesh(parts.hair, v.hairMat));
+        v.group.scale.setScalar(a.height / parts.modelHeight);
+        v.box.copy(parts.box);
+      } else {
+        v.group.add(new THREE.Mesh(buildMannequinGeometry(a.height, a.build, a.pose), v.mannequin));
+        v.group.scale.setScalar(1);
+        const b = mannequinBox(a.height, a.build, a.pose);
+        v.box.set(new THREE.Vector3(-b.x / 2, 0, -b.z / 2), new THREE.Vector3(b.x / 2, b.y, b.z / 2));
+      }
+      v.group.traverse((o) => {
+        o.castShadow = true;
+        o.receiveShadow = true;
+      });
+    }
     function placeActor(v: ActorView) {
-      v.mesh.position.set(v.actor.position.x, v.actor.position.y, v.actor.position.z);
-      v.mesh.rotation.y = v.actor.rotationY;
-      v.materials[0].color.setStyle(v.actor.clothColor);
-      v.materials[1].color.setStyle(v.actor.skinColor);
+      const a = v.actor;
+      v.group.position.set(a.position.x, a.position.y, a.position.z);
+      v.group.rotation.y = a.rotationY;
+      v.group.updateMatrixWorld();
+      v.skin.setColors(a.skinColor, a.topColor, a.bottomColor, a.shoeColor);
+      v.hairMat.color.setStyle(a.hairColor);
+      v.mannequin[0].color.setStyle(a.topColor);
+      v.mannequin[1].color.setStyle(a.skinColor);
     }
     function addActor(a: Actor) {
-      const materials = [
-        new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0 }),
-        new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0 }),
-      ];
-      const mesh = new THREE.Mesh(buildMannequinGeometry(a.height, a.build, a.pose), materials);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      const v: ActorView = { actor: a, key: actorKey(a), mesh, materials };
+      humans.ensure();
+      const v: ActorView = {
+        actor: a,
+        key: "",
+        group: new THREE.Group(),
+        human: false,
+        box: new THREE.Box3(),
+        skin: createHumanMaterial(),
+        hairMat: new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0 }),
+        mannequin: [
+          new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0 }),
+          new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0 }),
+        ],
+      };
+      rebuildActor(v);
       placeActor(v);
-      scene.add(mesh);
+      scene.add(v.group);
       actors.set(a.id, v);
     }
     function removeActor(id: string) {
       const v = actors.get(id);
       if (!v) return;
-      scene.remove(v.mesh);
-      v.mesh.geometry.dispose();
-      for (const m of v.materials) m.dispose();
+      scene.remove(v.group);
+      clearActorMeshes(v);
+      v.skin.dispose();
+      v.hairMat.dispose();
+      for (const m of v.mannequin) m.dispose();
       actors.delete(id);
     }
     for (const a of show.actors) addActor(a);
@@ -425,13 +491,13 @@ export function useStageScene(
       const fx = fixtures.get(selectedId);
       if (prop) {
         ring.visible = true;
-        ring.position.set(prop.position.x, 0.01, prop.position.z);
+        ring.position.set(prop.position.x, prop.position.y + 0.01, prop.position.z);
         ring.scale.setScalar(Math.hypot(prop.scale.x, prop.scale.z) / 2 + 0.15);
       } else if (actorView) {
-        const b = mannequinBox(actorView.actor.height, actorView.actor.build, actorView.actor.pose);
+        const size = actorView.box.getSize(tmpSize).multiplyScalar(actorView.group.scale.x);
         ring.visible = true;
-        ring.position.set(actorView.mesh.position.x, 0.01, actorView.mesh.position.z);
-        ring.scale.setScalar(Math.max(b.x, b.z) / 2 + 0.15);
+        ring.position.set(actorView.group.position.x, actorView.group.position.y + 0.01, actorView.group.position.z);
+        ring.scale.setScalar(Math.max(size.x, size.z) / 2 + 0.15);
       } else if (fx) {
         fx.body.material = bodySelected;
         const t = fx.res.target;
@@ -615,12 +681,8 @@ export function useStageScene(
         const v = actors.get(a.id);
         if (!v) addActor(a);
         else if (v.actor !== a) {
-          if (v.key !== actorKey(a)) {
-            v.mesh.geometry.dispose();
-            v.mesh.geometry = buildMannequinGeometry(a.height, a.build, a.pose);
-            v.key = actorKey(a);
-          }
           v.actor = a;
+          if (v.key !== actorKey(a, humans.state === "ready")) rebuildActor(v);
           placeActor(v);
         }
       }
@@ -682,6 +744,15 @@ export function useStageScene(
       return tmpHit.applyMatrix4(tmpM).distanceTo(raycaster.ray.origin);
     }
 
+    /** group 로컬 좌표의 상자와 광선이 만나는 거리. */
+    function hitLocalBox(group: THREE.Object3D, box: THREE.Box3): number | null {
+      group.updateMatrixWorld();
+      tmpInv.copy(group.matrixWorld).invert();
+      tmpRay.copy(raycaster.ray).applyMatrix4(tmpInv);
+      if (!tmpRay.intersectBox(box, tmpHit)) return null;
+      return tmpHit.applyMatrix4(group.matrixWorld).distanceTo(raycaster.ray.origin);
+    }
+
     function floorPointRaw(): Vec3 | null {
       const { origin: o, direction: dir } = raycaster.ray;
       if (dir.y >= 0) return null;
@@ -706,10 +777,7 @@ export function useStageScene(
         }
       };
       for (const p of show.props) consider("prop", p.id, hitBox(p.position, p.rotationY, p.scale, false));
-      for (const v of actors.values()) {
-        const a = v.actor;
-        consider("actor", a.id, hitBox(a.position, a.rotationY, mannequinBox(a.height, a.build, a.pose), false));
-      }
+      for (const v of actors.values()) consider("actor", v.actor.id, hitLocalBox(v.group, v.box));
       const fixtureSize = view === "plot" ? { x: 0.9, y: 0.9, z: 0.9 } : { x: 0.5, y: 0.5, z: 0.5 };
       for (const v of fixtures.values()) consider("fixture", v.fixture.id, hitBox(v.res.position, 0, fixtureSize, true));
       return best;
@@ -781,8 +849,11 @@ export function useStageScene(
         const prop = show.props.find((p) => p.id === id);
         if (prop) propLayer.setTransform(id, pos, prop.rotationY);
         const v = actors.get(id);
-        if (v) v.mesh.position.set(pos.x, pos.y, pos.z);
-        if (selectedId === id) ring.position.set(pos.x, 0.01, pos.z);
+        if (v) {
+          v.group.position.set(pos.x, pos.y, pos.z);
+          v.group.updateMatrixWorld();
+        }
+        if (selectedId === id) ring.position.set(pos.x, pos.y + 0.01, pos.z);
         shadowsPending = true;
         requestRender();
       },
@@ -856,6 +927,7 @@ export function useStageScene(
       for (const c of Object.values(controls)) c.dispose();
       for (const id of [...fixtures.keys()]) removeFixture(id);
       for (const id of [...actors.keys()]) removeActor(id);
+      humans.dispose();
       disposeGroup(stageGroup);
       venue.dispose();
       propLayer.dispose();

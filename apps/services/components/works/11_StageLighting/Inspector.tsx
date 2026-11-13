@@ -120,8 +120,8 @@ export default function Inspector({ store, selectedId, tier, solo, onSolo, onBeg
           onPick={(build) => { onBegin(); edit((s) => updateActor(s, id, { build })); }} />
         <Segmented label="자세" value={actor.pose} options={POSES.map((p) => ({ value: p, label: POSE_LABELS[p] }))}
           onPick={(pose) => { onBegin(); edit((s) => updateActor(s, id, { pose })); }} />
-        <ColorField label="옷" value={actor.clothColor} onBegin={onBegin}
-          onChange={(clothColor) => edit((s) => updateActor(s, id, { clothColor }))} />
+        <ColorField label="상의" value={actor.topColor} onBegin={onBegin}
+          onChange={(topColor) => edit((s) => updateActor(s, id, { topColor }))} />
         <ColorField label="피부" value={actor.skinColor} onBegin={onBegin}
           onChange={(skinColor) => edit((s) => updateActor(s, id, { skinColor }))} />
         <Slider label="좌우" value={actor.position.x} min={-15} max={15} step={0.1} format={m} onBegin={onBegin}
