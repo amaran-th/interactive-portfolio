@@ -1,12 +1,13 @@
 "use client";
 
 // 조명 연습실 본체. StageLightingLoader가 SSR 없이 불러오므로 첫 렌더부터 localStorage를 읽는다.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { isTextEntryTarget } from "@/components/works/_shared/imageInput";
 import ChannelPanel from "./ChannelPanel";
 import CueBar from "./CueBar";
 import Inspector from "./Inspector";
 import PlotLabels from "./PlotLabels";
+import SeatMap from "./SeatMap";
 import { loadQuality, loadShow, saveQuality, useAutoSave } from "./persistence";
 import type { Quality, Tier } from "./quality";
 import { stageBounds } from "./scene/stage";
@@ -31,7 +32,7 @@ import { useCuePlayback } from "./useCuePlayback";
 import { SEGMENT } from "./ui";
 import { useShow } from "./useShow";
 import { type ViewMode, useStageScene } from "./useStageScene";
-import type { SeatSide } from "./venue";
+import { type SeatRef, clampSeat, defaultSeat, seatLabel } from "./venue";
 
 type Drag = {
   type: "prop" | "actor" | "aim";
@@ -46,6 +47,7 @@ type Drag = {
 };
 
 const CLICK_SLOP = 4;
+const TAB_LABELS = { props: "속성", channels: "채널", seats: "객석" } as const;
 const NOTICE_MS = 5000;
 
 function exists(s: Show, id: string): boolean {
@@ -78,8 +80,11 @@ export default function StageLighting() {
   const [tier, setTier] = useState<Tier>(0);
   const [audienceOnGo, setAudienceOnGo] = useState(true);
   const [houseLights, setHouseLights] = useState(false);
-  const [seat, setSeat] = useState<{ row: number; side: SeatSide }>({ row: 5, side: "center" });
-  const [tab, setTab] = useState<"props" | "channels">("props");
+  const [seatPick, setSeatPick] = useState<SeatRef | null>(() => defaultSeat(loaded.show.venue));
+  const venue = useShow(store, (s) => s.venue);
+  // 블록이 지워지거나 줄어도 남아 있는 좌석으로 맞춘다.
+  const seat = useMemo(() => clampSeat(venue, seatPick), [venue, seatPick]);
+  const [tab, setTab] = useState<"props" | "channels" | "seats">("props");
   const [hazeStatus, setHazeStatus] = useState<"rising" | "falling" | null>(null);
   const solo = soloId && soloId === selectedId ? soloId : null;
 
@@ -93,7 +98,7 @@ export default function StageLighting() {
   }, [sceneRef, quality]);
   useEffect(() => sceneRef.current?.onTierChange(setTier), [sceneRef]);
   useEffect(() => sceneRef.current?.setHouseLights(houseLights), [sceneRef, houseLights]);
-  useEffect(() => sceneRef.current?.setSeat(seat.row, seat.side), [sceneRef, seat]);
+  useEffect(() => sceneRef.current?.setSeat(seat), [sceneRef, seat]);
   useEffect(() => sceneRef.current?.setSolo(solo), [sceneRef, solo]);
   useEffect(
     () =>
@@ -312,9 +317,8 @@ export default function StageLighting() {
         hazeStatus={hazeStatus}
         houseLights={houseLights}
         onHouseLights={setHouseLights}
-        seatRow={seat.row}
-        seatSide={seat.side}
-        onSeat={(row, side) => setSeat({ row, side })}
+        seatLabel={seatLabel(venue, seat)}
+        onSeatMap={() => setTab("seats")}
         onHaze={(v) => {
           // 슬라이더로 정한 농도는 바로 보이게 한다(큐 재생 때만 천천히 차오른다).
           sceneRef.current?.setHazeTarget(v, true);
@@ -349,16 +353,19 @@ export default function StageLighting() {
         </div>
         <aside aria-label="속성" className="max-h-[40%] shrink-0 overflow-auto border-t-2 border-point bg-white md:max-h-none md:w-72 md:border-t-0 md:border-l-2">
           <div role="tablist" aria-label="패널" className="sticky top-0 z-10 flex gap-1 border-b-2 border-point bg-white px-3 py-2">
-            {(["props", "channels"] as const).map((t) => (
+            {(["props", "channels", "seats"] as const).map((t) => (
               <button key={t} type="button" role="tab" aria-selected={tab === t}
                 onClick={() => setTab(t)} className={`${SEGMENT} aria-selected:bg-point aria-selected:text-white`}>
-                {t === "props" ? "속성" : "채널"}
+                {TAB_LABELS[t]}
               </button>
             ))}
           </div>
           {tab === "props" ? (
             <Inspector store={store} selectedId={selectedId} tier={tier} solo={solo !== null}
               onSolo={() => setSoloId(solo ? null : selectedId)} onBegin={beginEdit} onDeleted={() => setPickedId(null)} />
+          ) : tab === "seats" ? (
+            <SeatMap store={store} seat={seat} onBegin={beginEdit}
+              onSeat={(ref) => { setSeatPick(ref); changeView("audience"); }} />
           ) : (
             <ChannelPanel store={store} selectedId={selectedId} onBegin={beginEdit}
               onPick={(id) => { setPickedId(id); setTab("props"); }} />

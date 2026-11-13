@@ -1,83 +1,102 @@
-// 객석 배치(순수). 무대 형태별 계단식 좌석과 좌석 시점을 계산한다.
+// 객석 배치(순수). 좌석 블록에서 좌석 좌표·계단 단·좌석 시점·극장 크기를 계산한다.
 // node:test가 그대로 실행하도록 타입만 import한다.
-import type { Stage, Vec3 } from "./show";
+import type { SeatBlock, Stage, Vec3, Venue } from "./show";
 
-export type Seat = { x: number; y: number; z: number; rotationY: number; row: number; side: "front" | "left" | "right" | "back" };
-export type SeatSide = "left" | "center" | "right";
+export type Seat = { x: number; y: number; z: number; rotationY: number; blockId: string; row: number; seat: number; width: number };
+export type SeatRef = { blockId: string; row: number; seat: number };
 
 export const ROW_GAP = 0.9;
-export const RISE = 0.25;
 export const SEAT_W = 0.55;
-export const HOUSE_FLOOR = -0.6; // 객석 바닥(무대 바닥 y=0보다 무대 높이만큼 낮다)
+export const HOUSE_FLOOR = -0.6; // 객석 바닥(무대 바닥 y=0보다 낮다)
 const EYE = 1.15;
+const DEG = Math.PI / 180;
 
-const floorAt = (row: number) => HOUSE_FLOOR + row * RISE;
-
-/** 길이 span 안에 좌석 폭 간격으로 가운데 정렬한 좌표들. */
-function spread(span: number): number[] {
-  const n = Math.max(1, Math.floor(span / SEAT_W));
-  return Array.from({ length: n }, (_, i) => (i - (n - 1) / 2) * SEAT_W);
-}
-
-export function seatLayout(stage: Stage, rows: number): Seat[] {
-  const { width: w, depth: d } = stage;
+/** 블록 하나의 좌석. 줄·번호는 1부터, 번호는 객석에서 무대를 볼 때 왼쪽부터. */
+export function blockSeats(b: SeatBlock): Seat[] {
+  const n = b.seatsPerRow;
+  const cos = Math.cos(b.rotationY);
+  const sin = Math.sin(b.rotationY);
+  const arc = b.curve * DEG;
+  const r0 = arc > 1e-6 ? (n * SEAT_W) / arc : 0;
   const seats: Seat[] = [];
-  if (stage.shape === "round") {
-    const cz = -d / 2;
-    for (let r = 0; r < rows; r++) {
-      const R = Math.min(w, d) / 2 + 1.5 + r * ROW_GAP;
-      const n = Math.floor((2 * Math.PI * R) / SEAT_W);
-      for (let i = 0; i < n; i++) {
-        const phi = (i / n) * Math.PI * 2;
-        const c = Math.cos(phi);
-        const x = R * Math.sin(phi);
-        const side = c > 0.5 ? "front" : c < -0.5 ? "back" : x < 0 ? "left" : "right";
-        seats.push({ x, y: floorAt(r), z: cz + R * c, rotationY: phi + Math.PI, row: r, side });
+  for (let r = 0; r < b.rows; r++) {
+    const y = HOUSE_FLOOR + r * b.rake;
+    for (let i = 0; i < n; i++) {
+      const k = i - (n - 1) / 2;
+      let lx: number;
+      let lz: number;
+      let yaw = Math.PI;
+      let width = SEAT_W;
+      if (r0 > 0) {
+        const rr = r0 + r * ROW_GAP;
+        const th = (k * SEAT_W) / r0;
+        lx = rr * Math.sin(th);
+        lz = -r0 + rr * Math.cos(th);
+        yaw += th;
+        width = (SEAT_W * rr) / r0;
+      } else {
+        lx = k * SEAT_W;
+        lz = r * ROW_GAP;
       }
-    }
-    return seats;
-  }
-  const frontZ = stage.shape === "thrust" ? d * 0.4 + 1.5 : 1.5;
-  const frontXs = spread(w + 4);
-  for (let r = 0; r < rows; r++) {
-    for (const x of frontXs) seats.push({ x, y: floorAt(r), z: frontZ + r * ROW_GAP, rotationY: Math.PI, row: r, side: "front" });
-  }
-  if (stage.shape === "thrust") {
-    const zs = spread(d * 0.4 + 1).map((z) => z + (d * 0.4) / 2);
-    for (let r = 0; r < rows; r++) {
-      const off = w / 4 + 1.5 + r * ROW_GAP;
-      for (const z of zs) {
-        seats.push({ x: -off, y: floorAt(r), z, rotationY: Math.PI / 2, row: r, side: "left" });
-        seats.push({ x: off, y: floorAt(r), z, rotationY: -Math.PI / 2, row: r, side: "right" });
-      }
+      seats.push({
+        x: b.x + lx * cos + lz * sin,
+        y,
+        z: b.z - lx * sin + lz * cos,
+        rotationY: yaw + b.rotationY,
+        blockId: b.id,
+        row: r + 1,
+        seat: i + 1,
+        width,
+      });
     }
   }
   return seats;
 }
 
-/** 좌석마다 그 아래 계단 단(객석 바닥에서 좌석 바닥까지). 첫 줄처럼 높이가 0인 칸은 뺀다. */
-export function riserBoxes(
-  stage: Stage,
-  rows: number,
-): { x: number; z: number; w: number; d: number; h: number; rotationY: number }[] {
-  return seatLayout(stage, rows)
+export function seatLayout(venue: Venue): Seat[] {
+  return venue.blocks.flatMap(blockSeats);
+}
+
+/** 좌석마다 그 아래 계단 단(객석 바닥에서 좌석 바닥까지). 높이가 0인 칸은 뺀다. */
+export function riserBoxes(venue: Venue): { x: number; z: number; w: number; d: number; h: number; rotationY: number }[] {
+  return seatLayout(venue)
     .filter((s) => s.y > HOUSE_FLOOR + 1e-6)
-    .map((s) => ({ x: s.x, z: s.z, w: SEAT_W, d: ROW_GAP, h: s.y - HOUSE_FLOOR, rotationY: s.rotationY }));
+    .map((s) => ({ x: s.x, z: s.z, w: s.width, d: ROW_GAP, h: s.y - HOUSE_FLOOR, rotationY: s.rotationY }));
 }
 
-export function seatView(stage: Stage, rows: number, row: number, side: SeatSide): { eye: Vec3; target: Vec3 } {
-  const r = Math.min(Math.max(1, Math.round(row)), rows) - 1;
-  const front = seatLayout(stage, rows).filter((s) => s.row === r && s.side === "front");
+export function defaultSeat(venue: Venue): SeatRef | null {
+  const b = venue.blocks[0];
+  if (!b) return null;
+  return { blockId: b.id, row: Math.min(5, b.rows), seat: Math.ceil(b.seatsPerRow / 2) };
+}
+
+/** 블록이 지워지거나 줄·좌석 수가 줄어도 고른 좌석이 남아 있게 맞춘다. */
+export function clampSeat(venue: Venue, ref: SeatRef | null): SeatRef | null {
+  const b = ref && venue.blocks.find((x) => x.id === ref.blockId);
+  if (!ref || !b) return defaultSeat(venue);
+  return {
+    blockId: b.id,
+    row: Math.min(b.rows, Math.max(1, Math.round(ref.row))),
+    seat: Math.min(b.seatsPerRow, Math.max(1, Math.round(ref.seat))),
+  };
+}
+
+export function seatLabel(venue: Venue, ref: SeatRef | null): string {
+  const b = ref && venue.blocks.find((x) => x.id === ref.blockId);
+  return ref && b ? `${b.name} ${ref.row}열 ${ref.seat}번` : "좌석 없음";
+}
+
+export function seatView(stage: Stage, venue: Venue, ref: SeatRef | null): { eye: Vec3; target: Vec3 } {
   const target = { x: 0, y: 1, z: -stage.depth / 2 };
-  if (front.length === 0) return { eye: { x: 0, y: floorAt(r) + EYE, z: 2 }, target };
-  const xs = front.map((s) => s.x).sort((a, b) => a - b);
-  const z = front.reduce((m, s) => Math.max(m, s.z), -Infinity);
-  const x = side === "center" ? 0 : side === "left" ? xs[Math.floor(xs.length / 6)] : xs[xs.length - 1 - Math.floor(xs.length / 6)];
-  return { eye: { x, y: floorAt(r) + EYE, z }, target };
+  const r = clampSeat(venue, ref);
+  const b = r && venue.blocks.find((x) => x.id === r.blockId);
+  const seat = r && b ? blockSeats(b).find((s) => s.row === r.row && s.seat === r.seat) : undefined;
+  if (!seat) return { eye: { x: 0, y: HOUSE_FLOOR + EYE + 1, z: 8 }, target };
+  return { eye: { x: seat.x, y: seat.y + EYE, z: seat.z }, target };
 }
 
-export function venueBox(stage: Stage, rows: number): { minX: number; maxX: number; minZ: number; maxZ: number; height: number } {
-  const seats = seatLayout(stage, rows);
+export function venueBox(stage: Stage, venue: Venue): { minX: number; maxX: number; minZ: number; maxZ: number; height: number } {
+  const seats = seatLayout(venue);
   const xs = seats.map((s) => s.x);
   const zs = seats.map((s) => s.z);
   const m = 2;

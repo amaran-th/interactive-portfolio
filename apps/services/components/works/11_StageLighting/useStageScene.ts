@@ -21,7 +21,7 @@ import { buildStage } from "./scene/stage";
 import { VenueLayer } from "./scene/venue";
 import { type Actor, type Fixture, type LookState, type Resolved, type Show, type Vec3, resolve } from "./show";
 import { type Store, diffShow } from "./store";
-import { type SeatSide, seatView, venueBox } from "./venue";
+import { type SeatRef, seatView, venueBox } from "./venue";
 
 export type ViewMode = "edit" | "audience" | "plot";
 export type Pick = { type: "prop" | "actor" | "fixture" | "aim"; id: string } | null;
@@ -33,7 +33,7 @@ export type SceneApi = {
   setView(v: ViewMode): void;
   setWorkLight(on: boolean): void;
   setHouseLights(on: boolean): void;
-  setSeat(row: number, side: SeatSide): void;
+  setSeat(seat: SeatRef | null): void;
   setSolo(fixtureId: string | null): void;
   setHazeTarget(target: number, immediate: boolean): void;
   onHaze(fn: (actual: number, target: number) => void): () => void;
@@ -154,12 +154,11 @@ export function useStageScene(
     controls.plot.enableRotate = false;
     controls.plot.screenSpacePanning = true;
     let view: ViewMode = "edit";
-    let seatRow = 5;
-    let seatSide: SeatSide = "center";
+    let seat: SeatRef | null = null;
     const activeCamera = (): THREE.Camera => (view === "edit" ? edit : view === "audience" ? audience : plot);
 
     function placeAudience() {
-      const { eye, target } = seatView(show.stage, show.venue.rows, seatRow, seatSide);
+      const { eye, target } = seatView(show.stage, show.venue, seat);
       audience.position.set(eye.x, eye.y, eye.z);
       controls.audience.target.set(target.x, target.y, target.z);
       // 좌석에서 무대 쪽을 본 방위각을 기준으로 좌우 25°까지만 돌린다.
@@ -174,7 +173,7 @@ export function useStageScene(
 
     function placeCameras(resetEdit: boolean) {
       const d = show.stage.depth;
-      const box = venueBox(show.stage, show.venue.rows);
+      const box = venueBox(show.stage, show.venue);
       if (resetEdit) {
         edit.position.set(0, Math.min(box.height - 1, 8), Math.min(box.maxZ - 1.5, d + 8));
         controls.edit.target.set(0, 1, -d / 2);
@@ -203,14 +202,14 @@ export function useStageScene(
     let stageGroup = buildStage(show.stage);
     scene.add(stageGroup);
     const venue = new VenueLayer();
-    venue.build(show.stage, show.venue.rows);
+    venue.build(show.stage, show.venue);
     scene.add(venue.group);
     const propLayer = new PropLayer();
     scene.add(propLayer.group);
     propLayer.sync(show.props);
 
     function placeHouseLight() {
-      const box = venueBox(show.stage, show.venue.rows);
+      const box = venueBox(show.stage, show.venue);
       houseDir.position.set(0, box.height - 0.5, box.maxZ - 1);
       houseDir.target.position.set(0, 0, -show.stage.depth / 2);
       houseDir.target.updateMatrixWorld();
@@ -566,9 +565,11 @@ export function useStageScene(
         scene.add(stageGroup);
       }
       if (d.stage || d.venue) {
-        venue.build(next.stage, next.venue.rows);
+        venue.build(next.stage, next.venue);
         placeHouseLight();
-        placeCameras(false);
+        // 객석만 바뀌면(좌석 지도 편집) 편집·플롯 카메라는 그대로 둔다.
+        if (d.stage) placeCameras(false);
+        else placeAudience();
         cameraMoved = true;
       }
       if (d.props.added.length + d.props.changed.length + d.props.removed.length > 0) propLayer.sync(next.props);
@@ -704,9 +705,8 @@ export function useStageScene(
         houseFade = { from: houseLevel, to, start: performance.now() };
         requestRender();
       },
-      setSeat(row, side) {
-        seatRow = row;
-        seatSide = side;
+      setSeat(ref) {
+        seat = ref;
         placeAudience();
         cameraMoved = true;
         requestRender();

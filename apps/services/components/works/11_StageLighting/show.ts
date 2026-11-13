@@ -64,7 +64,22 @@ export type CueParam = "intensity" | "color" | "target" | "zoom";
 
 export type LookState = { levels: Record<string, FixtureLevel>; haze: number };
 export type Cue = { id: string; number: number; name: string; fadeSec: number; look: LookState };
-export type Venue = { rows: number };
+/**
+ * 좌석 블록. (x, z)는 첫 줄 가운데, 블록은 회전 0일 때 -z(무대 쪽)를 본다.
+ * 줄은 뒤(+z)로 쌓이고, curve(첫 줄이 이루는 호의 각도, 도)가 0보다 크면 줄이 앞쪽 한 점을 중심으로 휜다.
+ */
+export type SeatBlock = {
+  id: string;
+  name: string;
+  x: number;
+  z: number;
+  rotationY: number;
+  rows: number;
+  seatsPerRow: number;
+  rake: number; // 줄마다 올라가는 높이(m)
+  curve: number; // 0..120
+};
+export type Venue = { blocks: SeatBlock[] };
 
 export type Show = {
   version: 2;
@@ -86,7 +101,7 @@ export type Resolved = {
   position: Vec3;
 };
 
-export const LIMITS = { fixtures: 24, props: 40, actors: 40, cues: 99 } as const;
+export const LIMITS = { fixtures: 24, props: 40, actors: 40, cues: 99, blocks: 12 } as const;
 
 export const STAGE_SHAPES: StageShape[] = ["proscenium", "thrust", "round"];
 export const STAGE_LABELS: Record<StageShape, string> = { proscenium: "프로시니엄", thrust: "돌출", round: "원형" };
@@ -295,6 +310,67 @@ function clampActor(a: Actor): Actor {
   return { ...a, name: a.name.slice(0, 20), position: clampVec(a.position), height: clamp(a.height, 1, 2.1) };
 }
 
+function clampBlock(b: SeatBlock): SeatBlock {
+  return {
+    ...b,
+    name: b.name.slice(0, 20),
+    x: clamp(b.x, -COORD, COORD),
+    z: clamp(b.z, -COORD, COORD),
+    rotationY: Math.atan2(Math.sin(b.rotationY), Math.cos(b.rotationY)),
+    rows: Math.round(clamp(b.rows, 1, 20)),
+    seatsPerRow: Math.round(clamp(b.seatsPerRow, 1, 40)),
+    rake: clamp(b.rake, 0, 0.5),
+    curve: clamp(b.curve, 0, 120),
+  };
+}
+
+const SEAT_PITCH = 0.55; // venue.ts의 SEAT_W와 같다
+const block = (id: string, name: string, x: number, z: number, rotDeg: number, rows: number, seats: number, curve = 0): SeatBlock => ({
+  id,
+  name,
+  x: Math.round(x * 100) / 100,
+  z: Math.round(z * 100) / 100,
+  rotationY: (rotDeg * Math.PI) / 180,
+  rows,
+  seatsPerRow: seats,
+  rake: 0.25,
+  curve: Math.round(curve * 10) / 10,
+});
+
+/** 무대 형태별 기본 객석. 프로시니엄은 가운데와 양옆 블록, 돌출은 세 면, 원형은 네 면을 둘러싼다. */
+export function defaultBlocks(stage: Stage): SeatBlock[] {
+  const { width: w, depth: d } = stage;
+  if (stage.shape === "round") {
+    const r = Math.min(w, d) / 2 + 1.5;
+    const n = Math.max(4, Math.floor((r * 1.2) / SEAT_PITCH));
+    const arc = ((n * SEAT_PITCH) / r) * (180 / Math.PI);
+    const cz = -d / 2;
+    return [
+      block("b-front", "앞", 0, cz + r, 0, 6, n, arc),
+      block("b-left", "왼쪽", -r, cz, -90, 6, n, arc),
+      block("b-back", "뒤", 0, cz - r, 180, 6, n, arc),
+      block("b-right", "오른쪽", r, cz, 90, 6, n, arc),
+    ];
+  }
+  if (stage.shape === "thrust") {
+    const front = Math.max(4, Math.round((w / 2 + 2) / SEAT_PITCH));
+    const side = Math.max(3, Math.round((d * 0.4 + 1) / SEAT_PITCH));
+    const sx = w / 4 + 1.5;
+    return [
+      block("b-center", "가운데", 0, d * 0.4 + 1.5, 0, 8, front),
+      block("b-left", "왼쪽", -sx, d * 0.2, -90, 6, side),
+      block("b-right", "오른쪽", sx, d * 0.2, 90, 6, side),
+    ];
+  }
+  const center = Math.max(6, Math.round((w + 4) / SEAT_PITCH) - 10);
+  const sx = (center * SEAT_PITCH) / 2 + 1 + (5 * SEAT_PITCH) / 2;
+  return [
+    block("b-center", "가운데", 0, 1.5, 0, 10, center),
+    block("b-left", "왼쪽", -sx, 1.8, -20, 9, 5),
+    block("b-right", "오른쪽", sx, 1.8, 20, 9, 5),
+  ];
+}
+
 function clampFocus(f: Focus): Focus {
   return {
     ...f,
@@ -353,6 +429,8 @@ function makeFixture(
   };
 }
 
+const STAGE_DEFAULT: Stage = { shape: "proscenium", width: 10, depth: 8, height: 6, floorColor: "#3a3a40", backdropColor: "#202028" };
+
 export function defaultShow(): Show {
   const gel = (name: string) => GELS.find((g) => g.name === name)!.color;
   const fx = [
@@ -394,8 +472,8 @@ export function defaultShow(): Show {
   };
   return {
     version: 2,
-    stage: { shape: "proscenium", width: 10, depth: 8, height: 6, floorColor: "#3a3a40", backdropColor: "#202028" },
-    venue: { rows: 10 },
+    stage: STAGE_DEFAULT,
+    venue: { blocks: defaultBlocks(STAGE_DEFAULT) },
     props: [],
     actors: [makeActor("인물 1", -1, -3, "#7a2e3a"), makeActor("인물 2", 1, -3, "#2e4a7a")],
     fixtures: fx,
@@ -496,12 +574,44 @@ export function updateFocus(show: Show, id: string, patch: Partial<Focus>): Show
 }
 
 export function updateStage(show: Show, patch: Partial<Stage>): Show {
-  return { ...show, stage: clampStage({ ...show.stage, ...patch }) };
+  const stage = clampStage({ ...show.stage, ...patch });
+  // 무대 형태가 바뀌면 객석 배치도 그 형태의 기본 배치로 바꾼다(되돌리기로 복구할 수 있다).
+  const venue = stage.shape !== show.stage.shape ? { blocks: defaultBlocks(stage) } : show.venue;
+  return { ...show, stage, venue };
 }
 
-export function updateVenue(show: Show, patch: Partial<Venue>): Show {
-  const rows = patch.rows === undefined ? show.venue.rows : Math.round(clamp(patch.rows, 4, 20));
-  return { ...show, venue: { rows } };
+export function addBlock(show: Show): Show {
+  const blocks = show.venue.blocks;
+  if (blocks.length >= LIMITS.blocks) return show;
+  // 맨 뒤 블록 뒤에 같은 폭으로 하나 더 놓는다.
+  const back = blocks.reduce((m, b) => Math.max(m, b.z + b.rows * 0.9), 1);
+  const block = clampBlock({
+    id: newId("blk"),
+    name: `블록 ${blocks.length + 1}`,
+    x: 0,
+    z: back + 1.5,
+    rotationY: 0,
+    rows: 5,
+    seatsPerRow: 12,
+    rake: 0.25,
+    curve: 0,
+  });
+  return { ...show, venue: { blocks: [...blocks, block] } };
+}
+
+export function updateBlock(show: Show, id: string, patch: Partial<Omit<SeatBlock, "id">>): Show {
+  const blocks = updateIn(show.venue.blocks, id, (b) => clampBlock({ ...b, ...patch }));
+  return blocks ? { ...show, venue: { blocks } } : show;
+}
+
+export function removeBlock(show: Show, id: string): Show {
+  const blocks = show.venue.blocks.filter((b) => b.id !== id);
+  return blocks.length === show.venue.blocks.length ? show : { ...show, venue: { blocks } };
+}
+
+/** 무대 형태에 맞는 기본 객석으로 되돌린다. */
+export function resetVenue(show: Show): Show {
+  return { ...show, venue: { blocks: defaultBlocks(show.stage) } };
 }
 
 export function updateLevel(show: Show, fixtureId: string, patch: Partial<FixtureLevel>): Show {
@@ -647,6 +757,26 @@ function readActors(v: unknown): Actor[] {
     });
 }
 
+/** 블록 배열이 없으면(개발 중 쓰던 줄 수 형식) 기본 배치로 채운다. 블록이 있는데 형식이 틀리면 실패. */
+function readBlocks(v: unknown, stage: Stage): SeatBlock[] {
+  const vo = obj(v);
+  if (!Array.isArray(vo.blocks)) return defaultBlocks(stage);
+  return vo.blocks.slice(0, LIMITS.blocks).map((x) => {
+    const b = obj(x);
+    return clampBlock({
+      id: str(b.id),
+      name: str(b.name),
+      x: num(b.x),
+      z: num(b.z),
+      rotationY: num(b.rotationY),
+      rows: num(b.rows),
+      seatsPerRow: num(b.seatsPerRow),
+      rake: num(b.rake),
+      curve: num(b.curve),
+    });
+  });
+}
+
 function readLevel(v: unknown): FixtureLevel {
   const o = obj(v);
   const l: FixtureLevel = { intensity: num(o.intensity) };
@@ -683,7 +813,6 @@ function readCues(v: unknown, readLookFn: (v: unknown) => LookState): Cue[] {
 
 function readV2(o: Obj): Show {
   const stage = readStage(o.stage);
-  const vo = obj(o.venue);
   const seen = new Set<number>();
   const fixtures = arr(o.fixtures)
     .slice(0, LIMITS.fixtures)
@@ -715,7 +844,7 @@ function readV2(o: Obj): Show {
   return {
     version: 2,
     stage,
-    venue: { rows: Math.round(clamp(num(vo.rows), 4, 20)) },
+    venue: { blocks: readBlocks(o.venue, stage) },
     props: readProps(o.props),
     actors: readActors(o.actors),
     fixtures,
@@ -821,7 +950,7 @@ function migrateV1(o: Obj): Show {
   return {
     version: 2,
     stage,
-    venue: { rows: 10 },
+    venue: { blocks: defaultBlocks(stage) },
     props: readProps(o.props),
     actors: readActors(o.actors),
     fixtures,

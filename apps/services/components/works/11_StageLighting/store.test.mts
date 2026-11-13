@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { defaultShow, addProp, updateProp, removeEntity, updateLevel, updateActor, updateFocus, updateVenue } from "./show.ts";
+import { defaultShow, addProp, updateProp, removeEntity, updateLevel, updateActor, updateFocus, updateBlock } from "./show.ts";
 import { diffShow, createStore } from "./store.ts";
 
 test("변화 없으면 빈 diff", () => {
@@ -29,9 +29,9 @@ test("팔로우 큐 조준 → shadowsDirty", () => {
   const s = defaultShow(); const fol = s.fixtures.find((f) => f.kind === "follow")!;
   assert.equal(diffShow(s, updateLevel(s, fol.id, { target: { x: 2, y: 0, z: -2 } })).shadowsDirty, true);
 });
-test("객석 줄 수 → venue, 그림자 아님", () => {
+test("객석 블록 → venue, 그림자 아님", () => {
   const s = defaultShow();
-  const d = diffShow(s, updateVenue(s, { rows: 6 }));
+  const d = diffShow(s, updateBlock(s, s.venue.blocks[0].id, { rows: 6 }));
   assert.equal(d.venue, true); assert.equal(d.shadowsDirty, false);
 });
 test("인물 이동은 shadowsDirty", () => {

@@ -1,13 +1,12 @@
 "use client";
 
-import { Armchair, Lightbulb, LightbulbOff, Plus, Redo2, Undo2 } from "lucide-react";
+import { Armchair, Lamp, Lightbulb, LightbulbOff, Plus, Redo2, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Quality, Tier } from "./quality";
 import { FIXTURE_KINDS, FIXTURE_LABELS, type FixtureKind, LIMITS, PROP_KINDS, PROP_SPECS, type PropKind } from "./show";
 import type { Store } from "./store";
 import { BUTTON, LABEL, SEGMENT } from "./ui";
 import { useHistory, useShow } from "./useShow";
-import type { SeatSide } from "./venue";
 import type { ViewMode } from "./useStageScene";
 
 export type AddItem = { type: "prop"; kind: PropKind } | { type: "actor" } | { type: "fixture"; kind: FixtureKind };
@@ -16,11 +15,6 @@ const VIEWS: { value: ViewMode; label: string }[] = [
   { value: "edit", label: "편집" },
   { value: "audience", label: "객석" },
   { value: "plot", label: "플롯" },
-];
-const SIDES: { value: SeatSide; label: string }[] = [
-  { value: "left", label: "좌" },
-  { value: "center", label: "중" },
-  { value: "right", label: "우" },
 ];
 const QUALITIES: { value: Quality; label: string }[] = [
   { value: "auto", label: "자동" },
@@ -41,9 +35,8 @@ type Props = {
   hazeStatus: "rising" | "falling" | null;
   houseLights: boolean;
   onHouseLights: (on: boolean) => void;
-  seatRow: number;
-  seatSide: SeatSide;
-  onSeat: (row: number, side: SeatSide) => void;
+  seatLabel: string;
+  onSeatMap: () => void;
   onBegin: () => void;
   onHaze: (v: number) => void;
   onAdd: (item: AddItem) => void;
@@ -53,7 +46,6 @@ type Props = {
 
 export default function Toolbar(p: Props) {
   const { canUndo, canRedo } = useHistory(p.store);
-  const rows = useShow(p.store, (s) => s.venue.rows);
   const counts = useShow(p.store, (s) => `${s.props.length}|${s.actors.length}|${s.fixtures.length}`);
   const [nProps, nActors, nFixtures] = counts.split("|").map(Number);
   const [open, setOpen] = useState(false);
@@ -112,19 +104,9 @@ export default function Toolbar(p: Props) {
       </div>
 
       {p.view === "audience" && (
-        <div role="group" aria-label="좌석" className="flex items-center gap-1">
-          <select value={Math.min(p.seatRow, rows)} aria-label="좌석 줄"
-            onChange={(e) => p.onSeat(Number(e.target.value), p.seatSide)}
-            className="rounded-md border-2 border-point bg-white px-1 py-1 text-xs font-bold text-point">
-            {Array.from({ length: rows }, (_, i) => <option key={i} value={i + 1}>{i + 1}열</option>)}
-          </select>
-          {SIDES.map((s) => (
-            <button key={s.value} type="button" aria-pressed={p.seatSide === s.value}
-              onClick={() => p.onSeat(Math.min(p.seatRow, rows), s.value)} className={SEGMENT}>
-              {s.label}
-            </button>
-          ))}
-        </div>
+        <button type="button" onClick={p.onSeatMap} className={BUTTON} title="좌석 지도에서 다른 자리 고르기">
+          <Armchair aria-hidden className="size-4" /> {p.seatLabel}
+        </button>
       )}
 
       <button type="button" aria-pressed={p.workLight} onClick={() => p.onWorkLight(!p.workLight)} className={SEGMENT}
@@ -138,7 +120,7 @@ export default function Toolbar(p: Props) {
       <button type="button" aria-pressed={p.houseLights} onClick={() => p.onHouseLights(!p.houseLights)} className={SEGMENT}
         title="객석 천장 불. 켜면 극장 전체 배치와 공간을 볼 수 있어요">
         <span className="flex items-center gap-1">
-          <Armchair aria-hidden className="size-4" />
+          <Lamp aria-hidden className="size-4" />
           객석등
         </span>
       </button>

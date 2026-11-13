@@ -138,3 +138,9 @@
 - [ ] **Step 4: Playwright**(1단계 verify 스크립트를 v2에 맞게 고쳐 1–7 재실행) + 추가: (8) v1 저장본 → 안내 + 조명기가 걸 위치 좌표에 있음(`__stageStats` 대신 저장본 재읽기로 hang 확인), (9) 객석등 켬 → 2.5초 뒤 렌더 멈춤, (10) 채널 패널 디머 → 해당 조명 밝기 변화(렌더 발생) , (11) 솔로 켬 → GO → 솔로 버튼 해제, (12) 헤이즈 큐 GO 뒤 `hazeActual`이 즉시 목표가 아니라 서서히 변함.
 - [ ] **Step 5:** `npm run lint` 0 errors, `cd apps/services && npx next build` 성공.
 - [ ] **Step 6: 커밋** — `feat : 조명 연습실 보완 안내 갱신`
+
+### Task 5b: 좌석 지도(사용자 요청으로 추가)
+
+- `Venue = { blocks: SeatBlock[] }` — 블록마다 첫 줄 가운데 (x, z)·방향·줄 수(1–20)·줄마다 좌석(1–40)·단차(0–0.5m)·휘어짐(첫 줄 호 각도 0–120°). 최대 12개. 무대 형태별 기본 배치(프로시니엄 3·돌출 3·원형 4), 형태를 바꾸면 기본 배치로. 줄 수만 있던 저장본·v1은 기본 배치로 읽는다.
+- `venue.ts`: `blockSeats`·`seatLayout`·`riserBoxes`·`defaultSeat`·`clampSeat`·`seatLabel`·`seatView(stage, venue, ref)`·`venueBox(stage, venue)`. 계단 단은 InstancedMesh.
+- 오른쪽 패널 `객석` 탭(`SeatMap.tsx`): 위에서 본 SVG 지도. 좌석 클릭 → 객석 시점 + 그 좌석. 블록 끌기 → 이동(0.1m), 노란 손잡이 → 회전(5°). 아래에서 블록 수치 편집·추가·삭제·기본 배치로. 툴바의 줄·좌중우 선택은 좌석 이름 버튼(누르면 객석 탭)으로 바뀐다.

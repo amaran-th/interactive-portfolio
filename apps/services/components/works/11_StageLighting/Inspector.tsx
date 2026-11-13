@@ -36,7 +36,6 @@ import {
   updateLevel,
   updateProp,
   updateStage,
-  updateVenue,
   usesCueColor,
 } from "./show";
 import type { Store } from "./store";
@@ -71,7 +70,6 @@ export default function Inspector({ store, selectedId, tier, solo, onSolo, onBeg
   const level = useShow(store, (s) => (selectedId ? s.live.levels[selectedId] : undefined));
   const stage = useShow(store, (s) => s.stage);
   const shadowCount = useShow(store, (s) => s.fixtures.filter((f) => f.castShadow).length);
-  const rows = useShow(store, (s) => s.venue.rows);
   const takenChannels = useShow(store, (s) => channelKey(s, selectedId));
 
   const edit = (fn: (s: Show) => Show) => store.set(fn(store.get()));
@@ -252,15 +250,13 @@ export default function Inspector({ store, selectedId, tier, solo, onSolo, onBeg
         onChange={(depth) => edit((s) => updateStage(s, { depth }))} />
       <Slider label="높이" value={stage.height} min={3} max={12} step={0.5} format={m} onBegin={onBegin}
         onChange={(height) => edit((s) => updateStage(s, { height }))} />
-      <Slider label="객석 줄 수" value={rows} min={4} max={20} step={1} format={(v) => `${v}줄`} onBegin={onBegin}
-        onChange={(r) => edit((s) => updateVenue(s, { rows: r }))} />
       <ColorField label="바닥" value={stage.floorColor} onBegin={onBegin}
         onChange={(floorColor) => edit((s) => updateStage(s, { floorColor }))} />
       {stage.shape !== "round" && (
         <ColorField label="배경막" value={stage.backdropColor} onBegin={onBegin}
           onChange={(backdropColor) => edit((s) => updateStage(s, { backdropColor }))} />
       )}
-      <p className="text-[11px] text-ink/60">무대 위 인물·소품·조명기를 누르면 여기서 고칠 수 있어요.</p>
+      <p className="text-[11px] text-ink/60">무대 위 인물·소품·조명기를 누르면 여기서 고칠 수 있어요. 객석은 객석 탭에서 고쳐요.</p>
     </Panel>
   );
 }

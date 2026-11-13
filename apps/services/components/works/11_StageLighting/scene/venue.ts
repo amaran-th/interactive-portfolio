@@ -2,7 +2,7 @@
 // 모두 정적 메시 몇 개로 합쳐 드로우콜을 늘리지 않는다. 객석은 그림자를 받기만 한다.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { type HangId, type Stage, hangPoint, hangRange } from "../show";
+import { type HangId, type Stage, type Venue, hangPoint, hangRange } from "../show";
 import { HOUSE_FLOOR, riserBoxes, seatLayout, venueBox } from "../venue";
 import { disposeGroup } from "./dispose";
 
@@ -25,12 +25,12 @@ export class VenueLayer {
   readonly group = new THREE.Group();
   private houseMaterial = std("#2a2a2a", { emissive: "#fff2d8", emissiveIntensity: 0 });
 
-  build(stage: Stage, rows: number): void {
+  build(stage: Stage, venue: Venue): void {
     this.clear();
-    const box = venueBox(stage, rows);
+    const box = venueBox(stage, venue);
 
     // 좌석
-    const seats = seatLayout(stage, rows);
+    const seats = seatLayout(venue);
     const seatMesh = new THREE.InstancedMesh(seatGeometry(), std("#6b1d24"), Math.max(1, seats.length));
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -44,15 +44,18 @@ export class VenueLayer {
     seatMesh.frustumCulled = false;
     this.group.add(seatMesh);
 
-    // 계단 단
-    const risers = riserBoxes(stage, rows).map((b) =>
-      new THREE.BoxGeometry(b.w, b.h, b.d).rotateY(b.rotationY).translate(b.x, HOUSE_FLOOR + b.h / 2, b.z),
-    );
+    // 계단 단: 단위 상자 하나를 좌석마다 늘려 쓴다(좌석이 수천 개여도 드로우콜 하나).
+    const risers = riserBoxes(venue);
     if (risers.length > 0) {
-      const mesh = new THREE.Mesh(mergeGeometries(risers)!, std("#26262c"));
+      const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), std("#26262c"), risers.length);
+      const size = new THREE.Vector3();
+      risers.forEach((b, i) => {
+        q.setFromAxisAngle(UP, b.rotationY);
+        mesh.setMatrixAt(i, m.compose(new THREE.Vector3(b.x, HOUSE_FLOOR, b.z), q, size.set(b.w, b.h, b.d)));
+      });
       mesh.receiveShadow = true;
+      mesh.frustumCulled = false;
       this.group.add(mesh);
-      for (const g of risers) g.dispose();
     }
 
     // 벽·천장·바닥(안쪽 면)

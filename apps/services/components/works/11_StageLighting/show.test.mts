@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   defaultShow, addFixture, addProp, removeEntity, saveCue, updateStage, updateActor, updateCue,
-  updateLevel, updateFocus, updateFixture, updateVenue, setChannel, hangPoint, resolve,
+  updateLevel, updateFocus, updateFixture, setChannel, hangPoint, resolve,
   serialize, deserialize, LIMITS, GELS,
 } from "./show.ts";
 
@@ -14,7 +14,7 @@ test("기본 공연 v2", () => {
   assert.deepEqual(s.fixtures.map((f) => f.channel), [1, 2, 3, 4, 5, 6, 7, 8]);
   const kinds = new Set(s.fixtures.map((f) => f.kind));
   for (const k of ["profile", "fresnel", "par", "cyc", "follow"]) assert.ok(kinds.has(k as never), k);
-  assert.equal(s.venue.rows, 10);
+  assert.equal(s.venue.blocks.length, 3);
   assert.equal(s.cues.length, 2);
   assert.equal(s.live.haze, 0.4);
   assert.equal(GELS.length, 14);
@@ -114,8 +114,6 @@ test("소품 상한·clamp·큐", () => {
   assert.equal(s.actors[0].height, 2.1);
   s = updateCue(s, s.cues[0].id, { fadeSec: -2 });
   assert.equal(s.cues[0].fadeSec, 0);
-  s = updateVenue(s, { rows: 50 });
-  assert.equal(s.venue.rows, 20);
   const n = s.cues.length;
   s = saveCue(s);
   assert.equal(s.cues.length, n + 1);
@@ -135,6 +133,12 @@ test("직렬화 왕복 v2", () => {
   const back = deserialize(serialize(s))!;
   assert.equal(back.migrated, false);
   assert.deepEqual(back.show, s);
+});
+
+test("줄 수만 있던 v2 객석은 기본 블록으로", () => {
+  const s = defaultShow();
+  const back = deserialize(JSON.stringify({ ...s, venue: { rows: 8 } }))!;
+  assert.equal(back.show.venue.blocks.length, 3);
 });
 
 test("깨진 v2는 null", () => {
