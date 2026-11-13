@@ -40,6 +40,8 @@ export type SceneApi = {
   onHaze(fn: (actual: number, target: number) => void): () => void;
   setQuality(q: Quality): void;
   setSelected(id: string | null): void;
+  /** 3D 화면을 덮는 사이드바 크기(px). 보이는 부분 가운데에 무대가 오도록 투영 중심을 옮긴다. */
+  setInset(right: number, bottom: number): void;
   pick(clientX: number, clientY: number): Pick;
   floorPoint(clientX: number, clientY: number): Vec3 | null;
   previewEntity(id: string, pos: Vec3): void;
@@ -214,11 +216,26 @@ export function useStageScene(
       for (const c of Object.values(controls)) c.update();
     }
 
+    // 사이드바가 덮는 오른쪽·아래 크기(px)
+    const inset = { right: 0, bottom: 0 };
+    /** 화면 크기는 그대로 두고 보는 창을 사이드바 절반만큼 밀어, 보이는 부분의 가운데가 투영 중심이 되게 한다. */
+    function applyInset(w: number, h: number) {
+      for (const cam of [edit, audience, plot]) {
+        if (inset.right || inset.bottom) cam.setViewOffset(w, h, inset.right / 2, inset.bottom / 2, w, h);
+        else cam.clearViewOffset();
+      }
+    }
+
     function fitPlot() {
       const { width: w, depth: d } = show.stage;
       const rect = container!.getBoundingClientRect();
-      const aspect = rect.width / Math.max(1, rect.height);
-      const halfH = Math.max((d + 7) / 2, (w + 5) / 2 / aspect);
+      // 평면도는 사이드바에 가리지 않는 부분에 맞춘다.
+      const vw = Math.max(1, rect.width - inset.right);
+      const vh = Math.max(1, rect.height - inset.bottom);
+      // 보이는 부분(vw×vh)에 무대가 들어가는 화면 1px당 크기
+      const unit = Math.max((d + 7) / vh, (w + 5) / vw);
+      const halfH = (Math.max(1, rect.height) * unit) / 2;
+      const aspect = Math.max(1, rect.width) / Math.max(1, rect.height);
       plot.left = -halfH * aspect;
       plot.right = halfH * aspect;
       plot.top = halfH;
@@ -835,6 +852,12 @@ export function useStageScene(
         quality = q;
         applyTier();
       },
+      setInset(right, bottom) {
+        if (inset.right === right && inset.bottom === bottom) return;
+        inset.right = right;
+        inset.bottom = bottom;
+        resize();
+      },
       setSelected(id) {
         selectedId = id;
         updateSelection();
@@ -903,6 +926,7 @@ export function useStageScene(
       const h = Math.max(1, rect.height);
       renderer.setSize(w, h);
       edit.aspect = audience.aspect = w / h;
+      applyInset(w, h);
       edit.updateProjectionMatrix();
       audience.updateProjectionMatrix();
       fitPlot();

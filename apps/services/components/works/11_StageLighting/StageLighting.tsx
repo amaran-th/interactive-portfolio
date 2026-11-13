@@ -30,7 +30,8 @@ import {
   updateProp,
 } from "./show";
 import { createStore } from "./store";
-import Toolbar, { type AddItem } from "./Toolbar";
+import AddMenu, { type AddItem } from "./AddMenu";
+import Toolbar from "./Toolbar";
 import { useCuePlayback } from "./useCuePlayback";
 import { useShow } from "./useShow";
 import { type ViewMode, useStageScene } from "./useStageScene";
@@ -62,6 +63,7 @@ export default function StageLighting() {
   const progressRef = useRef<HTMLDivElement>(null);
   const [notice, setNotice] = useState<string | null>(loaded.notice);
   const [fatal, setFatal] = useState<string | null>(null);
+  const [inset, setInset] = useState({ right: 0, bottom: 0 });
   const sceneRef = useStageScene(viewRef, store, setFatal, setNotice);
   useAutoSave(store, setNotice);
   const playback = useCuePlayback(store, sceneRef, progressRef);
@@ -102,6 +104,7 @@ export default function StageLighting() {
   useEffect(() => sceneRef.current?.onTierChange(setTier), [sceneRef]);
   useEffect(() => sceneRef.current?.setHouseLights(houseLights), [sceneRef, houseLights]);
   useEffect(() => sceneRef.current?.setSeat(seat), [sceneRef, seat]);
+  useEffect(() => sceneRef.current?.setInset(inset.right, inset.bottom), [sceneRef, inset]);
   useEffect(() => sceneRef.current?.setSolo(solo), [sceneRef, solo]);
   // 공연 상태가 바뀌면(편집·되돌리기·큐 호출) 솔로를 푼다. 저장된 상태와 화면이 어긋나지 않게.
   useEffect(() => store.subscribe(() => setSoloId(null)), [store]);
@@ -366,7 +369,6 @@ export default function StageLighting() {
           sceneRef.current?.setHazeTarget(v, true);
           store.set(setHaze(store.get(), v));
         }}
-        onAdd={add}
         onUndo={undo}
         onRedo={redo}
       />
@@ -396,6 +398,8 @@ export default function StageLighting() {
         <Sidebar
           open={sidebarOpen}
           onOpen={setSidebarOpen}
+          actions={<AddMenu store={store} onAdd={add} />}
+          onInset={(right, bottom) => setInset((o) => (o.right === right && o.bottom === bottom ? o : { right, bottom }))}
           outliner={<Outliner store={store} selectedId={selectedId} onPick={setPickedId} onBegin={beginEdit} />}
           inspector={
             <Inspector store={store} selectedId={selectedId} tier={tier} solo={solo !== null} seat={seat}
