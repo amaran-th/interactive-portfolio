@@ -92,6 +92,8 @@ export function useStageScene(
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.shadowMap.autoUpdate = false;
     renderer.domElement.style.display = "block";
+    renderer.domElement.style.position = "absolute";
+    renderer.domElement.style.inset = "0";
     renderer.domElement.style.touchAction = "none";
     container.appendChild(renderer.domElement);
 
