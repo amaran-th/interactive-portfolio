@@ -100,6 +100,8 @@ export default function StageLighting() {
   useEffect(() => sceneRef.current?.setHouseLights(houseLights), [sceneRef, houseLights]);
   useEffect(() => sceneRef.current?.setSeat(seat), [sceneRef, seat]);
   useEffect(() => sceneRef.current?.setSolo(solo), [sceneRef, solo]);
+  // 공연 상태가 바뀌면(편집·되돌리기·큐 호출) 솔로를 푼다. 저장된 상태와 화면이 어긋나지 않게.
+  useEffect(() => store.subscribe(() => setSoloId(null)), [store]);
   useEffect(
     () =>
       sceneRef.current?.onHaze((actual, target) =>

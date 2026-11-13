@@ -270,7 +270,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-/** 채널 번호 입력. 이미 쓰는 번호면 저장하지 않고 입력칸에 알려 준다. */
+/** 채널 번호 입력. Enter나 칸을 떠날 때 저장하고, 이미 쓰는 번호면 저장하지 않고 입력칸에 알려 준다. */
 function ChannelField({
   channel,
   taken,
@@ -300,13 +300,15 @@ function ChannelField({
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? "fixture-channel-error" : undefined}
         onFocus={onBegin}
-        onChange={(e) => {
-          const v = e.target.value;
-          setDraft(v);
-          const c = Number(v);
-          if (Number.isInteger(c) && c >= 1 && c <= 99 && c !== channel && !taken.split(",").includes(String(c))) onCommit(c);
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
         }}
-        onBlur={() => error !== null || draft === "" ? setDraft(String(channel)) : undefined}
+        // 입력하는 동안에는 저장하지 않는다(저장하면 입력칸이 다시 그려져 포커스를 잃는다). 칸을 떠날 때 한 번 저장한다.
+        onBlur={() => {
+          if (error === null && draft !== "" && n !== channel) onCommit(n);
+          else setDraft(String(channel));
+        }}
         className="w-20 rounded-md border-2 border-point px-2 py-1 text-xs text-ink tabular-nums aria-invalid:border-red-600"
       />
       {error && <span id="fixture-channel-error" role="alert" className="text-[11px] font-bold text-red-600">{error}</span>}

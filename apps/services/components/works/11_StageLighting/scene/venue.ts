@@ -120,6 +120,8 @@ export class VenueLayer {
       this.group.remove(child);
       const mesh = child as THREE.Mesh;
       mesh.geometry?.dispose();
+      // InstancedMesh의 인스턴스 행렬 버퍼는 geometry.dispose로 풀리지 않는다.
+      if ((child as THREE.InstancedMesh).isInstancedMesh) (child as THREE.InstancedMesh).dispose();
       const mat = mesh.material as THREE.Material | undefined;
       if (mat && mat !== this.houseMaterial) mat.dispose();
     }

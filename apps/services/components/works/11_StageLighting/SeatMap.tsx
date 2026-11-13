@@ -40,10 +40,12 @@ export default function SeatMap({ store, seat, onSeat, onBegin }: Props) {
   const block = venue.blocks.find((b) => b.id === picked) ?? null;
   const svgRef = useRef<SVGSVGElement>(null);
   const gesture = useRef<Gesture | null>(null);
+  // 끄는 동안에는 지도 범위를 고정한다. 블록을 바깥으로 끌 때 범위가 넓어지면 축척이 바뀌어 블록이 커서보다 멀리 달아난다.
+  const [frozenBox, setFrozenBox] = useState<string | null>(null);
 
   const edit = (fn: (s: Show) => Show) => store.set(fn(store.get()));
   const box = venueBox(stage, venue);
-  const vb = `${box.minX} ${box.minZ} ${box.maxX - box.minX} ${box.maxZ - box.minZ}`;
+  const vb = frozenBox ?? `${box.minX} ${box.minZ} ${box.maxX - box.minX} ${box.maxZ - box.minZ}`;
   const { width: w, depth: d } = stage;
 
   const toWorld = (clientX: number, clientY: number) => {
@@ -103,6 +105,7 @@ export default function SeatMap({ store, seat, onSeat, onBegin }: Props) {
     if (!g.moved) {
       if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < SLOP) return;
       g.moved = true;
+      setFrozenBox(vb);
       onBegin();
     }
     g.last = toWorld(e.clientX, e.clientY);
@@ -118,8 +121,9 @@ export default function SeatMap({ store, seat, onSeat, onBegin }: Props) {
     if (!g || g.pointerId !== e.pointerId) return;
     gesture.current = null;
     cancelAnimationFrame(g.raf);
+    setFrozenBox(null);
     if (g.moved) apply(g);
-    else if (g.seat) onSeat(g.seat);
+    else if (g.seat && e.type === "pointerup") onSeat(g.seat);
   };
 
   return (
