@@ -337,6 +337,11 @@ export function sortedCues(show: Show): Cue[] {
   return show.cues.slice().sort((a, b) => a.number - b.number);
 }
 
+/** live를 주어진 상태(깊은 복사)로 바꾼다. 페이드가 끝나거나 멈출 때 쓴다. */
+export function setLive(show: Show, look: LookState): Show {
+  return { ...show, live: copyLook(look) };
+}
+
 /** 큐를 live로 불러온다(즉시 전환). */
 export function recallCue(show: Show, cueId: string): Show {
   const cue = show.cues.find((c) => c.id === cueId);
