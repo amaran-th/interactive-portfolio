@@ -41,13 +41,6 @@ export function buildStage(stage: Stage): THREE.Group {
     group.add(back);
   }
 
-  // 객석 바닥: 무대보다 넓은 어두운 면. 원형이면 사방, 나머지는 앞쪽.
-  const size = Math.max(w, d) * 3 + 20;
-  const house = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat("#111114"));
-  house.rotation.x = -Math.PI / 2;
-  house.position.set(0, -DECK - 0.001, stage.shape === "round" ? -d / 2 : size / 2 - d - 1);
-  house.receiveShadow = true;
-  group.add(house);
   return group;
 }
 
