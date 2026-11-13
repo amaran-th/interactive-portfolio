@@ -1,4 +1,4 @@
-// 조명 연습실의 공연 데이터(v2): 타입, 프리셋, 불변 조작, 직렬화, v1 변환.
+// 조명 연습실의 공연 데이터(v3): 타입, 프리셋, 불변 조작, 직렬화, v1·v2 변환.
 // node:test가 그대로 실행하도록 런타임 import를 하지 않는다.
 // 좌표: 미터, y 위. 무대 앞 끝 중앙이 원점, 업스테이지가 -z, 객석이 +z.
 //
@@ -22,18 +22,39 @@ export type Stage = {
 export type PropKind = "chair" | "table" | "stairs" | "platform" | "pillar" | "box" | "doorframe";
 export type Prop = { id: string; kind: PropKind; position: Vec3; rotationY: number; scale: Vec3; color: string };
 
+export type Gender = "female" | "male";
 export type Build = "slim" | "average" | "stocky";
-export type Pose = "stand" | "sit" | "armsOpen" | "walk";
+export type Pose =
+  | "stand"
+  | "talk"
+  | "walk"
+  | "formalWalk"
+  | "run"
+  | "sit"
+  | "sitTalk"
+  | "crouch"
+  | "kneel"
+  | "dance"
+  | "push"
+  | "reach"
+  | "lie"
+  | "armsOpen";
+export type HairStyle = "parted" | "buzzed" | "buns" | "long" | "none";
 export type Actor = {
   id: string;
   name: string;
-  position: Vec3;
+  gender: Gender;
+  position: Vec3; // y는 발바닥 높이(단·계단 위에 올라서면 0보다 크다)
   rotationY: number;
-  height: number;
+  height: number; // m
   build: Build;
   pose: Pose;
-  clothColor: string;
+  hair: HairStyle;
   skinColor: string;
+  hairColor: string;
+  topColor: string;
+  bottomColor: string;
+  shoeColor: string;
 };
 
 export type HangId = "foh" | "e1" | "e2" | "e3" | "boomL" | "boomR" | "floor";
@@ -78,11 +99,24 @@ export type SeatBlock = {
   seatsPerRow: number;
   rake: number; // 줄마다 올라가는 높이(m)
   curve: number; // 0..120
+  elevation: number; // 블록 바닥을 객석 바닥보다 올리는 높이(m). 발코니는 0보다 크다.
 };
-export type Venue = { blocks: SeatBlock[] };
+/** 실제 극장형 객석. 좌석 블록은 venue.ts의 templateBlocks가 이 값에서 계산한다(저장하지 않음). */
+export type VenueKind = "studio" | "hall" | "grand" | "thrust" | "arena";
+export type VenueTemplate = {
+  kind: VenueKind;
+  rows: number; // 1층 줄 수
+  width: number; // 가운데 블록 첫 줄 좌석 수
+  aisle: number; // 통로 폭(m)
+  rake: number; // 줄마다 올라가는 높이(m)
+  gap: number; // 무대 앞 끝에서 첫 줄까지(m)
+  widen: number; // 줄마다 늘어나는 좌석 수(0..1, 0.5면 두 줄마다 1석)
+  balconyRows: number; // 대극장 발코니 줄 수
+};
+export type Venue = { template: VenueTemplate };
 
 export type Show = {
-  version: 2;
+  version: 3;
   stage: Stage;
   venue: Venue;
   ambient: number; // 잔광 0..1. 유도등·통로등과 반사광 세기. 큐에는 들어가지 않는다.
@@ -102,16 +136,75 @@ export type Resolved = {
   position: Vec3;
 };
 
-export const LIMITS = { fixtures: 24, props: 40, actors: 40, cues: 99, blocks: 12 } as const;
+export const LIMITS = { fixtures: 24, props: 40, actors: 40, cues: 99 } as const;
 
 export const STAGE_SHAPES: StageShape[] = ["proscenium", "thrust", "round"];
 export const STAGE_LABELS: Record<StageShape, string> = { proscenium: "프로시니엄", thrust: "돌출", round: "원형" };
 export const PROP_KINDS: PropKind[] = ["chair", "table", "stairs", "platform", "pillar", "box", "doorframe"];
 export const FIXTURE_KINDS: FixtureKind[] = ["profile", "fresnel", "par", "follow", "ledpar", "cyc"];
+export const GENDERS: Gender[] = ["female", "male"];
+export const GENDER_LABELS: Record<Gender, string> = { female: "여자", male: "남자" };
+/** 성별별 키 범위와 기본값(m). 한국 성인 평균에 맞췄다. */
+export const HEIGHT_RANGE: Record<Gender, { min: number; max: number; base: number }> = {
+  female: { min: 1.5, max: 1.8, base: 1.6 },
+  male: { min: 1.6, max: 1.95, base: 1.73 },
+};
 export const BUILDS: Build[] = ["slim", "average", "stocky"];
 export const BUILD_LABELS: Record<Build, string> = { slim: "마름", average: "보통", stocky: "통통" };
-export const POSES: Pose[] = ["stand", "sit", "armsOpen", "walk"];
-export const POSE_LABELS: Record<Pose, string> = { stand: "서기", sit: "앉기", armsOpen: "팔 벌리기", walk: "걷기" };
+export const POSES: Pose[] = [
+  "stand",
+  "talk",
+  "walk",
+  "formalWalk",
+  "run",
+  "sit",
+  "sitTalk",
+  "crouch",
+  "kneel",
+  "dance",
+  "push",
+  "reach",
+  "lie",
+  "armsOpen",
+];
+export const POSE_LABELS: Record<Pose, string> = {
+  stand: "서기",
+  talk: "말하기",
+  walk: "걷기",
+  formalWalk: "점잖게 걷기",
+  run: "뛰기",
+  sit: "의자에 앉기",
+  sitTalk: "앉아서 말하기",
+  crouch: "쪼그려 앉기",
+  kneel: "한쪽 무릎 꿇기",
+  dance: "춤추기",
+  push: "밀기",
+  reach: "손 뻗기",
+  lie: "쓰러져 눕기",
+  armsOpen: "팔 벌리기",
+};
+export const HAIRS: HairStyle[] = ["parted", "buzzed", "buns", "long", "none"];
+export const HAIR_LABELS: Record<HairStyle, string> = {
+  parted: "가르마",
+  buzzed: "짧은 머리",
+  buns: "올림머리",
+  long: "긴 머리",
+  none: "민머리",
+};
+export const VENUE_KINDS: VenueKind[] = ["studio", "hall", "grand", "thrust", "arena"];
+export const VENUE_LABELS: Record<VenueKind, string> = {
+  studio: "소극장",
+  hall: "중극장",
+  grand: "대극장(발코니)",
+  thrust: "돌출 무대 객석",
+  arena: "원형 객석",
+};
+/** 무대 형태마다 쓸 수 있는 객석 종류. 첫 번째가 기본. */
+export const VENUE_KINDS_FOR: Record<StageShape, VenueKind[]> = {
+  proscenium: ["hall", "studio", "grand"],
+  thrust: ["thrust"],
+  round: ["arena"],
+};
 
 export const HANGS: HangId[] = ["foh", "e1", "e2", "e3", "boomL", "boomR", "floor"];
 export const HANG_LABELS: Record<HangId, string> = {
@@ -307,69 +400,40 @@ function clampProp(p: Prop): Prop {
   };
 }
 
-function clampActor(a: Actor): Actor {
-  return { ...a, name: a.name.slice(0, 20), position: clampVec(a.position), height: clamp(a.height, 1, 2.1) };
+function clampHeight(gender: Gender, h: number): number {
+  const r = HEIGHT_RANGE[gender];
+  return Math.round(clamp(h, r.min, r.max) * 100) / 100;
 }
 
-function clampBlock(b: SeatBlock): SeatBlock {
+function clampActor(a: Actor): Actor {
   return {
-    ...b,
-    name: b.name.slice(0, 20),
-    x: clamp(b.x, -COORD, COORD),
-    z: clamp(b.z, -COORD, COORD),
-    rotationY: Math.atan2(Math.sin(b.rotationY), Math.cos(b.rotationY)),
-    rows: Math.round(clamp(b.rows, 1, 20)),
-    seatsPerRow: Math.round(clamp(b.seatsPerRow, 1, 40)),
-    rake: clamp(b.rake, 0, 0.5),
-    curve: clamp(b.curve, 0, 120),
+    ...a,
+    name: a.name.slice(0, 20),
+    position: clampVec(a.position),
+    height: clampHeight(a.gender, a.height),
   };
 }
 
-const SEAT_PITCH = 0.55; // venue.ts의 SEAT_W와 같다
-const block = (id: string, name: string, x: number, z: number, rotDeg: number, rows: number, seats: number, curve = 0): SeatBlock => ({
-  id,
-  name,
-  x: Math.round(x * 100) / 100,
-  z: Math.round(z * 100) / 100,
-  rotationY: (rotDeg * Math.PI) / 180,
-  rows,
-  seatsPerRow: seats,
-  rake: 0.25,
-  curve: Math.round(curve * 10) / 10,
-});
+export function defaultTemplate(shape: StageShape): VenueTemplate {
+  const kind = VENUE_KINDS_FOR[shape][0];
+  const base = { aisle: 1.2, rake: 0.25, gap: 1.5, widen: 0.5, balconyRows: 5 };
+  if (kind === "arena") return { kind, rows: 6, width: 12, ...base, widen: 0 };
+  if (kind === "thrust") return { kind, rows: 8, width: 12, ...base };
+  return { kind, rows: 12, width: 14, ...base };
+}
 
-/** 무대 형태별 기본 객석. 프로시니엄은 가운데와 양옆 블록, 돌출은 세 면, 원형은 네 면을 둘러싼다. */
-export function defaultBlocks(stage: Stage): SeatBlock[] {
-  const { width: w, depth: d } = stage;
-  if (stage.shape === "round") {
-    const r = Math.min(w, d) / 2 + 1.5;
-    const n = Math.max(4, Math.floor((r * 1.2) / SEAT_PITCH));
-    const arc = ((n * SEAT_PITCH) / r) * (180 / Math.PI);
-    const cz = -d / 2;
-    return [
-      block("b-front", "앞", 0, cz + r, 0, 6, n, arc),
-      block("b-left", "왼쪽", -r, cz, -90, 6, n, arc),
-      block("b-back", "뒤", 0, cz - r, 180, 6, n, arc),
-      block("b-right", "오른쪽", r, cz, 90, 6, n, arc),
-    ];
-  }
-  if (stage.shape === "thrust") {
-    const front = Math.max(4, Math.round((w / 2 + 2) / SEAT_PITCH));
-    const side = Math.max(3, Math.round((d * 0.4 + 1) / SEAT_PITCH));
-    const sx = w / 4 + 1.5;
-    return [
-      block("b-center", "가운데", 0, d * 0.4 + 1.5, 0, 8, front),
-      block("b-left", "왼쪽", -sx, d * 0.2, -90, 6, side),
-      block("b-right", "오른쪽", sx, d * 0.2, 90, 6, side),
-    ];
-  }
-  const center = Math.max(6, Math.round((w + 4) / SEAT_PITCH) - 10);
-  const sx = (center * SEAT_PITCH) / 2 + 1 + (5 * SEAT_PITCH) / 2;
-  return [
-    block("b-center", "가운데", 0, 1.5, 0, 10, center),
-    block("b-left", "왼쪽", -sx, 1.8, -20, 9, 5),
-    block("b-right", "오른쪽", sx, 1.8, 20, 9, 5),
-  ];
+function clampTemplate(t: VenueTemplate, shape: StageShape): VenueTemplate {
+  const kinds = VENUE_KINDS_FOR[shape];
+  return {
+    kind: kinds.includes(t.kind) ? t.kind : kinds[0],
+    rows: Math.round(clamp(t.rows, 4, 25)),
+    width: Math.round(clamp(t.width, 6, 30)),
+    aisle: clamp(t.aisle, 1, 2),
+    rake: clamp(t.rake, 0.1, 0.5),
+    gap: clamp(t.gap, 1, 4),
+    widen: clamp(t.widen, 0, 1),
+    balconyRows: Math.round(clamp(t.balconyRows, 3, 10)),
+  };
 }
 
 function clampFocus(f: Focus): Focus {
@@ -389,17 +453,22 @@ function clampFixture(stage: Stage, f: Fixture): Fixture {
 
 // ── 만들기 ──
 
-function makeActor(name: string, x: number, z: number, clothColor: string): Actor {
+function makeActor(name: string, gender: Gender, x: number, z: number, topColor: string): Actor {
   return {
     id: newId("ac"),
     name,
+    gender,
     position: { x, y: 0, z },
     rotationY: 0,
-    height: 1.7,
+    height: HEIGHT_RANGE[gender].base,
     build: "average",
     pose: "stand",
-    clothColor,
+    hair: gender === "female" ? "long" : "parted",
     skinColor: "#d9a88a",
+    hairColor: "#1a1512",
+    topColor,
+    bottomColor: "#2a2a35",
+    shoeColor: "#1a1a1a",
   };
 }
 
@@ -473,12 +542,12 @@ export function defaultShow(): Show {
     },
   };
   return {
-    version: 2,
+    version: 3,
     stage: STAGE_DEFAULT,
-    venue: { blocks: defaultBlocks(STAGE_DEFAULT) },
+    venue: { template: defaultTemplate(STAGE_DEFAULT.shape) },
     ambient: AMBIENT_DEFAULT,
     props: [],
-    actors: [makeActor("인물 1", -1, -3, "#7a2e3a"), makeActor("인물 2", 1, -3, "#2e4a7a")],
+    actors: [makeActor("인물 1", "female", -1, -3, "#7a2e3a"), makeActor("인물 2", "male", 1, -3, "#2e4a7a")],
     fixtures: fx,
     cues: [
       { id: newId("cue"), number: 1, name: "처음", fadeSec: 3, look: copyLook(first) },
@@ -529,7 +598,8 @@ export function addProp(show: Show, kind: PropKind): Show {
 export function addActor(show: Show): Show {
   if (show.actors.length >= LIMITS.actors) return show;
   const n = show.actors.length + 1;
-  return { ...show, actors: [...show.actors, makeActor(`인물 ${n}`, 0, -show.stage.depth / 2, "#5a5a5a")] };
+  const gender: Gender = n % 2 === 1 ? "female" : "male";
+  return { ...show, actors: [...show.actors, makeActor(`인물 ${n}`, gender, 0, -show.stage.depth / 2, "#5a5a5a")] };
 }
 
 export function addFixture(show: Show, kind: FixtureKind): Show {
@@ -550,9 +620,38 @@ export function updateProp(show: Show, id: string, patch: Partial<Prop>): Show {
   return props ? { ...show, props } : show;
 }
 
-export function updateActor(show: Show, id: string, patch: Partial<Actor>): Show {
-  const actors = updateIn(show.actors, id, (a) => clampActor({ ...a, ...patch, id: a.id }));
+export function updateActor(show: Show, id: string, patch: Partial<Omit<Actor, "id" | "gender">>): Show {
+  const actors = updateIn(show.actors, id, (a) => clampActor({ ...a, ...patch, id: a.id, gender: a.gender }));
   return actors ? { ...show, actors } : show;
+}
+
+/** 성별을 바꾸면 키를 새 범위에 맞춘다. */
+export function setActorGender(show: Show, id: string, gender: Gender): Show {
+  const actors = updateIn(show.actors, id, (a) => clampActor({ ...a, gender }));
+  return actors ? { ...show, actors } : show;
+}
+
+/** 소품·인물·조명기를 0.5m 옆에 하나 더 만든다. 조명기는 빈 채널을 받고 live·큐 값도 그대로 복사한다. */
+export function duplicateEntity(show: Show, id: string): Show {
+  const shift = (v: Vec3): Vec3 => ({ ...v, x: v.x + 0.5 });
+  const prop = show.props.find((p) => p.id === id);
+  if (prop) {
+    if (show.props.length >= LIMITS.props) return show;
+    return { ...show, props: [...show.props, clampProp({ ...prop, id: newId("pr"), position: shift(prop.position) })] };
+  }
+  const actor = show.actors.find((a) => a.id === id);
+  if (actor) {
+    if (show.actors.length >= LIMITS.actors) return show;
+    const copy = clampActor({ ...actor, id: newId("ac"), name: `${actor.name} 복사`, position: shift(actor.position) });
+    return { ...show, actors: [...show.actors, copy] };
+  }
+  const f = show.fixtures.find((x) => x.id === id);
+  if (!f) return show;
+  if (show.fixtures.length >= LIMITS.fixtures) return show;
+  const nf = clampFixture(show.stage, { ...f, id: newId("fx"), channel: nextChannel(show), along: f.along + 0.5, focus: { ...f.focus, target: { ...f.focus.target } } });
+  const copyIn = (look: LookState): LookState =>
+    look.levels[id] ? { ...look, levels: { ...look.levels, [nf.id]: copyLevel(look.levels[id]) } } : look;
+  return { ...show, fixtures: [...show.fixtures, nf], live: copyIn(show.live), cues: show.cues.map((c) => ({ ...c, look: copyIn(c.look) })) };
 }
 
 export function updateFixture(
@@ -578,43 +677,15 @@ export function updateFocus(show: Show, id: string, patch: Partial<Focus>): Show
 
 export function updateStage(show: Show, patch: Partial<Stage>): Show {
   const stage = clampStage({ ...show.stage, ...patch });
-  // 무대 형태가 바뀌면 객석 배치도 그 형태의 기본 배치로 바꾼다(되돌리기로 복구할 수 있다).
-  const venue = stage.shape !== show.stage.shape ? { blocks: defaultBlocks(stage) } : show.venue;
+  // 무대 형태가 바뀌어 지금 객석 종류를 쓸 수 없으면 그 형태의 기본 객석으로 바꾼다(되돌리기로 복구할 수 있다).
+  const venue = VENUE_KINDS_FOR[stage.shape].includes(show.venue.template.kind)
+    ? show.venue
+    : { template: defaultTemplate(stage.shape) };
   return { ...show, stage, venue };
 }
 
-export function addBlock(show: Show): Show {
-  const blocks = show.venue.blocks;
-  if (blocks.length >= LIMITS.blocks) return show;
-  // 맨 뒤 블록 뒤에 같은 폭으로 하나 더 놓는다.
-  const back = blocks.reduce((m, b) => Math.max(m, b.z + b.rows * 0.9), 1);
-  const block = clampBlock({
-    id: newId("blk"),
-    name: `블록 ${blocks.length + 1}`,
-    x: 0,
-    z: back + 1.5,
-    rotationY: 0,
-    rows: 5,
-    seatsPerRow: 12,
-    rake: 0.25,
-    curve: 0,
-  });
-  return { ...show, venue: { blocks: [...blocks, block] } };
-}
-
-export function updateBlock(show: Show, id: string, patch: Partial<Omit<SeatBlock, "id">>): Show {
-  const blocks = updateIn(show.venue.blocks, id, (b) => clampBlock({ ...b, ...patch }));
-  return blocks ? { ...show, venue: { blocks } } : show;
-}
-
-export function removeBlock(show: Show, id: string): Show {
-  const blocks = show.venue.blocks.filter((b) => b.id !== id);
-  return blocks.length === show.venue.blocks.length ? show : { ...show, venue: { blocks } };
-}
-
-/** 무대 형태에 맞는 기본 객석으로 되돌린다. */
-export function resetVenue(show: Show): Show {
-  return { ...show, venue: { blocks: defaultBlocks(show.stage) } };
+export function updateTemplate(show: Show, patch: Partial<VenueTemplate>): Show {
+  return { ...show, venue: { template: clampTemplate({ ...show.venue.template, ...patch }, show.stage.shape) } };
 }
 
 export function updateLevel(show: Show, fixtureId: string, patch: Partial<FixtureLevel>): Show {
@@ -745,12 +816,13 @@ function readProps(v: unknown): Prop[] {
     });
 }
 
-function readActors(v: unknown): Actor[] {
+/** v3은 새 필드를 읽고, v1·v2는 남자·기본 하의/신발/머리로 채운다(옷 색은 상의로). */
+function readActors(v: unknown, version: number): Actor[] {
   return arr(v)
     .slice(0, LIMITS.actors)
     .map((x) => {
       const a = obj(x);
-      return clampActor({
+      const base = {
         id: str(a.id),
         name: str(a.name),
         position: vec(a.position),
@@ -758,30 +830,46 @@ function readActors(v: unknown): Actor[] {
         height: num(a.height),
         build: oneOf(a.build, BUILDS),
         pose: oneOf(a.pose, POSES),
-        clothColor: color(a.clothColor),
         skinColor: color(a.skinColor),
+      };
+      if (version < 3) {
+        return clampActor({
+          ...base,
+          gender: "male",
+          hair: "parted",
+          hairColor: "#1a1512",
+          topColor: color(a.clothColor),
+          bottomColor: "#2a2a35",
+          shoeColor: "#1a1a1a",
+        });
+      }
+      return clampActor({
+        ...base,
+        gender: oneOf(a.gender, GENDERS),
+        hair: oneOf(a.hair, HAIRS),
+        hairColor: color(a.hairColor),
+        topColor: color(a.topColor),
+        bottomColor: color(a.bottomColor),
+        shoeColor: color(a.shoeColor),
       });
     });
 }
 
-/** 블록 배열이 없으면(개발 중 쓰던 줄 수 형식) 기본 배치로 채운다. 블록이 있는데 형식이 틀리면 실패. */
-function readBlocks(v: unknown, stage: Stage): SeatBlock[] {
-  const vo = obj(v);
-  if (!Array.isArray(vo.blocks)) return defaultBlocks(stage);
-  return vo.blocks.slice(0, LIMITS.blocks).map((x) => {
-    const b = obj(x);
-    return clampBlock({
-      id: str(b.id),
-      name: str(b.name),
-      x: num(b.x),
-      z: num(b.z),
-      rotationY: num(b.rotationY),
-      rows: num(b.rows),
-      seatsPerRow: num(b.seatsPerRow),
-      rake: num(b.rake),
-      curve: num(b.curve),
-    });
-  });
+function readTemplate(v: unknown, stage: Stage): VenueTemplate {
+  const t = obj(obj(v).template);
+  return clampTemplate(
+    {
+      kind: oneOf(t.kind, VENUE_KINDS),
+      rows: num(t.rows),
+      width: num(t.width),
+      aisle: num(t.aisle),
+      rake: num(t.rake),
+      gap: num(t.gap),
+      widen: num(t.widen),
+      balconyRows: num(t.balconyRows),
+    },
+    stage.shape,
+  );
 }
 
 function readLevel(v: unknown): FixtureLevel {
@@ -818,7 +906,8 @@ function readCues(v: unknown, readLookFn: (v: unknown) => LookState): Cue[] {
     });
 }
 
-function readV2(o: Obj): Show {
+/** v2·v3 공통. v2는 좌석 블록 대신 무대 형태의 기본 템플릿을 쓴다. */
+function readShow(o: Obj, version: 2 | 3): Show {
   const stage = readStage(o.stage);
   const seen = new Set<number>();
   const fixtures = arr(o.fixtures)
@@ -849,19 +938,19 @@ function readV2(o: Obj): Show {
   const byId = new Map(fixtures.map((f) => [f.id, f]));
   const look = (v: unknown) => readLook(v, byId);
   return {
-    version: 2,
+    version: 3,
     stage,
-    venue: { blocks: readBlocks(o.venue, stage) },
+    venue: { template: version === 3 ? readTemplate(o.venue, stage) : defaultTemplate(stage.shape) },
     ambient: o.ambient === undefined ? AMBIENT_DEFAULT : clamp(num(o.ambient), 0, 1),
     props: readProps(o.props),
-    actors: readActors(o.actors),
+    actors: readActors(o.actors, version),
     fixtures,
     cues: readCues(o.cues, look),
     live: look(o.live),
   };
 }
 
-// ── v1 → v2 ──
+// ── v1 → v3 ──
 
 type V1Level = { intensity: number; color: string; target: Vec3; beamAngle: number; softness: number };
 
@@ -956,12 +1045,12 @@ function migrateV1(o: Obj): Show {
     return { levels, haze: clamp(num(lo.haze), 0, 1) };
   };
   return {
-    version: 2,
+    version: 3,
     stage,
-    venue: { blocks: defaultBlocks(stage) },
+    venue: { template: defaultTemplate(stage.shape) },
     ambient: AMBIENT_DEFAULT,
     props: readProps(o.props),
-    actors: readActors(o.actors),
+    actors: readActors(o.actors, 1),
     fixtures,
     cues: readCues(o.cues, look),
     live: look(o.live),
@@ -971,7 +1060,8 @@ function migrateV1(o: Obj): Show {
 export function deserialize(text: string): { show: Show; migrated: boolean } | null {
   try {
     const o = obj(JSON.parse(text));
-    if (o.version === 2) return { show: readV2(o), migrated: false };
+    if (o.version === 3) return { show: readShow(o, 3), migrated: false };
+    if (o.version === 2) return { show: readShow(o, 2), migrated: true };
     if (o.version === 1) return { show: migrateV1(o), migrated: true };
     return null;
   } catch {

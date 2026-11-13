@@ -3,18 +3,18 @@ import assert from "node:assert/strict";
 import {
   defaultShow, addFixture, addProp, removeEntity, saveCue, updateStage, updateActor, updateCue,
   updateLevel, updateFocus, updateFixture, setChannel, hangPoint, resolve,
-  serialize, deserialize, LIMITS, GELS,
+  serialize, deserialize, LIMITS, GELS, setActorGender, duplicateEntity, updateTemplate,
 } from "./show.ts";
 
 const STAGE = { shape: "proscenium", width: 10, depth: 8, height: 6, floorColor: "#000000", backdropColor: "#000000" } as const;
 
 test("기본 공연 v2", () => {
   const s = defaultShow();
-  assert.equal(s.version, 2);
+  assert.equal(s.version, 3);
   assert.deepEqual(s.fixtures.map((f) => f.channel), [1, 2, 3, 4, 5, 6, 7, 8]);
   const kinds = new Set(s.fixtures.map((f) => f.kind));
   for (const k of ["profile", "fresnel", "par", "cyc", "follow"]) assert.ok(kinds.has(k as never), k);
-  assert.equal(s.venue.blocks.length, 3);
+  assert.equal(s.venue.template.kind, "hall");
   assert.equal(s.cues.length, 2);
   assert.equal(s.live.haze, 0.4);
   assert.equal(GELS.length, 14);
@@ -111,7 +111,7 @@ test("소품 상한·clamp·큐", () => {
   s = updateStage(s, { width: 100, depth: 1 });
   assert.deepEqual([s.stage.width, s.stage.depth], [20, 3]);
   s = updateActor(s, s.actors[0].id, { height: 3 });
-  assert.equal(s.actors[0].height, 2.1);
+  assert.equal(s.actors[0].height, 1.8); // 인물 1은 여자: 1.5–1.8m
   s = updateCue(s, s.cues[0].id, { fadeSec: -2 });
   assert.equal(s.cues[0].fadeSec, 0);
   const n = s.cues.length;
@@ -128,22 +128,17 @@ test("조명기 삭제 시 live와 큐에서 레벨 제거", () => {
   for (const c of s.cues) assert.equal(id in c.look.levels, false);
 });
 
-test("직렬화 왕복 v2", () => {
+test("직렬화 왕복 v3", () => {
   const s = saveCue(addProp(defaultShow(), "table"));
   const back = deserialize(serialize(s))!;
   assert.equal(back.migrated, false);
   assert.deepEqual(back.show, s);
 });
 
-test("줄 수만 있던 v2 객석은 기본 블록으로", () => {
-  const s = defaultShow();
-  const back = deserialize(JSON.stringify({ ...s, venue: { rows: 8 } }))!;
-  assert.equal(back.show.venue.blocks.length, 3);
-});
 
-test("깨진 v2는 null", () => {
+test("깨진 저장본은 null", () => {
   assert.equal(deserialize("{"), null);
-  assert.equal(deserialize(JSON.stringify({ ...defaultShow(), version: 3 })), null);
+  assert.equal(deserialize(JSON.stringify({ ...defaultShow(), version: 4 })), null);
   assert.equal(deserialize(JSON.stringify({ ...defaultShow(), fixtures: "x" })), null);
 });
 
@@ -173,7 +168,7 @@ test("v1 저장본 변환", () => {
   const rr = resolve(r.show.stage, f, r.show.live.levels.f1);
   assert.ok(Math.abs(rr.beamAngle - 26) < 0.01);
   assert.ok(Math.abs(rr.softness - 0.1) < 0.01);
-  assert.equal(r.show.version, 2);
+  assert.equal(r.show.version, 3);
 });
 
 test("잔광: 기본 0.3, 범위 0–1, 저장본에 없으면 기본값", async () => {
@@ -187,4 +182,79 @@ test("잔광: 기본 0.3, 범위 0–1, 저장본에 없으면 기본값", async
   assert.equal(deserialize(JSON.stringify(noAmbient))!.show.ambient, 0.3);
   assert.equal(deserialize(JSON.stringify(setAmbient(s, 0.7)))!.show.ambient, 0.7);
   assert.equal(deserialize(JSON.stringify(V1))!.show.ambient, 0.3);
+});
+
+test("v3 인물 기본값", () => {
+  const a = defaultShow().actors;
+  assert.deepEqual(a.map((x) => x.gender), ["female", "male"]);
+  for (const x of a) {
+    assert.ok(x.topColor && x.bottomColor && x.shoeColor && x.hairColor && x.hair);
+    assert.equal(x.position.y, 0);
+  }
+  assert.equal(a[0].height, 1.6);
+  assert.equal(a[1].height, 1.73);
+});
+
+test("v2 저장본 → v3: 인물 손실 없음, 객석은 템플릿", () => {
+  const s = defaultShow();
+  const v2 = {
+    ...s,
+    version: 2,
+    venue: { blocks: [{ id: "b", name: "가운데", x: 0, z: 2, rotationY: 0, rows: 4, seatsPerRow: 6, rake: 0.25, curve: 0 }] },
+    actors: [{ id: "a1", name: "철수", position: { x: 1, y: 0, z: -2 }, rotationY: 0.5, height: 1.95, build: "slim", pose: "sit", clothColor: "#7a2e3a", skinColor: "#d9a88a" }],
+  };
+  delete (v2 as Record<string, unknown>).ambient;
+  const r = deserialize(JSON.stringify(v2))!;
+  assert.equal(r.migrated, true);
+  assert.equal(r.show.version, 3);
+  const a = r.show.actors[0];
+  assert.deepEqual([a.id, a.name, a.gender, a.pose, a.build, a.topColor, a.skinColor, a.height], ["a1", "철수", "male", "sit", "slim", "#7a2e3a", "#d9a88a", 1.95]);
+  assert.deepEqual(a.position, { x: 1, y: 0, z: -2 });
+  assert.equal(r.show.venue.template.kind, "hall");
+});
+
+test("성별 바꾸면 키 범위를 맞춘다", () => {
+  let s = defaultShow();
+  const id = s.actors[1].id; // 남 1.73
+  s = updateActor(s, id, { height: 1.9 });
+  s = setActorGender(s, id, "female");
+  assert.equal(s.actors[1].gender, "female");
+  assert.equal(s.actors[1].height, 1.8);
+  s = updateActor(s, id, { height: 1.4 });
+  assert.equal(s.actors[1].height, 1.5);
+  s = setActorGender(s, id, "male");
+  assert.equal(s.actors[1].height, 1.6);
+});
+
+test("복제: 새 id, 0.5m 옆, 조명기는 새 채널", () => {
+  let s = defaultShow();
+  const a = s.actors[0];
+  s = duplicateEntity(s, a.id);
+  const d = s.actors.at(-1)!;
+  assert.notEqual(d.id, a.id);
+  assert.equal(d.position.x, a.position.x + 0.5);
+  assert.equal(d.name, `${a.name} 복사`);
+  const f = s.fixtures[0];
+  s = duplicateEntity(s, f.id);
+  const df = s.fixtures.at(-1)!;
+  assert.notEqual(df.channel, f.channel);
+  assert.equal(df.along, f.along + 0.5);
+  assert.deepEqual(s.live.levels[df.id], s.live.levels[f.id]);
+  assert.equal(duplicateEntity(s, "없음"), s);
+});
+
+test("템플릿 수치 범위와 무대 형태 전환", () => {
+  let s = defaultShow();
+  s = updateTemplate(s, { rows: 99, width: 1, aisle: 9, rake: -1, gap: 0, widen: 3, balconyRows: 50 });
+  const t = s.venue.template;
+  assert.deepEqual([t.rows, t.width, t.aisle, t.rake, t.gap, t.widen, t.balconyRows], [25, 6, 2, 0.1, 1, 1, 10]);
+  s = updateStage(s, { shape: "round" });
+  assert.equal(s.venue.template.kind, "arena");
+  s = updateTemplate(s, { kind: "studio" });
+  assert.equal(s.venue.template.kind, "arena"); // 원형 무대에는 원형 객석만
+  s = updateStage(s, { shape: "proscenium" });
+  assert.equal(s.venue.template.kind, "hall");
+  s = updateTemplate(s, { kind: "grand" });
+  s = updateStage(s, { width: 12 });
+  assert.equal(s.venue.template.kind, "grand");
 });
