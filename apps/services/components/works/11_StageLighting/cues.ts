@@ -1,8 +1,9 @@
-// 큐 사이 보간과 페이드 진행률. node:test가 그대로 실행하도록 타입만 import한다.
-import type { Fixture, FixtureLevel, LookState } from "./show";
+// 큐 사이 보간, 페이드 진행률, 헤이즈 변화 속도. node:test가 그대로 실행하도록 타입만 import한다.
+import type { Fixture, FixtureLevel, LookState, Vec3 } from "./show";
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+// a·(1−t) + b·t 꼴이 a + (b−a)·t보다 중간값 반올림 오차가 적다.
+const lerp = (a: number, b: number, t: number) => a * (1 - t) + b * t;
 
 const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 const toSrgb = (c: number) => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
@@ -17,43 +18,33 @@ export function linearToHex([r, g, b]: [number, number, number]): string {
   return `#${h(r)}${h(g)}${h(b)}`;
 }
 
-// show.ts의 levelOf와 같은 규칙(런타임 import를 하지 않아 여기 다시 적는다).
-function fallback(f: Fixture): FixtureLevel {
-  return { intensity: 0, color: "#ffffff", target: { x: f.position.x, y: 0, z: f.position.z }, beamAngle: 40, softness: 0.5 };
+function lerpColor(a: string, b: string, t: number): string {
+  if (a === b || t <= 0) return a;
+  if (t >= 1) return b;
+  const ca = hexToLinear(a);
+  const cb = hexToLinear(b);
+  return linearToHex([lerp(ca[0], cb[0], t), lerp(ca[1], cb[1], t), lerp(ca[2], cb[2], t)]);
 }
 
-/** 양쪽 레벨을 맞춘다. 한쪽에만 있으면 다른 쪽은 같은 값에 밝기만 0으로 본다. */
-function pair(a: LookState, b: LookState, f: Fixture): [FixtureLevel, FixtureLevel] {
-  const la = a.levels[f.id];
-  const lb = b.levels[f.id];
-  if (la && lb) return [la, lb];
-  if (la) return [la, { ...la, intensity: 0 }];
-  if (lb) return [{ ...lb, intensity: 0 }, lb];
-  const d = fallback(f);
-  return [d, d];
-}
+const lerpVec = (a: Vec3, b: Vec3, t: number): Vec3 => ({ x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t), z: lerp(a.z, b.z, t) });
 
+/**
+ * 큐에 있는 값만 보간한다. 밝기가 없으면 0, 색이 한쪽에만 있으면 그 색 그대로,
+ * 조준·아이리스가 한쪽에만 있으면 다른 쪽은 조명기 포커스 값에서 출발한다.
+ */
 export function lerpLook(a: LookState, b: LookState, t: number, fixtures: Fixture[]): LookState {
   const levels: Record<string, FixtureLevel> = {};
   for (const f of fixtures) {
-    const [x, y] = pair(a, b, f);
-    let color = t <= 0 ? x.color : t >= 1 ? y.color : x.color;
-    if (t > 0 && t < 1 && x.color !== y.color) {
-      const ca = hexToLinear(x.color);
-      const cb = hexToLinear(y.color);
-      color = linearToHex([lerp(ca[0], cb[0], t), lerp(ca[1], cb[1], t), lerp(ca[2], cb[2], t)]);
-    }
-    levels[f.id] = {
-      intensity: lerp(x.intensity, y.intensity, t),
-      color,
-      target: {
-        x: lerp(x.target.x, y.target.x, t),
-        y: lerp(x.target.y, y.target.y, t),
-        z: lerp(x.target.z, y.target.z, t),
-      },
-      beamAngle: lerp(x.beamAngle, y.beamAngle, t),
-      softness: lerp(x.softness, y.softness, t),
-    };
+    const x = a.levels[f.id];
+    const y = b.levels[f.id];
+    if (!x && !y) continue;
+    const out: FixtureLevel = { intensity: lerp(x?.intensity ?? 0, y?.intensity ?? 0, t) };
+    const ca = x?.color ?? y?.color;
+    const cb = y?.color ?? x?.color;
+    if (ca && cb) out.color = lerpColor(ca, cb, t);
+    if (x?.target || y?.target) out.target = lerpVec(x?.target ?? f.focus.target, y?.target ?? f.focus.target, t);
+    if (x?.zoom !== undefined || y?.zoom !== undefined) out.zoom = lerp(x?.zoom ?? f.focus.zoom, y?.zoom ?? f.focus.zoom, t);
+    levels[f.id] = out;
   }
   return { levels, haze: lerp(a.haze, b.haze, t) };
 }
@@ -66,12 +57,26 @@ export function fadeProgress(elapsedMs: number, fadeSec: number): number {
   return Math.round(((1 - Math.cos(Math.PI * x)) / 2) * 1e9) / 1e9;
 }
 
-/** 두 상태 사이에 조준점·빔 각도가 다른 조명기가 있는지. 없으면 그림자 맵을 다시 그릴 필요가 없다. */
+/** 큐 사이에 조준·아이리스가 바뀌는 조명기가 있는지. 없으면 그림자 맵을 다시 그릴 필요가 없다. */
 export function aimChanged(a: LookState, b: LookState, fixtures: Fixture[]): boolean {
   for (const f of fixtures) {
-    const [x, y] = pair(a, b, f);
-    if (x.beamAngle !== y.beamAngle) return true;
-    if (x.target.x !== y.target.x || x.target.y !== y.target.y || x.target.z !== y.target.z) return true;
+    const x = a.levels[f.id];
+    const y = b.levels[f.id];
+    // 큐에 없는 조준·아이리스는 포커스 값이다(일반 조명기는 늘 포커스 값이라 바뀌지 않는다).
+    const ta = x?.target ?? f.focus.target;
+    const tb = y?.target ?? f.focus.target;
+    if (ta.x !== tb.x || ta.y !== tb.y || ta.z !== tb.z) return true;
+    if ((x?.zoom ?? f.focus.zoom) !== (y?.zoom ?? f.focus.zoom)) return true;
   }
   return false;
+}
+
+const RISE_PER_SEC = 1 / 20;
+const FALL_PER_SEC = 1 / 40;
+
+/** 헤이즈 실제 농도가 목표를 따라간다. 차오를 때 0→1에 20초, 빠질 때 1→0에 40초. */
+export function stepHaze(current: number, target: number, dtSec: number): number {
+  if (current < target) return Math.min(target, current + RISE_PER_SEC * dtSec);
+  if (current > target) return Math.max(target, current - FALL_PER_SEC * dtSec);
+  return current;
 }

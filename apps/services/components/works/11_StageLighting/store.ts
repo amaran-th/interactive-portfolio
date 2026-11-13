@@ -5,6 +5,7 @@ import type { FixtureLevel, Show } from "./show";
 export type Delta = { added: string[]; changed: string[]; removed: string[] };
 export type ShowDiff = {
   stage: boolean;
+  venue: boolean;
   props: Delta;
   actors: Delta;
   fixtures: Delta;
@@ -30,11 +31,13 @@ function diffList<T extends { id: string }>(prev: T[], next: T[]): Delta {
 
 const empty = (d: Delta) => d.added.length + d.changed.length + d.removed.length === 0;
 
+/** 큐 값 중 조준·아이리스(그림자에 영향)가 바뀌었는지. */
 function aimDiffers(a: FixtureLevel | undefined, b: FixtureLevel | undefined): boolean {
-  if (!a || !b) return true;
-  return (
-    a.beamAngle !== b.beamAngle || a.target.x !== b.target.x || a.target.y !== b.target.y || a.target.z !== b.target.z
-  );
+  if (a?.zoom !== b?.zoom) return true;
+  const ta = a?.target;
+  const tb = b?.target;
+  if (!ta || !tb) return ta !== tb;
+  return ta.x !== tb.x || ta.y !== tb.y || ta.z !== tb.z;
 }
 
 export function diffShow(prev: Show, next: Show): ShowDiff {
@@ -55,6 +58,7 @@ export function diffShow(prev: Show, next: Show): ShowDiff {
   }
   return {
     stage,
+    venue: prev.venue !== next.venue,
     props,
     actors,
     fixtures,
