@@ -10,6 +10,7 @@ import PlotLabels from "./PlotLabels";
 import SeatMap from "./SeatMap";
 import { loadQuality, loadShow, saveQuality, useAutoSave } from "./persistence";
 import type { Quality, Tier } from "./quality";
+import { dragHeight, dropAt } from "./placement";
 import { stageBounds } from "./scene/stage";
 import {
   CUE_PARAMS,
@@ -172,12 +173,12 @@ export default function StageLighting() {
     const scene = sceneRef.current;
     const fp = scene?.floorPoint(d.clientX, d.clientY);
     if (!fp) return null;
-    const b = stageBounds(store.get().stage);
-    return {
-      x: Math.min(b.maxX, Math.max(b.minX, fp.x + d.offset.x)),
-      y: d.baseY,
-      z: Math.min(b.maxZ, Math.max(b.minZ, fp.z + d.offset.z)),
-    };
+    const s = store.get();
+    const b = stageBounds(s.stage);
+    const x = Math.min(b.maxX, Math.max(b.minX, fp.x + d.offset.x));
+    const z = Math.min(b.maxZ, Math.max(b.minZ, fp.z + d.offset.z));
+    // 인물·소품은 그 점 아래 단·계단·탁자·상자 윗면에 올라선다.
+    return { x, y: d.type === "aim" ? d.baseY : dragHeight(s, d.type, d.id, x, z), z };
   };
 
   const preview = (d: Drag) => {
@@ -250,8 +251,12 @@ export default function StageLighting() {
     const pos = d.last;
     if (pos) {
       const s = store.get();
-      if (d.type === "prop") store.set(updateProp(s, d.id, { position: pos }));
-      else if (d.type === "actor") store.set(updateActor(s, d.id, { position: pos }));
+      if (d.type === "prop" || d.type === "actor") {
+        // 놓을 때 같은 높이의 다른 인물·소품과 겹치면 가까운 빈자리로 민다.
+        const at = dropAt(s, d.type, d.id, pos, stageBounds(s.stage));
+        if (d.type === "prop") store.set(updateProp(s, d.id, { position: at }));
+        else store.set(updateActor(s, d.id, { position: at }));
+      }
       else {
         // 팔로우는 큐마다 대상을 따라가고, 나머지는 포커스(고정 조준)를 옮긴다.
         const f = s.fixtures.find((x) => x.id === d.id);

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { type Body, bodiesOf, resolveOverlap, surfaceAt } from "./placement.ts";
+import { type Body, bodiesOf, dragHeight, dropAt, resolveOverlap, surfaceAt } from "./placement.ts";
 import { defaultShow } from "./show.ts";
 import type { Prop, PropKind } from "./show.ts";
 
@@ -57,7 +57,7 @@ test("회전 90°: 계단이 +x를 향하고, 긴 단은 z로 눕는다", () => 
   assert.equal(surfaceAt(plat, 1.8, 0), 0);
 });
 
-const actor = (id: string, x: number, z: number, y = 0, sitting = false): Body => ({ id, x, z, y, r: 0.3, kind: "actor", sitting });
+const actor = (id: string, x: number, z: number, y = 0, sitting = false): Body => ({ id, x, z, y, h: 1.7, r: 0.3, kind: "actor", sitting });
 
 test("겹치면 겹친 만큼 바깥으로 밀어낸다", () => {
   const bodies = [actor("a", 0, 0), actor("b", 0.2, 0)];
@@ -67,12 +67,22 @@ test("겹치면 겹친 만큼 바깥으로 밀어낸다", () => {
   assert.deepEqual(resolveOverlap(bodies, "b", { x: 2, z: 0 }, BOUNDS), { x: 2, z: 0 });
 });
 
-test("다른 층(|Δy| ≥ 0.3)은 겹쳐도 된다, 앉은 인물과 의자도", () => {
-  const bodies = [actor("a", 0, 0, 0.4), actor("b", 0.1, 0)];
+test("높이 구간이 겹치지 않으면(위층·올라선 단) 겹쳐도 된다, 앉은 인물과 의자도", () => {
+  const bodies = [actor("a", 0, 0, 1.8), actor("b", 0.1, 0)];
   assert.deepEqual(resolveOverlap(bodies, "b", { x: 0.1, z: 0 }, BOUNDS), { x: 0.1, z: 0 });
-  const chair: Body = { id: "c", x: 0, z: 0, y: 0, r: Math.hypot(0.5, 0.5) / 2, kind: "chair", sitting: false };
+  // 20cm 단 위에 선 인물은 그 단에 밀리지 않는다
+  const low: Body = { id: "p", x: 0, z: 0, y: 0, h: 0.2, r: 1, kind: "platform", sitting: false };
+  assert.deepEqual(resolveOverlap([low, actor("s", 0.2, 0, 0.2)], "s", { x: 0.2, z: 0 }, BOUNDS), { x: 0.2, z: 0 });
+  assert.deepEqual(resolveOverlap(bodies, "b", { x: 0.1, z: 0 }, BOUNDS), { x: 0.1, z: 0 });
+  const chair: Body = { id: "c", x: 0, z: 0, y: 0, h: 0.9, r: Math.hypot(0.5, 0.5) / 2, kind: "chair", sitting: false };
   const sit = actor("s", 0, 0.05, 0, true);
   assert.deepEqual(resolveOverlap([chair, sit], "s", { x: 0, z: 0.05 }, BOUNDS), { x: 0, z: 0.05 });
+});
+
+test("양쪽에 끼여 밀기가 안 풀리면 둘레에서 가장 가까운 빈자리", () => {
+  const wall = (id: string, x: number): Body => ({ id, x, z: 0, y: 0, h: 1, r: 0.5, kind: "box", sitting: false });
+  const p = resolveOverlap([wall("l", -0.7), wall("r", 0.7), actor("me", 0, 0)], "me", { x: 0, z: 0 }, BOUNDS);
+  assert.ok(Math.abs(p.z) > 0.3 && Math.abs(p.z) < 0.8, JSON.stringify(p));
 });
 
 test("정확히 같은 자리면 +x로, 빈자리가 없으면 원래 자리", () => {
@@ -101,4 +111,20 @@ test("bodiesOf: 인물 반지름 0.3, 소품은 바닥 대각선/2, 앉은 자�
   assert.equal(a0.r, 0.3);
   assert.equal(a0.sitting, true);
   assert.equal(bodies.find((b) => b.id === s.actors[1].id)!.sitting, false);
+});
+
+test("dragHeight·dropAt: 끄는 동안 윗면 높이, 놓으면 겹침 보정 뒤 그 자리 높이", () => {
+  const s = defaultShow();
+  const [a, b] = s.actors;
+  const show = { ...s, props: [P("p", "platform", 3, -3, 2, 0.4, 1.5)] };
+  assert.equal(dragHeight(show, "actor", a.id, 3, -3), 0.4);
+  assert.equal(dragHeight(show, "actor", a.id, 0, 0), 0);
+  // 소품은 자기 자신 위에 올라서지 않는다
+  assert.equal(dragHeight(show, "prop", "p", 3, -3), 0);
+  // b 바로 옆에 놓으면 밀려나고, 바닥 높이를 다시 잰다
+  const drop = dropAt(show, "actor", a.id, { x: b.position.x + 0.1, z: b.position.z }, BOUNDS);
+  assert.ok(Math.hypot(drop.x - b.position.x, drop.z - b.position.z) >= 0.6 - 1e-6);
+  assert.equal(drop.y, 0);
+  // 단 위에 놓으면 단 높이에 선다(단에 밀리지 않음)
+  assert.deepEqual(dropAt(show, "actor", a.id, { x: 3.2, z: -3 }, BOUNDS), { x: 3.2, y: 0.4, z: -3 });
 });
