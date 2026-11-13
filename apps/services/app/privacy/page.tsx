@@ -76,7 +76,7 @@ const STORAGE_ITEMS: {
     tool: "조명 연습실",
     where: "localStorage",
     keys: ["stage-lighting-show", "stage-lighting-quality"],
-    what: "무대 설정, 소품·인물·조명기 배치, 큐 목록, 품질 설정",
+    what: "무대 설정, 객석 좌석 블록, 소품·인물·조명기 배치와 포커스, 큐 목록, 품질 설정",
   },
 ];
 
