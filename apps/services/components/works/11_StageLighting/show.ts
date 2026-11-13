@@ -99,6 +99,7 @@ export type SeatBlock = {
   seatsPerRow: number;
   rake: number; // 줄마다 올라가는 높이(m)
   curve: number; // 0..120
+  widen: number; // 줄마다 늘어나는 좌석 수(0..1). n번째 줄 좌석 = seatsPerRow + floor((n-1)·widen)
   elevation: number; // 블록 바닥을 객석 바닥보다 올리는 높이(m). 발코니는 0보다 크다.
 };
 /** 실제 극장형 객석. 좌석 블록은 venue.ts의 templateBlocks가 이 값에서 계산한다(저장하지 않음). */

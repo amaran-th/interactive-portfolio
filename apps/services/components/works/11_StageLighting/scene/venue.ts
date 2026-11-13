@@ -30,7 +30,7 @@ export class VenueLayer {
     const box = venueBox(stage, venue);
 
     // 좌석
-    const seats = seatLayout(venue);
+    const seats = seatLayout(stage, venue);
     const seatMesh = new THREE.InstancedMesh(seatGeometry(), std("#6b1d24"), Math.max(1, seats.length));
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -44,14 +44,14 @@ export class VenueLayer {
     seatMesh.frustumCulled = false;
     this.group.add(seatMesh);
 
-    // 계단 단: 단위 상자 하나를 좌석마다 늘려 쓴다(좌석이 수천 개여도 드로우콜 하나).
-    const risers = riserBoxes(venue);
+    // 계단 단: 단위 상자 하나를 좌석마다 늘려 쓴다(좌석이 수천 개여도 드로우콜 하나). 발코니는 받침만.
+    const risers = riserBoxes(stage, venue);
     if (risers.length > 0) {
       const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), std("#26262c"), risers.length);
       const size = new THREE.Vector3();
       risers.forEach((b, i) => {
         q.setFromAxisAngle(UP, b.rotationY);
-        mesh.setMatrixAt(i, m.compose(new THREE.Vector3(b.x, HOUSE_FLOOR, b.z), q, size.set(b.w, b.h, b.d)));
+        mesh.setMatrixAt(i, m.compose(new THREE.Vector3(b.x, b.base, b.z), q, size.set(b.w, b.h, b.d)));
       });
       mesh.receiveShadow = true;
       mesh.frustumCulled = false;
