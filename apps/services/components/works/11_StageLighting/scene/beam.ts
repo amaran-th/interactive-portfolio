@@ -3,7 +3,7 @@ import * as THREE from "three";
 
 /** 꼭짓점이 원점, 높이 1, 밑면 반지름 1, -y 방향 열린 원뿔. */
 export function buildBeamGeometry(segments: number): THREE.BufferGeometry {
-  return new THREE.ConeGeometry(1, 1, segments, 1, true).rotateX(Math.PI).translate(0, -0.5, 0);
+  return new THREE.ConeGeometry(1, 1, segments, 1, true).translate(0, -0.5, 0);
 }
 
 const vertex = /* glsl */ `
