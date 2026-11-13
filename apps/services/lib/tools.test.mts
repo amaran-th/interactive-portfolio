@@ -35,7 +35,7 @@ test("toolsIn은 카테고리의 도구를 TOOLS 순서로 돌려준다", () => 
     "palette-extractor",
   ]);
   assert.deepEqual(toolsIn("life"), []);
-  assert.deepEqual(slugs(toolsIn("creative")), ["visual-novel-studio", "nemo-nemo-beam", "monorism"]);
+  assert.deepEqual(slugs(toolsIn("creative")), ["visual-novel-studio", "nemo-nemo-beam", "monorism", "stage-lighting"]);
   assert.deepEqual(toolsIn("text"), []);
   assert.deepEqual(toolsIn("dev"), []);
 });
@@ -71,4 +71,8 @@ test("맞는 도구가 없거나 특수문자만 있으면 빈 배열, 예외 �
   assert.deepEqual(searchTools("없는단어xyz"), []);
   assert.deepEqual(searchTools("("), []);
   assert.deepEqual(searchTools(".*"), []);
+});
+
+test("조명 검색", () => {
+  assert.deepEqual(slugs(searchTools("조명")), ["stage-lighting"]);
 });

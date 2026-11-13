@@ -72,6 +72,12 @@ const STORAGE_ITEMS: {
     keys: ["monorism-board"],
     what: "판 크기, 칩 앞면·뒷면 색, 판 색, 칩 상태, 음소거 여부",
   },
+  {
+    tool: "조명 연습실",
+    where: "localStorage",
+    keys: ["stage-lighting-show", "stage-lighting-quality"],
+    what: "무대 설정, 소품·인물·조명기 배치, 큐 목록, 품질 설정",
+  },
 ];
 
 function Section({

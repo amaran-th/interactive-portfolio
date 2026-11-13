@@ -161,6 +161,16 @@ export const TOOLS: Tool[] = [
     tags: ["모자이크", "스팽글", "도트", "3D", "픽셀아트", "칩"],
     thumb: null,
   },
+  {
+    slug: "stage-lighting",
+    category: "creative",
+    title: "조명 연습실",
+    desc: "무대에 조명을 걸고 큐를 짜 보는 3D 연습실",
+    about:
+      "무대에 인물과 소품을 세우고 조명기를 걸어 빛을 만들어요. 장면마다 큐로 저장해 페이드로 이어 보고, 객석 자리에서 어떻게 보이는지 확인해요. 만든 무대는 알아서 저장돼요.",
+    tags: ["조명", "무대", "공연", "큐", "3D", "헤이즈", "연극"],
+    thumb: null,
+  },
 ];
 
 export function getCategory(id: string): Category | undefined {
