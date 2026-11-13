@@ -39,7 +39,7 @@ test("조명기 삭제 시 live와 모든 큐에서 레벨 제거", () => {
 });
 
 test("새 조명기는 기존 큐에 레벨이 없고 levelOf가 밝기 0을 준다", () => {
-  let s = addFixture(defaultShow(), "fresnel");
+  const s = addFixture(defaultShow(), "fresnel");
   const f = s.fixtures.at(-1)!;
   assert.equal(f.id in s.cues[0].look.levels, false);
   assert.equal(levelOf(s.cues[0].look, f).intensity, 0);
