@@ -3,11 +3,11 @@
 // 조명 연습실 본체. StageLightingLoader가 SSR 없이 불러오므로 첫 렌더부터 localStorage를 읽는다.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { isTextEntryTarget } from "@/components/works/_shared/imageInput";
-import ChannelPanel from "./ChannelPanel";
 import CueBar from "./CueBar";
 import Inspector from "./Inspector";
+import Outliner from "./Outliner";
 import PlotLabels from "./PlotLabels";
-import SeatMap from "./SeatMap";
+import Sidebar from "./Sidebar";
 import { loadQuality, loadShow, saveQuality, useAutoSave } from "./persistence";
 import type { Quality, Tier } from "./quality";
 import { dragHeight, dropAt } from "./placement";
@@ -19,6 +19,7 @@ import {
   addActor,
   addFixture,
   addProp,
+  duplicateEntity,
   removeEntity,
   resolve,
   setAmbient,
@@ -31,7 +32,6 @@ import {
 import { createStore } from "./store";
 import Toolbar, { type AddItem } from "./Toolbar";
 import { useCuePlayback } from "./useCuePlayback";
-import { SEGMENT } from "./ui";
 import { useShow } from "./useShow";
 import { type ViewMode, useStageScene } from "./useStageScene";
 import { type SeatRef, clampSeat, defaultSeat, seatLabel } from "./venue";
@@ -49,7 +49,6 @@ type Drag = {
 };
 
 const CLICK_SLOP = 4;
-const TAB_LABELS = { props: "속성", channels: "채널", seats: "객석" } as const;
 const NOTICE_MS = 5000;
 
 function exists(s: Show, id: string): boolean {
@@ -88,7 +87,7 @@ export default function StageLighting() {
   const stageForSeat = useShow(store, (s) => s.stage);
   // 템플릿이 바뀌어 블록이 없어지거나 줄어도 남아 있는 좌석으로 맞춘다.
   const seat = useMemo(() => clampSeat(stageForSeat, venue, seatPick), [stageForSeat, venue, seatPick]);
-  const [tab, setTab] = useState<"props" | "channels" | "seats">("props");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [hazeStatus, setHazeStatus] = useState<"rising" | "falling" | null>(null);
   const solo = soloId && soloId === selectedId ? soloId : null;
 
@@ -132,15 +131,38 @@ export default function StageLighting() {
     if (v === "audience") setWorkLight(false);
   };
 
+  /** 새로 생긴 인물·소품을 다른 것과 겹치지 않게 옮겨 넣고 고른다. */
+  const placeNew = (prev: Show, next: Show) => {
+    const fresh = (list: { id: string }[], old: { id: string }[]) => list.find((x) => !old.some((o) => o.id === x.id));
+    const prop = fresh(next.props, prev.props);
+    const actor = fresh(next.actors, prev.actors);
+    const fixture = fresh(next.fixtures, prev.fixtures);
+    let out = next;
+    if (prop || actor) {
+      const type = prop ? "prop" : "actor";
+      const id = (prop ?? actor)!.id;
+      const pos = (prop ? next.props.find((p) => p.id === id)! : next.actors.find((a) => a.id === id)!).position;
+      const at = dropAt(next, type, id, pos, stageBounds(next.stage));
+      out = type === "prop" ? updateProp(next, id, { position: at }) : updateActor(next, id, { position: at });
+    }
+    store.set(out);
+    setPickedId((prop ?? actor ?? fixture)?.id ?? null);
+  };
+
   const add = (item: AddItem) => {
     beginEdit();
     const s = store.get();
     const next =
-      item.type === "prop" ? addProp(s, item.kind) : item.type === "actor" ? addActor(s) : addFixture(s, item.kind);
-    if (next === s) return;
-    store.set(next);
-    const list = item.type === "prop" ? next.props : item.type === "actor" ? next.actors : next.fixtures;
-    setPickedId(list[list.length - 1].id);
+      item.type === "prop" ? addProp(s, item.kind) : item.type === "actor" ? addActor(s, item.gender) : addFixture(s, item.kind);
+    if (next !== s) placeNew(s, next);
+  };
+
+  const duplicateSelected = () => {
+    if (!selectedId) return;
+    beginEdit();
+    const s = store.get();
+    const next = duplicateEntity(s, selectedId);
+    if (next !== s) placeNew(s, next);
   };
 
   const go = () => {
@@ -289,6 +311,11 @@ export default function StageLighting() {
         else undo();
         return;
       }
+      if (mod && e.key.toLowerCase() === "d") {
+        e.preventDefault(); // 브라우저 북마크 단축키 대신 복제
+        duplicateSelected();
+        return;
+      }
       if (mod || e.altKey) return;
       if (e.key === " ") {
         // 버튼·체크박스 등에 포커스가 있으면 Space는 그 컨트롤 몫이다.
@@ -330,7 +357,10 @@ export default function StageLighting() {
         houseLights={houseLights}
         onHouseLights={setHouseLights}
         seatLabel={seatLabel(stageForSeat, venue, seat)}
-        onSeatMap={() => setTab("seats")}
+        onSeatMap={() => {
+          setPickedId(null);
+          setSidebarOpen(true);
+        }}
         onHaze={(v) => {
           // 슬라이더로 정한 농도는 바로 보이게 한다(큐 재생 때만 천천히 차오른다).
           sceneRef.current?.setHazeTarget(v, true);
@@ -340,11 +370,11 @@ export default function StageLighting() {
         onUndo={undo}
         onRedo={redo}
       />
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      <div className="relative min-h-0 flex-1">
         <div
           ref={viewRef}
           aria-label="무대 3D 화면"
-          className="relative min-h-0 flex-1 touch-none overflow-hidden bg-[#050507] select-none"
+          className="absolute inset-0 touch-none overflow-hidden bg-[#050507] select-none"
           onPointerDownCapture={onPointerDownCapture}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -358,31 +388,22 @@ export default function StageLighting() {
             </p>
           )}
           {notice && !fatal && (
-            <p role="alert" className="absolute top-3 left-1/2 z-10 max-w-[90%] -translate-x-1/2 rounded-md border-2 border-point bg-white px-3 py-1.5 text-xs font-bold text-point shadow-[2px_2px_0_0_var(--color-point)]">
+            <p role="alert" className="absolute top-3 left-1/2 z-30 max-w-[90%] -translate-x-1/2 rounded-md border-2 border-point bg-white px-3 py-1.5 text-xs font-bold text-point shadow-[2px_2px_0_0_var(--color-point)]">
               {notice}
             </p>
           )}
         </div>
-        <aside aria-label="속성" className="max-h-[40%] shrink-0 overflow-auto border-t-2 border-point bg-white md:max-h-none md:w-72 md:border-t-0 md:border-l-2">
-          <div role="tablist" aria-label="패널" className="sticky top-0 z-10 flex gap-1 border-b-2 border-point bg-white px-3 py-2">
-            {(["props", "channels", "seats"] as const).map((t) => (
-              <button key={t} type="button" role="tab" aria-selected={tab === t}
-                onClick={() => setTab(t)} className={`${SEGMENT} aria-selected:bg-point aria-selected:text-white`}>
-                {TAB_LABELS[t]}
-              </button>
-            ))}
-          </div>
-          {tab === "props" ? (
-            <Inspector store={store} selectedId={selectedId} tier={tier} solo={solo !== null}
-              onSolo={() => setSoloId(solo ? null : selectedId)} onBegin={beginEdit} onDeleted={() => setPickedId(null)} />
-          ) : tab === "seats" ? (
-            <SeatMap store={store} seat={seat} onBegin={beginEdit}
-              onSeat={(ref) => { setSeatPick(ref); changeView("audience"); }} />
-          ) : (
-            <ChannelPanel store={store} selectedId={selectedId} onBegin={beginEdit}
-              onPick={(id) => { setPickedId(id); setTab("props"); }} />
-          )}
-        </aside>
+        <Sidebar
+          open={sidebarOpen}
+          onOpen={setSidebarOpen}
+          outliner={<Outliner store={store} selectedId={selectedId} onPick={setPickedId} onBegin={beginEdit} />}
+          inspector={
+            <Inspector store={store} selectedId={selectedId} tier={tier} solo={solo !== null} seat={seat}
+              onSeat={(ref) => { setSeatPick(ref); changeView("audience"); }}
+              onSolo={() => setSoloId(solo ? null : selectedId)} onBegin={beginEdit}
+              onDuplicate={duplicateSelected} onDelete={removeSelected} />
+          }
+        />
       </div>
       <CueBar
         store={store}

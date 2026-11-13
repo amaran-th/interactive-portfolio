@@ -3,13 +3,14 @@
 import { Armchair, Lamp, Lightbulb, LightbulbOff, Plus, Redo2, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Quality, Tier } from "./quality";
-import { FIXTURE_KINDS, FIXTURE_LABELS, type FixtureKind, LIMITS, PROP_KINDS, PROP_SPECS, type PropKind } from "./show";
+import { FixtureIcon, PersonIcon, PropIcon } from "./icons";
+import { FIXTURE_KINDS, FIXTURE_LABELS, type FixtureKind, GENDERS, GENDER_LABELS, type Gender, LIMITS, PROP_KINDS, PROP_SPECS, type PropKind } from "./show";
 import type { Store } from "./store";
 import { BUTTON, LABEL, SEGMENT } from "./ui";
 import { useHistory, useShow } from "./useShow";
 import type { ViewMode } from "./useStageScene";
 
-export type AddItem = { type: "prop"; kind: PropKind } | { type: "actor" } | { type: "fixture"; kind: FixtureKind };
+export type AddItem = { type: "prop"; kind: PropKind } | { type: "actor"; gender: Gender } | { type: "fixture"; kind: FixtureKind };
 
 const VIEWS: { value: ViewMode; label: string }[] = [
   { value: "edit", label: "편집" },
@@ -80,16 +81,19 @@ export default function Toolbar(p: Props) {
             <div className="flex flex-col gap-0.5">
               <p className={LABEL}>소품</p>
               {PROP_KINDS.map((k) => (
-                <MenuItem key={k} label={PROP_SPECS[k].label} disabledReason={full(nProps, LIMITS.props)}
+                <MenuItem key={k} icon={<PropIcon kind={k} />} label={PROP_SPECS[k].label} disabledReason={full(nProps, LIMITS.props)}
                   onClick={() => pick({ type: "prop", kind: k })} />
               ))}
               <p className={`${LABEL} mt-1`}>인물</p>
-              <MenuItem label="인물" disabledReason={full(nActors, LIMITS.actors)} onClick={() => pick({ type: "actor" })} />
+              {GENDERS.map((g) => (
+                <MenuItem key={g} icon={<PersonIcon gender={g} />} label={`인물(${GENDER_LABELS[g]})`} disabledReason={full(nActors, LIMITS.actors)}
+                  onClick={() => pick({ type: "actor", gender: g })} />
+              ))}
             </div>
             <div className="flex flex-col gap-0.5">
               <p className={LABEL}>조명기</p>
               {FIXTURE_KINDS.map((k) => (
-                <MenuItem key={k} label={FIXTURE_LABELS[k]} disabledReason={full(nFixtures, LIMITS.fixtures)}
+                <MenuItem key={k} icon={<FixtureIcon kind={k} />} label={FIXTURE_LABELS[k]} disabledReason={full(nFixtures, LIMITS.fixtures)}
                   onClick={() => pick({ type: "fixture", kind: k })} />
               ))}
             </div>
@@ -167,10 +171,11 @@ export default function Toolbar(p: Props) {
   );
 }
 
-function MenuItem({ label, disabledReason, onClick }: { label: string; disabledReason?: string; onClick: () => void }) {
+function MenuItem({ icon, label, disabledReason, onClick }: { icon: React.ReactNode; label: string; disabledReason?: string; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} disabled={!!disabledReason} title={disabledReason}
-      className="rounded-md px-2 py-1 text-left text-xs font-bold text-point hover:bg-shade disabled:opacity-40">
+      className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-xs font-bold text-point hover:bg-shade disabled:opacity-40">
+      {icon}
       {label}
     </button>
   );

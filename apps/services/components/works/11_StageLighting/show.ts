@@ -596,10 +596,11 @@ export function addProp(show: Show, kind: PropKind): Show {
   return { ...show, props: [...show.props, prop] };
 }
 
-export function addActor(show: Show): Show {
+/** 성별을 정하지 않으면 여자·남자를 번갈아 넣는다. */
+export function addActor(show: Show, gender?: Gender): Show {
   if (show.actors.length >= LIMITS.actors) return show;
   const n = show.actors.length + 1;
-  const gender: Gender = n % 2 === 1 ? "female" : "male";
+  gender ??= n % 2 === 1 ? "female" : "male";
   return { ...show, actors: [...show.actors, makeActor(`인물 ${n}`, gender, 0, -show.stage.depth / 2, "#5a5a5a")] };
 }
 

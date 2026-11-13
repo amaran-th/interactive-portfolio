@@ -1,20 +1,18 @@
 "use client";
 
-// 객석: 극장 템플릿 수치와 위에서 본 좌석 지도. 블록 위치·방향은 템플릿 규칙이 정하므로 지도는 보기 전용이고,
-// 좌석을 누르면 그 자리에서 무대를 본다.
+// 객석: 극장 템플릿 수치(VenueFields)와 위에서 본 좌석 지도(SeatPicker).
+// 블록 위치·방향은 템플릿 규칙이 정하므로 지도는 보기 전용이고, 좌석을 누르면 그 자리에서 무대를 본다.
 import { RotateCcw } from "lucide-react";
 import { Segmented, Slider } from "./fields";
 import { VENUE_KINDS_FOR, VENUE_LABELS, type VenueKind, type VenueTemplate, defaultTemplate, updateTemplate } from "./show";
 import type { Store } from "./store";
-import { BUTTON, PANEL_TITLE } from "./ui";
+import { BUTTON } from "./ui";
 import { useShow } from "./useShow";
 import { type SeatRef, blockSeats, seatLabel, venueBlocks, venueBox } from "./venue";
 
-type Props = { store: Store; seat: SeatRef | null; onSeat: (ref: SeatRef) => void; onBegin: () => void };
-
 const DEG = 180 / Math.PI;
 
-export function SeatMapView({ store, seat, onSeat }: Omit<Props, "onBegin">) {
+export function SeatMapView({ store, seat, onSeat }: { store: Store; seat: SeatRef | null; onSeat: (ref: SeatRef) => void }) {
   const venue = useShow(store, (s) => s.venue);
   const stage = useShow(store, (s) => s.stage);
   const box = venueBox(stage, venue);
@@ -73,7 +71,7 @@ export function SeatMapView({ store, seat, onSeat }: Omit<Props, "onBegin">) {
   );
 }
 
-export default function SeatMap({ store, seat, onSeat, onBegin }: Props) {
+export function VenueFields({ store, onBegin }: { store: Store; onBegin: () => void }) {
   const venue = useShow(store, (s) => s.venue);
   const stage = useShow(store, (s) => s.stage);
   const t = venue.template;
@@ -84,7 +82,7 @@ export default function SeatMap({ store, seat, onSeat, onBegin }: Props) {
       onChange={(v) => set({ [key]: v })} />
   );
   return (
-    <div className="flex flex-col gap-2.5">
+    <>
       {kinds.length > 1 ? (
         <Segmented<VenueKind> label="극장 종류" value={t.kind} options={kinds.map((k) => ({ value: k, label: VENUE_LABELS[k] }))}
           onPick={(kind) => { onBegin(); set({ kind }); }} />
@@ -102,11 +100,18 @@ export default function SeatMap({ store, seat, onSeat, onBegin }: Props) {
         onClick={() => { onBegin(); store.set({ ...store.get(), venue: { template: defaultTemplate(stage.shape) } }); }}>
         <RotateCcw aria-hidden className="size-4" /> 기본 객석으로
       </button>
-      <hr className="border-point/20" />
-      <p className={PANEL_TITLE}>좌석 지도</p>
-      <p className="text-[11px] text-ink/60">좌석을 누르면 그 자리에서 무대를 봐요.</p>
+    </>
+  );
+}
+
+export function SeatPicker({ store, seat, onSeat }: { store: Store; seat: SeatRef | null; onSeat: (ref: SeatRef) => void }) {
+  const venue = useShow(store, (s) => s.venue);
+  const stage = useShow(store, (s) => s.stage);
+  return (
+    <>
+      <p className="text-[11px] text-ink/60">좌석을 누르면 그 자리에서 무대를 봐요. 발코니는 흐리게 겹쳐 보여요.</p>
       <p className="text-xs font-bold text-point">보는 자리: {seatLabel(stage, venue, seat)}</p>
       <SeatMapView store={store} seat={seat} onSeat={onSeat} />
-    </div>
+    </>
   );
 }
