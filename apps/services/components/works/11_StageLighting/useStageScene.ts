@@ -2,56 +2,70 @@
 
 // 조명 연습실 three.js 씬. store를 구독해 바뀐 것만 반영하고, 필요할 때만 그린다.
 // - 렌더: requestRender()가 다음 rAF 한 번으로 묶는다. 정지 상태에서는 0프레임.
+//   객석등 페이드·헤이즈 변화·카메라 관성이 진행 중일 때만 계속 그린다.
 // - 그림자: autoUpdate를 끄고 위치·조준이 바뀔 때만 다시 계산한다(밝기·색만 바뀌면 그대로).
 // - 조작 중에는 픽셀 비율을 1로 낮추고, 드래그 중 그림자는 4프레임에 한 번만 갱신한다.
+// - 조명기 값은 resolve()로 포커스와 큐 값을 합친 결과만 쓴다.
 
 import { type RefObject, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { stepHaze } from "./cues";
 import { type Quality, type Tier, TIERS, effectiveTier, nextTier, shadowFixtureIds } from "./quality";
-import { buildBeamGeometry, createBeamMaterial } from "./scene/beam";
+import { angleBoost, buildBeamGeometry, createBeamMaterial } from "./scene/beam";
 import { disposeGroup } from "./scene/dispose";
 import { buildFixtureBodyGeometry } from "./scene/fixtureBody";
 import { buildMannequinGeometry, mannequinBox } from "./scene/mannequin";
 import { PropLayer } from "./scene/props";
 import { buildStage } from "./scene/stage";
-import { type Actor, type Fixture, type FixtureLevel, type LookState, type Show, type Vec3, levelOf } from "./show";
+import { VenueLayer } from "./scene/venue";
+import { type Actor, type Fixture, type LookState, type Resolved, type Show, type Vec3, resolve } from "./show";
 import { type Store, diffShow } from "./store";
+import { type SeatSide, seatView, venueBox } from "./venue";
 
-export type ViewMode = "edit" | "audience" | "top";
+export type ViewMode = "edit" | "audience" | "plot";
 export type Pick = { type: "prop" | "actor" | "fixture" | "aim"; id: string } | null;
+export type ScreenPoint = { id: string; channel: number; color: string; x: number; y: number };
 
 export type SceneApi = {
   requestRender(): void;
   applyLook(look: LookState, shadows: boolean): void;
   setView(v: ViewMode): void;
   setWorkLight(on: boolean): void;
+  setHouseLights(on: boolean): void;
+  setSeat(row: number, side: SeatSide): void;
+  setSolo(fixtureId: string | null): void;
+  setHazeTarget(target: number, immediate: boolean): void;
+  onHaze(fn: (actual: number) => void): void;
   setQuality(q: Quality): void;
   setSelected(id: string | null): void;
   pick(clientX: number, clientY: number): Pick;
   floorPoint(clientX: number, clientY: number): Vec3 | null;
   previewEntity(id: string, pos: Vec3): void;
   previewAim(fixtureId: string, target: Vec3): void;
+  fixtureScreenPoints(): ScreenPoint[];
+  onCamera(fn: () => void): void;
   beginInteraction(): void;
   endInteraction(): void;
   onTierChange(fn: (t: Tier) => void): void;
 };
 
-type StageStats = { renders: number; shadowUpdates: number; frameMs: number[] };
+type StageStats = { renders: number; shadowUpdates: number; frameMs: number[]; hazeActual: number };
 declare global {
   interface Window {
     __stageStats?: StageStats;
   }
 }
 
-const CANDELA = 600; // 밝기 1일 때 광도
+const CANDELA = 600; // 디머 100%일 때 광도
 const MAX_DPR = 2;
 const RESTORE_MS = 150;
 const DRAG_SHADOW_EVERY = 4;
 const HANDLE_RADIUS = 0.4;
+const HOUSE_FADE_MS = 2000;
 const DEG = Math.PI / 180;
 
-type FixtureView = { fixture: Fixture; light: THREE.SpotLight; beam: THREE.Mesh; body: THREE.Mesh; level: FixtureLevel };
+type FixtureView = { fixture: Fixture; light: THREE.SpotLight; beam: THREE.Mesh; body: THREE.Mesh; res: Resolved };
 type ActorView = { actor: Actor; key: string; mesh: THREE.Mesh; materials: THREE.MeshStandardMaterial[] };
 
 const DOWN = new THREE.Vector3(0, -1, 0);
@@ -97,27 +111,35 @@ export function useStageScene(
     renderer.domElement.style.touchAction = "none";
     container.appendChild(renderer.domElement);
 
+    let show: Show = store.get();
+    let shadowsPending = true;
+
     const stats: StageStats | null =
-      process.env.NODE_ENV !== "production" ? { renders: 0, shadowUpdates: 0, frameMs: [] } : null;
+      process.env.NODE_ENV !== "production" ? { renders: 0, shadowUpdates: 0, frameMs: [], hazeActual: show.live.haze } : null;
     if (stats) window.__stageStats = stats;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#050507");
     const workLight = new THREE.HemisphereLight(0xffffff, 0x222222, 0.6);
     scene.add(workLight);
+    let workLightOn = true;
 
-    let show: Show = store.get();
-    let shadowsPending = true;
+    // 객석등: 광원 개수를 고정해 두고 세기만 바꾼다(셰이더 재컴파일 없음).
+    const houseHemi = new THREE.HemisphereLight(0xfff4e0, 0x202020, 0);
+    const houseDir = new THREE.DirectionalLight(0xfff4e0, 0);
+    scene.add(houseHemi, houseDir, houseDir.target);
+    let houseLevel = 0;
+    let houseFade: { from: number; to: number; start: number } | null = null;
 
     // ── 카메라 ──
-    const edit = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
-    const audience = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
-    const top = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
-    top.up.set(0, 0, -1);
+    const edit = new THREE.PerspectiveCamera(45, 1, 0.1, 300);
+    const audience = new THREE.PerspectiveCamera(50, 1, 0.1, 300);
+    const plot = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 300);
+    plot.up.set(0, 0, -1);
     const controls = {
       edit: new OrbitControls(edit, renderer.domElement),
       audience: new OrbitControls(audience, renderer.domElement),
-      top: new OrbitControls(top, renderer.domElement),
+      plot: new OrbitControls(plot, renderer.domElement),
     };
     for (const c of Object.values(controls)) {
       c.enableDamping = true;
@@ -127,51 +149,73 @@ export function useStageScene(
     controls.edit.minDistance = 2;
     controls.edit.maxDistance = 60;
     controls.audience.enablePan = false;
-    controls.audience.minAzimuthAngle = -25 * DEG;
-    controls.audience.maxAzimuthAngle = 25 * DEG;
-    controls.audience.minPolarAngle = 75 * DEG;
-    controls.audience.maxPolarAngle = 95 * DEG;
-    controls.top.enableRotate = false;
-    controls.top.screenSpacePanning = true;
+    controls.audience.minPolarAngle = 70 * DEG;
+    controls.audience.maxPolarAngle = 100 * DEG;
+    controls.plot.enableRotate = false;
+    controls.plot.screenSpacePanning = true;
     let view: ViewMode = "edit";
-    const activeCamera = (): THREE.Camera => (view === "edit" ? edit : view === "audience" ? audience : top);
+    let seatRow = 5;
+    let seatSide: SeatSide = "center";
+    const activeCamera = (): THREE.Camera => (view === "edit" ? edit : view === "audience" ? audience : plot);
+
+    function placeAudience() {
+      const { eye, target } = seatView(show.stage, show.venue.rows, seatRow, seatSide);
+      audience.position.set(eye.x, eye.y, eye.z);
+      controls.audience.target.set(target.x, target.y, target.z);
+      // 좌석에서 무대 쪽을 본 방위각을 기준으로 좌우 25°까지만 돌린다.
+      const az = Math.atan2(eye.x - target.x, eye.z - target.z);
+      controls.audience.minAzimuthAngle = az - 25 * DEG;
+      controls.audience.maxAzimuthAngle = az + 25 * DEG;
+      const dist = audience.position.distanceTo(controls.audience.target);
+      controls.audience.minDistance = dist * 0.6;
+      controls.audience.maxDistance = dist * 1.05;
+      controls.audience.update();
+    }
 
     function placeCameras(resetEdit: boolean) {
       const d = show.stage.depth;
+      const box = venueBox(show.stage, show.venue.rows);
       if (resetEdit) {
-        edit.position.set(0, 9, d + 8);
+        edit.position.set(0, Math.min(box.height - 1, 8), Math.min(box.maxZ - 1.5, d + 8));
         controls.edit.target.set(0, 1, -d / 2);
       }
-      audience.position.set(0, 1.2, d);
-      controls.audience.target.set(0, 1, -d / 2);
-      const dist = audience.position.distanceTo(controls.audience.target);
-      controls.audience.minDistance = dist * 0.6;
-      controls.audience.maxDistance = dist * 1.2;
-      top.position.set(0, 30, -d / 2 + 1);
-      controls.top.target.set(0, 0, -d / 2 + 1);
-      top.zoom = 1;
-      fitTop();
+      placeAudience();
+      plot.position.set(0, 40, -d / 2 + 1);
+      controls.plot.target.set(0, 0, -d / 2 + 1);
+      plot.zoom = 1;
+      fitPlot();
       for (const c of Object.values(controls)) c.update();
     }
 
-    function fitTop() {
+    function fitPlot() {
       const { width: w, depth: d } = show.stage;
       const rect = container!.getBoundingClientRect();
       const aspect = rect.width / Math.max(1, rect.height);
-      const halfH = Math.max((d * 1.4 + 4) / 2, (w + 4) / 2 / aspect);
-      top.left = -halfH * aspect;
-      top.right = halfH * aspect;
-      top.top = halfH;
-      top.bottom = -halfH;
-      top.updateProjectionMatrix();
+      const halfH = Math.max((d + 7) / 2, (w + 5) / 2 / aspect);
+      plot.left = -halfH * aspect;
+      plot.right = halfH * aspect;
+      plot.top = halfH;
+      plot.bottom = -halfH;
+      plot.updateProjectionMatrix();
     }
 
-    // ── 무대·소품 ──
+    // ── 무대·극장·소품 ──
     let stageGroup = buildStage(show.stage);
     scene.add(stageGroup);
+    const venue = new VenueLayer();
+    venue.build(show.stage, show.venue.rows);
+    scene.add(venue.group);
     const propLayer = new PropLayer();
     scene.add(propLayer.group);
     propLayer.sync(show.props);
+
+    function placeHouseLight() {
+      const box = venueBox(show.stage, show.venue.rows);
+      houseDir.position.set(0, box.height - 0.5, box.maxZ - 1);
+      houseDir.target.position.set(0, 0, -show.stage.depth / 2);
+      houseDir.target.updateMatrixWorld();
+    }
+    placeHouseLight();
 
     // ── 인물 ──
     const actors = new Map<string, ActorView>();
@@ -208,45 +252,64 @@ export function useStageScene(
     let tier: Tier = 0;
     let autoTier: Tier = 0;
     let quality: Quality = "auto";
+    let hazeTarget = show.live.haze;
+    let hazeActual = show.live.haze;
+    let hazeLast = 0;
+    let soloId: string | null = null;
+    let currentLook: LookState = show.live;
     let beamGeometry = buildBeamGeometry(TIERS[0].segments);
     const bodyGeometry = buildFixtureBodyGeometry();
     const bodyMaterial = new THREE.MeshStandardMaterial({ color: "#2a2a2e", roughness: 0.5, metalness: 0.6 });
-    const bodySelected = new THREE.MeshStandardMaterial({
-      color: "#2a2a2e",
-      emissive: "#ffd23f",
-      emissiveIntensity: 0.6,
-    });
+    const bodySelected = new THREE.MeshStandardMaterial({ color: "#2a2a2e", emissive: "#ffd23f", emissiveIntensity: 0.6 });
     const fixtures = new Map<string, FixtureView>();
     const tmpDir = new THREE.Vector3();
     const tmpQ = new THREE.Quaternion();
 
-    function applyLevel(v: FixtureView, level: FixtureLevel, haze: number) {
-      v.level = level;
-      const p = v.fixture.position;
+    function beamVisible(v: FixtureView): boolean {
+      return view !== "plot" && hazeActual > 0 && v.res.intensity > 0;
+    }
+
+    function draw(v: FixtureView) {
+      const r = v.res;
+      const p = r.position;
       const { light, beam, body } = v;
       light.position.set(p.x, p.y, p.z);
-      light.intensity = level.intensity * CANDELA;
-      light.color.setStyle(level.color);
-      light.angle = (level.beamAngle / 2) * DEG;
-      light.penumbra = level.softness;
-      light.target.position.set(level.target.x, level.target.y, level.target.z);
+      light.intensity = r.intensity * CANDELA;
+      light.color.setStyle(r.color);
+      light.angle = (r.beamAngle / 2) * DEG;
+      light.penumbra = r.softness;
+      light.target.position.set(r.target.x, r.target.y, r.target.z);
       light.target.updateMatrixWorld();
-      tmpDir.set(level.target.x - p.x, level.target.y - p.y, level.target.z - p.z);
+      tmpDir.set(r.target.x - p.x, r.target.y - p.y, r.target.z - p.z);
       const dist = Math.max(0.1, tmpDir.length());
       tmpQ.setFromUnitVectors(DOWN, tmpDir.normalize());
       body.position.set(p.x, p.y, p.z);
       body.quaternion.copy(tmpQ);
       const len = dist + 1;
-      const r = len * Math.tan(light.angle);
+      const rad = len * Math.tan(light.angle);
       beam.position.set(p.x, p.y, p.z);
       beam.quaternion.copy(tmpQ);
-      beam.scale.set(r, len, r);
+      beam.scale.set(rad, len, rad);
       const u = (beam.material as THREE.ShaderMaterial).uniforms;
-      u.uColor.value.setStyle(level.color);
-      u.uIntensity.value = level.intensity;
-      u.uHaze.value = haze;
-      u.uSoftness.value = level.softness;
-      beam.visible = haze > 0 && level.intensity > 0;
+      u.uColor.value.setStyle(r.color);
+      u.uIntensity.value = r.intensity;
+      u.uHaze.value = hazeActual;
+      u.uSoftness.value = r.softness;
+      u.uLightPos.value.set(p.x, p.y, p.z);
+      u.uAngleBoost.value = angleBoost(r.beamAngle);
+      beam.visible = beamVisible(v);
+    }
+
+    /** 포커스·큐 값·솔로를 합쳐 조명기 하나를 다시 계산한다. */
+    function apply(v: FixtureView, look: LookState) {
+      const r = resolve(show.stage, v.fixture, look.levels[v.fixture.id]);
+      v.res = soloId ? { ...r, intensity: v.fixture.id === soloId ? 1 : 0 } : r;
+      draw(v);
+    }
+
+    function applyAll(look: LookState) {
+      currentLook = look;
+      for (const v of fixtures.values()) apply(v, look);
     }
 
     function addFixture(f: Fixture) {
@@ -261,9 +324,9 @@ export function useStageScene(
       beam.renderOrder = 10;
       const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
       scene.add(beam, body);
-      const v: FixtureView = { fixture: f, light, beam, body, level: levelOf(show.live, f) };
+      const v: FixtureView = { fixture: f, light, beam, body, res: resolve(show.stage, f, undefined) };
       fixtures.set(f.id, v);
-      applyLevel(v, v.level, show.live.haze);
+      apply(v, currentLook);
     }
     function removeFixture(id: string) {
       const v = fixtures.get(id);
@@ -289,6 +352,11 @@ export function useStageScene(
         }
       }
       shadowsPending = true;
+    }
+
+    function refreshViewState() {
+      workLight.visible = workLightOn || view === "plot";
+      for (const v of fixtures.values()) v.beam.visible = beamVisible(v);
     }
 
     // ── 선택 표시 ──
@@ -330,11 +398,12 @@ export function useStageScene(
         ring.scale.setScalar(Math.max(b.x, b.z) / 2 + 0.15);
       } else if (fx) {
         fx.body.material = bodySelected;
-        const t = fx.level.target;
+        const t = fx.res.target;
+        const p = fx.res.position;
         handle.visible = true;
         handle.position.set(t.x, 0.02, t.z);
         const pos = aimLine.geometry.attributes.position as THREE.BufferAttribute;
-        pos.setXYZ(0, fx.fixture.position.x, fx.fixture.position.y, fx.fixture.position.z);
+        pos.setXYZ(0, p.x, p.y, p.z);
         pos.setXYZ(1, t.x, t.y, t.z);
         pos.needsUpdate = true;
         aimLine.geometry.computeBoundingSphere();
@@ -350,15 +419,50 @@ export function useStageScene(
     let lastFrame = 0;
     let frameTimes: number[] = [];
     let restoreTimer = 0;
+    let cameraMoved = true;
     const tierListeners = new Set<(t: Tier) => void>();
+    const hazeListeners = new Set<(v: number) => void>();
+    const cameraListeners = new Set<() => void>();
 
     function requestRender() {
       if (!frameReq) frameReq = requestAnimationFrame(frame);
     }
 
+    function setBeamHaze() {
+      for (const v of fixtures.values()) {
+        (v.beam.material as THREE.ShaderMaterial).uniforms.uHaze.value = hazeActual;
+        v.beam.visible = beamVisible(v);
+      }
+      for (const fn of hazeListeners) fn(hazeActual);
+      if (stats) stats.hazeActual = hazeActual;
+    }
+
+    function stepAnimations(now: number): boolean {
+      let busy = false;
+      if (houseFade) {
+        const t = Math.min(1, (now - houseFade.start) / HOUSE_FADE_MS);
+        houseLevel = houseFade.from + (houseFade.to - houseFade.from) * t;
+        houseHemi.intensity = 1.2 * houseLevel;
+        houseDir.intensity = 0.8 * houseLevel;
+        venue.setHouseLevel(houseLevel);
+        if (t >= 1) houseFade = null;
+        else busy = true;
+      }
+      if (hazeActual !== hazeTarget) {
+        const dt = hazeLast ? Math.min(0.1, (now - hazeLast) / 1000) : 0;
+        hazeLast = now;
+        hazeActual = stepHaze(hazeActual, hazeTarget, dt);
+        setBeamHaze();
+        if (hazeActual !== hazeTarget) busy = true;
+        else hazeLast = 0;
+      }
+      return busy;
+    }
+
     function frame(now: number) {
       frameReq = 0;
       const moving = controls[view].update();
+      const animating = stepAnimations(now);
       if (interacting) {
         if (lastFrame) {
           frameTimes.push(now - lastFrame);
@@ -385,7 +489,11 @@ export function useStageScene(
         stats.frameMs.push(performance.now() - t0);
         if (stats.frameMs.length > 60) stats.frameMs.splice(0, stats.frameMs.length - 60);
       }
-      if (moving || interacting) requestRender();
+      if (moving || cameraMoved) {
+        cameraMoved = false;
+        for (const fn of cameraListeners) fn();
+      }
+      if (moving || interacting || animating) requestRender();
     }
 
     function applyTier() {
@@ -427,10 +535,24 @@ export function useStageScene(
       requestRender();
     }
 
+    const onControlsChange = () => {
+      cameraMoved = true;
+      requestRender();
+    };
     for (const c of Object.values(controls)) {
-      c.addEventListener("change", requestRender);
+      c.addEventListener("change", onControlsChange);
       c.addEventListener("start", beginInteraction);
       c.addEventListener("end", endInteraction);
+    }
+
+    function setHazeTarget(target: number, immediate: boolean) {
+      hazeTarget = target;
+      if (immediate) {
+        hazeActual = target;
+        hazeLast = 0;
+        setBeamHaze();
+      }
+      requestRender();
     }
 
     // ── store 동기화 ──
@@ -442,7 +564,12 @@ export function useStageScene(
         disposeGroup(stageGroup);
         stageGroup = buildStage(next.stage);
         scene.add(stageGroup);
-        if (prev.stage.depth !== next.stage.depth || prev.stage.width !== next.stage.width) placeCameras(false);
+      }
+      if (d.stage || d.venue) {
+        venue.build(next.stage, next.venue.rows);
+        placeHouseLight();
+        placeCameras(false);
+        cameraMoved = true;
       }
       if (d.props.added.length + d.props.changed.length + d.props.removed.length > 0) propLayer.sync(next.props);
       for (const id of d.actors.removed) removeActor(id);
@@ -459,18 +586,19 @@ export function useStageScene(
           placeActor(v);
         }
       }
+      currentLook = next.live;
       for (const id of d.fixtures.removed) removeFixture(id);
       for (const id of d.fixtures.added) addFixture(next.fixtures.find((f) => f.id === id)!);
-      const fixtureChanged = d.fixtures.added.length + d.fixtures.removed.length + d.fixtures.changed.length > 0;
       for (const id of d.fixtures.changed) {
         const v = fixtures.get(id);
         if (v) v.fixture = next.fixtures.find((f) => f.id === id)!;
       }
       const touched = new Set([...d.levels, ...d.fixtures.changed]);
-      for (const [id, v] of fixtures) {
-        if (d.haze || touched.has(id)) applyLevel(v, levelOf(next.live, v.fixture), next.live.haze);
-      }
-      if (fixtureChanged) applyShadows();
+      for (const [id, v] of fixtures) if (d.stage || touched.has(id)) apply(v, next.live);
+      if (d.fixtures.added.length + d.fixtures.removed.length + d.fixtures.changed.length > 0) applyShadows();
+      // 실행 취소·슬라이더처럼 store에서 바로 바뀐 헤이즈는 즉시 반영한다.
+      // (큐 재생은 setHazeTarget으로 목표를 먼저 정하므로 여기서는 그대로다.)
+      if (d.haze && next.live.haze !== hazeTarget) setHazeTarget(next.live.haze, true);
       if (d.shadowsDirty) shadowsPending = true;
       updateSelection();
       requestRender();
@@ -494,6 +622,7 @@ export function useStageScene(
     const tmpBox = new THREE.Box3();
     const tmpPos = new THREE.Vector3();
     const tmpScale = new THREE.Vector3();
+    const tmpProj = new THREE.Vector3();
 
     function setRay(clientX: number, clientY: number) {
       const rect = renderer.domElement.getBoundingClientRect();
@@ -525,7 +654,7 @@ export function useStageScene(
       const sel = selectedId ? fixtures.get(selectedId) : undefined;
       if (sel) {
         const fp = floorPointRaw();
-        const t = sel.level.target;
+        const t = sel.res.target;
         if (fp && Math.hypot(fp.x - t.x, fp.z - t.z) < HANDLE_RADIUS) return { type: "aim", id: sel.fixture.id };
       }
       let best: Pick = null;
@@ -541,9 +670,8 @@ export function useStageScene(
         const a = v.actor;
         consider("actor", a.id, hitBox(a.position, a.rotationY, mannequinBox(a.height, a.build, a.pose), false));
       }
-      for (const v of fixtures.values()) {
-        consider("fixture", v.fixture.id, hitBox(v.fixture.position, 0, { x: 0.5, y: 0.5, z: 0.5 }, true));
-      }
+      const fixtureSize = view === "plot" ? { x: 0.9, y: 0.9, z: 0.9 } : { x: 0.5, y: 0.5, z: 0.5 };
+      for (const v of fixtures.values()) consider("fixture", v.fixture.id, hitBox(v.res.position, 0, fixtureSize, true));
       return best;
     }
 
@@ -551,7 +679,7 @@ export function useStageScene(
     const api: SceneApi = {
       requestRender,
       applyLook(look, shadows) {
-        for (const v of fixtures.values()) applyLevel(v, levelOf(look, v.fixture), look.haze);
+        applyAll(look);
         if (shadows) shadowsPending = true;
         updateSelection();
         requestRender();
@@ -561,11 +689,38 @@ export function useStageScene(
         controls[view].enabled = false;
         view = v;
         controls[view].enabled = true;
+        refreshViewState();
+        cameraMoved = true;
         requestRender();
       },
       setWorkLight(on) {
-        workLight.visible = on;
+        workLightOn = on;
+        refreshViewState();
         requestRender();
+      },
+      setHouseLights(on) {
+        const to = on ? 1 : 0;
+        if (houseFade ? houseFade.to === to : houseLevel === to) return;
+        houseFade = { from: houseLevel, to, start: performance.now() };
+        requestRender();
+      },
+      setSeat(row, side) {
+        seatRow = row;
+        seatSide = side;
+        placeAudience();
+        cameraMoved = true;
+        requestRender();
+      },
+      setSolo(id) {
+        if (soloId === id) return;
+        soloId = id;
+        applyAll(currentLook);
+        shadowsPending = true;
+        requestRender();
+      },
+      setHazeTarget,
+      onHaze(fn) {
+        hazeListeners.add(fn);
       },
       setQuality(q) {
         quality = q;
@@ -593,10 +748,32 @@ export function useStageScene(
       previewAim(fixtureId, target) {
         const v = fixtures.get(fixtureId);
         if (!v) return;
-        applyLevel(v, { ...v.level, target }, show.live.haze);
+        v.res = { ...v.res, target };
+        draw(v);
         updateSelection();
         shadowsPending = true;
         requestRender();
+      },
+      fixtureScreenPoints() {
+        const rect = renderer.domElement.getBoundingClientRect();
+        const cam = activeCamera();
+        const out: ScreenPoint[] = [];
+        for (const v of fixtures.values()) {
+          const p = v.res.position;
+          tmpProj.set(p.x, p.y, p.z).project(cam);
+          if (tmpProj.z > 1) continue;
+          out.push({
+            id: v.fixture.id,
+            channel: v.fixture.channel,
+            color: resolve(show.stage, v.fixture, show.live.levels[v.fixture.id]).color,
+            x: ((tmpProj.x + 1) / 2) * rect.width,
+            y: ((1 - tmpProj.y) / 2) * rect.height,
+          });
+        }
+        return out;
+      },
+      onCamera(fn) {
+        cameraListeners.add(fn);
       },
       beginInteraction,
       endInteraction,
@@ -615,13 +792,14 @@ export function useStageScene(
       edit.aspect = audience.aspect = w / h;
       edit.updateProjectionMatrix();
       audience.updateProjectionMatrix();
-      fitTop();
+      fitPlot();
+      cameraMoved = true;
       requestRender();
     }
     const observer = new ResizeObserver(resize);
     observer.observe(container);
     controls.audience.enabled = false;
-    controls.top.enabled = false;
+    controls.plot.enabled = false;
     resize();
     placeCameras(true);
     applyShadows();
@@ -637,6 +815,7 @@ export function useStageScene(
       for (const id of [...fixtures.keys()]) removeFixture(id);
       for (const id of [...actors.keys()]) removeActor(id);
       disposeGroup(stageGroup);
+      venue.dispose();
       propLayer.dispose();
       beamGeometry.dispose();
       bodyGeometry.dispose();
