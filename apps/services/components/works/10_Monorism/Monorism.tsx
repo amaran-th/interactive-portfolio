@@ -6,6 +6,7 @@ import {
   Redo2,
   Undo2,
   Volume2,
+  X,
   VolumeX,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -13,9 +14,12 @@ import type React from "react";
 import {
   type BulkOp,
   type Change,
+  type ChipShape,
   type Stroke,
   type Tool,
+  CHIP_SHAPES,
   DEFAULT_BASE,
+  DEFAULT_SHAPE,
   SIZES,
   beginStroke,
   bulk,
@@ -26,9 +30,11 @@ import {
   redo,
   serialize,
   strokeApply,
+  strokeBreak,
   toggleTool,
   undo,
 } from "./board";
+import { chipOutlinePath } from "./shapes";
 import { createChipSound } from "./chipSound";
 import { type Point, cellAt, interpolate, nearBoard } from "./layout";
 import { PALETTES } from "./palettes";
@@ -52,6 +58,16 @@ const BULK_BUTTONS: { op: BulkOp; label: string }[] = [
 
 const BUTTON =
   "flex items-center gap-1 rounded-md border-2 border-point bg-white px-2 py-1 text-xs font-bold text-point hover:bg-shade disabled:opacity-40";
+
+const SHAPE_BUTTON =
+  "flex items-center rounded-md border-2 border-point bg-white p-1 text-point hover:bg-shade aria-pressed:bg-point aria-pressed:text-white";
+
+const SHAPE_LABELS: Record<ChipShape, string> = {
+  circle: "원",
+  square: "정사각형",
+  diamond: "마름모",
+  hexagon: "육각형",
+};
 
 function timestamp(): string {
   const d = new Date();
@@ -87,8 +103,11 @@ export default function Monorism() {
   const [front, setFront] = useState(PALETTES[0].front);
   const [back, setBack] = useState(PALETTES[0].back);
   const [base, setBase] = useState(DEFAULT_BASE);
+  const [shape, setShape] = useState<ChipShape>(DEFAULT_SHAPE);
   const [muted, setMuted] = useState(false);
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewRef = useRef<HTMLDialogElement>(null);
   const sizeMenuRef = useRef<HTMLDivElement>(null);
   const [boardVersion, setBoardVersion] = useState(0);
   const [hydrated, setHydrated] = useState(false);
@@ -108,6 +127,7 @@ export default function Monorism() {
       setFront(saved.front);
       setBack(saved.back);
       setBase(saved.base);
+      setShape(saved.shape);
       setMuted(saved.muted);
     }
     setHydrated(true);
@@ -125,28 +145,33 @@ export default function Monorism() {
   }, [front, back, base, scene]);
 
   useEffect(() => {
+    scene.current?.setShape(shape);
+  }, [shape, scene]);
+
+  useEffect(() => {
     sound.setMuted(muted);
   }, [muted, sound]);
 
   useEffect(() => () => sound.dispose(), [sound]);
 
   // 저장은 타이머·페이지 이탈 시점에 일어나므로 최신 설정을 ref로 읽는다.
-  const settingsRef = useRef({ front, back, base, muted, hydrated });
+  const settingsRef = useRef({ front, back, base, shape, muted, hydrated });
   useEffect(() => {
-    settingsRef.current = { front, back, base, muted, hydrated };
+    settingsRef.current = { front, back, base, shape, muted, hydrated };
   });
 
   const saveNow = useCallback(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = null;
-    const { front: f, back: bk, base: bs, muted: m, hydrated: ready } = settingsRef.current;
+    const { front: f, back: bk, base: bs, shape: sh, muted: m, hydrated: ready } =
+      settingsRef.current;
     // 저장값을 읽기 전에 쓰면 저장된 판을 기본 판으로 덮어쓴다
     if (!ready) return;
     const b = boardRef.current;
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        serialize({ w: b.w, h: b.h, cells: b.cells, front: f, back: bk, base: bs, muted: m }),
+        serialize({ w: b.w, h: b.h, cells: b.cells, front: f, back: bk, base: bs, shape: sh, muted: m }),
       );
     } catch {
       // 저장 공간이 없거나 막혀 있으면 조용히 넘어간다
@@ -160,7 +185,7 @@ export default function Monorism() {
 
   useEffect(() => {
     if (hydrated) scheduleSave();
-  }, [hydrated, front, back, base, muted, scheduleSave]);
+  }, [hydrated, front, back, base, shape, muted, scheduleSave]);
 
   // 기다리던 저장이 있으면 페이지를 떠나거나 가려질 때·언마운트될 때 바로 쓴다.
   useEffect(() => {
@@ -201,6 +226,7 @@ export default function Monorism() {
     // 포인터가 판 평면을 벗어나거나 판에서 너무 멀어지면 경로를 끊는다 — 돌아왔을 때 사이를 잇지 않는다
     if (!p || !nearBoard(p, b.w, b.h)) {
       lastPointRef.current = null;
+      strokeBreak(stroke);
       return;
     }
     const points = lastPointRef.current ? interpolate(lastPointRef.current, p) : [p];
@@ -280,16 +306,48 @@ export default function Monorism() {
     scheduleSave();
   }
 
-  async function savePng() {
+  // PNG는 바로 내려받지 않고 미리보기 창부터 띄운다
+  async function openPreview() {
     const blob = await scene.current?.exportPng();
     if (!blob) return;
-    const url = URL.createObjectURL(blob);
+    setPreviewUrl((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return URL.createObjectURL(blob);
+    });
+    previewRef.current?.showModal();
+  }
+
+  function downloadPreview() {
+    if (!previewUrl) return;
     const a = document.createElement("a");
-    a.href = url;
+    a.href = previewUrl;
     a.download = `monorism-${timestamp()}.png`;
     a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    previewRef.current?.close();
   }
+
+  // 창이 닫히면 이미지 URL을 놓아 준다. 포커스가 'PNG로 저장' 버튼으로 돌아가면
+  // 뒤이어 누른 Space가 버튼을 다시 누르므로 포커스를 푼다.
+  function onPreviewClose() {
+    setPreviewUrl((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return null;
+    });
+    (document.activeElement as HTMLElement | null)?.blur();
+  }
+
+  // 미리보기 창에서 친 키가 window의 단축키(되돌리기·Space 이동)로 새지 않게 한다
+  useEffect(() => {
+    const dialog = previewRef.current;
+    if (!dialog) return;
+    const stop = (e: Event) => e.stopPropagation();
+    dialog.addEventListener("keydown", stop);
+    dialog.addEventListener("keyup", stop);
+    return () => {
+      dialog.removeEventListener("keydown", stop);
+      dialog.removeEventListener("keyup", stop);
+    };
+  }, []);
 
   // 크기 메뉴 바깥을 누르면 닫는다
   useEffect(() => {
@@ -536,6 +594,24 @@ export default function Monorism() {
           </label>
         </div>
 
+        <div role="group" aria-label="칩 모양" className="flex gap-1">
+          {CHIP_SHAPES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              title={SHAPE_LABELS[s]}
+              aria-label={SHAPE_LABELS[s]}
+              aria-pressed={shape === s}
+              onClick={() => setShape(s)}
+              className={SHAPE_BUTTON}
+            >
+              <svg aria-hidden viewBox="-0.5 -0.5 1 1" className="size-4">
+                <path d={chipOutlinePath(s)} fill="currentColor" />
+              </svg>
+            </button>
+          ))}
+        </div>
+
         <div ref={sizeMenuRef} className="relative">
           <button
             type="button"
@@ -587,7 +663,7 @@ export default function Monorism() {
           >
             {muted ? <VolumeX aria-hidden className="size-4" /> : <Volume2 aria-hidden className="size-4" />}
           </button>
-          <button type="button" onClick={savePng} className={BUTTON}>
+          <button type="button" onClick={openPreview} className={BUTTON}>
             <Download aria-hidden className="size-4" />
             PNG로 저장
           </button>
@@ -615,6 +691,53 @@ export default function Monorism() {
           </p>
         )}
       </div>
+      <dialog
+        ref={previewRef}
+        aria-label="PNG 미리보기"
+        onClose={onPreviewClose}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) previewRef.current?.close();
+        }}
+        className="m-auto max-h-[90dvh] w-[min(92vw,720px)] bg-transparent p-0 backdrop:bg-point/40"
+      >
+        <div className="flex max-h-[90dvh] flex-col overflow-hidden rounded-xl border-[2.5px] border-point bg-white text-ink shadow-[4px_4px_0_0_var(--color-point)]">
+          <div className="flex shrink-0 items-center justify-between border-b-2 border-point bg-shade px-4 py-2.5">
+            <p className="text-sm font-bold text-point">PNG 미리보기</p>
+            <button
+              type="button"
+              onClick={() => previewRef.current?.close()}
+              aria-label="미리보기 닫기"
+              className="rounded-full p-1.5 text-point transition-colors hover:bg-sub/60"
+            >
+              <X aria-hidden className="size-4" />
+            </button>
+          </div>
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+            {previewUrl && (
+              // blob URL 미리보기라 next/image 최적화를 쓰지 않는다
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewUrl}
+                alt="저장될 판을 위에서 본 평면 이미지"
+                className="max-h-[65dvh] max-w-full rounded border border-point/30 object-contain"
+              />
+            )}
+          </div>
+          <div className="flex shrink-0 justify-end gap-2 border-t-2 border-point px-4 py-2.5">
+            <button type="button" onClick={() => previewRef.current?.close()} className={BUTTON}>
+              닫기
+            </button>
+            <button
+              type="button"
+              onClick={downloadPreview}
+              className={`${BUTTON} bg-point! text-white! hover:opacity-90`}
+            >
+              <Download aria-hidden className="size-4" />
+              내려받기
+            </button>
+          </div>
+        </div>
+      </dialog>
     </div>
   );
 }

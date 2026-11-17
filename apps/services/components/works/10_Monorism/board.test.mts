@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   BACK,
   DEFAULT_BASE,
+  DEFAULT_SHAPE,
   EMPTY,
   FRONT,
   MAX_HISTORY,
@@ -16,6 +17,7 @@ import {
   redo,
   serialize,
   strokeApply,
+  strokeBreak,
   toggleTool,
   undo,
 } from "./board.ts";
@@ -37,13 +39,40 @@ test("도구별 상태 전이", () => {
   assert.equal(applyTool(BACK, "place"), BACK);
 });
 
-test("한 번 긋는 동안 같은 칸은 한 번만 바뀐다", () => {
+test("같은 칸 안에 머무는 동안은 한 번만 바뀐다", () => {
   const b = createBoard(3, 1);
   const s = beginStroke("flip");
   assert.deepEqual(strokeApply(b, s, 0), { index: 0, before: FRONT, after: BACK });
   assert.equal(strokeApply(b, s, 0), null);
   assert.equal(b.cells[0], BACK);
   assert.equal(s.changes.length, 1);
+});
+
+test("한 번 긋는 동안 지나간 칸으로 돌아오면 다시 뒤집힌다", () => {
+  const b = createBoard(3, 1);
+  const s = beginStroke("flip");
+  strokeApply(b, s, 0);
+  strokeApply(b, s, 1);
+  assert.deepEqual(strokeApply(b, s, 0), { index: 0, before: BACK, after: FRONT });
+  assert.equal(b.cells[0], FRONT);
+  strokeBreak(s);
+  assert.deepEqual(strokeApply(b, s, 0), { index: 0, before: FRONT, after: BACK });
+});
+
+test("같은 칸을 여러 번 바꾼 단계도 되돌리면 처음으로 돌아간다", () => {
+  const b = createBoard(2, 1);
+  const h = createHistory();
+  const s = beginStroke("flip");
+  strokeApply(b, s, 0);
+  strokeApply(b, s, 1);
+  strokeApply(b, s, 0);
+  commit(h, s.changes);
+  assert.deepEqual([...b.cells], [FRONT, BACK]);
+  // 칸 0은 결국 그대로라 애니메이션 목록에서 빠진다
+  assert.deepEqual(undo(b, h), [{ index: 1, before: BACK, after: FRONT }]);
+  assert.deepEqual([...b.cells], [FRONT, FRONT]);
+  assert.deepEqual(redo(b, h), [{ index: 1, before: FRONT, after: BACK }]);
+  assert.deepEqual([...b.cells], [FRONT, BACK]);
 });
 
 test("바뀌지 않는 칸은 변화로 남기지 않는다", () => {
@@ -108,7 +137,7 @@ test("전체 뒤집기·모두 채우기·모두 빼기", () => {
 test("저장 형식 왕복", () => {
   const b = createBoard(24, 24);
   for (let i = 0; i < b.cells.length; i++) b.cells[i] = i % 3;
-  const json = serialize({ ...b, front: "#c9ced6", back: "#d8b24a", base: "#2b2f38", muted: true });
+  const json = serialize({ ...b, front: "#c9ced6", back: "#d8b24a", base: "#2b2f38", shape: "hexagon", muted: true });
   const s = deserialize(json)!;
   assert.equal(s.w, 24);
   assert.equal(s.h, 24);
@@ -116,12 +145,13 @@ test("저장 형식 왕복", () => {
   assert.equal(s.front, "#c9ced6");
   assert.equal(s.back, "#d8b24a");
   assert.equal(s.base, "#2b2f38");
+  assert.equal(s.shape, "hexagon");
   assert.equal(s.muted, true);
 });
 
 test("잘못된 저장값은 null", () => {
   const ok = JSON.parse(
-    serialize({ ...createBoard(24, 24), front: "#000000", back: "#ffffff", base: "#111111", muted: false }),
+    serialize({ ...createBoard(24, 24), front: "#000000", back: "#ffffff", base: "#111111", shape: "circle", muted: false }),
   );
   const bad = (patch: object) => deserialize(JSON.stringify({ ...ok, ...patch }));
   assert.equal(deserialize(null), null);
@@ -131,6 +161,7 @@ test("잘못된 저장값은 null", () => {
   assert.equal(bad({ h: 40 }), null);
   assert.equal(bad({ front: "red" }), null);
   assert.equal(bad({ base: "dark" }), null);
+  assert.equal(bad({ shape: "star" }), null);
   assert.equal(bad({ muted: "no" }), null);
   assert.equal(bad({ cells: ok.cells.slice(0, 8) }), null);
   assert.equal(bad({ cells: "%%%" }), null);
@@ -146,8 +177,16 @@ test("우클릭 획은 처음 누른 칸에 칩이 있으면 빼기, 비어 있�
 
 test("판 색이 없는 예전 저장값은 기본 판 색으로 읽는다", () => {
   const old = JSON.parse(
-    serialize({ ...createBoard(24, 24), front: "#000000", back: "#ffffff", base: "#123456", muted: false }),
+    serialize({ ...createBoard(24, 24), front: "#000000", back: "#ffffff", base: "#123456", shape: "square", muted: false }),
   );
   delete old.base;
   assert.equal(deserialize(JSON.stringify(old))!.base, DEFAULT_BASE);
+});
+
+test("모양이 없는 예전 저장값은 원으로 읽는다", () => {
+  const old = JSON.parse(
+    serialize({ ...createBoard(24, 24), front: "#000000", back: "#ffffff", base: "#123456", shape: "square", muted: false }),
+  );
+  delete old.shape;
+  assert.equal(deserialize(JSON.stringify(old))!.shape, DEFAULT_SHAPE);
 });
