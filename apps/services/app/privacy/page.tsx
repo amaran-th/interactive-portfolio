@@ -78,6 +78,12 @@ const STORAGE_ITEMS: {
     keys: ["stage-lighting-show", "stage-lighting-quality"],
     what: "무대 설정, 객석 극장 종류와 수치, 소품·인물·조명기 배치와 포커스, 큐 목록, 품질 설정",
   },
+  {
+    tool: "글자수 세기",
+    where: "localStorage",
+    keys: ["char-counter"],
+    what: "입력한 글, 목표 글자 수와 기준, 맞춤법 검사 설정",
+  },
 ];
 
 function Section({

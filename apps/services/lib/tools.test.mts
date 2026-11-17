@@ -33,6 +33,7 @@ test("toolsIn은 카테고리의 도구를 TOOLS 순서로 돌려준다", () => 
     "text-encoding",
     "color-picker",
     "palette-extractor",
+    "char-counter",
   ]);
   assert.deepEqual(toolsIn("life"), []);
   assert.deepEqual(slugs(toolsIn("creative")), ["visual-novel-studio", "nemo-nemo-beam", "monorism", "stage-lighting"]);

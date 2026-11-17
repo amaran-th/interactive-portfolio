@@ -118,4 +118,24 @@ export const works: WorkItem[] = [
     embedPath: "/asset-simulator",
     path: "/asset-simulator",
   },
+  {
+    id: 7,
+    title: "글자수 세기",
+    description: `글을 쓰거나 붙여 넣는 즉시 공백 포함·공백 제외 글자 수, 바이트, 단어, 줄·문단 수를 세는 도구입니다.
+
+  🎯 목표 분량: 목표 글자 수와 기준(공백 포함·공백 제외·바이트)을 정하면 입력칸 아랫변 막대와 숫자로 보여 주고, 넘친 부분은 입력칸에서 빨갛게 칠합니다.
+
+  ✂️ 부분 세기: 글 일부를 드래그해 고르면 고른 부분만 따로 셉니다.
+
+  🔢 세는 방식: 이모지처럼 여러 문자가 합쳐진 글자도 보이는 대로 한 글자로 셉니다. 바이트는 한글 2바이트 방식과 UTF-8 두 가지로 보여 줍니다.
+
+  특징:
+  - 브라우저 맞춤법 검사를 스위치로 켭니다.
+  - 쓰던 글과 설정은 자동 저장되어 새로고침 후에도 유지됩니다.`,
+    period: "2026.11.16 - ",
+    platforms: [{ type: "pc" }, { type: "mobile" }],
+    embedPath: "/char-counter",
+    thumbnail: "/playground/char-counter.png",
+    path: "/char-counter",
+  },
 ];
