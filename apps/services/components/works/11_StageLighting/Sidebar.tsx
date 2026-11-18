@@ -26,7 +26,7 @@ type Props = {
   /** 무대 설정 탭은 목록 없이 속성만 보여 준다. */
   outliner?: React.ReactNode;
   inspector: React.ReactNode;
-  /** 넓은 화면에서 사이드바 왼쪽에 따로 붙는 패널(무대 설정 탭의 좌석 미리보기). 접으면 세로 탭만 남는다. */
+  /** 넓은 화면에서 사이드바 왼쪽에 떠 있는 패널(무대 설정 탭의 좌석 미리보기). 3D 화면 중심은 옮기지 않고, 접으면 세로 탭만 남는다. */
   side?: { title: string; content: React.ReactNode };
   /** 사이드바가 덮는 오른쪽·아래 크기(px). 접으면 0. */
   onInset: (right: number, bottom: number) => void;
@@ -35,7 +35,6 @@ type Props = {
 export default function Sidebar({ open, onOpen, tab, onTab, actions, outliner, inspector, side, onInset }: Props) {
   const [width, setWidth] = useState(320);
   const [sideOpen, setSideOpen] = useState(true);
-  const sideRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; w: number } | null>(null);
   const ref = useRef<HTMLElement>(null);
   const insetRef = useRef(onInset);
@@ -54,18 +53,14 @@ export default function Sidebar({ open, onOpen, tab, onTab, actions, outliner, i
       const parent = el.parentElement!.getBoundingClientRect();
       const r = el.getBoundingClientRect();
       const sheet = r.width > parent.width * 0.8;
-      // 왼쪽에 붙은 패널이 보이면 그만큼 더 덮는다(좁은 화면에서는 숨겨져 크기가 0)
-      const sideRect = sideRef.current?.getBoundingClientRect();
-      const left = sideRect && sideRect.width > 0 ? Math.min(r.left, sideRect.left) : r.left;
-      insetRef.current(sheet ? 0 : Math.round(parent.right - left), sheet ? Math.round(parent.bottom - r.top) : 0);
+      insetRef.current(sheet ? 0 : Math.round(parent.right - r.left), sheet ? Math.round(parent.bottom - r.top) : 0);
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     ro.observe(el.parentElement!);
-    if (sideRef.current) ro.observe(sideRef.current);
     return () => ro.disconnect();
-  }, [open, side?.title, sideOpen]);
+  }, [open]);
 
   if (!open) {
     return (
@@ -110,7 +105,6 @@ export default function Sidebar({ open, onOpen, tab, onTab, actions, outliner, i
       {side &&
         (sideOpen ? (
           <div
-            ref={sideRef}
             role="region"
             aria-label={side.title}
             className="absolute top-0 right-[calc(100%+0.5rem)] hidden max-h-full w-72 flex-col rounded-xl border border-white/50 bg-white/70 shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-md md:flex"
