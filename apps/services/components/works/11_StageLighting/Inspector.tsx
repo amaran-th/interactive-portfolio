@@ -10,6 +10,7 @@ import { FixtureIcon, PersonIcon, PropIcon, StageIcon } from "./icons";
 import { propNames } from "./Outliner";
 import { TIERS, type Tier } from "./quality";
 import { SeatPicker, VenueFields } from "./SeatMap";
+import SeatSelect from "./SeatSelect";
 import {
   BUILDS,
   BUILD_LABELS,
@@ -148,6 +149,7 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
   const fixture = useShow(store, (s) => s.fixtures.find((f) => f.id === selectedId));
   const level = useShow(store, (s) => (selectedId ? s.live.levels[selectedId] : undefined));
   const stage = useShow(store, (s) => s.stage);
+  const venue = useShow(store, (s) => s.venue);
   const shadowCount = useShow(store, (s) => s.fixtures.filter((f) => f.castShadow).length);
   const takenChannels = useShow(store, (s) => channelKey(s, selectedId));
 
@@ -360,6 +362,7 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
       {/* 넓은 화면에서는 사이드바 왼쪽 '좌석 미리보기' 패널에 따로 보여 준다 */}
       <div className="md:hidden">
         <Section title="좌석 지도">
+          <SeatSelect stage={stage} venue={venue} seat={seat} onSeat={onSeat} />
           <SeatPicker store={store} seat={seat} onSeat={onSeat} />
         </Section>
       </div>

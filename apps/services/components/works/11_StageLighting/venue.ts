@@ -1,7 +1,7 @@
 // 객석 배치(순수). 극장 템플릿에서 좌석 블록을 계산하고, 블록에서 좌석 좌표·계단 단·좌석 시점·극장 크기를 계산한다.
 // 좌석 블록은 저장하지 않는다. 템플릿 수치가 같으면 항상 같은 블록이 나온다.
 // node:test가 그대로 실행하도록 타입만 import한다.
-import type { SeatBlock, Stage, Vec3, Venue, VenueTemplate } from "./show";
+import type { Gender, SeatBlock, Stage, Vec3, Venue, VenueTemplate } from "./show";
 
 export type Seat = { x: number; y: number; z: number; rotationY: number; blockId: string; row: number; seat: number; width: number };
 export type SeatRef = { blockId: string; row: number; seat: number };
@@ -202,5 +202,75 @@ export function venueBox(stage: Stage, venue: Venue): { minX: number; maxX: numb
     minZ: Math.min(-stage.depth - 1, ...zs) - m,
     maxZ: Math.max(5, ...zs) + m,
     height: Math.max(stage.height + 4, top),
+  };
+}
+
+// ── 좌석 옮겨 다니기 ──
+
+export type SeatStep = "left" | "right" | "front" | "back";
+
+/**
+ * 무대를 보는 관객 기준으로 옆·앞·뒤의 가장 가까운 좌석. 번호가 아니라 실제 위치로 찾아서,
+ * 줄 끝에서는 통로 건너 옆 구역으로 넘어가고 휜 객석에서도 자연스럽다. 같은 층(1층·발코니) 안에서만 움직이고, 갈 곳이 없으면 그대로.
+ */
+export function stepSeat(stage: Stage, venue: Venue, ref: SeatRef, dir: SeatStep): SeatRef {
+  const blocks = venueBlocks(stage, venue);
+  const cur = blocks.find((b) => b.id === ref.blockId);
+  const here = cur && blockSeats(cur).find((s) => s.row === ref.row && s.seat === ref.seat);
+  if (!cur || !here) return ref;
+  // 좌석 정면(무대 쪽)은 로컬 +z를 rotationY만큼 돌린 방향, 오른쪽은 정면 × 위
+  const fx = Math.sin(here.rotationY);
+  const fz = Math.cos(here.rotationY);
+  const [dx, dz] = dir === "front" ? [fx, fz] : dir === "back" ? [-fx, -fz] : dir === "right" ? [-fz, fx] : [fz, -fx];
+  let best: Seat | null = null;
+  let bestCost = Infinity;
+  for (const b of blocks) {
+    if (b.elevation !== cur.elevation) continue;
+    for (const s of blockSeats(b)) {
+      const vx = s.x - here.x;
+      const vz = s.z - here.z;
+      const along = vx * dx + vz * dz;
+      if (along < 0.2) continue;
+      // 옆으로 갈 때는 같은 줄에서 벗어나는 것을, 앞뒤로 갈 때는 옆으로 밀리는 것을 크게 친다
+      const side = Math.abs(vx * dz - vz * dx);
+      const cost = along + side * 3;
+      if (cost < bestCost) {
+        bestCost = cost;
+        best = s;
+      }
+    }
+  }
+  return best ? { blockId: best.blockId, row: best.row, seat: best.seat } : ref;
+}
+
+// ── 관객 ──
+
+const AUDIENCE_TOPS = ["#2b3a55", "#7a2e2e", "#e8e4da", "#3d5a40", "#1d1d22", "#8a6d3b", "#5b4a7a", "#b85c38", "#4f6d8a", "#6e6e73"];
+const AUDIENCE_SKINS = ["#f0c8a8", "#d9a88a", "#b98163", "#8d5a3c"];
+const AUDIENCE_HAIRS = ["#1a1512", "#3b2a1e", "#6b4a2e", "#a9a29a"];
+
+export type AudienceMember = { gender: Gender; height: number; topColor: string; skinColor: string; hairColor: string };
+
+/** 좌석 순번으로 정해지는 관객 모습. 같은 순번은 늘 같은 사람이라 다시 그려도 바뀌지 않는다. */
+export function audienceMember(index: number): AudienceMember {
+  // 정수 해시(Murmur3 마무리 단계)로 순번마다 0..1 값을 몇 개 뽑는다
+  const rand = (salt: number) => {
+    let h = Math.imul(index + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b);
+    h ^= h >>> 16;
+    h = Math.imul(h, 0x7feb352d);
+    h ^= h >>> 15;
+    h = Math.imul(h, 0x846ca68b);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  };
+  const gender: Gender = rand(1) < 0.5 ? "female" : "male";
+  const base = gender === "female" ? 1.6 : 1.73;
+  const pick = <T,>(list: T[], salt: number) => list[Math.floor(rand(salt) * list.length)];
+  return {
+    gender,
+    height: Math.round((base + (rand(2) - 0.5) * 0.16) * 100) / 100,
+    topColor: pick(AUDIENCE_TOPS, 3),
+    skinColor: pick(AUDIENCE_SKINS, 4),
+    hairColor: pick(AUDIENCE_HAIRS, 5),
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Armchair, Lamp, Lightbulb, LightbulbOff, Redo2, Undo2 } from "lucide-react";
+import { Armchair, Lamp, Lightbulb, LightbulbOff, Redo2, Undo2, Users } from "lucide-react";
 import type { Quality, Tier } from "./quality";
 import type { Store } from "./store";
 import { BUTTON, LABEL, SEGMENT } from "./ui";
@@ -33,6 +33,8 @@ type Props = {
   hazeStatus: "rising" | "falling" | null;
   houseLights: boolean;
   onHouseLights: (on: boolean) => void;
+  audience: boolean;
+  onAudience: (on: boolean) => void;
   seatLabel: string;
   onSeatMap: () => void;
   onBegin: () => void;
@@ -75,6 +77,14 @@ export default function Toolbar(p: Props) {
         <span className="flex items-center gap-1">
           <Lamp aria-hidden className="size-4" />
           객석등
+        </span>
+      </button>
+
+      <button type="button" aria-pressed={p.audience} onClick={() => p.onAudience(!p.audience)} className={SEGMENT}
+        title="객석 좌석마다 관객을 앉혀요. 관객 시점으로 보는 자리는 비워 둬요">
+        <span className="flex items-center gap-1">
+          <Users aria-hidden className="size-4" />
+          관객
         </span>
       </button>
 

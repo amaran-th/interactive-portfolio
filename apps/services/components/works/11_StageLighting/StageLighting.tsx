@@ -9,6 +9,7 @@ import LinePanel from "./LinePanel";
 import Outliner from "./Outliner";
 import PlotLabels from "./PlotLabels";
 import PlotMap, { type PlotMapMode } from "./PlotMap";
+import SeatSelect from "./SeatSelect";
 import { SeatPicker } from "./SeatMap";
 import Sidebar, { type SidebarTab } from "./Sidebar";
 import { loadQuality, loadShow, saveQuality, useAutoSave } from "./persistence";
@@ -47,7 +48,7 @@ import Toolbar from "./Toolbar";
 import { useCuePlayback } from "./useCuePlayback";
 import { useShow } from "./useShow";
 import { type ViewMode, useStageScene } from "./useStageScene";
-import { type SeatRef, clampSeat, defaultSeat, seatLabel } from "./venue";
+import { type SeatRef, clampSeat, defaultSeat, seatLabel, stepSeat } from "./venue";
 
 type Drag = {
   type: "prop" | "actor" | "aim" | "fixture";
@@ -134,6 +135,7 @@ export default function StageLighting() {
   const [tier, setTier] = useState<Tier>(0);
   const [audienceOnGo, setAudienceOnGo] = useState(true);
   const [houseLights, setHouseLights] = useState(false);
+  const [audienceOn, setAudienceOn] = useState(false);
   const [seatPick, setSeatPick] = useState<SeatRef | null>(() => defaultSeat(loaded.show.stage, loaded.show.venue));
   const venue = useShow(store, (s) => s.venue);
   const stageForSeat = useShow(store, (s) => s.stage);
@@ -153,6 +155,7 @@ export default function StageLighting() {
   }, [sceneRef, quality]);
   useEffect(() => sceneRef.current?.onTierChange(setTier), [sceneRef]);
   useEffect(() => sceneRef.current?.setHouseLights(houseLights), [sceneRef, houseLights]);
+  useEffect(() => sceneRef.current?.setAudience(audienceOn), [sceneRef, audienceOn]);
   useEffect(() => sceneRef.current?.setSeat(seat), [sceneRef, seat]);
   useEffect(() => sceneRef.current?.setInset(inset.right, inset.bottom), [sceneRef, inset]);
   useEffect(() => sceneRef.current?.setSolo(solo), [sceneRef, solo]);
@@ -530,6 +533,11 @@ export default function StageLighting() {
           e.preventDefault();
           removeSelected();
         }
+      } else if (view === "audience" && seat && e.key.startsWith("Arrow") && !e.altKey && !e.metaKey && !e.ctrlKey) {
+        // 객석 시점: 방향키로 옆·앞·뒤 자리로 옮겨 앉는다(무대를 보는 관객 기준)
+        e.preventDefault();
+        const dir = ({ ArrowLeft: "left", ArrowRight: "right", ArrowUp: "front", ArrowDown: "back" } as const)[e.key as "ArrowLeft"];
+        if (dir) setSeatPick(stepSeat(stageForSeat, venue, seat, dir));
       } else if (e.key === "Escape") {
         setPickedId(null);
       }
@@ -559,6 +567,8 @@ export default function StageLighting() {
         hazeStatus={hazeStatus}
         houseLights={houseLights}
         onHouseLights={setHouseLights}
+        audience={audienceOn}
+        onAudience={setAudienceOn}
         seatLabel={seatLabel(stageForSeat, venue, seat)}
         onSeatMap={() => {
           setPickedId(null);
@@ -627,7 +637,12 @@ export default function StageLighting() {
             tab === "stage"
               ? {
                   title: "좌석 미리보기",
-                  content: <SeatPicker store={store} seat={seat} onSeat={(ref) => { setSeatPick(ref); changeView("audience"); }} />,
+                  content: (
+                    <>
+                      <SeatSelect stage={stageForSeat} venue={venue} seat={seat} onSeat={(ref) => { setSeatPick(ref); changeView("audience"); }} />
+                      <SeatPicker store={store} seat={seat} onSeat={(ref) => { setSeatPick(ref); changeView("audience"); }} />
+                    </>
+                  ),
                 }
               : undefined
           }

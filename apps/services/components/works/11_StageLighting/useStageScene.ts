@@ -15,6 +15,7 @@ import { type Quality, type Tier, TIERS, effectiveTier, nextTier, shadowFixtureI
 import { angleBoost, buildBeamGeometry, createBeamMaterial } from "./scene/beam";
 import { disposeGroup } from "./scene/dispose";
 import { buildFixtureBodyGeometry } from "./scene/fixtureBody";
+import { AudienceLayer } from "./scene/audience";
 import { type HumanMaterial, HumanLibrary, createHumanMaterial } from "./scene/humans";
 import { buildMannequinGeometry, mannequinBox } from "./scene/mannequin";
 import { PropLayer } from "./scene/props";
@@ -34,6 +35,8 @@ export type SceneApi = {
   setView(v: ViewMode): void;
   setWorkLight(on: boolean): void;
   setHouseLights(on: boolean): void;
+  /** 객석 좌석마다 관객을 앉힌다. 고른 좌석(관객 시점 자리)은 비워 둔다. */
+  setAudience(on: boolean): void;
   setSeat(seat: SeatRef | null): void;
   setSolo(fixtureId: string | null): void;
   setHazeTarget(target: number, immediate: boolean): void;
@@ -272,6 +275,7 @@ export function useStageScene(
     const humans = new HumanLibrary((state) => {
       if (state === "failed") onNoticeRef.current("사람 모델을 받지 못해 단순한 마네킹으로 그려요.");
       for (const v of actors.values()) rebuildActor(v);
+      audienceLayer.rebuild();
       updateSelection();
       shadowsPending = true;
       requestRender();
@@ -347,6 +351,11 @@ export function useStageScene(
       actors.delete(id);
     }
     for (const a of show.actors) addActor(a);
+
+    // ── 관객 ──
+    const audienceLayer = new AudienceLayer(humans);
+    audienceLayer.update(show.stage, show.venue, seat);
+    scene.add(audienceLayer.group);
 
     // ── 조명기 ──
     let tier: Tier = 0;
@@ -669,6 +678,7 @@ export function useStageScene(
         old.dispose();
       }
       applyShadows();
+      audienceLayer.setDetail(t === 0);
       for (const fn of tierListeners) fn(t);
       requestRender();
     }
@@ -729,6 +739,7 @@ export function useStageScene(
       if (d.stage) updateLineHighlight();
       if (d.stage || d.venue) {
         venue.build(next.stage, next.venue);
+        audienceLayer.update(next.stage, next.venue, seat);
         placeHouseLight();
         // 객석만 바뀌면(좌석 지도 편집) 편집·플롯 카메라는 그대로 둔다.
         if (d.stage) placeCameras(false);
@@ -880,6 +891,10 @@ export function useStageScene(
         refreshViewState();
         requestRender();
       },
+      setAudience(on) {
+        audienceLayer.setEnabled(on);
+        requestRender();
+      },
       setHouseLights(on) {
         const to = on ? 1 : 0;
         if (houseFade ? houseFade.to === to : houseLevel === to) return;
@@ -888,6 +903,7 @@ export function useStageScene(
       },
       setSeat(ref) {
         seat = ref;
+        audienceLayer.update(show.stage, show.venue, ref);
         placeAudience();
         cameraMoved = true;
         requestRender();
@@ -1028,6 +1044,7 @@ export function useStageScene(
       for (const c of Object.values(controls)) c.dispose();
       for (const id of [...fixtures.keys()]) removeFixture(id);
       for (const id of [...actors.keys()]) removeActor(id);
+      audienceLayer.dispose();
       humans.dispose();
       disposeGroup(stageGroup);
       venue.dispose();
