@@ -7,6 +7,7 @@ import CueBar from "./CueBar";
 import Inspector from "./Inspector";
 import Outliner from "./Outliner";
 import PlotLabels from "./PlotLabels";
+import { SeatPicker } from "./SeatMap";
 import Sidebar, { type SidebarTab } from "./Sidebar";
 import { loadQuality, loadShow, saveQuality, useAutoSave } from "./persistence";
 import type { Quality, Tier } from "./quality";
@@ -443,6 +444,14 @@ export default function StageLighting() {
           onOpen={setSidebarOpen}
           tab={tab}
           onTab={setTab}
+          side={
+            tab === "stage"
+              ? {
+                  title: "좌석 미리보기",
+                  content: <SeatPicker store={store} seat={seat} onSeat={(ref) => { setSeatPick(ref); changeView("audience"); }} />,
+                }
+              : undefined
+          }
           actions={tab === "stage" ? undefined : <AddMenu store={store} onAdd={add} only={tab} />}
           onInset={(right, bottom) => setInset((o) => (o.right === right && o.bottom === bottom ? o : { right, bottom }))}
           outliner={

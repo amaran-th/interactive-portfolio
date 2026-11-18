@@ -356,9 +356,12 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
       <Section title="객석">
         <VenueFields store={store} onBegin={onBegin} />
       </Section>
-      <Section title="좌석 지도">
-        <SeatPicker store={store} seat={seat} onSeat={onSeat} />
-      </Section>
+      {/* 넓은 화면에서는 사이드바 왼쪽 '좌석 미리보기' 패널에 따로 보여 준다 */}
+      <div className="md:hidden">
+        <Section title="좌석 지도">
+          <SeatPicker store={store} seat={seat} onSeat={onSeat} />
+        </Section>
+      </div>
     </div>
   );
 }
