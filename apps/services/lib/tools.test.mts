@@ -32,7 +32,6 @@ test("toolsIn은 카테고리의 도구를 TOOLS 순서로 돌려준다", () => 
     "asset-simulator",
     "text-encoding",
     "color-picker",
-    "palette-extractor",
     "char-counter",
   ]);
   assert.deepEqual(toolsIn("life"), []);
@@ -60,11 +59,11 @@ test("제목·설명·태그·카테고리 이름으로 찾는다", () => {
   assert.deepEqual(slugs(searchTools("픽셀")), ["nemo-nemo-beam", "monorism"]);
   assert.deepEqual(slugs(searchTools("게임")), ["knit-muffler", "stellar-forge"]);
   assert.deepEqual(slugs(searchTools("뜨개 뜨개")), ["knit-muffler"]);
-  assert.deepEqual(slugs(searchTools("png")), ["nemo-nemo-beam"]);
+  assert.deepEqual(slugs(searchTools("png")), ["nemo-nemo-beam", "color-picker"]);
   assert.deepEqual(slugs(searchTools("재테크")), ["asset-simulator"]);
   assert.deepEqual(slugs(searchTools("utf-8")), ["text-encoding"]);
   assert.deepEqual(slugs(searchTools("스포이트")), ["color-picker"]);
-  assert.deepEqual(slugs(searchTools("팔레트 추출")), ["palette-extractor"]);
+  assert.deepEqual(slugs(searchTools("팔레트")), ["color-picker"]);
   assert.deepEqual(slugs(searchTools("스팽글")), ["monorism"]);
 });
 

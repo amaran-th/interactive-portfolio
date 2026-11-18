@@ -15,6 +15,19 @@ export function isTextEntryTarget(t: PasteTarget): boolean {
   return false;
 }
 
+// 클립보드에 이미지 파일 없이 주소만 온 경우(웹 페이지·메신저에서 복사하면 HTML의
+// <img src>만 오기도 한다) 그 주소를 찾는다. data:image 주소나 이미지 확장자로 끝나는
+// http(s) 주소만 받는다.
+export function imageSrcFromClipboardText(html: string, plain: string): string | null {
+  const m = /<img\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/i.exec(html);
+  const fromHtml = m?.[1].replace(/&amp;/g, "&");
+  if (fromHtml && /^(data:image\/|https?:)/i.test(fromHtml)) return fromHtml;
+  const t = plain.trim();
+  if (/^data:image\/[\w.+-]+;base64,/i.test(t)) return t;
+  if (/^https?:\/\/\S+\.(png|jpe?g|gif|webp|avif|bmp|svg)(\?\S*)?$/i.test(t)) return t;
+  return null;
+}
+
 // 브라우저 캔버스 한도(iOS Safari는 약 16.7M 픽셀)를 넘지 않도록, 비율을
 // 지킨 채 긴 변과 넓이를 상한 안으로 줄인 크기. 이미 작으면 그대로 둔다.
 export function fitWithin(

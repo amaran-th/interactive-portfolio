@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  // 팔레트 추출기는 색상 추출기(/color-picker)로 합쳤다
+  async redirects() {
+    return [{ source: "/palette-extractor", destination: "/color-picker", permanent: true }];
+  },
   async headers() {
     return [
       {
