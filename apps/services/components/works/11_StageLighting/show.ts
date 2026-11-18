@@ -10,6 +10,8 @@
 export type Vec3 = { x: number; y: number; z: number };
 
 export type StageShape = "proscenium" | "thrust" | "round";
+/** 라인을 기본 위치에서 옮긴 거리(m). dz는 앞뒤(+가 객석 쪽), dy는 높이(붐은 무대에서 떨어진 거리). */
+export type LineOffset = { dz: number; dy: number };
 export type Stage = {
   shape: StageShape;
   width: number;
@@ -17,6 +19,8 @@ export type Stage = {
   height: number;
   floorColor: string;
   backdropColor: string;
+  /** 라인마다 옮긴 거리. 무대 크기를 바꿔도 기본 위치 기준이라 배치가 함께 따라간다. */
+  rig: Record<HangId, LineOffset>;
 };
 
 export type PropKind = "chair" | "table" | "stairs" | "platform" | "pillar" | "box" | "doorframe";
@@ -314,21 +318,23 @@ export function hangPoint(stage: Stage, hang: HangId, along: number): Vec3 {
   const [lo, hi] = hangRange(stage, hang);
   const a = clamp(along, lo, hi);
   const { width: w, depth: d, height: h } = stage;
+  const { dz, dy } = stage.rig?.[hang] ?? { dz: 0, dy: 0 };
+  const line = (y: number, z: number): Vec3 => ({ x: a, y: Math.max(MIN_LINE_Y, y + dy), z: z + dz });
   switch (hang) {
     case "foh":
-      return { x: a, y: h + 1, z: 4 };
+      return line(h + 1, 4);
     case "e1":
-      return { x: a, y: h, z: -d * 0.2 };
+      return line(h, -d * 0.2);
     case "e2":
-      return { x: a, y: h, z: -d * 0.5 };
+      return line(h, -d * 0.5);
     case "e3":
-      return { x: a, y: h, z: -d * 0.8 };
+      return line(h, -d * 0.8);
     case "boomL":
-      return { x: -(w / 2 + 0.8), y: a, z: -d / 2 };
+      return { x: -(w / 2 + 0.8 + dy), y: a, z: -d / 2 + dz };
     case "boomR":
-      return { x: w / 2 + 0.8, y: a, z: -d / 2 };
+      return { x: w / 2 + 0.8 + dy, y: a, z: -d / 2 + dz };
     case "floor":
-      return { x: a, y: 0.3, z: -d + 0.6 };
+      return line(0.3, -d + 0.6);
   }
 }
 
@@ -389,8 +395,23 @@ function copyLook(look: LookState): LookState {
 
 // ── clamp ──
 
+export const LINE_DZ = { min: -10, max: 10 };
+export const LINE_DY = { min: -3, max: 4 };
+const MIN_LINE_Y = 0.1;
+
+export function zeroRig(): Record<HangId, LineOffset> {
+  return Object.fromEntries(HANGS.map((h) => [h, { dz: 0, dy: 0 }])) as Record<HangId, LineOffset>;
+}
+
+const clampOffset = (o: LineOffset): LineOffset => ({
+  dz: Math.round(clamp(o.dz, LINE_DZ.min, LINE_DZ.max) * 100) / 100,
+  dy: Math.round(clamp(o.dy, LINE_DY.min, LINE_DY.max) * 100) / 100,
+});
+
 export function clampStage(s: Stage): Stage {
-  return { ...s, width: clamp(s.width, 4, 20), depth: clamp(s.depth, 3, 15), height: clamp(s.height, 3, 12) };
+  const rig = zeroRig();
+  for (const h of HANGS) if (s.rig?.[h]) rig[h] = clampOffset(s.rig[h]);
+  return { ...s, width: clamp(s.width, 4, 20), depth: clamp(s.depth, 3, 15), height: clamp(s.height, 3, 12), rig };
 }
 
 function clampProp(p: Prop): Prop {
@@ -460,7 +481,7 @@ const sub = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - 
 const dot = (a: Vec3, b: Vec3) => a.x * b.x + a.y * b.y + a.z * b.z;
 
 /** 광선(t ≥ 0)과 선분 a–b 사이 가장 가까운 거리와 선분 위 비율 s(0..1). */
-function raySegment(ray: Ray, a: Vec3, b: Vec3): { dist: number; s: number } {
+export function raySegment(ray: Ray, a: Vec3, b: Vec3): { dist: number; s: number } {
   const u = sub(b, a);
   const v = ray.dir;
   const w = sub(a, ray.origin);
@@ -543,7 +564,15 @@ function makeFixture(
 }
 
 const AMBIENT_DEFAULT = 0.3;
-const STAGE_DEFAULT: Stage = { shape: "proscenium", width: 10, depth: 8, height: 6, floorColor: "#3a3a40", backdropColor: "#202028" };
+const STAGE_DEFAULT: Stage = {
+  shape: "proscenium",
+  width: 10,
+  depth: 8,
+  height: 6,
+  floorColor: "#3a3a40",
+  backdropColor: "#202028",
+  rig: zeroRig(),
+};
 
 export function defaultShow(): Show {
   const gel = (name: string) => GELS.find((g) => g.name === name)!.color;
@@ -845,7 +874,21 @@ function readStage(v: unknown): Stage {
     height: num(so.height),
     floorColor: color(so.floorColor),
     backdropColor: color(so.backdropColor),
+    rig: readRig(so.rig),
   });
+}
+
+// 라인 위치가 없던 저장본은 기본 위치(옮긴 거리 0)
+function readRig(v: unknown): Record<HangId, LineOffset> {
+  const rig = zeroRig();
+  if (v === undefined) return rig;
+  const o = obj(v);
+  for (const h of HANGS) {
+    if (o[h] === undefined) continue;
+    const l = obj(o[h]);
+    rig[h] = { dz: num(l.dz), dy: num(l.dy) };
+  }
+  return rig;
 }
 
 function readProps(v: unknown): Prop[] {
@@ -1115,4 +1158,91 @@ export function deserialize(text: string): { show: Show; migrated: boolean } | n
   } catch {
     return null;
   }
+}
+
+// ── 조명 세팅 도우미 ──
+
+export function setLineOffset(show: Show, hang: HangId, offset: LineOffset): Show {
+  return updateStage(show, { rig: { ...show.stage.rig, [hang]: clampOffset(offset) } });
+}
+
+export function resetLine(show: Show, hang: HangId): Show {
+  return setLineOffset(show, hang, { dz: 0, dy: 0 });
+}
+
+/** 한 라인에 걸린 조명기를 지금 순서 그대로 라인 전체에 같은 간격으로 펼친다. */
+export function spreadLine(show: Show, hang: HangId): Show {
+  const on = show.fixtures.filter((f) => f.hang === hang).sort((a, b) => a.along - b.along);
+  if (on.length < 2) return show;
+  const [lo, hi] = hangRange(show.stage, hang);
+  const step = (hi - lo) / on.length;
+  const along = new Map(on.map((f, i) => [f.id, Math.round((lo + (i + 0.5) * step) * 10) / 10]));
+  return { ...show, fixtures: show.fixtures.map((f) => (along.has(f.id) ? { ...f, along: along.get(f.id)! } : f)) };
+}
+
+/** 무대 가운데, 또는 조명기에서 가장 가까운 인물(발밑). 인물이 없으면 무대 가운데. */
+export function focusTarget(show: Show, fixtureId: string, mode: "center" | "actor"): Vec3 {
+  const center = { x: 0, y: 0, z: -show.stage.depth / 2 };
+  const f = show.fixtures.find((x) => x.id === fixtureId);
+  if (!f || mode === "center" || show.actors.length === 0) return center;
+  const p = hangPoint(show.stage, f.hang, f.along);
+  let best = show.actors[0];
+  for (const a of show.actors)
+    if (Math.hypot(a.position.x - p.x, a.position.z - p.z) < Math.hypot(best.position.x - p.x, best.position.z - p.z)) best = a;
+  return { ...best.position };
+}
+
+/** 여러 조명기를 한 번에 겨눈다. 팔로우처럼 큐마다 대상이 바뀌는 종류는 지금(라이브) 값의 대상을 바꾼다. */
+export function aimFixtures(show: Show, ids: string[], mode: "center" | "actor"): Show {
+  let out = show;
+  for (const id of ids) {
+    const f = out.fixtures.find((x) => x.id === id);
+    if (!f) continue;
+    const target = focusTarget(out, id, mode);
+    out = CUE_PARAMS[f.kind].includes("target") ? updateLevel(out, id, { target }) : updateFocus(out, id, { target });
+  }
+  return out;
+}
+
+/** 기본 조명 배치(앞조명·윗조명·역광·호리존트) 8대를 지금 조명기 옆에 더 건다. 한도에 닿으면 거기서 멈춘다. */
+export function addPresetRig(show: Show): Show {
+  const gel = (name: string) => GELS.find((g) => g.name === name)!.color;
+  const d = show.stage.depth;
+  const plan: { kind: FixtureKind; name: string; hang: HangId; along: number; target: Vec3; gel?: string; intensity: number }[] = [
+    { kind: "profile", name: "앞 왼쪽", hang: "foh", along: -2, target: { x: -1.5, y: 0, z: -d * 0.4 }, intensity: 0.7 },
+    { kind: "profile", name: "앞 오른쪽", hang: "foh", along: 2, target: { x: 1.5, y: 0, z: -d * 0.4 }, intensity: 0.7 },
+    { kind: "fresnel", name: "위 왼쪽", hang: "e1", along: -3, target: { x: -2.5, y: 0, z: -d * 0.4 }, gel: gel("웜 앰버"), intensity: 0.5 },
+    { kind: "fresnel", name: "위 가운데", hang: "e1", along: 0, target: { x: 0, y: 0, z: -d * 0.4 }, gel: gel("웜 앰버"), intensity: 0.5 },
+    { kind: "fresnel", name: "위 오른쪽", hang: "e1", along: 3, target: { x: 2.5, y: 0, z: -d * 0.4 }, gel: gel("웜 앰버"), intensity: 0.5 },
+    { kind: "par", name: "역광 왼쪽", hang: "e3", along: -2, target: { x: -1.5, y: 0, z: -d * 0.35 }, gel: gel("딥 블루"), intensity: 0 },
+    { kind: "par", name: "역광 오른쪽", hang: "e3", along: 2, target: { x: 1.5, y: 0, z: -d * 0.35 }, gel: gel("딥 블루"), intensity: 0 },
+    { kind: "cyc", name: "호리존트", hang: "floor", along: 0, target: { x: 0, y: 4, z: -d }, intensity: 0.4 },
+  ];
+  let out = show;
+  for (const p of plan) {
+    if (out.fixtures.length >= LIMITS.fixtures) break;
+    let along = p.along;
+    while (out.fixtures.some((f) => f.hang === p.hang && Math.abs(f.along - along) < 0.01)) along += 0.5;
+    const f = clampFixture(out.stage, makeFixture(nextChannel(out), p.kind, p.name, p.hang, along, { target: p.target, ...(p.gel ? { gel: p.gel } : {}) }, p.kind !== "cyc"));
+    out = {
+      ...out,
+      fixtures: [...out.fixtures, f],
+      live: { ...out.live, levels: { ...out.live.levels, [f.id]: { intensity: p.intensity } } },
+    };
+  }
+  return out;
+}
+
+/** 광선이 높이 y의 수평면과 만나는 점(라인 끌기용). 평행하거나 뒤쪽이면 null. */
+export function rayAtY(ray: Ray, y: number): { x: number; z: number } | null {
+  if (Math.abs(ray.dir.y) < 1e-9) return null;
+  const t = (y - ray.origin.y) / ray.dir.y;
+  return t < 0 ? null : { x: ray.origin.x + ray.dir.x * t, z: ray.origin.z + ray.dir.z * t };
+}
+
+/** 광선이 앞뒤 위치 z의 수직면과 만나는 점(라인 높이 끌기용). */
+export function rayAtZ(ray: Ray, z: number): { x: number; y: number } | null {
+  if (Math.abs(ray.dir.z) < 1e-9) return null;
+  const t = (z - ray.origin.z) / ray.dir.z;
+  return t < 0 ? null : { x: ray.origin.x + ray.dir.x * t, y: ray.origin.y + ray.dir.y * t };
 }

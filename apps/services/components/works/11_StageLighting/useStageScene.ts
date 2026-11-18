@@ -20,12 +20,12 @@ import { buildMannequinGeometry, mannequinBox } from "./scene/mannequin";
 import { PropLayer } from "./scene/props";
 import { buildStage } from "./scene/stage";
 import { VenueLayer } from "./scene/venue";
-import { type Actor, type Fixture, type LookState, type Ray, type Resolved, type Show, type Vec3, resolve } from "./show";
+import { type Actor, type Fixture, HANGS, type LookState, type Ray, type Resolved, type Show, type Vec3, hangPoint, hangRange, raySegment, resolve } from "./show";
 import { type Store, diffShow } from "./store";
 import { type SeatRef, seatView, venueBox } from "./venue";
 
 export type ViewMode = "edit" | "audience" | "plot";
-export type Pick = { type: "prop" | "actor" | "fixture" | "aim"; id: string } | null;
+export type Pick = { type: "prop" | "actor" | "fixture" | "aim" | "line"; id: string } | null;
 export type ScreenPoint = { id: string; channel: number; color: string; x: number; y: number };
 
 export type SceneApi = {
@@ -800,7 +800,21 @@ export function useStageScene(
       for (const v of actors.values()) consider("actor", v.actor.id, hitLocalBox(v.group, v.box));
       const fixtureSize = view === "plot" ? { x: 0.9, y: 0.9, z: 0.9 } : { x: 0.5, y: 0.5, z: 0.5 };
       for (const v of fixtures.values()) consider("fixture", v.fixture.id, hitBox(v.res.position, 0, fixtureSize, true));
-      return best;
+      if (best) return best;
+      // 아무것도 맞지 않으면 라인(파이프) 가까이를 눌렀는지 본다
+      const { origin: o, direction: dir } = raycaster.ray;
+      const ray = { origin: { x: o.x, y: o.y, z: o.z }, dir: { x: dir.x, y: dir.y, z: dir.z } };
+      let lineD = view === "plot" ? 0.6 : 0.35;
+      let line: Pick = null;
+      for (const hang of HANGS) {
+        const [lo, hi] = hangRange(show.stage, hang);
+        const { dist } = raySegment(ray, hangPoint(show.stage, hang, lo), hangPoint(show.stage, hang, hi));
+        if (dist < lineD) {
+          lineD = dist;
+          line = { type: "line", id: hang };
+        }
+      }
+      return line;
     }
 
     // ── API ──

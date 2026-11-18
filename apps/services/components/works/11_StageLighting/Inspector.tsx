@@ -36,6 +36,7 @@ import {
   STAGE_LABELS,
   STAGE_SHAPES,
   type Show,
+  aimFixtures,
   hangRange,
   resolve,
   setActorGender,
@@ -307,6 +308,15 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
           ) : (
             <GelPicker value={fixture.focus.gel} onBegin={onBegin} onChange={(gel) => edit((s) => updateFocus(s, id, { gel }))} />
           )}
+          <div className="flex flex-wrap gap-1">
+            <button type="button" className={SEGMENT} onClick={() => { onBegin(); edit((s) => aimFixtures(s, [id], "center")); }}>
+              가운데 비추기
+            </button>
+            <button type="button" className={SEGMENT} onClick={() => { onBegin(); edit((s) => aimFixtures(s, [id], "actor")); }}
+              title="이 조명기에서 가장 가까운 인물을 비춰요">
+              가까운 인물 비추기
+            </button>
+          </div>
           {cueAim ? (
             <p className="text-[11px] text-ink/60">조준과 아이리스는 큐마다 바꿔요.</p>
           ) : (

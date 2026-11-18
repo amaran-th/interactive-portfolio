@@ -316,3 +316,73 @@ test("v3 저장본은 라인 그대로, v4(자유 위치) 저장본은 가장 �
   assert.deepEqual([r4.show.fixtures[0].hang, r4.show.fixtures[0].along], ["e3", -2]);
   assert.equal(deserialize(serialize(r4.show))!.migrated, false);
 });
+
+test("라인 옮기기: 걸 위치와 조명기가 따라가고, 범위를 넘지 않는다", async () => {
+  const { setLineOffset, resetLine } = await import("./show.ts");
+  let s = defaultShow();
+  const before = hangPoint(s.stage, "e1", 1);
+  s = setLineOffset(s, "e1", { dz: -1.5, dy: 0.5 });
+  assert.deepEqual(hangPoint(s.stage, "e1", 1), { x: before.x, y: before.y + 0.5, z: before.z - 1.5 });
+  const f = s.fixtures.find((x) => x.hang === "e1")!;
+  assert.deepEqual(resolve(s.stage, f, undefined).position, hangPoint(s.stage, "e1", f.along));
+  // 붐은 dy가 무대에서 떨어진 거리
+  s = setLineOffset(s, "boomL", { dz: 0, dy: 1 });
+  assert.equal(hangPoint(s.stage, "boomL", 2).x, -(5 + 0.8 + 1));
+  s = setLineOffset(s, "foh", { dz: 99, dy: -99 });
+  assert.deepEqual(s.stage.rig.foh, { dz: 10, dy: -3 });
+  assert.ok(hangPoint(setLineOffset(s, "floor", { dz: 0, dy: -3 }).stage, "floor", 0).y >= 0.1);
+  assert.deepEqual(resetLine(s, "foh").stage.rig.foh, { dz: 0, dy: 0 });
+  // 무대 크기를 바꿔도 옮긴 거리는 그대로
+  assert.deepEqual(updateStage(s, { depth: 10 }).stage.rig.e1, { dz: -1.5, dy: 0.5 });
+});
+
+test("라인 위치는 저장되고, 예전 저장본은 기본 위치", async () => {
+  const { setLineOffset } = await import("./show.ts");
+  const s = setLineOffset(defaultShow(), "e2", { dz: 1, dy: 0 });
+  assert.deepEqual(deserialize(serialize(s))!.show.stage.rig.e2, { dz: 1, dy: 0 });
+  const old = JSON.parse(serialize(defaultShow()));
+  delete old.stage.rig;
+  assert.deepEqual(deserialize(JSON.stringify(old))!.show.stage.rig.e3, { dz: 0, dy: 0 });
+});
+
+test("라인 위 고르게 펼치기", async () => {
+  const { spreadLine } = await import("./show.ts");
+  let s = { ...defaultShow(), fixtures: [] };
+  for (let i = 0; i < 3; i++) s = addFixture(s, "fresnel");
+  s = spreadLine(s, "e1");
+  assert.deepEqual(s.fixtures.filter((f) => f.hang === "e1").map((f) => f.along), [-4, 0, 4]);
+  assert.equal(spreadLine(s, "e3"), s);
+});
+
+test("포커스 한 번에: 무대 가운데·가장 가까운 인물", async () => {
+  const { focusTarget, aimFixtures } = await import("./show.ts");
+  const s = defaultShow();
+  const f = s.fixtures.find((x) => x.hang === "foh" && x.along === -2)!;
+  assert.deepEqual(focusTarget(s, f.id, "center"), { x: 0, y: 0, z: -4 });
+  assert.deepEqual(focusTarget(s, f.id, "actor"), { x: -1, y: 0, z: -3 });
+  const follow = s.fixtures.find((x) => x.kind === "follow")!;
+  const t = aimFixtures(s, [f.id, follow.id], "center");
+  assert.deepEqual(t.fixtures.find((x) => x.id === f.id)!.focus.target, { x: 0, y: 0, z: -4 });
+  // 팔로우는 큐 값(라이브)의 대상을 바꾼다
+  assert.deepEqual(t.live.levels[follow.id].target, { x: 0, y: 0, z: -4 });
+});
+
+test("기본 조명 배치: 8대를 빈 채널로 걸고 한도를 넘지 않는다", async () => {
+  const { addPresetRig } = await import("./show.ts");
+  const empty = { ...defaultShow(), fixtures: [], live: { haze: 0, levels: {} } };
+  const t = addPresetRig(empty);
+  assert.equal(t.fixtures.length, 8);
+  assert.equal(new Set(t.fixtures.map((f) => f.channel)).size, 8);
+  assert.ok(t.fixtures.every((f) => t.live.levels[f.id] !== undefined));
+  let full = empty;
+  for (let i = 0; i < LIMITS.fixtures - 3; i++) full = addFixture(full, "par");
+  assert.equal(addPresetRig(full).fixtures.length, LIMITS.fixtures);
+});
+
+test("광선과 평면의 교점", async () => {
+  const { rayAtY, rayAtZ } = await import("./show.ts");
+  const ray = { origin: { x: 0, y: 10, z: 10 }, dir: { x: 0, y: -1, z: -1 } };
+  assert.deepEqual(rayAtY(ray, 4), { x: 0, z: 4 });
+  assert.deepEqual(rayAtZ(ray, 2), { x: 0, y: 2 });
+  assert.equal(rayAtY({ origin: { x: 0, y: 1, z: 0 }, dir: { x: 1, y: 0, z: 0 } }, 4), null);
+});

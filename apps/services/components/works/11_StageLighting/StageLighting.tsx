@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { isTextEntryTarget } from "@/components/works/_shared/imageInput";
 import CueBar from "./CueBar";
 import Inspector from "./Inspector";
+import LinePanel from "./LinePanel";
 import Outliner from "./Outliner";
 import PlotLabels from "./PlotLabels";
 import { SeatPicker } from "./SeatMap";
@@ -16,9 +17,13 @@ import { stageBounds } from "./scene/stage";
 import {
   CUE_PARAMS,
   type HangId,
+  type LineOffset,
   type Show,
   type Vec3,
   hangFromRay,
+  rayAtY,
+  rayAtZ,
+  setLineOffset,
   hangPoint,
   addActor,
   addFixture,
@@ -56,6 +61,23 @@ type Drag = {
   raf: number;
   last: Vec3 | null;
 };
+
+// 라인(파이프) 끌기. Shift를 누르면 높이(붐은 무대와의 거리)를, 아니면 앞뒤를 바꾼다.
+type LineDrag = {
+  hang: HangId;
+  pointerId: number;
+  boom: boolean;
+  shift: boolean;
+  wantShift: boolean;
+  start: LineOffset;
+  ref: number;
+  planeY: number;
+  planeZ: number;
+  clientX: number;
+  clientY: number;
+  raf: number;
+};
+const BOOM_DRAG_Y = 2; // 붐은 이 높이의 수평면에서 끈다
 
 const CLICK_SLOP = 4;
 const NOTICE_MS = 5000;
@@ -242,6 +264,49 @@ export default function StageLighting() {
     else sceneRef.current?.previewEntity(d.id, pos);
   };
 
+  const lineDragRef = useRef<LineDrag | null>(null);
+
+  // 끌기를 시작할 때·Shift를 누르거나 뗄 때 기준점을 다시 잡는다
+  const lineBaseline = (d: LineDrag, shift: boolean) => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    const s = store.get();
+    const ray = scene.screenRay(d.clientX, d.clientY);
+    const p = hangPoint(s.stage, d.hang, 0);
+    d.start = s.stage.rig[d.hang];
+    d.shift = shift;
+    d.planeY = d.boom ? BOOM_DRAG_Y : p.y;
+    d.planeZ = p.z;
+    if (shift && !d.boom) d.ref = rayAtZ(ray, d.planeZ)?.y ?? NaN;
+    else {
+      const h = rayAtY(ray, d.planeY);
+      d.ref = h ? (shift ? Math.abs(h.x) : h.z) : NaN;
+    }
+  };
+
+  const applyLineDrag = (d: LineDrag) => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    if (d.wantShift !== d.shift || Number.isNaN(d.ref)) {
+      lineBaseline(d, d.wantShift);
+      return;
+    }
+    const ray = scene.screenRay(d.clientX, d.clientY);
+    let next: LineOffset | null = null;
+    if (!d.shift) {
+      const h = rayAtY(ray, d.planeY);
+      if (h) next = { ...d.start, dz: d.start.dz + (h.z - d.ref) };
+    } else if (d.boom) {
+      const h = rayAtY(ray, d.planeY);
+      if (h) next = { ...d.start, dy: d.start.dy + (Math.abs(h.x) - d.ref) };
+    } else {
+      const v = rayAtZ(ray, d.planeZ);
+      if (v) next = { ...d.start, dy: d.start.dy + (v.y - d.ref) };
+    }
+    // 0.05m 단위로 맞춰 끄는 동안 값이 덜 떨리게 한다
+    if (next) store.set(setLineOffset(store.get(), d.hang, { dz: Math.round(next.dz * 20) / 20, dy: Math.round(next.dy * 20) / 20 }));
+  };
+
   const onPointerDownCapture = (e: React.PointerEvent<HTMLDivElement>) => {
     downRef.current = { x: e.clientX, y: e.clientY };
     const scene = sceneRef.current;
@@ -250,6 +315,32 @@ export default function StageLighting() {
     if (!hit) return; // 빈 곳: 카메라 조작
     e.stopPropagation(); // 캔버스의 OrbitControls까지 가지 않게
     downRef.current = null;
+    if (hit.type === "line") {
+      // 라인 끌기: 걸린 조명기는 라인을 따라 함께 움직인다
+      setPickedId(null);
+      setTab("fixtures");
+      beginEdit();
+      scene.beginInteraction();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      const hang = hit.id as HangId;
+      const d: LineDrag = {
+        hang,
+        pointerId: e.pointerId,
+        boom: hang === "boomL" || hang === "boomR",
+        shift: e.shiftKey,
+        wantShift: e.shiftKey,
+        start: store.get().stage.rig[hang],
+        ref: NaN,
+        planeY: 0,
+        planeZ: 0,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        raf: 0,
+      };
+      lineBaseline(d, e.shiftKey);
+      lineDragRef.current = d;
+      return;
+    }
     setPickedId(hit.id);
     const s = store.get();
     let base: Vec3;
@@ -289,6 +380,18 @@ export default function StageLighting() {
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const ld = lineDragRef.current;
+    if (ld && ld.pointerId === e.pointerId) {
+      ld.clientX = e.clientX;
+      ld.clientY = e.clientY;
+      ld.wantShift = e.shiftKey;
+      if (!ld.raf)
+        ld.raf = requestAnimationFrame(() => {
+          ld.raf = 0;
+          applyLineDrag(ld);
+        });
+      return;
+    }
     const d = dragRef.current;
     if (!d || d.pointerId !== e.pointerId) return;
     d.clientX = e.clientX;
@@ -301,6 +404,13 @@ export default function StageLighting() {
   };
 
   const finishDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    const ld = lineDragRef.current;
+    if (ld && ld.pointerId === e.pointerId) {
+      lineDragRef.current = null;
+      cancelAnimationFrame(ld.raf);
+      sceneRef.current?.endInteraction();
+      return true;
+    }
     const d = dragRef.current;
     if (!d || d.pointerId !== e.pointerId) return false;
     dragRef.current = null;
@@ -461,9 +571,11 @@ export default function StageLighting() {
                 onSolo={() => setSoloId(solo ? null : selectedId)} onBegin={beginEdit}
                 onDuplicate={duplicateSelected} onDelete={removeSelected} />
             ) : (
-              <p className="p-3 text-xs text-ink/60">
-                {tab === "elements" ? "목록이나 3D 화면에서 인물·소품을 고르면 여기에 속성이 나와요." : "목록이나 3D 화면에서 조명기를 고르면 여기에 속성이 나와요."}
-              </p>
+              tab === "fixtures" ? (
+                <LinePanel store={store} onBegin={beginEdit} />
+              ) : (
+                <p className="p-3 text-xs text-ink/60">목록이나 3D 화면에서 인물·소품을 고르면 여기에 속성이 나와요.</p>
+              )
             )
           }
         />
