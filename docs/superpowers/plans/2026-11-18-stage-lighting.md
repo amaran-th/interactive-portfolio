@@ -1,5 +1,7 @@
 # 무대조명 시뮬레이터 (1단계) Implementation Plan
 
+> **폐기됨 (2026-11-18):** 같은 경로(`/stage-lighting`, `components/works/11_StageLighting/`)에 이미 '조명 연습실'이 있어 이 설계로 새로 만들지 않았다. 요청 사항 중 '사이드바 탭 3개(무대 설정·무대 요소·조명기)'와 '조명기 자유 배치·몸체 끌기'만 기존 조명 연습실에 반영했다(커밋 `115ac21`). 나머지 내용은 참고용이다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 무대·배우·소품을 배치하고 조명기를 직접 끌어 걸고, 큐를 저장해 GO로 페이드하는 3D 무대조명 연습 도구 `/stage-lighting`을 서비스 앱에 추가한다.
