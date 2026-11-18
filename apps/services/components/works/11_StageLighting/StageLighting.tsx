@@ -16,6 +16,7 @@ import { dragHeight, dropAt } from "./placement";
 import { stageBounds } from "./scene/stage";
 import {
   CUE_PARAMS,
+  HANG_LABELS,
   type HangId,
   type LineOffset,
   type Show,
@@ -101,10 +102,14 @@ export default function StageLighting() {
   const [pickedId, setPickedIdRaw] = useState<string | null>(null);
   const [soloId, setSoloId] = useState<string | null>(null);
   const [tab, setTab] = useState<SidebarTab>("stage");
-  // 다른 대상을 고르면 솔로는 풀리고, 사이드바는 그 대상의 탭으로 넘어간다.
+  // 고른 라인(파이프). 3D에서 진하게 칠하고 라인 패널에서 그 칸을 펼친다.
+  const [selectedLine, setSelectedLine] = useState<HangId | null>(null);
+  const [lineLabel, setLineLabel] = useState<{ x: number; y: number; text: string } | null>(null);
+  // 다른 대상을 고르면 솔로와 고른 라인은 풀리고, 사이드바는 그 대상의 탭으로 넘어간다.
   const setPickedId = (id: string | null) => {
     setPickedIdRaw(id);
     setSoloId(null);
+    setSelectedLine(null);
     if (!id) return;
     const s = store.get();
     if (s.fixtures.some((f) => f.id === id)) setTab("fixtures");
@@ -304,8 +309,46 @@ export default function StageLighting() {
       if (v) next = { ...d.start, dy: d.start.dy + (v.y - d.ref) };
     }
     // 0.05m 단위로 맞춰 끄는 동안 값이 덜 떨리게 한다
-    if (next) store.set(setLineOffset(store.get(), d.hang, { dz: Math.round(next.dz * 20) / 20, dy: Math.round(next.dy * 20) / 20 }));
+    if (!next) return;
+    const s2 = setLineOffset(store.get(), d.hang, { dz: Math.round(next.dz * 20) / 20, dy: Math.round(next.dy * 20) / 20 });
+    store.set(s2);
+    const o = s2.stage.rig[d.hang];
+    const sign = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(2)}m`;
+    const r = viewRef.current?.getBoundingClientRect();
+    if (r)
+      setLineLabel({
+        x: d.clientX - r.left + 14,
+        y: d.clientY - r.top + 14,
+        text: `${HANG_LABELS[d.hang]} · 앞뒤 ${sign(o.dz)} · ${d.boom ? "거리" : "높이"} ${sign(o.dy)}`,
+      });
   };
+
+  // 마우스를 올린 라인은 옅게 칠하고 커서를 손 모양으로 바꾼다
+  const hoverRef = useRef<{ raf: number; x: number; y: number; line: HangId | null }>({ raf: 0, x: 0, y: 0, line: null });
+  const onHover = (e: React.PointerEvent<HTMLDivElement>) => {
+    const h = hoverRef.current;
+    h.x = e.clientX;
+    h.y = e.clientY;
+    if (h.raf || e.pointerType !== "mouse") return;
+    const el = e.currentTarget;
+    h.raf = requestAnimationFrame(() => {
+      h.raf = 0;
+      const scene = sceneRef.current;
+      if (!scene) return;
+      const hit = scene.pick(h.x, h.y);
+      const line = hit?.type === "line" ? (hit.id as HangId) : null;
+      el.style.cursor = hit ? "grab" : "";
+      if (line !== h.line) {
+        h.line = line;
+        scene.setLineHighlight(line, selectedLineRef.current);
+      }
+    });
+  };
+  const selectedLineRef = useRef<HangId | null>(null);
+  useEffect(() => {
+    selectedLineRef.current = selectedLine;
+    sceneRef.current?.setLineHighlight(hoverRef.current.line, selectedLine);
+  }, [sceneRef, selectedLine]);
 
   const onPointerDownCapture = (e: React.PointerEvent<HTMLDivElement>) => {
     downRef.current = { x: e.clientX, y: e.clientY };
@@ -318,6 +361,7 @@ export default function StageLighting() {
     if (hit.type === "line") {
       // 라인 끌기: 걸린 조명기는 라인을 따라 함께 움직인다
       setPickedId(null);
+      setSelectedLine(hit.id as HangId);
       setTab("fixtures");
       beginEdit();
       scene.beginInteraction();
@@ -380,6 +424,10 @@ export default function StageLighting() {
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!lineDragRef.current && !dragRef.current) {
+      onHover(e);
+      return;
+    }
     const ld = lineDragRef.current;
     if (ld && ld.pointerId === e.pointerId) {
       ld.clientX = e.clientX;
@@ -408,6 +456,7 @@ export default function StageLighting() {
     if (ld && ld.pointerId === e.pointerId) {
       lineDragRef.current = null;
       cancelAnimationFrame(ld.raf);
+      setLineLabel(null);
       sceneRef.current?.endInteraction();
       return true;
     }
@@ -531,6 +580,12 @@ export default function StageLighting() {
           onContextMenu={(e) => e.preventDefault()}
         >
           {view === "plot" && !fatal && <PlotLabels store={store} sceneRef={sceneRef} selectedId={selectedId} />}
+          {lineLabel && (
+            <span className="pointer-events-none absolute z-20 rounded-md bg-point px-2 py-1 text-[11px] font-bold tabular-nums text-white shadow"
+              style={{ left: lineLabel.x, top: lineLabel.y }}>
+              {lineLabel.text}
+            </span>
+          )}
           {fatal && (
             <p role="alert" className="absolute inset-0 z-10 flex items-center justify-center p-6 text-center text-sm font-bold text-white">
               {fatal}
@@ -572,7 +627,7 @@ export default function StageLighting() {
                 onDuplicate={duplicateSelected} onDelete={removeSelected} />
             ) : (
               tab === "fixtures" ? (
-                <LinePanel store={store} onBegin={beginEdit} />
+                <LinePanel store={store} onBegin={beginEdit} selected={selectedLine} />
               ) : (
                 <p className="p-3 text-xs text-ink/60">목록이나 3D 화면에서 인물·소품을 고르면 여기에 속성이 나와요.</p>
               )

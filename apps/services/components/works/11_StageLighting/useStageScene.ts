@@ -20,7 +20,7 @@ import { buildMannequinGeometry, mannequinBox } from "./scene/mannequin";
 import { PropLayer } from "./scene/props";
 import { buildStage } from "./scene/stage";
 import { VenueLayer } from "./scene/venue";
-import { type Actor, type Fixture, HANGS, type LookState, type Ray, type Resolved, type Show, type Vec3, hangPoint, hangRange, raySegment, resolve } from "./show";
+import { type Actor, type Fixture, HANGS, type HangId, type LookState, type Ray, type Resolved, type Show, type Vec3, hangPoint, hangRange, raySegment, resolve } from "./show";
 import { type Store, diffShow } from "./store";
 import { type SeatRef, seatView, venueBox } from "./venue";
 
@@ -43,6 +43,8 @@ export type SceneApi = {
   /** 3D 화면을 덮는 사이드바 크기(px). 보이는 부분 가운데에 무대가 오도록 투영 중심을 옮긴다. */
   setInset(right: number, bottom: number): void;
   pick(clientX: number, clientY: number): Pick;
+  /** 라인 강조. hover는 마우스를 올린 라인(옅게), active는 고르거나 끄는 라인(진하게). */
+  setLineHighlight(hover: HangId | null, active: HangId | null): void;
   floorPoint(clientX: number, clientY: number): Vec3 | null;
   /** 화면 좌표의 포인터 광선. 조명기 몸체를 끌 때 가장 가까운 라인을 찾는 데 쓴다. */
   screenRay(clientX: number, clientY: number): Ray;
@@ -500,6 +502,43 @@ export function useStageScene(
     scene.add(ring, handle, aimLine);
     let selectedId: string | null = null;
 
+    // ── 라인 강조 ──
+    const lineHiMat = new THREE.MeshBasicMaterial({ color: "#ffd166", transparent: true, depthTest: false });
+    const lineHi = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 12), lineHiMat);
+    lineHi.renderOrder = 6;
+    lineHi.visible = false;
+    scene.add(lineHi);
+    let hoverLine: HangId | null = null;
+    let activeLine: HangId | null = null;
+    const lineUp = new THREE.Vector3(0, 1, 0);
+
+    // 파이프와 같은 자리에 조금 굵은 빛나는 막대를 겹친다(scene/venue.ts의 파이프 위치와 맞춘다)
+    function updateLineHighlight() {
+      const hang = activeLine ?? hoverLine;
+      if (!hang) {
+        lineHi.visible = false;
+        requestRender();
+        return;
+      }
+      const [lo, hi] = hangRange(show.stage, hang);
+      const p = hangPoint(show.stage, hang, 0);
+      const boom = hang === "boomL" || hang === "boomR";
+      const r = activeLine ? 0.07 : 0.055;
+      if (boom) {
+        lineHi.position.set(p.x, 2.3, p.z);
+        lineHi.quaternion.identity();
+        lineHi.scale.set(r, 4.6, r);
+      } else {
+        lineHi.position.set((lo + hi) / 2, p.y + (hang === "floor" ? 0 : 0.3), p.z);
+        lineHi.quaternion.setFromUnitVectors(lineUp, new THREE.Vector3(1, 0, 0));
+        lineHi.scale.set(r, hi - lo + 0.6, r);
+      }
+      lineHiMat.color.set(activeLine ? "#ffb000" : "#ffe08a");
+      lineHiMat.opacity = activeLine ? 1 : 0.75;
+      lineHi.visible = true;
+      requestRender();
+    }
+
     function updateSelection() {
       ring.visible = false;
       handle.visible = false;
@@ -687,6 +726,7 @@ export function useStageScene(
         stageGroup = buildStage(next.stage);
         scene.add(stageGroup);
       }
+      if (d.stage) updateLineHighlight();
       if (d.stage || d.venue) {
         venue.build(next.stage, next.venue);
         placeHouseLight();
@@ -881,6 +921,12 @@ export function useStageScene(
         requestRender();
       },
       pick,
+      setLineHighlight(hover, active) {
+        if (hover === hoverLine && active === activeLine) return;
+        hoverLine = hover;
+        activeLine = active;
+        updateLineHighlight();
+      },
       floorPoint(clientX, clientY) {
         setRay(clientX, clientY);
         return floorPointRaw();

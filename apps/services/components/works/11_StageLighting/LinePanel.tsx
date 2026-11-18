@@ -2,6 +2,7 @@
 
 // 조명기 탭에서 조명기를 고르지 않았을 때 보이는 라인 패널.
 // 라인마다 앞뒤·높이(붐은 무대에서 떨어진 거리)를 바꾸고, 걸린 조명기를 펼치거나 한 번에 겨눈다.
+import { useEffect, useRef } from "react";
 import { NumberField, Section } from "./fields";
 import {
   HANGS,
@@ -22,7 +23,12 @@ import { useShow } from "./useShow";
 
 const isBoom = (h: HangId) => h === "boomL" || h === "boomR";
 
-export default function LinePanel({ store, onBegin }: { store: Store; onBegin: () => void }) {
+export default function LinePanel({ store, onBegin, selected }: { store: Store; onBegin: () => void; selected: HangId | null }) {
+  // 3D에서 라인을 고르면 그 칸을 펼치고 보이게 굴린다
+  const selRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selected) selRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [selected]);
   const rig = useShow(store, (s) => s.stage.rig);
   const counts = useShow(store, (s) => HANGS.map((h) => s.fixtures.filter((f) => f.hang === h).length).join(","));
   const full = useShow(store, (s) => s.fixtures.length);
@@ -45,7 +51,9 @@ export default function LinePanel({ store, onBegin }: { store: Store; onBegin: (
         </p>
       </div>
       {HANGS.map((h, i) => (
-        <Section key={h} title={`${HANG_LABELS[h]} · ${count[i]}대`} defaultOpen={false}>
+        <div key={`${h}-${selected === h}`} ref={selected === h ? selRef : undefined}
+          className={selected === h ? "bg-[#ffb000]/15 shadow-[inset_3px_0_0_#ffb000]" : undefined}>
+        <Section title={`${HANG_LABELS[h]} · ${count[i]}대${selected === h ? " · 고름" : ""}`} defaultOpen={selected === h}>
           <div className="grid grid-cols-2 gap-1.5">
             <NumberField label="앞뒤" title="기본 위치에서 앞뒤로 옮긴 거리(m, +가 객석 쪽)" value={rig[h].dz}
               min={LINE_DZ.min} max={LINE_DZ.max} step={0.25} digits={2} unit="m" onBegin={onBegin}
@@ -68,6 +76,7 @@ export default function LinePanel({ store, onBegin }: { store: Store; onBegin: (
             </button>
           </div>
         </Section>
+        </div>
       ))}
     </div>
   );
