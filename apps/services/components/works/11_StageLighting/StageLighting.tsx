@@ -8,6 +8,7 @@ import Inspector from "./Inspector";
 import LinePanel from "./LinePanel";
 import Outliner from "./Outliner";
 import PlotLabels from "./PlotLabels";
+import PlotMap, { type PlotMapMode } from "./PlotMap";
 import { SeatPicker } from "./SeatMap";
 import Sidebar, { type SidebarTab } from "./Sidebar";
 import { loadQuality, loadShow, saveQuality, useAutoSave } from "./persistence";
@@ -104,6 +105,10 @@ export default function StageLighting() {
   const [tab, setTab] = useState<SidebarTab>("stage");
   // 고른 라인(파이프). 3D에서 진하게 칠하고 라인 패널에서 그 칸을 펼친다.
   const [selectedLine, setSelectedLine] = useState<HangId | null>(null);
+  // 평면도: 넓은 화면은 작게 띄운 채로 시작하고, 좁은 화면은 접어 둔다
+  const [mapMode, setMapMode] = useState<PlotMapMode>(() =>
+    typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches ? "mini" : "off",
+  );
   const [lineLabel, setLineLabel] = useState<{ x: number; y: number; text: string } | null>(null);
   // 다른 대상을 고르면 솔로와 고른 라인은 풀리고, 사이드바는 그 대상의 탭으로 넘어간다.
   const setPickedId = (id: string | null) => {
@@ -572,7 +577,7 @@ export default function StageLighting() {
         <div
           ref={viewRef}
           aria-label="무대 3D 화면"
-          className="absolute inset-0 touch-none overflow-hidden bg-[#050507] select-none"
+          className={`absolute inset-y-0 right-0 touch-none overflow-hidden bg-[#050507] select-none ${mapMode === "split" ? "left-0 md:left-1/2" : "left-0"}`}
           onPointerDownCapture={onPointerDownCapture}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -597,6 +602,22 @@ export default function StageLighting() {
             </p>
           )}
         </div>
+        {mapMode === "split" ? (
+          <div className="absolute inset-y-0 left-0 z-20 hidden w-1/2 md:block">
+            <PlotMap store={store} sceneRef={sceneRef} mode="split" onMode={setMapMode} selectedId={selectedId} selectedLine={selectedLine}
+              onPick={setPickedId} onPickLine={(h) => { setPickedId(null); setSelectedLine(h); setTab("fixtures"); }} onBegin={beginEdit} />
+          </div>
+        ) : mapMode === "mini" && view !== "plot" ? (
+          <div className="absolute left-3 z-20" style={{ bottom: inset.bottom + 12 }}>
+            <PlotMap store={store} sceneRef={sceneRef} mode="mini" onMode={setMapMode} selectedId={selectedId} selectedLine={selectedLine}
+              onPick={setPickedId} onPickLine={(h) => { setPickedId(null); setSelectedLine(h); setTab("fixtures"); }} onBegin={beginEdit} />
+          </div>
+        ) : mapMode === "off" ? (
+          <button type="button" className="absolute left-3 z-20 rounded-md border-2 border-point bg-white px-2 py-1 text-xs font-bold text-point shadow-[2px_2px_0_0_var(--color-point)] hover:bg-shade"
+            style={{ bottom: inset.bottom + 12 }} onClick={() => setMapMode("mini")}>
+            평면도 보기
+          </button>
+        ) : null}
         <Sidebar
           open={sidebarOpen}
           onOpen={setSidebarOpen}

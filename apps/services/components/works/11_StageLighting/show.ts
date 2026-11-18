@@ -1246,3 +1246,83 @@ export function rayAtZ(ray: Ray, z: number): { x: number; y: number } | null {
   const t = (z - ray.origin.z) / ray.dir.z;
   return t < 0 ? null : { x: ray.origin.x + ray.dir.x * t, y: ray.origin.y + ray.dir.y * t };
 }
+
+// ── 평면도(위에서 본 2D) ──
+// 좌표는 월드 x·z 그대로 쓴다(z가 클수록 객석 쪽). 붐은 위에서 보면 점이라, 높이를 앞뒤 막대로 펼쳐 그린다.
+
+export type MapPt = { x: number; z: number };
+const BOOM_MAP_SCALE = 0.35; // 붐 높이 1m를 평면도에서 이만큼(m) 앞뒤로 펼친다
+const MAP_MARGIN = 1;
+
+const isBoomHang = (h: HangId) => h === "boomL" || h === "boomR";
+
+export function deckOutline(stage: Stage): { kind: "circle"; cx: number; cz: number; r: number } | { kind: "rects"; rects: { x: number; z: number; w: number; h: number }[] } {
+  const { width: w, depth: d } = stage;
+  if (stage.shape === "round") return { kind: "circle", cx: 0, cz: -d / 2, r: Math.min(w, d) / 2 };
+  const rects = [{ x: -w / 2, z: -d, w, h: d }];
+  if (stage.shape === "thrust") rects.push({ x: -w / 4, z: 0, w: w / 2, h: d * 0.4 });
+  return { kind: "rects", rects };
+}
+
+/** 라인 위 자리의 평면도 위치. 붐 꼭대기는 무대 안쪽(위)으로 펼친다. */
+export function fixtureMapPoint(stage: Stage, hang: HangId, along: number): MapPt {
+  const p = hangPoint(stage, hang, along);
+  if (!isBoomHang(hang)) return { x: p.x, z: p.z };
+  const [lo, hi] = hangRange(stage, hang);
+  return { x: p.x, z: p.z - (p.y - (lo + hi) / 2) * BOOM_MAP_SCALE };
+}
+
+export function lineMapSegment(stage: Stage, hang: HangId): [MapPt, MapPt] {
+  const [lo, hi] = hangRange(stage, hang);
+  return [fixtureMapPoint(stage, hang, lo), fixtureMapPoint(stage, hang, hi)];
+}
+
+function pointSegment(p: MapPt, a: MapPt, b: MapPt): { dist: number; s: number } {
+  const ux = b.x - a.x;
+  const uz = b.z - a.z;
+  const uu = ux * ux + uz * uz;
+  const s = uu > 1e-12 ? clamp(((p.x - a.x) * ux + (p.z - a.z) * uz) / uu, 0, 1) : 0;
+  return { dist: Math.hypot(a.x + ux * s - p.x, a.z + uz * s - p.z), s };
+}
+
+/** 평면도 위치에서 가장 가까운 라인과 그 위 자리. 지금 라인은 HANG_STICKY만큼 더 붙잡는다. */
+export function hangFromMap(stage: Stage, p: MapPt, current: HangId | null): { hang: HangId; along: number } {
+  let best = { hang: current ?? ("e1" as HangId), along: 0 };
+  let bestD = Infinity;
+  for (const hang of HANGS) {
+    const [lo, hi] = hangRange(stage, hang);
+    const [a, b] = lineMapSegment(stage, hang);
+    const { dist, s } = pointSegment(p, a, b);
+    const d = hang === current ? dist - HANG_STICKY : dist;
+    if (d < bestD) {
+      bestD = d;
+      best = { hang, along: Math.round((lo + (hi - lo) * s) * 10) / 10 };
+    }
+  }
+  return best;
+}
+
+/** 평면도에서 라인을 (dx, dz)만큼 끈 결과. 가로 라인은 앞뒤만, 붐은 바깥으로 끌면 무대에서 멀어진다. */
+export function dragLineOnMap(hang: HangId, start: LineOffset, dx: number, dz: number): LineOffset {
+  if (!isBoomHang(hang)) return { ...start, dz: start.dz + dz };
+  return { dz: start.dz + dz, dy: start.dy + (hang === "boomL" ? -dx : dx) };
+}
+
+/** 평면도에 담을 범위: 무대 바닥·라인·인물·소품·조준점에 여백 1m. */
+export function mapBounds(show: Show): { minX: number; maxX: number; minZ: number; maxZ: number } {
+  const pts: MapPt[] = HANGS.flatMap((h) => lineMapSegment(show.stage, h));
+  const deck = deckOutline(show.stage);
+  if (deck.kind === "circle") pts.push({ x: -deck.r, z: deck.cz - deck.r }, { x: deck.r, z: deck.cz + deck.r });
+  else for (const r of deck.rects) pts.push({ x: r.x, z: r.z }, { x: r.x + r.w, z: r.z + r.h });
+  for (const a of show.actors) pts.push(a.position);
+  for (const p of show.props) pts.push(p.position);
+  for (const f of show.fixtures) pts.push(f.focus.target);
+  const xs = pts.map((p) => p.x);
+  const zs = pts.map((p) => p.z);
+  return {
+    minX: Math.min(...xs) - MAP_MARGIN,
+    maxX: Math.max(...xs) + MAP_MARGIN,
+    minZ: Math.min(...zs) - MAP_MARGIN,
+    maxZ: Math.max(...zs) + MAP_MARGIN,
+  };
+}
