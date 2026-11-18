@@ -3,6 +3,13 @@ import assert from "node:assert/strict";
 import {
   asciiBytes,
   buildEucKrTable,
+  byteRangeToChars,
+  charByteLengths,
+  charsToByteRange,
+  parseBytesSpans,
+  parseCodePointSpans,
+  pickRange,
+  textSpans,
   codePoints,
   decodeBytes,
   displayChar,
@@ -133,4 +140,50 @@ test("decodeBytes UTF-16·EUC-KR·ASCII", () => {
   const ascii = decodeBytes([0x41, 0x80], "ascii");
   assert.equal(ascii.text, "A");
   assert.match(ascii.error!, /2번째/);
+});
+
+test("parseBytesSpans: 바이트마다 입력에서의 위치", () => {
+  assert.deepEqual(parseBytesSpans("EA B0 80").spans, [[0, 2], [3, 5], [6, 8]]);
+  assert.deepEqual(parseBytesSpans("EAB080").spans, [[0, 2], [2, 4], [4, 6]]);
+  const ox = parseBytesSpans("0xEA,0xB0");
+  assert.deepEqual(ox.values, [0xea, 0xb0]);
+  assert.deepEqual(ox.spans, [[2, 4], [7, 9]]);
+  assert.deepEqual(parseBytesSpans("\\xEA\\xB0").spans, [[2, 4], [6, 8]]);
+  assert.deepEqual(parseBytesSpans("234 176", 10).spans, [[0, 3], [4, 7]]);
+});
+
+test("parseCodePointSpans: 코드마다 위치, 서로게이트 쌍은 한 범위로", () => {
+  assert.deepEqual(parseCodePointSpans("U+AC00 U+0041").spans, [[0, 6], [7, 13]]);
+  const pair = parseCodePointSpans("\\uD83D\\uDE00");
+  assert.deepEqual(pair.values, [0x1f600]);
+  assert.deepEqual(pair.spans, [[0, 12]]);
+});
+
+test("charByteLengths: 인코딩별 문자당 바이트 수", () => {
+  assert.deepEqual(charByteLengths("가A😀", "utf-8"), [3, 1, 4]);
+  assert.deepEqual(charByteLengths("가A😀", "utf-16be"), [2, 2, 4]);
+  assert.deepEqual(charByteLengths("가A", "euc-kr"), [2, 1]);
+  assert.deepEqual(charByteLengths("AB", "ascii"), [1, 1]);
+});
+
+test("textSpans: 코드포인트마다 원문(UTF-16) 위치", () => {
+  assert.deepEqual(textSpans("가😀A"), [[0, 1], [1, 3], [3, 4]]);
+});
+
+test("pickRange: 선택 범위와 겹치는 항목, 커서만 있으면 그 자리 항목", () => {
+  const spans: [number, number][] = [[0, 2], [3, 5], [6, 8]];
+  assert.deepEqual(pickRange(spans, 4, 4), [1, 2]);
+  assert.deepEqual(pickRange(spans, 0, 8), [0, 3]);
+  assert.deepEqual(pickRange(spans, 1, 4), [0, 2]);
+  assert.equal(pickRange(spans, 2, 3), null);
+  assert.deepEqual(pickRange(spans, 2, 2), [0, 1]);
+  assert.equal(pickRange([], 0, 0), null);
+});
+
+test("byteRangeToChars·charsToByteRange: 바이트와 문자 대응", () => {
+  const lens = [3, 1, 4]; // 가 A 😀 (UTF-8)
+  assert.deepEqual(byteRangeToChars(lens, 0, 1), [0, 1]);
+  assert.deepEqual(byteRangeToChars(lens, 3, 5), [1, 3]);
+  assert.equal(byteRangeToChars(lens, 8, 9), null);
+  assert.deepEqual(charsToByteRange(lens, 1, 3), [3, 8]);
 });

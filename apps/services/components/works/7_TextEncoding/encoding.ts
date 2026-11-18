@@ -110,35 +110,49 @@ const DIGITS: Record<Radix, RegExp> = {
 };
 const RADIX_NAME: Record<Radix, string> = { 16: "16진수", 10: "10진수", 2: "2진수" };
 
+export type Span = [number, number];
+export type SpannedResult = ParseResult & { spans: Span[] };
+
 // 바이트열 입력을 읽는다. 16진수는 0x·\x 접두사를 지우고, 붙여 쓴 값
 // (EAB080)은 2자리씩, 2진수는 8자리씩 자른다. 구분자는 공백·쉼표.
-export function parseBytes(input: string, radix: Radix = 16): ParseResult {
+// spans[i]는 i번째 바이트가 입력에서 차지하는 [시작, 끝) 위치(하이라이트용).
+export function parseBytesSpans(input: string, radix: Radix = 16): SpannedResult {
+  // 접두사를 같은 길이의 공백으로 바꿔 원래 위치를 그대로 둔다
   let s = input;
-  if (radix === 16) s = s.replace(/\\x|0x/gi, " ");
-  if (radix === 2) s = s.replace(/0b/gi, " ");
-  const tokens = s.split(/[\s,]+/).filter(Boolean);
+  if (radix === 16) s = s.replace(/\\x|0x/gi, "  ");
+  if (radix === 2) s = s.replace(/0b/gi, "  ");
   const width = radix === 16 ? 2 : radix === 2 ? 8 : 0;
   const values: number[] = [];
-  for (let i = 0; i < tokens.length; i++) {
-    const tok = tokens[i];
+  const spans: Span[] = [];
+  let i = 0;
+  for (const m of s.matchAll(/[^\s,]+/g)) {
+    const tok = m[0];
+    const at = m.index;
     const where = `${i + 1}번째 값 ${tok}`;
+    i++;
     if (!DIGITS[radix].test(tok))
-      return { values, error: `${where}: ${RADIX_NAME[radix]}가 아니에요` };
-    const chunks: string[] = [];
+      return { values, spans, error: `${where}: ${RADIX_NAME[radix]}가 아니에요` };
+    const chunks: Span[] = [];
     if (width && tok.length > width) {
       if (tok.length % width !== 0)
-        return { values, error: `${where}: 자리 수가 ${width}의 배수가 아니에요` };
-      for (let k = 0; k < tok.length; k += width) chunks.push(tok.slice(k, k + width));
+        return { values, spans, error: `${where}: 자리 수가 ${width}의 배수가 아니에요` };
+      for (let k = 0; k < tok.length; k += width) chunks.push([at + k, at + k + width]);
     } else {
-      chunks.push(tok);
+      chunks.push([at, at + tok.length]);
     }
     for (const c of chunks) {
-      const v = parseInt(c, radix);
-      if (v > 255) return { values, error: `${where}: 한 바이트(0~255)를 넘어요` };
+      const v = parseInt(input.slice(c[0], c[1]), radix);
+      if (v > 255) return { values, spans, error: `${where}: 한 바이트(0~255)를 넘어요` };
       values.push(v);
+      spans.push(c);
     }
   }
-  return { values, error: null };
+  return { values, spans, error: null };
+}
+
+export function parseBytes(input: string, radix: Radix = 16): ParseResult {
+  const { values, error } = parseBytesSpans(input, radix);
+  return { values, error };
 }
 
 export function looksLikeCodePoints(input: string): boolean {
@@ -148,30 +162,31 @@ export function looksLikeCodePoints(input: string): boolean {
 const CP_TOKEN =
   /U\+([0-9a-f]{1,6})|\\u\{([0-9a-f]{1,6})\}|\\u([0-9a-f]{4})|&#x([0-9a-f]{1,6});?|&#([0-9]{1,7});?/gi;
 
-// 😀처럼 나뉜 서로게이트 쌍을 코드포인트 하나로 합친다.
-function combineSurrogates(units: number[]): ParseResult {
+// 😀처럼 나뉜 서로게이트 쌍을 코드포인트 하나로 합친다. 위치도 두 토큰을 합친 범위가 된다.
+function combineSurrogates(units: number[], unitSpans: Span[]): SpannedResult {
   const values: number[] = [];
+  const spans: Span[] = [];
   for (let i = 0; i < units.length; i++) {
     const u = units[i];
     if (isHighSurrogate(u) && i + 1 < units.length && isLowSurrogate(units[i + 1])) {
       values.push(0x10000 + ((u - 0xd800) << 10) + (units[i + 1] - 0xdc00));
+      spans.push([unitSpans[i][0], unitSpans[i + 1][1]]);
       i++;
       continue;
     }
     if (isSurrogate(u))
-      return { values, error: `${i + 1}번째 코드 ${formatCodePoint(u)}: 짝이 없는 서로게이트예요` };
+      return { values, spans, error: `${i + 1}번째 코드 ${formatCodePoint(u)}: 짝이 없는 서로게이트예요` };
     values.push(u);
+    spans.push(unitSpans[i]);
   }
-  return { values, error: null };
+  return { values, spans, error: null };
 }
 
-export function parseCodePoints(input: string): ParseResult {
+export function parseCodePointSpans(input: string): SpannedResult {
   const units: number[] = [];
+  const unitSpans: Span[] = [];
   let last = 0;
-  const fail = (error: string): ParseResult => ({
-    values: combineSurrogates(units).values,
-    error,
-  });
+  const fail = (error: string): SpannedResult => ({ ...combineSurrogates(units, unitSpans), error });
   for (const m of input.matchAll(CP_TOKEN)) {
     const gap = input.slice(last, m.index).replace(/[\s,]+/g, "");
     if (gap) return fail(`${gap}: 코드로 읽지 못했어요`);
@@ -180,11 +195,82 @@ export function parseCodePoints(input: string): ParseResult {
     if (v > 0x10ffff)
       return fail(`${units.length + 1}번째 코드 ${m[0]}: 유니코드 범위(U+10FFFF)를 넘어요`);
     units.push(v);
+    unitSpans.push([m.index, m.index + m[0].length]);
     last = m.index + m[0].length;
   }
   const tail = input.slice(last).replace(/[\s,]+/g, "");
   if (tail) return fail(`${tail}: 코드로 읽지 못했어요`);
-  return combineSurrogates(units);
+  return combineSurrogates(units, unitSpans);
+}
+
+export function parseCodePoints(input: string): ParseResult {
+  const { values, error } = parseCodePointSpans(input);
+  return { values, error };
+}
+
+// ── 하이라이트용 대응 계산 ──
+
+// 복원한 문자 하나가 쓴 바이트 수. 해독기는 정규형만 받으므로 다시 인코딩한 길이와 같다.
+export function charByteLengths(text: string, encoding: Encoding): number[] {
+  return codePoints(text).map((cp) => {
+    if (encoding === "utf-8") return utf8Bytes(cp).length;
+    if (encoding === "utf-16be") return utf16Units(cp).length * 2;
+    if (encoding === "ascii") return 1;
+    return cp < 0x80 ? 1 : 2;
+  });
+}
+
+// 코드포인트마다 원문(UTF-16 인덱스)에서의 [시작, 끝)
+export function textSpans(text: string): Span[] {
+  const out: Span[] = [];
+  let at = 0;
+  for (const cp of codePoints(text)) {
+    const len = cp > 0xffff ? 2 : 1;
+    out.push([at, at + len]);
+    at += len;
+  }
+  return out;
+}
+
+// 선택 [start, end)와 겹치는 항목의 [첫, 끝) 번호. 커서만 있으면(start = end) 그 자리를 포함하는 항목.
+export function pickRange(spans: Span[], start: number, end: number): Span | null {
+  let a = -1;
+  let b = -1;
+  for (let i = 0; i < spans.length; i++) {
+    const [s, e] = spans[i];
+    const hit = start === end ? s <= start && start <= e : s < end && e > start;
+    if (!hit) continue;
+    if (a < 0) a = i;
+    b = i + 1;
+    if (start === end) break;
+  }
+  return a < 0 ? null : [a, b];
+}
+
+// 바이트 [b0, b1)를 포함하는 문자 번호 범위. lens는 문자별 바이트 수.
+export function byteRangeToChars(lens: number[], b0: number, b1: number): Span | null {
+  let at = 0;
+  let a = -1;
+  let b = -1;
+  for (let i = 0; i < lens.length; i++) {
+    const s = at;
+    const e = at + lens[i];
+    at = e;
+    if (s < b1 && e > b0) {
+      if (a < 0) a = i;
+      b = i + 1;
+    }
+  }
+  return a < 0 ? null : [a, b];
+}
+
+// 문자 [c0, c1)이 쓴 바이트 범위
+export function charsToByteRange(lens: number[], c0: number, c1: number): Span {
+  let start = 0;
+  for (let i = 0; i < c0; i++) start += lens[i];
+  let end = start;
+  for (let i = c0; i < c1; i++) end += lens[i];
+  return [start, end];
 }
 
 function decodeAscii(bytes: number[]): DecodeResult {
