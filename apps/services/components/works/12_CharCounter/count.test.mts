@@ -52,7 +52,7 @@ test("저장값 읽기", () => {
   assert.equal(parseSaved(JSON.stringify({ ...ok, limit: 1.5 })), null);
 });
 
-test("목표를 처음 넘기는 위치", () => {
+test("제한을 처음 넘기는 위치", () => {
   assert.equal(overflowStart("가나다", 3, "with-spaces"), null);
   assert.equal(overflowStart("가나다라", 3, "with-spaces"), 3);
   // 공백 제외는 공백을 건너뛰고, 넘기는 첫 글자에서 시작한다

@@ -13,7 +13,7 @@ import {
   overflowStart,
   parseSaved,
 } from "./count";
-import { NumberCombo, Select } from "./Dropdown";
+import { NumberCombo, Select } from "../_shared/Dropdown";
 
 const STORAGE_KEY = "char-counter";
 // 치는 동안은 저장하지 않고, 손을 멈춘 뒤 잠시 기다렸다 저장한다. 나갈 때는 기다리지 않고 바로 저장한다
@@ -33,12 +33,12 @@ type StatProps = {
   label: string;
   value: number;
   unit: string;
-  /** 목표 기준인 값이면 "/목표"를 붙이고 강조한다. 넘으면 붉게 칠한다 */
+  /** 제한 기준인 값이면 "/제한"을 붙이고 강조한다. 넘으면 붉게 칠한다 */
   goal?: number | null;
   active?: boolean;
 };
 
-// 가장 먼저 보는 숫자. 크게 쓰고, 목표 기준인 값은 포인트 색으로 칠한다.
+// 가장 먼저 보는 숫자. 크게 쓰고, 제한 기준인 값은 포인트 색으로 칠한다.
 function BigStat({ label, value, unit, goal, active }: StatProps) {
   const over = goal != null && value > goal;
   const color = over ? "text-[#c0392b]" : active ? "text-point" : "text-ink";
@@ -234,7 +234,7 @@ export default function CharCounter() {
         </button>
       </div>
 
-      {/* 목표를 넘긴 부분은 textarea 뒤에 같은 글을 겹쳐 그려 배경만 칠한다 */}
+      {/* 제한을 넘긴 부분은 textarea 뒤에 같은 글을 겹쳐 그려 배경만 칠한다 */}
       <div className={`relative min-h-48 flex-1 overflow-hidden focus-within:border-ink/30 ${PANEL}`}>
         <div ref={backdropRef} aria-hidden className={`${FIELD} pointer-events-none overflow-hidden text-transparent`}>
           {cut === null ? (
@@ -265,11 +265,11 @@ export default function CharCounter() {
           lang="ko"
           className={`${FIELD} resize-none overflow-y-auto bg-transparent text-ink focus:outline-none`}
         />
-        {/* 목표 막대는 입력칸 아랫변에 겹쳐 그려, 목표를 정하고 지워도 배치가 그대로다 */}
+        {/* 제한 막대는 입력칸 아랫변에 겹쳐 그려, 제한을 정하고 지워도 배치가 그대로다 */}
         {limit !== null && (
           <div
             role="progressbar"
-            aria-label="목표 대비"
+            aria-label="제한 대비"
             aria-valuemin={0}
             aria-valuemax={limit}
             aria-valuenow={Math.min(current, limit)}
@@ -291,7 +291,7 @@ export default function CharCounter() {
         </p>
       </div>
 
-      {/* 카드 없이 입력칸 아래에 바로 둔다: 왼쪽은 글자 수, 오른쪽은 목표 */}
+      {/* 카드 없이 입력칸 아래에 바로 둔다: 왼쪽은 글자 수, 오른쪽은 제한 */}
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-1">
         <div className="flex items-end gap-5">
           <BigStat
@@ -301,7 +301,7 @@ export default function CharCounter() {
             goal={basis === "with-spaces" ? limit : null}
             active={basis === "with-spaces"}
           />
-          {/* 둘째 칸은 늘 하나 — 바이트를 목표 기준으로 고르면 바이트로 바꾼다 */}
+          {/* 둘째 칸은 늘 하나 — 바이트를 제한 기준으로 고르면 바이트로 바꾼다 */}
           {bytesGoal ? (
             <BigStat label="바이트(한글 2)" value={counts.bytesKr} unit="B" goal={limit} active />
           ) : (
@@ -326,10 +326,11 @@ export default function CharCounter() {
         </div>
         <div className="flex items-center gap-2">
           <label htmlFor="char-limit" className="text-xs text-ink/60">
-            목표
+            제한
           </label>
           <Select
-            label="목표 기준"
+            placement="up"
+            label="제한 기준"
             value={basis}
             onChange={setBasis}
             options={(Object.keys(BASIS_LABELS) as Basis[]).map((b) => ({ value: b, label: BASIS_LABELS[b] }))}

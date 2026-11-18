@@ -3,9 +3,11 @@
 import { Check, ChevronDown, X } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
-// 글자수 세기의 목표 칸에 쓰는 드롭다운. 화면 아래쪽에 놓이므로 목록은 위로 연다.
+// 네이티브 select 대신 쓰는 드롭다운. 목록 모양을 직접 그린다.
+// placement로 목록을 아래(기본)나 위로 연다 — 화면 아래쪽 칸은 위로 연다.
 
 type Option<T> = { value: T; label: ReactNode };
+type Placement = "up" | "down";
 
 const TRIGGER =
   "flex h-8 items-center rounded-md border border-ink/15 bg-white text-sm text-ink hover:border-ink/30 focus-within:border-point";
@@ -63,7 +65,9 @@ function OptionList<T>({
   active,
   onHover,
   onPick,
+  placement,
 }: {
+  placement: Placement;
   id: string;
   options: Option<T>[];
   selected: T | null;
@@ -75,7 +79,7 @@ function OptionList<T>({
     <ul
       id={id}
       role="listbox"
-      className="absolute bottom-full left-0 z-20 mb-1.5 min-w-full overflow-hidden rounded-lg border border-ink/10 bg-white py-1 shadow-[0_8px_24px_-6px_rgba(12,54,117,0.25)]"
+      className={`absolute left-0 z-20 min-w-full ${placement === "up" ? "bottom-full mb-1.5" : "top-full mt-1.5"} overflow-hidden rounded-lg border border-ink/10 bg-white py-1 shadow-[0_8px_24px_-6px_rgba(12,54,117,0.25)]`}
     >
       {options.map((o, i) => {
         const isSelected = o.value === selected;
@@ -108,11 +112,16 @@ export function Select<T extends string>({
   value,
   options,
   onChange,
+  placement = "down",
+  triggerClassName = `${TRIGGER} gap-1 pr-1.5 pl-2.5`,
 }: {
   label: string;
   value: T;
   options: Option<T>[];
   onChange: (v: T) => void;
+  placement?: Placement;
+  /** 버튼 모양을 바꿀 때 쓴다. 화살표 아이콘은 늘 붙는다 */
+  triggerClassName?: string;
 }) {
   const listId = useId();
   const selectedIndex = options.findIndex((o) => o.value === value);
@@ -129,13 +138,14 @@ export function Select<T extends string>({
         aria-controls={open ? listId : undefined}
         onClick={() => (open ? setOpen(false) : show())}
         onKeyDown={(e) => onKey(e, (i) => onChange(options[i].value))}
-        className={`${TRIGGER} gap-1 pr-1.5 pl-2.5`}
+        className={triggerClassName}
       >
         {current?.label}
-        <ChevronDown aria-hidden className={`size-4 text-ink/40 ${open ? "rotate-180" : ""}`} />
+        <ChevronDown aria-hidden className={`size-4 opacity-50 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <OptionList
+          placement={placement}
           id={listId}
           options={options}
           selected={value}
@@ -199,7 +209,7 @@ export function NumberCombo({
         {/* 비우기 버튼은 값이 없어도 자리를 지켜 칸 폭이 흔들리지 않게 한다 */}
         <button
           type="button"
-          aria-label="목표 지우기"
+          aria-label="제한 지우기"
           disabled={value === null}
           onClick={() => {
             onChange(null);
@@ -212,7 +222,7 @@ export function NumberCombo({
         <button
           type="button"
           tabIndex={-1}
-          aria-label="자주 쓰는 목표 보기"
+          aria-label="자주 쓰는 제한 보기"
           onPointerDown={(e) => e.preventDefault()}
           onClick={() => {
             if (open) setOpen(false);
@@ -226,6 +236,7 @@ export function NumberCombo({
       </div>
       {open && (
         <OptionList
+          placement="up"
           id={listId}
           options={presets.map((n) => ({ value: n, label: `${format(n)}${unit}` }))}
           selected={value}
