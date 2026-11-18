@@ -15,8 +15,11 @@ import { dragHeight, dropAt } from "./placement";
 import { stageBounds } from "./scene/stage";
 import {
   CUE_PARAMS,
+  type HangId,
   type Show,
   type Vec3,
+  hangFromRay,
+  hangPoint,
   addActor,
   addFixture,
   addProp,
@@ -45,10 +48,9 @@ type Drag = {
   pointerId: number;
   offset: { x: number; z: number };
   baseY: number;
-  /** 조명기: 끌기 시작 자리. Shift를 누르는 동안은 높이만 바뀐다. */
-  base: Vec3;
-  shift: boolean;
-  wasShift: boolean;
+  /** 조명기: 지금 걸린 라인(끄는 동안 바뀔 수 있다). */
+  hang: HangId | null;
+  along: number;
   clientX: number;
   clientY: number;
   raf: number;
@@ -214,20 +216,12 @@ export default function StageLighting() {
     const scene = sceneRef.current;
     if (d.type === "fixture") {
       if (!scene) return null;
-      const cur = d.last ?? d.base;
-      if (d.shift) {
-        const y = scene.heightAt(d.clientX, d.clientY, cur);
-        d.wasShift = true;
-        return y === null ? null : { ...cur, y: Math.min(15, Math.max(0, y)) };
-      }
-      // Shift를 떼면 지금 높이에서 수평 끌기를 다시 잡는다
-      if (d.wasShift) {
-        const p0 = scene.planePoint(d.clientX, d.clientY, cur.y);
-        if (p0) d.offset = { x: cur.x - p0.x, z: cur.z - p0.z };
-        d.wasShift = false;
-      }
-      const p = scene.planePoint(d.clientX, d.clientY, cur.y);
-      return p ? { x: p.x + d.offset.x, y: cur.y, z: p.z + d.offset.z } : null;
+      // 포인터에 가장 가까운 라인 위로만 움직인다. 다른 라인 가까이 가면 그 라인으로 옮겨 건다.
+      const s = store.get();
+      const line = hangFromRay(s.stage, scene.screenRay(d.clientX, d.clientY), d.hang);
+      d.hang = line.hang;
+      d.along = line.along;
+      return hangPoint(s.stage, line.hang, line.along);
     }
     const fp = scene?.floorPoint(d.clientX, d.clientY);
     if (!fp) return null;
@@ -259,10 +253,12 @@ export default function StageLighting() {
     setPickedId(hit.id);
     const s = store.get();
     let base: Vec3;
+    let fixtureLine: { hang: HangId; along: number } | null = null;
     if (hit.type === "fixture") {
       const f = s.fixtures.find((x) => x.id === hit.id);
       if (!f) return;
-      base = f.position;
+      fixtureLine = { hang: f.hang, along: f.along };
+      base = hangPoint(s.stage, f.hang, f.along);
     } else if (hit.type === "aim") {
       const f = s.fixtures.find((x) => x.id === hit.id);
       if (!f) return;
@@ -272,8 +268,7 @@ export default function StageLighting() {
       if (!ent) return;
       base = ent.position;
     }
-    // 조명기 몸체는 그 높이의 수평면에서, 나머지는 바닥에서 잡은 점과의 차이를 유지한다
-    const fp = hit.type === "fixture" ? scene.planePoint(e.clientX, e.clientY, base.y) : scene.floorPoint(e.clientX, e.clientY);
+    const fp = hit.type === "fixture" ? base : scene.floorPoint(e.clientX, e.clientY);
     if (!fp) return;
     beginEdit();
     scene.beginInteraction();
@@ -284,9 +279,8 @@ export default function StageLighting() {
       pointerId: e.pointerId,
       offset: { x: base.x - fp.x, z: base.z - fp.z },
       baseY: base.y,
-      base,
-      shift: e.shiftKey,
-      wasShift: false,
+      hang: fixtureLine?.hang ?? null,
+      along: fixtureLine?.along ?? 0,
       clientX: e.clientX,
       clientY: e.clientY,
       raf: 0,
@@ -299,7 +293,6 @@ export default function StageLighting() {
     if (!d || d.pointerId !== e.pointerId) return;
     d.clientX = e.clientX;
     d.clientY = e.clientY;
-    d.shift = e.shiftKey;
     if (d.raf) return;
     d.raf = requestAnimationFrame(() => {
       d.raf = 0;
@@ -324,7 +317,7 @@ export default function StageLighting() {
         if (d.type === "prop") store.set(updateProp(s, d.id, { position: at }));
         else store.set(updateActor(s, d.id, { position: at }));
       } else if (d.type === "fixture") {
-        store.set(updateFixture(s, d.id, { position: pos }));
+        if (d.hang) store.set(updateFixture(s, d.id, { hang: d.hang, along: d.along }));
       } else {
         // 팔로우는 큐마다 대상을 따라가고, 나머지는 포커스(고정 조준)를 옮긴다.
         const f = s.fixtures.find((x) => x.id === d.id);

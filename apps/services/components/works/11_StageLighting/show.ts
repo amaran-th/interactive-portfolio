@@ -74,7 +74,8 @@ export type Fixture = {
   channel: number;
   kind: FixtureKind;
   name: string;
-  position: Vec3; // 조명기 몸체 위치(m). 걸 위치에 묶이지 않고 자유롭게 놓는다.
+  hang: HangId; // 걸린 라인
+  along: number; // 라인 위 좌표(m). 붐은 높이.
   castShadow: boolean;
   focus: Focus;
 };
@@ -116,7 +117,7 @@ export type VenueTemplate = {
 export type Venue = { template: VenueTemplate };
 
 export type Show = {
-  version: 4;
+  version: 5;
   stage: Stage;
   venue: Venue;
   ambient: number; // 잔광 0..1. 유도등·통로등과 반사광 세기. 큐에는 들어가지 않는다.
@@ -358,7 +359,7 @@ export function resolve(stage: Stage, f: Fixture, level: FixtureLevel | undefine
     target,
     beamAngle: beamAngle(f.kind, zoom, f.focus.lamp),
     softness: softnessOf(f.kind, f.focus.sharpness),
-    position: f.position,
+    position: hangPoint(stage, f.hang, f.along),
   };
 }
 
@@ -446,18 +447,51 @@ function clampFocus(f: Focus): Focus {
   };
 }
 
-function clampFixture(f: Fixture): Fixture {
-  return { ...f, name: f.name.slice(0, 20), position: clampVec(f.position), focus: clampFocus(f.focus) };
+function clampFixture(stage: Stage, f: Fixture): Fixture {
+  const [lo, hi] = hangRange(stage, f.hang);
+  return { ...f, name: f.name.slice(0, 20), along: clamp(f.along, lo, hi), focus: clampFocus(f.focus) };
 }
 
-/** '높이 맞추기' 버튼 값(m). 걸 위치(FOH·일렉트릭·바닥)의 높이와 같고, 붐은 사람 키보다 조금 높게. */
-export function heightPresets(stage: Stage): { foh: number; batten: number; boom: number; floor: number } {
-  return {
-    foh: hangPoint(stage, "foh", 0).y,
-    batten: hangPoint(stage, "e1", 0).y,
-    boom: 2.5,
-    floor: hangPoint(stage, "floor", 0).y,
-  };
+export type Ray = { origin: Vec3; dir: Vec3 };
+// 두 라인 사이에서 들썩이지 않도록, 지금 라인은 이만큼(m) 더 가깝다고 본다
+const HANG_STICKY = 0.6;
+
+const sub = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+const dot = (a: Vec3, b: Vec3) => a.x * b.x + a.y * b.y + a.z * b.z;
+
+/** 광선(t ≥ 0)과 선분 a–b 사이 가장 가까운 거리와 선분 위 비율 s(0..1). */
+function raySegment(ray: Ray, a: Vec3, b: Vec3): { dist: number; s: number } {
+  const u = sub(b, a);
+  const v = ray.dir;
+  const w = sub(a, ray.origin);
+  const uu = dot(u, u);
+  const uv = dot(u, v);
+  const vv = dot(v, v);
+  const uw = dot(u, w);
+  const vw = dot(v, w);
+  const den = uu * vv - uv * uv;
+  let s = den > 1e-9 ? (uv * vw - vv * uw) / den : 0;
+  s = clamp(s, 0, 1);
+  const t = Math.max(0, (uv * s + vw) / vv);
+  const p = { x: a.x + u.x * s, y: a.y + u.y * s, z: a.z + u.z * s };
+  const q = { x: ray.origin.x + v.x * t, y: ray.origin.y + v.y * t, z: ray.origin.z + v.z * t };
+  return { dist: Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z), s };
+}
+
+/** 화면 포인터 광선에 가장 가까운 라인과 그 위 좌표. 조명기 몸체를 끌 때 라인을 따라가거나 다른 라인으로 옮긴다. */
+export function hangFromRay(stage: Stage, ray: Ray, current: HangId | null): { hang: HangId; along: number } {
+  let best = { hang: current ?? ("e1" as HangId), along: 0 };
+  let bestD = Infinity;
+  for (const hang of HANGS) {
+    const [lo, hi] = hangRange(stage, hang);
+    const { dist, s } = raySegment(ray, hangPoint(stage, hang, lo), hangPoint(stage, hang, hi));
+    const d = hang === current ? dist - HANG_STICKY : dist;
+    if (d < bestD) {
+      bestD = d;
+      best = { hang, along: Math.round((lo + (hi - lo) * s) * 10) / 10 };
+    }
+  }
+  return best;
 }
 
 // ── 만들기 ──
@@ -491,7 +525,8 @@ function makeFixture(
   channel: number,
   kind: FixtureKind,
   name: string,
-  position: Vec3,
+  hang: HangId,
+  along: number,
   focus: Partial<Focus> & { target: Vec3 },
   castShadow: boolean,
 ): Fixture {
@@ -500,7 +535,8 @@ function makeFixture(
     channel,
     kind,
     name,
-    position,
+    hang,
+    along,
     castShadow,
     focus: { zoom: 0.5, sharpness: 0.8, lamp: "mfl", gel: OPEN, ...focus },
   };
@@ -512,14 +548,14 @@ const STAGE_DEFAULT: Stage = { shape: "proscenium", width: 10, depth: 8, height:
 export function defaultShow(): Show {
   const gel = (name: string) => GELS.find((g) => g.name === name)!.color;
   const fx = [
-    makeFixture(1, "profile", "앞 왼쪽", hangPoint(STAGE_DEFAULT, "foh", -2), { target: { x: -1, y: 0, z: -3 }, zoom: 0.3, sharpness: 0.9 }, true),
-    makeFixture(2, "profile", "앞 오른쪽", hangPoint(STAGE_DEFAULT, "foh", 2), { target: { x: 1, y: 0, z: -3 }, zoom: 0.3, sharpness: 0.9 }, true),
-    makeFixture(3, "fresnel", "위 왼쪽", hangPoint(STAGE_DEFAULT, "e1", -2), { target: { x: -1.5, y: 0, z: -3 }, gel: gel("웜 앰버") }, true),
-    makeFixture(4, "fresnel", "위 오른쪽", hangPoint(STAGE_DEFAULT, "e1", 2), { target: { x: 1.5, y: 0, z: -3 }, gel: gel("웜 앰버") }, true),
-    makeFixture(5, "par", "역광 왼쪽", hangPoint(STAGE_DEFAULT, "e3", -2.5), { target: { x: -1, y: 0, z: -2.5 }, gel: gel("딥 블루") }, true),
-    makeFixture(6, "par", "역광 오른쪽", hangPoint(STAGE_DEFAULT, "e3", 2.5), { target: { x: 1, y: 0, z: -2.5 }, gel: gel("딥 블루") }, true),
-    makeFixture(7, "cyc", "호리존트", hangPoint(STAGE_DEFAULT, "floor", 0), { target: { x: 0, y: 4, z: -8 } }, false),
-    makeFixture(8, "follow", "팔로우", hangPoint(STAGE_DEFAULT, "foh", 0), { target: { x: 0, y: 0, z: -3 }, zoom: 0.3, sharpness: 0.7 }, false),
+    makeFixture(1, "profile", "앞 왼쪽", "foh", -2, { target: { x: -1, y: 0, z: -3 }, zoom: 0.3, sharpness: 0.9 }, true),
+    makeFixture(2, "profile", "앞 오른쪽", "foh", 2, { target: { x: 1, y: 0, z: -3 }, zoom: 0.3, sharpness: 0.9 }, true),
+    makeFixture(3, "fresnel", "위 왼쪽", "e1", -2, { target: { x: -1.5, y: 0, z: -3 }, gel: gel("웜 앰버") }, true),
+    makeFixture(4, "fresnel", "위 오른쪽", "e1", 2, { target: { x: 1.5, y: 0, z: -3 }, gel: gel("웜 앰버") }, true),
+    makeFixture(5, "par", "역광 왼쪽", "e3", -2.5, { target: { x: -1, y: 0, z: -2.5 }, gel: gel("딥 블루") }, true),
+    makeFixture(6, "par", "역광 오른쪽", "e3", 2.5, { target: { x: 1, y: 0, z: -2.5 }, gel: gel("딥 블루") }, true),
+    makeFixture(7, "cyc", "호리존트", "floor", 0, { target: { x: 0, y: 4, z: -8 } }, false),
+    makeFixture(8, "follow", "팔로우", "foh", 0, { target: { x: 0, y: 0, z: -3 }, zoom: 0.3, sharpness: 0.7 }, false),
   ];
   const [f1, f2, f3, f4, f5, f6, f7, f8] = fx;
   const first: LookState = {
@@ -549,7 +585,7 @@ export function defaultShow(): Show {
     },
   };
   return {
-    version: 4,
+    version: 5,
     stage: STAGE_DEFAULT,
     venue: { template: defaultTemplate(STAGE_DEFAULT.shape) },
     ambient: AMBIENT_DEFAULT,
@@ -615,11 +651,11 @@ export function addFixture(show: Show, kind: FixtureKind): Show {
   const d = show.stage.depth;
   const target = kind === "cyc" ? { x: 0, y: 4, z: -d } : { x: 0, y: 0, z: -d / 2 };
   const n = show.fixtures.filter((f) => f.kind === kind).length + 1;
-  // 종류별 기본 걸 위치 가운데에 놓고, 이미 조명기가 있으면 1m씩 옆으로 비킨다
-  let position = hangPoint(show.stage, defaultHang(kind), 0);
-  const taken = (p: Vec3) => show.fixtures.some((f) => Math.hypot(f.position.x - p.x, f.position.y - p.y, f.position.z - p.z) < 0.01);
-  while (taken(position)) position = { ...position, x: position.x + 1 };
-  const f = clampFixture(makeFixture(nextChannel(show), kind, `${FIXTURE_LABELS[kind]} ${n}`, position, { target }, false));
+  // 종류별 기본 라인 가운데에 놓고, 이미 조명기가 있으면 라인을 따라 1m씩 비킨다
+  const hang = defaultHang(kind);
+  let along = 0;
+  while (show.fixtures.some((f) => f.hang === hang && Math.abs(f.along - along) < 0.01)) along += 1;
+  const f = clampFixture(show.stage, makeFixture(nextChannel(show), kind, `${FIXTURE_LABELS[kind]} ${n}`, hang, along, { target }, false));
   return {
     ...show,
     fixtures: [...show.fixtures, f],
@@ -660,7 +696,7 @@ export function duplicateEntity(show: Show, id: string): Show {
   const f = show.fixtures.find((x) => x.id === id);
   if (!f) return show;
   if (show.fixtures.length >= LIMITS.fixtures) return show;
-  const nf = clampFixture({ ...f, id: newId("fx"), channel: nextChannel(show), position: { ...f.position, x: f.position.x + 0.5 }, focus: { ...f.focus, target: { ...f.focus.target } } });
+  const nf = clampFixture(show.stage, { ...f, id: newId("fx"), channel: nextChannel(show), along: f.along + 0.5, focus: { ...f.focus, target: { ...f.focus.target } } });
   const copyIn = (look: LookState): LookState =>
     look.levels[id] ? { ...look, levels: { ...look.levels, [nf.id]: copyLevel(look.levels[id]) } } : look;
   return { ...show, fixtures: [...show.fixtures, nf], live: copyIn(show.live), cues: show.cues.map((c) => ({ ...c, look: copyIn(c.look) })) };
@@ -669,11 +705,11 @@ export function duplicateEntity(show: Show, id: string): Show {
 export function updateFixture(
   show: Show,
   id: string,
-  patch: Partial<Pick<Fixture, "name" | "kind" | "position" | "castShadow">>,
+  patch: Partial<Pick<Fixture, "name" | "kind" | "hang" | "along" | "castShadow">>,
 ): Show {
   const old = show.fixtures.find((f) => f.id === id);
   if (!old) return show;
-  const fixtures = updateIn(show.fixtures, id, (f) => clampFixture({ ...f, ...patch }))!;
+  const fixtures = updateIn(show.fixtures, id, (f) => clampFixture(show.stage, { ...f, ...patch }))!;
   const kind = patch.kind;
   if (!kind || kind === old.kind) return { ...show, fixtures };
   // 종류가 바뀌면 큐 값도 새 종류가 허용하는 것만 남긴다.
@@ -918,8 +954,8 @@ function readCues(v: unknown, readLookFn: (v: unknown) => LookState): Cue[] {
     });
 }
 
-/** v2·v3·v4 공통. v2는 좌석 블록 대신 무대 형태의 기본 템플릿을 쓰고, v3까지는 걸 위치(hang·along)를 그 자리 좌표로 옮긴다. */
-function readShow(o: Obj, version: 2 | 3 | 4): Show {
+/** v2~v5 공통. v2는 좌석 블록 대신 무대 형태의 기본 템플릿을 쓰고, v4(자유 위치)는 가장 가까운 라인으로 옮긴다. */
+function readShow(o: Obj, version: 2 | 3 | 4 | 5): Show {
   const stage = readStage(o.stage);
   const seen = new Set<number>();
   const fixtures = arr(o.fixtures)
@@ -930,12 +966,13 @@ function readShow(o: Obj, version: 2 | 3 | 4): Show {
       const channel = num(f.channel);
       if (!Number.isInteger(channel) || channel < 1 || channel > 99 || seen.has(channel)) fail();
       seen.add(channel);
-      return clampFixture({
+      const line = version === 4 ? nearestHang(stage, vec(f.position)) : { hang: oneOf(f.hang, HANGS), along: num(f.along) };
+      return clampFixture(stage, {
         id: str(f.id),
         channel,
         kind: oneOf(f.kind, FIXTURE_KINDS),
         name: str(f.name),
-        position: version === 4 ? vec(f.position) : hangPoint(stage, oneOf(f.hang, HANGS), num(f.along)),
+        ...line,
         castShadow: bool(f.castShadow),
         focus: {
           target: vec(fo.target),
@@ -949,7 +986,7 @@ function readShow(o: Obj, version: 2 | 3 | 4): Show {
   const byId = new Map(fixtures.map((f) => [f.id, f]));
   const look = (v: unknown) => readLook(v, byId);
   return {
-    version: 4,
+    version: 5,
     stage,
     venue: { template: version >= 3 ? readTemplate(o.venue, stage) : defaultTemplate(stage.shape) },
     ambient: o.ambient === undefined ? AMBIENT_DEFAULT : clamp(num(o.ambient), 0, 1),
@@ -961,7 +998,7 @@ function readShow(o: Obj, version: 2 | 3 | 4): Show {
   };
 }
 
-// ── v1 → v4 ──
+// ── v1 → v5 ──
 
 type V1Level = { intensity: number; color: string; target: Vec3; beamAngle: number; softness: number };
 
@@ -992,6 +1029,23 @@ function sharpnessFor(kind: FixtureKind, softness: number): number {
   return s ? clamp(1 - (softness - s[2]) / (s[1] - s[2]), 0, 1) : 0.8;
 }
 
+function nearestHang(stage: Stage, p: Vec3): { hang: HangId; along: number } {
+  let best = { hang: "e1" as HangId, along: 0 };
+  let bestD = Infinity;
+  for (const hang of HANGS) {
+    const boom = hang === "boomL" || hang === "boomR";
+    const [lo, hi] = hangRange(stage, hang);
+    const along = clamp(boom ? p.y : p.x, lo, hi);
+    const q = hangPoint(stage, hang, along);
+    const d = Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z);
+    if (d < bestD) {
+      bestD = d;
+      best = { hang, along };
+    }
+  }
+  return best;
+}
+
 function migrateV1(o: Obj): Show {
   const stage = readStage(o.stage);
   const liveRaw = obj(obj(o.live).levels);
@@ -1003,12 +1057,12 @@ function migrateV1(o: Obj): Show {
       const kind = oneOf(f.kind, ["profile", "par", "fresnel", "follow", "cyc"] as const);
       const l = liveRaw[id] !== undefined ? readV1Level(liveRaw[id]) : null;
       const { zoom, lamp } = l ? zoomFor(kind, l.beamAngle) : { zoom: 0.5, lamp: "mfl" as ParLamp };
-      return clampFixture({
+      return clampFixture(stage, {
         id,
         channel: i + 1,
         kind,
         name: str(f.name),
-        position: vec(f.position),
+        ...nearestHang(stage, vec(f.position)),
         castShadow: bool(f.castShadow),
         focus: {
           target: l ? l.target : { x: 0, y: 0, z: -stage.depth / 2 },
@@ -1037,7 +1091,7 @@ function migrateV1(o: Obj): Show {
     return { levels, haze: clamp(num(lo.haze), 0, 1) };
   };
   return {
-    version: 4,
+    version: 5,
     stage,
     venue: { template: defaultTemplate(stage.shape) },
     ambient: AMBIENT_DEFAULT,
@@ -1052,7 +1106,8 @@ function migrateV1(o: Obj): Show {
 export function deserialize(text: string): { show: Show; migrated: boolean } | null {
   try {
     const o = obj(JSON.parse(text));
-    if (o.version === 4) return { show: readShow(o, 4), migrated: false };
+    if (o.version === 5) return { show: readShow(o, 5), migrated: false };
+    if (o.version === 4) return { show: readShow(o, 4), migrated: true };
     if (o.version === 3) return { show: readShow(o, 3), migrated: true };
     if (o.version === 2) return { show: readShow(o, 2), migrated: true };
     if (o.version === 1) return { show: migrateV1(o), migrated: true };
