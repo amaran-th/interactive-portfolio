@@ -7,7 +7,7 @@ import CueBar from "./CueBar";
 import Inspector from "./Inspector";
 import Outliner from "./Outliner";
 import PlotLabels from "./PlotLabels";
-import Sidebar from "./Sidebar";
+import Sidebar, { type SidebarTab } from "./Sidebar";
 import { loadQuality, loadShow, saveQuality, useAutoSave } from "./persistence";
 import type { Quality, Tier } from "./quality";
 import { dragHeight, dropAt } from "./placement";
@@ -25,6 +25,7 @@ import {
   setAmbient,
   setHaze,
   updateActor,
+  updateFixture,
   updateFocus,
   updateLevel,
   updateProp,
@@ -38,11 +39,15 @@ import { type ViewMode, useStageScene } from "./useStageScene";
 import { type SeatRef, clampSeat, defaultSeat, seatLabel } from "./venue";
 
 type Drag = {
-  type: "prop" | "actor" | "aim";
+  type: "prop" | "actor" | "aim" | "fixture";
   id: string;
   pointerId: number;
   offset: { x: number; z: number };
   baseY: number;
+  /** 조명기: 끌기 시작 자리. Shift를 누르는 동안은 높이만 바뀐다. */
+  base: Vec3;
+  shift: boolean;
+  wasShift: boolean;
   clientX: number;
   clientY: number;
   raf: number;
@@ -70,12 +75,22 @@ export default function StageLighting() {
 
   const [pickedId, setPickedIdRaw] = useState<string | null>(null);
   const [soloId, setSoloId] = useState<string | null>(null);
-  // 다른 대상을 고르면 솔로는 풀린다.
+  const [tab, setTab] = useState<SidebarTab>("stage");
+  // 다른 대상을 고르면 솔로는 풀리고, 사이드바는 그 대상의 탭으로 넘어간다.
   const setPickedId = (id: string | null) => {
     setPickedIdRaw(id);
     setSoloId(null);
+    if (!id) return;
+    const s = store.get();
+    if (s.fixtures.some((f) => f.id === id)) setTab("fixtures");
+    else if (s.props.some((p) => p.id === id) || s.actors.some((a) => a.id === id)) setTab("elements");
   };
   const selectedId = useShow(store, (s) => (pickedId && exists(s, pickedId) ? pickedId : null));
+  // 고른 대상이 속한 탭. 다른 탭을 보고 있으면 그 탭의 속성 칸은 비워 둔다.
+  const selectedTab = useShow(store, (s): SidebarTab | null =>
+    !selectedId ? null : s.fixtures.some((f) => f.id === selectedId) ? "fixtures" : "elements",
+  );
+  const tabSelectedId = selectedTab === tab ? selectedId : null;
   const haze = useShow(store, (s) => s.live.haze);
   const ambient = useShow(store, (s) => s.ambient);
   const [view, setView] = useState<ViewMode>("edit");
@@ -196,6 +211,23 @@ export default function StageLighting() {
 
   const dragTarget = (d: Drag): Vec3 | null => {
     const scene = sceneRef.current;
+    if (d.type === "fixture") {
+      if (!scene) return null;
+      const cur = d.last ?? d.base;
+      if (d.shift) {
+        const y = scene.heightAt(d.clientX, d.clientY, cur);
+        d.wasShift = true;
+        return y === null ? null : { ...cur, y: Math.min(15, Math.max(0, y)) };
+      }
+      // Shift를 떼면 지금 높이에서 수평 끌기를 다시 잡는다
+      if (d.wasShift) {
+        const p0 = scene.planePoint(d.clientX, d.clientY, cur.y);
+        if (p0) d.offset = { x: cur.x - p0.x, z: cur.z - p0.z };
+        d.wasShift = false;
+      }
+      const p = scene.planePoint(d.clientX, d.clientY, cur.y);
+      return p ? { x: p.x + d.offset.x, y: cur.y, z: p.z + d.offset.z } : null;
+    }
     const fp = scene?.floorPoint(d.clientX, d.clientY);
     if (!fp) return null;
     const s = store.get();
@@ -211,6 +243,7 @@ export default function StageLighting() {
     if (!pos) return;
     d.last = pos;
     if (d.type === "aim") sceneRef.current?.previewAim(d.id, pos);
+    else if (d.type === "fixture") sceneRef.current?.previewFixture(d.id, pos);
     else sceneRef.current?.previewEntity(d.id, pos);
   };
 
@@ -223,10 +256,13 @@ export default function StageLighting() {
     e.stopPropagation(); // 캔버스의 OrbitControls까지 가지 않게
     downRef.current = null;
     setPickedId(hit.id);
-    if (hit.type === "fixture") return;
     const s = store.get();
     let base: Vec3;
-    if (hit.type === "aim") {
+    if (hit.type === "fixture") {
+      const f = s.fixtures.find((x) => x.id === hit.id);
+      if (!f) return;
+      base = f.position;
+    } else if (hit.type === "aim") {
       const f = s.fixtures.find((x) => x.id === hit.id);
       if (!f) return;
       base = resolve(s.stage, f, s.live.levels[f.id]).target;
@@ -235,7 +271,8 @@ export default function StageLighting() {
       if (!ent) return;
       base = ent.position;
     }
-    const fp = scene.floorPoint(e.clientX, e.clientY);
+    // 조명기 몸체는 그 높이의 수평면에서, 나머지는 바닥에서 잡은 점과의 차이를 유지한다
+    const fp = hit.type === "fixture" ? scene.planePoint(e.clientX, e.clientY, base.y) : scene.floorPoint(e.clientX, e.clientY);
     if (!fp) return;
     beginEdit();
     scene.beginInteraction();
@@ -246,6 +283,9 @@ export default function StageLighting() {
       pointerId: e.pointerId,
       offset: { x: base.x - fp.x, z: base.z - fp.z },
       baseY: base.y,
+      base,
+      shift: e.shiftKey,
+      wasShift: false,
       clientX: e.clientX,
       clientY: e.clientY,
       raf: 0,
@@ -258,6 +298,7 @@ export default function StageLighting() {
     if (!d || d.pointerId !== e.pointerId) return;
     d.clientX = e.clientX;
     d.clientY = e.clientY;
+    d.shift = e.shiftKey;
     if (d.raf) return;
     d.raf = requestAnimationFrame(() => {
       d.raf = 0;
@@ -281,8 +322,9 @@ export default function StageLighting() {
         const at = dropAt(s, d.type, d.id, pos, stageBounds(s.stage));
         if (d.type === "prop") store.set(updateProp(s, d.id, { position: at }));
         else store.set(updateActor(s, d.id, { position: at }));
-      }
-      else {
+      } else if (d.type === "fixture") {
+        store.set(updateFixture(s, d.id, { position: pos }));
+      } else {
         // 팔로우는 큐마다 대상을 따라가고, 나머지는 포커스(고정 조준)를 옮긴다.
         const f = s.fixtures.find((x) => x.id === d.id);
         if (f && CUE_PARAMS[f.kind].includes("target")) store.set(updateLevel(s, d.id, { target: pos }));
@@ -362,6 +404,7 @@ export default function StageLighting() {
         seatLabel={seatLabel(stageForSeat, venue, seat)}
         onSeatMap={() => {
           setPickedId(null);
+          setTab("stage");
           setSidebarOpen(true);
         }}
         onHaze={(v) => {
@@ -398,14 +441,28 @@ export default function StageLighting() {
         <Sidebar
           open={sidebarOpen}
           onOpen={setSidebarOpen}
-          actions={<AddMenu store={store} onAdd={add} />}
+          tab={tab}
+          onTab={setTab}
+          actions={tab === "stage" ? undefined : <AddMenu store={store} onAdd={add} only={tab} />}
           onInset={(right, bottom) => setInset((o) => (o.right === right && o.bottom === bottom ? o : { right, bottom }))}
-          outliner={<Outliner store={store} selectedId={selectedId} onPick={setPickedId} onBegin={beginEdit} />}
+          outliner={
+            tab === "stage" ? undefined : (
+              <Outliner store={store} selectedId={selectedId} onPick={setPickedId} onBegin={beginEdit}
+                groups={tab === "elements" ? ["people", "props"] : ["fixtures"]} />
+            )
+          }
           inspector={
-            <Inspector store={store} selectedId={selectedId} tier={tier} solo={solo !== null} seat={seat}
-              onSeat={(ref) => { setSeatPick(ref); changeView("audience"); }}
-              onSolo={() => setSoloId(solo ? null : selectedId)} onBegin={beginEdit}
-              onDuplicate={duplicateSelected} onDelete={removeSelected} />
+            // 무대 설정 탭은 늘 무대·객석을, 나머지 탭은 그 탭의 대상을 골랐을 때만 속성을 보여 준다
+            tab === "stage" || (tabSelectedId && tabSelectedId === selectedId) ? (
+              <Inspector store={store} selectedId={tab === "stage" ? null : selectedId} tier={tier} solo={solo !== null} seat={seat}
+                onSeat={(ref) => { setSeatPick(ref); changeView("audience"); }}
+                onSolo={() => setSoloId(solo ? null : selectedId)} onBegin={beginEdit}
+                onDuplicate={duplicateSelected} onDelete={removeSelected} />
+            ) : (
+              <p className="p-3 text-xs text-ink/60">
+                {tab === "elements" ? "목록이나 3D 화면에서 인물·소품을 고르면 여기에 속성이 나와요." : "목록이나 3D 화면에서 조명기를 고르면 여기에 속성이 나와요."}
+              </p>
+            )
           }
         />
       </div>

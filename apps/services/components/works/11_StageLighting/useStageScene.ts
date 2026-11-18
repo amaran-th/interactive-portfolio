@@ -44,7 +44,12 @@ export type SceneApi = {
   setInset(right: number, bottom: number): void;
   pick(clientX: number, clientY: number): Pick;
   floorPoint(clientX: number, clientY: number): Vec3 | null;
+  /** 높이 y의 수평면과 만나는 점. 조명기 몸체를 그 높이에서 끌 때 쓴다. */
+  planePoint(clientX: number, clientY: number, y: number): Vec3 | null;
+  /** anchor를 지나며 카메라를 마주 보는 수직면에서 읽은 높이. Shift+끌기로 조명기 높이를 바꿀 때 쓴다. */
+  heightAt(clientX: number, clientY: number, anchor: Vec3): number | null;
   previewEntity(id: string, pos: Vec3): void;
+  previewFixture(fixtureId: string, position: Vec3): void;
   previewAim(fixtureId: string, target: Vec3): void;
   fixtureScreenPoints(): ScreenPoint[];
   onCamera(fn: () => void): () => void;
@@ -770,6 +775,10 @@ export function useStageScene(
       return tmpHit.applyMatrix4(group.matrixWorld).distanceTo(raycaster.ray.origin);
     }
 
+    const dragPlane = new THREE.Plane();
+    const dragHit = new THREE.Vector3();
+    const camDir = new THREE.Vector3();
+
     function floorPointRaw(): Vec3 | null {
       const { origin: o, direction: dir } = raycaster.ray;
       if (dir.y >= 0) return null;
@@ -867,6 +876,32 @@ export function useStageScene(
       floorPoint(clientX, clientY) {
         setRay(clientX, clientY);
         return floorPointRaw();
+      },
+      planePoint(clientX, clientY, y) {
+        setRay(clientX, clientY);
+        dragPlane.set(new THREE.Vector3(0, 1, 0), -y);
+        const h = raycaster.ray.intersectPlane(dragPlane, dragHit);
+        return h ? { x: h.x, y, z: h.z } : null;
+      },
+      heightAt(clientX, clientY, anchor) {
+        setRay(clientX, clientY);
+        activeCamera().getWorldDirection(camDir);
+        camDir.y = 0;
+        // 위에서 내려다보는 평면도에서는 수평 방향이 없으므로 앞뒤 방향을 쓴다
+        if (camDir.lengthSq() < 1e-6) camDir.set(0, 0, 1);
+        camDir.normalize();
+        dragPlane.setFromNormalAndCoplanarPoint(camDir, new THREE.Vector3(anchor.x, anchor.y, anchor.z));
+        const h = raycaster.ray.intersectPlane(dragPlane, dragHit);
+        return h ? h.y : null;
+      },
+      previewFixture(fixtureId, position) {
+        const v = fixtures.get(fixtureId);
+        if (!v) return;
+        v.res = { ...v.res, position };
+        draw(v);
+        updateSelection();
+        shadowsPending = true;
+        requestRender();
       },
       previewEntity(id, pos) {
         const prop = show.props.find((p) => p.id === id);

@@ -3,13 +3,20 @@
 // 요소 목록. 무대·객석 / 인물 / 소품 / 조명기(채널 순, 줄마다 디머)로 묶고, 누르면 그 요소를 고른다.
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { FixtureIcon, PersonIcon, PropIcon, StageIcon } from "./icons";
+import { FixtureIcon, PersonIcon, PropIcon } from "./icons";
 import { PROP_SPECS, type Show, resolve, updateLevel } from "./show";
 import type { Store } from "./store";
 import { useShow } from "./useShow";
 
-type Props = { store: Store; selectedId: string | null; onPick: (id: string | null) => void; onBegin: () => void };
 type Group = "people" | "props" | "fixtures";
+type Props = {
+  store: Store;
+  selectedId: string | null;
+  onPick: (id: string | null) => void;
+  onBegin: () => void;
+  /** 보여 줄 묶음. 무대 요소 탭은 인물·소품, 조명기 탭은 조명기만. */
+  groups: Group[];
+};
 
 const ROW = "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-ink hover:bg-point/10 aria-[current=true]:bg-point aria-[current=true]:text-white";
 
@@ -25,7 +32,7 @@ export function propNames(props: Show["props"]): Map<string, string> {
   return out;
 }
 
-export default function Outliner({ store, selectedId, onPick, onBegin }: Props) {
+export default function Outliner({ store, selectedId, onPick, onBegin, groups }: Props) {
   const props = useShow(store, (s) => s.props);
   const actors = useShow(store, (s) => s.actors);
   const fixtures = useShow(store, (s) => s.fixtures);
@@ -51,13 +58,8 @@ export default function Outliner({ store, selectedId, onPick, onBegin }: Props) 
 
   return (
     <nav aria-label="무대 요소" className="flex flex-col pb-1">
-      <button type="button" aria-current={selectedId === null ? "true" : undefined} onClick={() => onPick(null)} className={ROW}>
-        <StageIcon className="size-4 shrink-0" />
-        <span className="truncate font-bold">무대·객석</span>
-      </button>
-
-      {head("people", "인물", actors.length)}
-      {!closed.people && (
+      {groups.includes("people") && head("people", "인물", actors.length)}
+      {groups.includes("people") && !closed.people && (
         <ul>
           {actors.map((a) => (
             <li key={a.id}>
@@ -70,8 +72,8 @@ export default function Outliner({ store, selectedId, onPick, onBegin }: Props) 
         </ul>
       )}
 
-      {head("props", "소품", props.length)}
-      {!closed.props && (
+      {groups.includes("props") && head("props", "소품", props.length)}
+      {groups.includes("props") && !closed.props && (
         <ul>
           {props.map((p) => (
             <li key={p.id}>
@@ -84,8 +86,8 @@ export default function Outliner({ store, selectedId, onPick, onBegin }: Props) 
         </ul>
       )}
 
-      {head("fixtures", "조명기", fixtures.length)}
-      {!closed.fixtures && (
+      {groups.includes("fixtures") && head("fixtures", "조명기", fixtures.length)}
+      {groups.includes("fixtures") && !closed.fixtures && (
         <ul aria-label="채널">
           {channels.map((f) => {
             const r = resolve(stage, f, levels[f.id]);

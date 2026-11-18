@@ -1,9 +1,17 @@
 "use client";
 
-// 3D 화면 위에 떠 있는 반투명 사이드바. 위는 요소 목록, 아래는 고른 요소의 속성.
+// 3D 화면 위에 떠 있는 반투명 사이드바. 무대 설정 / 무대 요소 / 조명기 탭으로 나누고,
+// 탭마다 위는 요소 목록, 아래는 고른 요소의 속성.
 // 넓은 화면은 오른쪽(왼쪽 가장자리를 끌어 260–480px), 좁은 화면은 아래쪽 시트. 접으면 손잡이만 남는다.
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+
+export type SidebarTab = "stage" | "elements" | "fixtures";
+export const SIDEBAR_TABS: { id: SidebarTab; label: string }[] = [
+  { id: "stage", label: "무대 설정" },
+  { id: "elements", label: "무대 요소" },
+  { id: "fixtures", label: "조명기" },
+];
 
 const MIN_W = 260;
 const MAX_W = 480;
@@ -11,14 +19,18 @@ const MAX_W = 480;
 type Props = {
   open: boolean;
   onOpen: (open: boolean) => void;
-  actions: React.ReactNode;
-  outliner: React.ReactNode;
+  tab: SidebarTab;
+  onTab: (tab: SidebarTab) => void;
+  /** 탭 머리줄 오른쪽(추가 메뉴 등). 없으면 비운다. */
+  actions?: React.ReactNode;
+  /** 무대 설정 탭은 목록 없이 속성만 보여 준다. */
+  outliner?: React.ReactNode;
   inspector: React.ReactNode;
   /** 사이드바가 덮는 오른쪽·아래 크기(px). 접으면 0. */
   onInset: (right: number, bottom: number) => void;
 };
 
-export default function Sidebar({ open, onOpen, actions, outliner, inspector, onInset }: Props) {
+export default function Sidebar({ open, onOpen, tab, onTab, actions, outliner, inspector, onInset }: Props) {
   const [width, setWidth] = useState(320);
   const drag = useRef<{ x: number; w: number } | null>(null);
   const ref = useRef<HTMLElement>(null);
@@ -87,8 +99,15 @@ export default function Sidebar({ open, onOpen, actions, outliner, inspector, on
           drag.current = null;
         }}
       />
-      <div className="flex items-center justify-between border-b border-point/15 py-1 pr-1 pl-3">
-        <h2 className="text-xs font-bold text-point">무대 요소</h2>
+      <div className="flex items-center justify-between border-b border-point/15 py-1 pr-1 pl-2">
+        <div role="tablist" aria-label="사이드바" className="flex gap-0.5">
+          {SIDEBAR_TABS.map((t) => (
+            <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => onTab(t.id)}
+              className="rounded-md px-2 py-1 text-xs font-bold text-point/70 hover:bg-point/10 aria-selected:bg-point aria-selected:text-white">
+              {t.label}
+            </button>
+          ))}
+        </div>
         <div className="ml-auto flex items-center gap-1">
           {actions}
           <button
@@ -102,8 +121,8 @@ export default function Sidebar({ open, onOpen, actions, outliner, inspector, on
           </button>
         </div>
       </div>
-      <div className="max-h-[40%] shrink-0 overflow-auto px-1">{outliner}</div>
-      <div className="min-h-0 flex-1 overflow-auto border-t-2 border-point/20">{inspector}</div>
+      {outliner && <div className="max-h-[40%] shrink-0 overflow-auto px-1">{outliner}</div>}
+      <div className={`min-h-0 flex-1 overflow-auto ${outliner ? "border-t-2 border-point/20" : ""}`}>{inspector}</div>
     </aside>
   );
 }

@@ -22,7 +22,16 @@ import { useShow } from "./useShow";
 
 export type AddItem = { type: "prop"; kind: PropKind } | { type: "actor"; gender: Gender } | { type: "fixture"; kind: FixtureKind };
 
-export default function AddMenu({ store, onAdd }: { store: Store; onAdd: (item: AddItem) => void }) {
+export default function AddMenu({
+  store,
+  onAdd,
+  only,
+}: {
+  store: Store;
+  onAdd: (item: AddItem) => void;
+  /** 무대 요소 탭은 소품·인물만, 조명기 탭은 조명기만 보여 준다. */
+  only: "elements" | "fixtures";
+}) {
   const counts = useShow(store, (s) => `${s.props.length}|${s.actors.length}|${s.fixtures.length}`);
   const [nProps, nActors, nFixtures] = counts.split("|").map(Number);
   const [open, setOpen] = useState(false);
@@ -54,7 +63,8 @@ export default function AddMenu({ store, onAdd }: { store: Store; onAdd: (item: 
         <Plus aria-hidden className="size-4" /> 추가
       </button>
       {open && (
-        <div className="absolute top-full right-0 z-30 mt-1 grid w-max grid-cols-2 gap-x-4 gap-y-1 rounded-lg border-2 border-point bg-white p-2 shadow-[3px_3px_0_0_var(--color-point)]">
+        <div className="absolute top-full right-0 z-30 mt-1 flex w-max gap-x-4 rounded-lg border-2 border-point bg-white p-2 shadow-[3px_3px_0_0_var(--color-point)]">
+          {only === "elements" && (
           <div className="flex flex-col gap-0.5">
             <p className={LABEL}>소품</p>
             {PROP_KINDS.map((k) => (
@@ -67,6 +77,8 @@ export default function AddMenu({ store, onAdd }: { store: Store; onAdd: (item: 
                 onClick={() => pick({ type: "actor", gender: g })} />
             ))}
           </div>
+          )}
+          {only === "fixtures" && (
           <div className="flex flex-col gap-0.5">
             <p className={LABEL}>조명기</p>
             {FIXTURE_KINDS.map((k) => (
@@ -74,6 +86,7 @@ export default function AddMenu({ store, onAdd }: { store: Store; onAdd: (item: 
                 onClick={() => pick({ type: "fixture", kind: k })} />
             ))}
           </div>
+          )}
         </div>
       )}
     </div>

@@ -2,15 +2,24 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   defaultShow, addFixture, addProp, removeEntity, saveCue, updateStage, updateActor, updateCue,
-  updateLevel, updateFocus, updateFixture, setChannel, hangPoint, resolve,
+  updateLevel, updateFocus, updateFixture, setChannel, hangPoint, heightPresets, resolve,
   serialize, deserialize, LIMITS, GELS, setActorGender, duplicateEntity, updateTemplate,
 } from "./show.ts";
 
+// v3 이전 저장본처럼 조명기 위치를 걸 위치(hang·along)로 바꾼다
+function asHang(f: object, hang: string, along: number) {
+  const o: Record<string, unknown> = { ...f, hang, along };
+  delete o.position;
+  return o;
+}
+
 const STAGE = { shape: "proscenium", width: 10, depth: 8, height: 6, floorColor: "#000000", backdropColor: "#000000" } as const;
 
-test("기본 공연 v2", () => {
+test("기본 공연 v4", () => {
   const s = defaultShow();
-  assert.equal(s.version, 3);
+  assert.equal(s.version, 4);
+  // 기본 조명기는 예전 걸 위치 자리에 그대로 놓인다
+  assert.deepEqual(s.fixtures[0].position, hangPoint(s.stage, "foh", -2));
   assert.deepEqual(s.fixtures.map((f) => f.channel), [1, 2, 3, 4, 5, 6, 7, 8]);
   const kinds = new Set(s.fixtures.map((f) => f.kind));
   for (const k of ["profile", "fresnel", "par", "cyc", "follow"]) assert.ok(kinds.has(k as never), k);
@@ -55,13 +64,33 @@ test("hangPoint 좌표", () => {
   assert.equal(hangPoint(STAGE, "e1", 20).x, 6);
 });
 
-test("무대 폭을 줄이면 조명기가 걸 위치 끝으로 붙는다", () => {
-  let s = addFixture(defaultShow(), "fresnel");
+test("조명기는 자유 위치: 범위 안으로만 맞추고 무대를 바꿔도 그대로", () => {
+  let s = removeEntity(defaultShow(), defaultShow().fixtures[0].id);
+  s = addFixture(s, "fresnel");
   const id = s.fixtures.at(-1)!.id;
-  s = updateFixture(s, id, { hang: "e1", along: 4.5 });
-  s = updateStage(s, { width: 6 });
+  s = updateFixture(s, id, { position: { x: 4.5, y: 99, z: -50 } });
   const f = s.fixtures.find((x) => x.id === id)!;
-  assert.equal(resolve(s.stage, f, s.live.levels[id]).position.x, 4);
+  assert.deepEqual(f.position, { x: 4.5, y: 15, z: -30 });
+  s = updateStage(s, { width: 6 });
+  const g = s.fixtures.find((x) => x.id === id)!;
+  assert.equal(resolve(s.stage, g, s.live.levels[id]).position.x, 4.5);
+});
+
+test("높이 맞추기 값은 걸 위치 높이와 같다", () => {
+  const h = heightPresets(STAGE);
+  assert.equal(h.foh, hangPoint(STAGE, "foh", 0).y);
+  assert.equal(h.batten, hangPoint(STAGE, "e1", 0).y);
+  assert.equal(h.floor, hangPoint(STAGE, "floor", 0).y);
+  assert.equal(h.boom, 2.5);
+});
+
+test("새 조명기는 종류별 기본 자리에 놓이고 겹치면 1m씩 비킨다", () => {
+  let s = { ...defaultShow(), fixtures: [] };
+  s = addFixture(s, "profile");
+  s = addFixture(s, "profile");
+  const [a, b] = s.fixtures.slice(-2);
+  assert.deepEqual(a.position, hangPoint(s.stage, "foh", 0));
+  assert.equal(b.position.x, a.position.x + 1);
 });
 
 test("resolve: 큐 값은 종류별로 허용된 것만", () => {
@@ -138,7 +167,7 @@ test("직렬화 왕복 v3", () => {
 
 test("깨진 저장본은 null", () => {
   assert.equal(deserialize("{"), null);
-  assert.equal(deserialize(JSON.stringify({ ...defaultShow(), version: 4 })), null);
+  assert.equal(deserialize(JSON.stringify({ ...defaultShow(), version: 5 })), null);
   assert.equal(deserialize(JSON.stringify({ ...defaultShow(), fixtures: "x" })), null);
 });
 
@@ -159,7 +188,7 @@ test("v1 저장본 변환", () => {
   const r = deserialize(JSON.stringify(V1))!;
   assert.equal(r.migrated, true);
   const f = r.show.fixtures[0];
-  assert.equal(f.hang, "foh");
+  assert.deepEqual(f.position, { x: -2, y: 6, z: 3 });
   assert.equal(f.channel, 1);
   assert.equal(f.focus.gel, "#ff8800");
   assert.deepEqual(f.focus.target, { x: -1, y: 0, z: -3 });
@@ -168,7 +197,7 @@ test("v1 저장본 변환", () => {
   const rr = resolve(r.show.stage, f, r.show.live.levels.f1);
   assert.ok(Math.abs(rr.beamAngle - 26) < 0.01);
   assert.ok(Math.abs(rr.softness - 0.1) < 0.01);
-  assert.equal(r.show.version, 3);
+  assert.equal(r.show.version, 4);
 });
 
 test("잔광: 기본 0.3, 범위 0–1, 저장본에 없으면 기본값", async () => {
@@ -200,13 +229,14 @@ test("v2 저장본 → v3: 인물 손실 없음, 객석은 템플릿", () => {
   const v2 = {
     ...s,
     version: 2,
+    fixtures: s.fixtures.map((f) => asHang(f, "e1", 0)),
     venue: { blocks: [{ id: "b", name: "가운데", x: 0, z: 2, rotationY: 0, rows: 4, seatsPerRow: 6, rake: 0.25, curve: 0 }] },
     actors: [{ id: "a1", name: "철수", position: { x: 1, y: 0, z: -2 }, rotationY: 0.5, height: 1.95, build: "slim", pose: "sit", clothColor: "#7a2e3a", skinColor: "#d9a88a" }],
   };
   delete (v2 as Record<string, unknown>).ambient;
   const r = deserialize(JSON.stringify(v2))!;
   assert.equal(r.migrated, true);
-  assert.equal(r.show.version, 3);
+  assert.equal(r.show.version, 4);
   const a = r.show.actors[0];
   assert.deepEqual([a.id, a.name, a.gender, a.pose, a.build, a.topColor, a.skinColor, a.height], ["a1", "철수", "male", "sit", "slim", "#7a2e3a", "#d9a88a", 1.95]);
   assert.deepEqual(a.position, { x: 1, y: 0, z: -2 });
@@ -238,7 +268,7 @@ test("복제: 새 id, 0.5m 옆, 조명기는 새 채널", () => {
   s = duplicateEntity(s, f.id);
   const df = s.fixtures.at(-1)!;
   assert.notEqual(df.channel, f.channel);
-  assert.equal(df.along, f.along + 0.5);
+  assert.equal(df.position.x, f.position.x + 0.5);
   assert.deepEqual(s.live.levels[df.id], s.live.levels[f.id]);
   assert.equal(duplicateEntity(s, "없음"), s);
 });
@@ -257,4 +287,18 @@ test("템플릿 수치 범위와 무대 형태 전환", () => {
   s = updateTemplate(s, { kind: "grand" });
   s = updateStage(s, { width: 12 });
   assert.equal(s.venue.template.kind, "grand");
+});
+
+test("v3 저장본 → v4: 걸 위치를 그 자리 좌표로 옮긴다", () => {
+  const s = defaultShow();
+  const v3 = {
+    ...s,
+    version: 3,
+    fixtures: s.fixtures.map((f, i) => asHang(f, i === 0 ? "e2" : "foh", i === 0 ? 1 : 0)),
+  };
+  const r = deserialize(JSON.stringify(v3))!;
+  assert.equal(r.migrated, true);
+  assert.equal(r.show.version, 4);
+  assert.deepEqual(r.show.fixtures[0].position, hangPoint(s.stage, "e2", 1));
+  assert.equal(deserialize(serialize(r.show))!.migrated, false);
 });

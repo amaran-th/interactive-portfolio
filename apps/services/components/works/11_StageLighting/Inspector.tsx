@@ -21,10 +21,7 @@ import {
   GENDER_LABELS,
   HAIRS,
   HAIR_LABELS,
-  HANGS,
-  HANG_LABELS,
   HEIGHT_RANGE,
-  type HangId,
   KNOBS,
   PAR_LAMPS,
   PAR_LAMP_KEYS,
@@ -36,7 +33,7 @@ import {
   STAGE_LABELS,
   STAGE_SHAPES,
   type Show,
-  hangRange,
+  heightPresets,
   resolve,
   setActorGender,
   setChannel,
@@ -60,6 +57,12 @@ const POS_AXES = {
   x: { min: -15, max: 15, title: "좌우(m)" },
   y: { min: 0, max: 6, title: "높이(m)" },
   z: { min: -20, max: 10, title: "앞뒤(m)" },
+};
+// 조명기는 객석 위·무대 위 어디에나 둘 수 있어 높이 범위가 넓다
+const FIXTURE_AXES = {
+  x: { min: -30, max: 30, title: "좌우(m)" },
+  y: { min: 0, max: 15, title: "높이(m)" },
+  z: { min: -30, max: 30, title: "앞뒤(m)" },
 };
 const SIZE_AXES = {
   x: { min: 0.1, max: 10, title: "폭(m)" },
@@ -231,8 +234,7 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
     const cueColor = usesCueColor(kind);
     const cueAim = cueParams.includes("target");
     const res = resolve(stage, fixture, level);
-    const [lo, hi] = hangRange(stage, fixture.hang);
-    const boom = fixture.hang === "boomL" || fixture.hang === "boomR";
+    const heights = heightPresets(stage);
     const limit = TIERS[tier].shadows;
     const shadowLocked = !fixture.castShadow && shadowCount >= limit;
     const dx = res.target.x - res.position.x;
@@ -262,23 +264,31 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
             솔로
           </button>
         </Section>
-        <Section title="걸기">
+        <Section title="위치·채널">
           <ChannelField key={`${id}-${fixture.channel}`} channel={fixture.channel} taken={takenChannels} onBegin={onBegin}
             onCommit={(c) => edit((s) => setChannel(s, id, c))} />
           <Segmented<FixtureKind> label="종류" value={kind}
             options={FIXTURE_KINDS.map((k) => ({ value: k, label: FIXTURE_LABELS[k] }))}
             onPick={(k) => { onBegin(); edit((s) => updateFixture(s, id, { kind: k })); }} />
-          <label className="flex flex-col gap-0.5">
-            <span className={LABEL}>걸 위치</span>
-            <select value={fixture.hang} onFocus={onBegin}
-              onChange={(e) => edit((s) => updateFixture(s, id, { hang: e.target.value as HangId }))}
-              className="rounded-md border border-point/40 bg-white/80 px-2 py-1 text-xs text-ink">
-              {HANGS.map((h) => <option key={h} value={h}>{HANG_LABELS[h]}</option>)}
-            </select>
-          </label>
-          <NumberField label={boom ? "높이" : "좌우"} title={boom ? "붐 위 높이(m)" : "걸 위치 위 좌우(m)"}
-            value={Math.min(hi, Math.max(lo, fixture.along))} min={lo} max={hi} step={0.1} digits={1} unit="m"
-            onBegin={onBegin} onChange={(along) => edit((s) => updateFixture(s, id, { along }))} />
+          <Vec3Field label="X 좌우 · Y 높이 · Z 앞뒤" value={fixture.position} axes={FIXTURE_AXES} onBegin={onBegin}
+            onChange={(position) => edit((s) => updateFixture(s, id, { position }))} />
+          <div className="flex flex-col gap-0.5">
+            <span className={LABEL}>높이 맞추기</span>
+            <div className="flex flex-wrap gap-1">
+              {([
+                ["FOH", heights.foh],
+                ["배튼", heights.batten],
+                ["붐", heights.boom],
+                ["바닥", heights.floor],
+              ] as const).map(([label, y]) => (
+                <button key={label} type="button" className={SEGMENT} title={`높이 ${y}m`}
+                  onClick={() => { onBegin(); edit((s) => updateFixture(s, id, { position: { ...fixture.position, y } })); }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="text-[11px] text-ink/60">3D에서 몸체를 끌면 옮기고, Shift를 누른 채 끌면 높이가 바뀌어요.</p>
           <label className="flex items-center gap-2" title={shadowLocked ? `그림자는 지금 품질에서 최대 ${limit}대예요` : undefined}>
             <input type="checkbox" checked={fixture.castShadow} disabled={shadowLocked} className="accent-point"
               onChange={(e) => { onBegin(); edit((s) => updateFixture(s, id, { castShadow: e.target.checked })); }} />

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { lerpLook, fadeProgress, aimChanged, hexToLinear, linearToHex, stepHaze } from "./cues.ts";
 
 const f = (id: string, kind: string) =>
-  ({ id, kind, channel: 1, name: id, hang: "e1", along: 0, castShadow: false,
+  ({ id, kind, channel: 1, name: id, position: { x: 0, y: 6, z: -2 }, castShadow: false,
      focus: { target: { x: 0, y: 0, z: 0 }, zoom: 0.5, sharpness: 0.8, lamp: "mfl", gel: "#ffffff" } }) as never;
 const P = f("p", "profile");
 const F = f("f", "follow");
