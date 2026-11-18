@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default function TextEncodingPage() {
   return (
     <ToolShell guide={textEncodingGuide}>
-      <main className="min-h-0 flex-1 overflow-y-auto bg-shade text-ink">
+      <main className="min-h-0 flex-1 overflow-hidden bg-shade text-ink">
         <TextEncoding />
       </main>
     </ToolShell>
