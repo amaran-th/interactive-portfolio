@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, CircleAlert, Copy, Trash2 } from "lucide-react";
+import { ArrowLeftRight, Check, ChevronDown, CircleAlert, Copy, NotebookPen, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import CopyToast from "../_shared/CopyToast";
 import { useCopyFeedback } from "../_shared/useCopyFeedback";
@@ -10,6 +10,7 @@ import {
   MAX_LIMIT,
   basisValue,
   countText,
+  limitFromQuestion,
   overflowStart,
   parseSaved,
 } from "./count";
@@ -64,6 +65,10 @@ function SmallStat({ label, value, unit }: StatProps) {
 }
 
 export default function CharCounter() {
+  const [question, setQuestion] = useState("");
+  const [memo, setMemo] = useState("");
+  const [memoOpen, setMemoOpen] = useState(false);
+  const [memoSide, setMemoSide] = useState<"left" | "right">("right");
   const [text, setText] = useState("");
   const [limit, setLimit] = useState<number | null>(null);
   const [basis, setBasis] = useState<Basis>("with-spaces");
@@ -87,6 +92,10 @@ export default function CharCounter() {
     }
     /* eslint-disable react-hooks/set-state-in-effect */
     if (saved) {
+      setQuestion(saved.question);
+      setMemo(saved.memo);
+      setMemoOpen(saved.memoOpen);
+      setMemoSide(saved.memoSide);
       setText(saved.text);
       setLimit(saved.limit);
       setBasis(saved.basis);
@@ -97,7 +106,7 @@ export default function CharCounter() {
   }, []);
 
   // 나갈 때 바로 저장하려고 마지막 값을 들고 있는다
-  const latest = useRef({ text, limit, basis, spellcheck });
+  const latest = useRef({ question, memo, memoOpen, memoSide, text, limit, basis, spellcheck });
   const dirty = useRef(false);
 
   function saveNow(): boolean {
@@ -117,11 +126,11 @@ export default function CharCounter() {
   // 입력이 멈추면 잠시 뒤 저장한다
   useEffect(() => {
     if (!hydrated) return;
-    latest.current = { text, limit, basis, spellcheck };
+    latest.current = { question, memo, memoOpen, memoSide, text, limit, basis, spellcheck };
     dirty.current = true;
     const t = setTimeout(saveNow, SAVE_DELAY_MS);
     return () => clearTimeout(t);
-  }, [hydrated, text, limit, basis, spellcheck]);
+  }, [hydrated, question, memo, memoOpen, memoSide, text, limit, basis, spellcheck]);
 
   // 탭을 닫거나 다른 데로 옮겨 갈 때는 기다리지 않고 바로 저장하고,
   // 그래도 저장하지 못했으면 브라우저의 '나가시겠어요?' 확인을 띄운다
@@ -130,7 +139,8 @@ export default function CharCounter() {
       if (document.visibilityState === "hidden") saveNow();
     };
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (saveNow() || !latest.current.text) return;
+      const { text: t, question: q, memo: m } = latest.current;
+      if (saveNow() || !(t || q || m)) return;
       e.preventDefault();
       e.returnValue = "";
     };
@@ -169,6 +179,10 @@ export default function CharCounter() {
     if (el) setSelection([el.selectionStart, el.selectionEnd]);
   }
 
+  // 문항에 적힌 분량. 지금 제한과 다를 때만 '적용' 버튼을 띄운다
+  const suggested = limitFromQuestion(question);
+  const showSuggest = suggested !== null && (suggested.limit !== limit || suggested.basis !== basis);
+
   function clear() {
     if (!confirmClear) {
       setConfirmClear(true);
@@ -181,7 +195,9 @@ export default function CharCounter() {
   }
 
   return (
-    <div className="mx-auto flex h-full max-w-4xl flex-col gap-3 p-3 sm:p-6">
+    // 넓은 화면에서는 글 쓰는 칸 오른쪽에 메모, 좁은 화면에서는 아래에 메모를 둔다
+    <div className="mx-auto flex h-full max-w-6xl flex-col justify-center gap-3 p-3 sm:p-6 lg:flex-row lg:gap-4">
+    <div className="flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-base font-bold text-point">글자수 세기</h1>
         {/* 저장 상태. 폭을 잡아 둬 글자가 바뀌어도 옆 버튼이 밀리지 않는다 */}
@@ -219,6 +235,16 @@ export default function CharCounter() {
             <span className="absolute top-0.5 left-0.5 size-3 rounded-full bg-white shadow-sm transition-transform group-aria-checked:translate-x-3" />
           </span>
         </button>
+        <button
+          type="button"
+          aria-pressed={memoOpen}
+          aria-controls="char-memo"
+          onClick={() => setMemoOpen((v) => !v)}
+          className={`${BUTTON} ${memoOpen ? "border-point/40! text-point!" : ""}`}
+        >
+          <NotebookPen aria-hidden className="size-3.5" />
+          메모
+        </button>
         <button type="button" onClick={() => copy(text)} disabled={!text} className={BUTTON}>
           <Copy aria-hidden className="size-3.5" />
           전체 복사
@@ -232,6 +258,44 @@ export default function CharCounter() {
           <Trash2 aria-hidden className="size-3.5" />
           {confirmClear ? "한 번 더 누르면 지워요" : "지우기"}
         </button>
+      </div>
+
+      {/* 자기소개서 문항. 붙여 넣은 문항에 분량이 적혀 있으면 그 제한을 바로 적용할 수 있다 */}
+      <div className={`flex items-start gap-2 px-3 py-1.5 focus-within:border-ink/30 ${PANEL}`}>
+        <label htmlFor="char-question" className="shrink-0 py-1 text-xs leading-6 font-bold text-point">
+          문항
+        </label>
+        <textarea
+          id="char-question"
+          rows={1}
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="자기소개서 문항을 붙여 넣으세요 (예: 지원 동기를 500자 이내로 작성해 주세요)"
+          className="max-h-32 min-h-8 flex-1 resize-none bg-transparent py-1 text-sm leading-6 text-ink [field-sizing:content] placeholder:text-ink/35 focus:outline-none"
+        />
+        {showSuggest && (
+          <button
+            type="button"
+            onClick={() => {
+              setLimit(suggested.limit);
+              setBasis(suggested.basis);
+            }}
+            className="mt-0.5 shrink-0 rounded-md bg-point/10 px-2 py-1 text-xs font-bold whitespace-nowrap text-point hover:bg-point/15"
+          >
+            {BASIS_LABELS[suggested.basis]} {fmt(suggested.limit)}
+            {suggested.basis === "bytes-kr" ? "B" : "자"} 제한 적용
+          </button>
+        )}
+        {question && (
+          <button
+            type="button"
+            aria-label="문항 지우기"
+            onClick={() => setQuestion("")}
+            className="mt-0.5 grid size-6 shrink-0 place-items-center rounded text-ink/40 hover:text-ink"
+          >
+            <X aria-hidden className="size-3.5" />
+          </button>
+        )}
       </div>
 
       {/* 제한을 넘긴 부분은 textarea 뒤에 같은 글을 겹쳐 그려 배경만 칠한다 */}
@@ -358,6 +422,45 @@ export default function CharCounter() {
           <SmallStat label="줄" value={counts.lines} unit="줄" />
           <SmallStat label="문단" value={counts.paragraphs} unit="개" />
         </div>
+      )}
+    </div>
+
+      {/* 메모 — 떠오른 경험·키워드를 적어 두는 곳. 글자 수에는 넣지 않는다 */}
+      {memoOpen && (
+        <aside
+          id="char-memo"
+          aria-label="메모"
+          className={`flex h-48 shrink-0 flex-col focus-within:border-[#d9c787] lg:h-auto lg:w-72 ${memoSide === "left" ? "lg:order-first" : ""} rounded-lg border border-[#ecdfb4] bg-[#fffbea]`}
+        >
+          <div className="flex items-center gap-2 border-b border-[#ecdfb4] py-1.5 pr-1.5 pl-3">
+            <h2 className="text-xs font-bold text-point">메모</h2>
+            {/* 넓은 화면에서만 좌우가 있다. 좁은 화면에서는 늘 글 아래 */}
+            <button
+              type="button"
+              aria-label={memoSide === "right" ? "메모를 왼쪽으로 옮기기" : "메모를 오른쪽으로 옮기기"}
+              title={memoSide === "right" ? "왼쪽으로 옮기기" : "오른쪽으로 옮기기"}
+              onClick={() => setMemoSide((v) => (v === "right" ? "left" : "right"))}
+              className="ml-auto hidden size-6 place-items-center rounded text-ink/40 hover:text-ink lg:grid"
+            >
+              <ArrowLeftRight aria-hidden className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label="메모 닫기"
+              onClick={() => setMemoOpen(false)}
+              className="grid size-6 place-items-center rounded text-ink/40 hover:text-ink max-lg:ml-auto"
+            >
+              <X aria-hidden className="size-3.5" />
+            </button>
+          </div>
+          <textarea
+            aria-label="메모 내용"
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            placeholder="글 작성에 필요한 내용을 메모할 수 있는 공간입니다."
+            className="min-h-0 flex-1 resize-none bg-transparent p-3 text-sm leading-relaxed text-ink placeholder:text-ink/35 focus:outline-none"
+          />
+        </aside>
       )}
       <CopyToast message={message} />
     </div>

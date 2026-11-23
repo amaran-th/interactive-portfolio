@@ -82,7 +82,7 @@ const STORAGE_ITEMS: {
     tool: "글자수 세기",
     where: "localStorage",
     keys: ["char-counter"],
-    what: "입력한 글, 글자 수 제한과 기준, 맞춤법 검사 설정",
+    what: "입력한 글, 문항, 메모(내용·열림·위치), 글자 수 제한과 기준, 맞춤법 검사 설정",
   },
 ];
 

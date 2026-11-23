@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { basisValue, overflowStart, countText, parseSaved } from "./count.ts";
+import { basisValue, overflowStart, countText, limitFromQuestion, parseSaved } from "./count.ts";
 
 test("빈 글은 모두 0", () => {
   assert.deepEqual(countText(""), {
@@ -39,10 +39,11 @@ test("기준별 값", () => {
 });
 
 test("저장값 읽기", () => {
-  const ok = { text: "글", limit: 500, basis: "no-spaces", spellcheck: true };
+  const ok = { question: "지원 동기", memo: "메모", memoOpen: true, memoSide: "left", text: "글", limit: 500, basis: "no-spaces", spellcheck: true };
   assert.deepEqual(parseSaved(JSON.stringify(ok)), ok);
+  // 문항이 생기기 전에 저장한 값은 빈 문항으로 읽는다
   const old = { text: "글", limit: 500, basis: "no-spaces", crlf: false };
-  assert.deepEqual(parseSaved(JSON.stringify(old)), { ...ok, spellcheck: false });
+  assert.deepEqual(parseSaved(JSON.stringify(old)), { ...ok, question: "", memo: "", memoOpen: false, memoSide: "right", spellcheck: false });
   assert.equal(parseSaved(JSON.stringify(old))?.spellcheck, false);
   assert.deepEqual(parseSaved(JSON.stringify({ ...ok, limit: null }))?.limit, null);
   assert.equal(parseSaved(null), null);
@@ -69,4 +70,14 @@ test("제한을 처음 넘기는 위치", () => {
     assert.equal(overflowStart(text, total, basis), null);
     assert.notEqual(overflowStart(text, total - 1, basis), null);
   }
+});
+
+test("문항에서 분량 찾기", () => {
+  assert.deepEqual(limitFromQuestion("지원 동기를 500자 이내로 작성해 주세요."), { limit: 500, basis: "with-spaces" });
+  assert.deepEqual(limitFromQuestion("성장 과정 (1,000자)"), { limit: 1000, basis: "with-spaces" });
+  assert.deepEqual(limitFromQuestion("공백 제외 700 자 이내"), { limit: 700, basis: "no-spaces" });
+  assert.deepEqual(limitFromQuestion("1500 Byte 이내"), { limit: 1500, basis: "bytes-kr" });
+  assert.deepEqual(limitFromQuestion("최대 2000바이트"), { limit: 2000, basis: "bytes-kr" });
+  assert.equal(limitFromQuestion("본인의 강점을 서술하세요."), null);
+  assert.equal(limitFromQuestion(""), null);
 });

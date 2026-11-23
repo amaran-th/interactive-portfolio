@@ -95,6 +95,13 @@ export const BASIS_LABELS: Record<Basis, string> = {
 };
 
 export type Saved = {
+  /** 자기소개서 문항. 글자 수에는 넣지 않는다 */
+  question: string;
+  /** 옆 메모장. 글자 수에는 넣지 않는다 */
+  memo: string;
+  memoOpen: boolean;
+  /** 넓은 화면에서 메모를 둘 쪽 */
+  memoSide: "left" | "right";
   text: string;
   limit: number | null;
   basis: Basis;
@@ -119,8 +126,29 @@ export function parseSaved(json: string | null): Saved | null {
           : undefined;
     if (limit === undefined) return null;
     // 맞춤법 검사 설정은 나중에 생겨, 없으면 꺼 둔다. 예전에 저장한 crlf 값은 버린다.
-    return { text: d.text, limit, basis: d.basis, spellcheck: d.spellcheck === true };
+    // 문항 칸은 나중에 생겨, 없으면 빈 문항으로 읽는다.
+    return {
+      question: typeof d.question === "string" ? d.question : "",
+      memo: typeof d.memo === "string" ? d.memo : "",
+      memoOpen: d.memoOpen === true,
+      memoSide: d.memoSide === "left" ? "left" : "right",
+      text: d.text,
+      limit,
+      basis: d.basis,
+      spellcheck: d.spellcheck === true,
+    };
   } catch {
     return null;
   }
+}
+
+// 문항에 적힌 분량("500자 이내", "1,000자", "1500 byte")을 찾는다. 처음 나온 것 하나만 본다.
+// byte·바이트는 한글 2바이트 기준으로, 'N자'는 공백 포함으로 읽는다(공백 제외라고 적혀 있으면 공백 제외).
+export function limitFromQuestion(question: string): { limit: number; basis: Basis } | null {
+  const m = /(\d{1,3}(?:,\d{3})+|\d+)\s*(자|byte|bytes|바이트)/i.exec(question);
+  if (!m) return null;
+  const limit = Number(m[1].replace(/,/g, ""));
+  if (!Number.isInteger(limit) || limit <= 0 || limit > MAX_LIMIT) return null;
+  if (m[2] !== "자") return { limit, basis: "bytes-kr" };
+  return { limit, basis: /공백\s*(제외|미포함|빼고)/.test(question) ? "no-spaces" : "with-spaces" };
 }
