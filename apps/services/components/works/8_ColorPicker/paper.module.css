@@ -1,0 +1,150 @@
+/* 종이 위에 연필·펜으로 쓴 느낌. 공용 색 토큰을 이 화면 안에서만 다시 정한다 —
+   ImageDropZone·CopyToast처럼 토큰을 쓰는 공용 조각도 함께 종이 톤이 된다 */
+.root {
+  --color-point: #2b2723; /* 먹 */
+  --color-ink: #2b2723;
+  --color-main: #c4553b; /* 붉은 색연필 */
+  --color-shade: #efe8d8;
+  --paper: #f6f1e6;
+  --sheet: #fffdf8;
+  --pencil: #8a8174;
+  --marker: rgb(255 214 92 / 0.55);
+
+  color: var(--color-ink);
+  background-color: var(--paper);
+  /* 종이 결: 아주 옅은 노이즈 + 가로 줄 */
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35  0 0 0 0 0.3  0 0 0 0 0.22  0 0 0 0.09 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 31px,
+      rgb(120 140 170 / 0.09) 31px 32px
+    );
+}
+
+/* 손글씨 */
+.pen {
+  font-family: var(--font-pen), cursive;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+/* 형광펜으로 그은 듯한 밑줄 */
+.marker {
+  background-image: linear-gradient(
+    100deg,
+    transparent 2%,
+    var(--marker) 4%,
+    var(--marker) 94%,
+    transparent 97%
+  );
+  background-size: 100% 0.55em;
+  background-position: 0 88%;
+  background-repeat: no-repeat;
+  padding: 0 0.2em;
+}
+
+/* 손으로 그린 테두리: 모서리마다 반지름을 다르게 줘 선이 살짝 일그러져 보인다 */
+.sketch {
+  border: 1.5px solid var(--color-ink);
+  border-radius: 255px 12px 225px 14px / 14px 225px 12px 255px;
+}
+.sketchAlt {
+  border: 1.5px solid var(--color-ink);
+  border-radius: 12px 225px 14px 255px / 255px 14px 225px 12px;
+}
+
+.btn {
+  composes: sketch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--sheet);
+  color: var(--color-ink);
+  box-shadow: 2px 3px 0 -0.5px rgb(43 39 35 / 0.85);
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s,
+    background-color 0.12s;
+}
+.btn:hover:not(:disabled) {
+  transform: translate(-1px, -1px) rotate(-0.6deg);
+  box-shadow: 3px 4px 0 -0.5px rgb(43 39 35 / 0.85);
+}
+.btn:active:not(:disabled) {
+  transform: translate(1px, 2px);
+  box-shadow: 0 0 0 0 transparent;
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.btn:focus-visible {
+  outline: 2px dashed var(--color-main);
+  outline-offset: 3px;
+}
+.btnInk {
+  background: var(--color-ink);
+  color: var(--sheet);
+}
+
+/* 이미지+팔레트 카드: 흰 종이 한 장을 마스킹 테이프로 붙인 모양 */
+.sheet {
+  position: relative;
+  background: var(--sheet);
+  box-shadow:
+    0 1px 1px rgb(60 50 35 / 0.08),
+    0 8px 22px -6px rgb(60 50 35 / 0.28);
+}
+.tape {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  width: 92px;
+  height: 24px;
+  translate: -50% 0;
+  rotate: -3deg;
+  background: rgb(222 210 178 / 0.72);
+  box-shadow: 0 1px 2px rgb(60 50 35 / 0.15);
+  /* 양 끝을 톱니처럼 찢은 모양 */
+  clip-path: polygon(
+    0 8%, 4% 0, 8% 10%, 0 22%, 5% 34%, 0 48%, 4% 62%, 0 76%, 5% 88%, 1% 100%,
+    96% 100%, 100% 90%, 95% 78%, 100% 64%, 96% 50%, 100% 36%, 95% 22%, 100% 10%, 97% 0
+  );
+  pointer-events: none;
+}
+
+/* 고른 색 견본: 물감을 한 번 찍은 듯한 둥근 얼룩 */
+.blob {
+  border-radius: 58% 42% 55% 45% / 48% 58% 42% 52%;
+  border: 1.5px solid var(--color-ink);
+}
+.chip {
+  border-radius: 40% 60% 45% 55% / 55% 45% 60% 40%;
+  border: 1.5px solid rgb(43 39 35 / 0.7);
+}
+
+/* 손으로 그은 물결선 구분선 */
+.squiggle {
+  height: 8px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='8'><path d='M0 4 Q 5 0 10 4 T 20 4 T 30 4 T 40 4' fill='none' stroke='%232b2723' stroke-opacity='0.45' stroke-width='1.3' stroke-linecap='round'/></svg>");
+  background-repeat: repeat-x;
+}
+
+.row:hover,
+.row:focus-visible {
+  background-image: linear-gradient(
+    100deg,
+    transparent 1%,
+    var(--marker) 3%,
+    var(--marker) 96%,
+    transparent 99%
+  );
+  outline: none;
+}
+
+.range {
+  accent-color: var(--color-ink);
+}

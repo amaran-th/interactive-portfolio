@@ -10,6 +10,8 @@ import { extractPalette } from "../_shared/quantize";
 import { useCopyFeedback } from "../_shared/useCopyFeedback";
 import { fitWithin } from "../_shared/imageInput";
 import { useImageInput } from "../_shared/useImageInput";
+import { penFont } from "./font";
+import s from "./paper.module.css";
 
 // 색상 추출기: 한 점을 찍어 색을 뽑는 스포이트와, 이미지 전체에서 많이 쓰인 색을
 // 고르는 팔레트를 한 화면에 둔다. 팔레트 견본을 누르면 스포이트로 뽑은 것처럼
@@ -32,7 +34,8 @@ const DEFAULT_COLORS = 6;
 const SAMPLE_MAX = 200;
 // 이미지+팔레트 카드의 여백. 바깥 여백·이미지와 막대 사이·막대 사이가 모두 같다
 const CARD_GAP = 10;
-const CARD_BORDER = 2;
+// 저장하는 PNG 바탕(화면의 카드 종이색)
+const SHEET = "#fffdf8";
 // 내려받는 PNG에서 이미지 폭의 범위(px)
 const EXPORT_MIN = 800;
 const EXPORT_MAX = 1600;
@@ -46,8 +49,14 @@ function labelPx(barWidth: number, barHeight: number): number | null {
   return px < 8 || barHeight < 22 ? null : px;
 }
 
-const SMALL_BUTTON =
-  "rounded-md border-2 border-point bg-white px-2.5 py-1 text-xs font-bold text-point shadow-[2px_2px_0_0_var(--color-point)] hover:bg-shade";
+const SMALL_BUTTON = `${s.btn} ${s.pen} px-3 text-xl leading-8`;
+// 이미지 넣는 칸도 같은 종이·손글씨 모양으로
+const DROP_ZONE = {
+  zone: `border-dashed! ${s.sketch}`,
+  primary: `${SMALL_BUTTON} ${s.btnInk}`,
+  button: SMALL_BUTTON,
+  text: `${s.pen} text-lg text-ink/60`,
+};
 
 type EyeDropperCtor = new () => { open: () => Promise<{ sRGBHex: string }> };
 type Hover = { x: number; y: number; clientX: number; clientY: number; hex: string };
@@ -100,7 +109,7 @@ export default function ColorPicker() {
     const img = input.image;
     if (!area || !img) return;
     const fit = () => {
-      const pad = 2 * (CARD_GAP + CARD_BORDER);
+      const pad = 2 * CARD_GAP; // 카드는 테두리 없이 종이 그림자로 띄운다
       const bar = area.clientWidth < 640 ? 96 : 128;
       // 세로로 긴 이미지는 팔레트를 오른쪽에 둔다
       const vertical = img.naturalHeight / img.naturalWidth > TALL_RATIO;
@@ -213,7 +222,7 @@ export default function ColorPicker() {
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, LOUPE_PX, LOUPE_PX);
     ctx.drawImage(tmp, 0, 0, LOUPE_PX, LOUPE_PX);
-    ctx.strokeStyle = "#0c3675";
+    ctx.strokeStyle = "#c4553b";
     ctx.lineWidth = 2;
     ctx.strokeRect(half * LOUPE_CELL_PX, half * LOUPE_CELL_PX, LOUPE_CELL_PX, LOUPE_CELL_PX);
   }, [hover]);
@@ -267,7 +276,7 @@ export default function ColorPicker() {
     out.width = Math.round(shown.vertical ? w + bar + gap * 3 : w + gap * 2);
     out.height = Math.round(shown.vertical ? h + gap * 2 : h + bar + gap * 3);
     const ctx = out.getContext("2d")!;
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = SHEET;
     ctx.fillRect(0, 0, out.width, out.height);
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(img, gap, gap, w, h);
@@ -298,7 +307,7 @@ export default function ColorPicker() {
     out.width = Math.round(w + gap * 2);
     out.height = Math.round(bh + gap * 2);
     const ctx = out.getContext("2d")!;
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = SHEET;
     ctx.fillRect(0, 0, out.width, out.height);
     custom.forEach((hex, i) => drawBar(ctx, hex, gap + i * (bw + gap), gap, bw, bh, k));
     saveCanvas(out, "my-palette.png");
@@ -322,8 +331,11 @@ export default function ColorPicker() {
       : (hover?.clientY ?? 0) + LOUPE_OFFSET;
 
   return (
-    <div className="mx-auto grid min-h-full max-w-6xl gap-x-5 gap-y-4 p-4 sm:p-6 lg:h-full lg:grid-cols-[1fr_22rem] lg:grid-rows-[auto_1fr]">
-      <h1 className="text-base font-bold text-point lg:col-span-2">색상 추출기</h1>
+    <div className={`min-h-full lg:h-full ${penFont.variable} ${s.root}`}>
+    <div className="mx-auto grid min-h-full max-w-6xl gap-x-8 gap-y-4 p-4 sm:p-6 lg:h-full lg:grid-cols-[1fr_22rem] lg:grid-rows-[auto_1fr]">
+      <h1 className={`text-4xl leading-none lg:col-span-2 ${s.pen}`}>
+        <span className={s.marker}>색상 추출기</span>
+      </h1>
       <section aria-label="이미지" className="flex min-h-0 flex-col gap-3">
         {input.image ? (
           <>
@@ -331,9 +343,10 @@ export default function ColorPicker() {
                 남은 자리(area) 가운데에 카드를 두고, 카드는 이미지 폭에 맞춰 줄어든다 */}
             <div ref={areaRef} className="flex h-[60vh] min-h-80 items-center justify-center lg:h-auto lg:min-h-0 lg:flex-1">
               <div
-                className={`flex border-point bg-white ${shown?.vertical ? "flex-row" : "flex-col"}`}
-                style={{ padding: CARD_GAP, gap: CARD_GAP, borderWidth: CARD_BORDER }}
+                className={`flex ${s.sheet} ${shown?.vertical ? "flex-row" : "flex-col"}`}
+                style={{ padding: CARD_GAP, gap: CARD_GAP }}
               >
+                <span aria-hidden className={s.tape} />
                 <canvas
                   ref={canvasRef}
                   aria-label="이미지에서 색 고르기"
@@ -400,7 +413,7 @@ export default function ColorPicker() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <label className="flex items-center gap-2 text-xs font-bold text-point">
+              <label className={`flex items-center gap-2 text-2xl ${s.pen}`}>
                 컬러 팔레트 <span className="w-7 tabular-nums">{count}색</span>
                 <input
                   type="range"
@@ -409,22 +422,22 @@ export default function ColorPicker() {
                   max={MAX_COLORS}
                   value={count}
                   onChange={(e) => setCount(Number(e.target.value))}
-                  className="w-28 accent-[var(--color-point)]"
+                  className={`w-28 ${s.range}`}
                 />
               </label>
               {palette.length > 0 && (
                 <div className="ml-auto flex gap-2">
                   <button type="button" onClick={downloadCard} className={`${SMALL_BUTTON} flex items-center gap-1`}>
-                    <Download aria-hidden className="size-3.5" />
+                    <Download aria-hidden className="size-4" strokeWidth={1.75} />
                     PNG 저장
                   </button>
                 </div>
               )}
             </div>
-            <ImageDropZone input={input} compact />
+            <ImageDropZone input={input} compact classNames={DROP_ZONE} />
           </>
         ) : (
-          <ImageDropZone input={input} />
+          <ImageDropZone input={input} classNames={DROP_ZONE} />
         )}
       </section>
 
@@ -435,13 +448,13 @@ export default function ColorPicker() {
             <button
               type="button"
               onClick={pickFromScreen}
-              className="flex items-center justify-center gap-2 rounded-lg border-2 border-point bg-point px-4 py-2.5 font-bold text-white shadow-[3px_3px_0_0_var(--color-ink)] hover:bg-point/90"
+              className={`px-4 py-1.5 text-2xl ${s.btn} ${s.btnInk} ${s.pen}`}
             >
-              <Pipette aria-hidden className="size-4" />
+              <Pipette aria-hidden className="size-4" strokeWidth={1.75} />
               화면에서 색상 추출
             </button>
           ) : (
-            <p className="text-xs text-ink/60">
+            <p className={`text-xl leading-6 text-ink/60 ${s.pen}`}>
               화면 어디서나 색을 뽑는 기능은 데스크톱 Chrome·Edge에서만 돼요.
             </p>
           )}
@@ -451,7 +464,7 @@ export default function ColorPicker() {
           <div className="flex h-18 items-center gap-3">
             <div
               aria-hidden
-              className={`size-14 shrink-0 rounded-full border border-ink/15 ${current ? "" : "border-dashed bg-white/60"}`}
+              className={`size-14 shrink-0 ${s.blob} ${current ? "" : "border-dashed! bg-white/50"}`}
               style={current ? { backgroundColor: formatHex(current) } : undefined}
             />
             {current ? (
@@ -462,17 +475,17 @@ export default function ColorPicker() {
                       type="button"
                       aria-label={`${label} 복사`}
                       onClick={() => copy(format(current))}
-                      className="group flex w-full items-center gap-2 rounded px-1.5 py-0.5 text-left hover:bg-white"
+                      className={`group flex w-full items-center gap-2 px-1.5 py-0.5 text-left ${s.row}`}
                     >
-                      <span className="w-8 shrink-0 text-[11px] font-bold text-ink/45">{label}</span>
+                      <span className={`w-10 shrink-0 text-xl leading-5 text-ink/55 ${s.pen}`}>{label}</span>
                       <span className="truncate font-mono text-sm text-ink">{format(current)}</span>
-                      <Copy aria-hidden className="ml-auto size-3.5 shrink-0 text-ink/40 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" />
+                      <Copy aria-hidden strokeWidth={1.75} className="ml-auto size-3.5 shrink-0 text-ink/40 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" />
                     </button>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-ink/50">이미지나 팔레트를 누르면 여기에 색이 나와요</p>
+              <p className={`text-xl leading-6 text-ink/50 ${s.pen}`}>이미지나 팔레트를 누르면 여기에 색이 나와요</p>
             )}
           </div>
 
@@ -481,9 +494,9 @@ export default function ColorPicker() {
             type="button"
             disabled={!canAdd}
             onClick={() => currentHex && setCustom((c) => [...c, currentHex])}
-            className="flex items-center gap-1 self-start rounded-md border border-point/30 bg-white/70 px-2.5 py-1 text-xs font-bold text-point hover:border-point hover:bg-white disabled:opacity-40 disabled:hover:border-point/30"
+            className={`self-start px-3 text-xl leading-8 ${s.btn} ${s.pen}`}
           >
-            <Plus aria-hidden className="size-3.5" />
+            <Plus aria-hidden className="size-4" strokeWidth={1.75} />
             {currentHex && custom.includes(currentHex)
               ? "내 팔레트에 담김"
               : custom.length >= MAX_CUSTOM
@@ -492,14 +505,14 @@ export default function ColorPicker() {
           </button>
 
           {notice && (
-            <p role="status" className="text-sm font-bold text-red-600">
+            <p role="status" className={`text-xl leading-6 text-main ${s.pen}`}>
               {notice}
             </p>
           )}
 
           {recent.length > 0 && (
             <div>
-              <h2 className="text-xs font-bold text-point">최근 고른 색</h2>
+              <h2 className={`text-2xl leading-7 ${s.pen}`}>최근 고른 색</h2>
               <ul className="mt-2 flex flex-wrap gap-2">
                 {recent.map((c) => (
                   <li key={formatHex(c)}>
@@ -508,7 +521,7 @@ export default function ColorPicker() {
                       aria-label={`${formatHex(c)} 다시 고르기`}
                       title={formatHex(c)}
                       onClick={() => choose(c)}
-                      className="size-7 border border-ink/20 hover:border-ink/50"
+                      className={`size-7 transition-transform hover:scale-110 ${s.chip}`}
                       style={{ backgroundColor: formatHex(c) }}
                     />
                   </li>
@@ -519,17 +532,20 @@ export default function ColorPicker() {
         </section>
 
         {/* 내 팔레트 — 사진 없이 막대만 있는 카드. 고른 색을 담아 직접 만든다 */}
-        <section aria-label="내 팔레트" className="flex flex-col gap-3 border-t-2 border-dashed border-point/20 pt-4 lg:mt-auto">
+        <section aria-label="내 팔레트" className="flex flex-col gap-3 lg:mt-auto">
+          <div aria-hidden className={s.squiggle} />
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold text-point">내 팔레트</h2>
-            <span className="text-xs text-ink/50 tabular-nums">
+            <h2 className={`text-3xl leading-none ${s.pen}`}>
+              <span className={s.marker}>내 팔레트</span>
+            </h2>
+            <span className={`text-xl text-ink/50 tabular-nums ${s.pen}`}>
               {custom.length}/{MAX_CUSTOM}
             </span>
             {custom.length > 0 && (
               <button
                 type="button"
                 onClick={() => setCustom([])}
-                className="ml-auto text-xs text-ink/50 underline-offset-2 hover:text-point hover:underline"
+                className={`ml-auto text-xl text-ink/50 underline-offset-2 hover:text-main hover:underline ${s.pen}`}
               >
                 초기화
               </button>
@@ -541,7 +557,7 @@ export default function ColorPicker() {
               </button>
             )}
           </div>
-          <div className="border-point bg-white" style={{ padding: CARD_GAP, borderWidth: CARD_BORDER }}>
+          <div className={s.sheet} style={{ padding: CARD_GAP }}>
             <ul ref={customRef} aria-label="내 팔레트 색" className="relative flex" style={{ height: CUSTOM_BAR, gap: CARD_GAP }}>
               {/* 놓일 자리 보조선: 틈 가운데에 세로 막대와 위아래 점 */}
               {dropGap !== null && custom.length > 0 && (
@@ -552,7 +568,7 @@ export default function ColorPicker() {
                 />
               )}
               {custom.length === 0 ? (
-                <li className="grid flex-1 place-items-center border border-dashed border-ink/20 px-4 text-center text-xs text-ink/50">
+                <li className={`grid flex-1 place-items-center border-dashed! border-ink/30! px-4 text-center text-xl leading-6 text-ink/50 ${s.sketch} ${s.pen}`}>
                   색을 고르고 &apos;내 팔레트에 담기&apos;를 누르면 여기에 쌓여요
                 </li>
               ) : (
@@ -659,14 +675,15 @@ export default function ColorPicker() {
             ref={loupeRef}
             width={LOUPE_PX}
             height={LOUPE_PX}
-            className="rounded-md border-2 border-point bg-white shadow-lg"
+            className="rounded-full border-2 border-ink bg-white shadow-lg"
           />
-          <span className="rounded bg-point px-1.5 py-0.5 font-mono text-[11px] text-white">
+          <span className={`bg-ink px-2 font-mono text-[11px] leading-5 text-[#fffdf8] ${s.sketch}`}>
             {hover.hex}
           </span>
         </div>
       )}
       <CopyToast message={message} />
+    </div>
     </div>
   );
 }

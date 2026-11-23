@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default function ColorPickerPage() {
   return (
     <ToolShell guide={colorPickerGuide}>
-      <main className="min-h-0 flex-1 overflow-y-auto bg-shade text-ink">
+      <main className="min-h-0 flex-1 overflow-y-auto bg-[#f6f1e6] text-ink">
         <ColorPicker />
       </main>
     </ToolShell>
