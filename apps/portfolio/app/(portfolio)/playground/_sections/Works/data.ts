@@ -134,7 +134,7 @@ export const works: WorkItem[] = [
   특징:
   - 브라우저 맞춤법 검사를 스위치로 켭니다.
   - 쓰던 글·문항·메모와 설정은 자동 저장되어 새로고침 후에도 유지됩니다.`,
-    period: "2026.11.16 - 11.19",
+    period: "2026.11.16 - 11.24",
     platforms: [{ type: "pc" }, { type: "mobile" }],
     embedPath: "/char-counter",
     thumbnail: "/playground/char-counter.png",

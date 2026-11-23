@@ -261,9 +261,11 @@ export default function CharCounter() {
       </div>
 
       {/* 자기소개서 문항. 붙여 넣은 문항에 분량이 적혀 있으면 그 제한을 바로 적용할 수 있다 */}
-      <div className={`flex items-start gap-2 px-3 py-1.5 focus-within:border-ink/30 ${PANEL}`}>
-        <label htmlFor="char-question" className="shrink-0 py-1 text-xs leading-6 font-bold text-point">
-          문항
+      {/* 입력칸(흰 상자)과 구분되게, 상자 없는 제목줄로 그린다 */}
+      <div className="group flex items-start gap-2 rounded-md py-0.5 pr-1 pl-2 transition-colors focus-within:bg-point/[0.04] hover:bg-point/[0.03]">
+        <label htmlFor="char-question" className="shrink-0 py-1 text-base leading-6 font-extrabold text-point">
+          <span aria-hidden>Q.</span>
+          <span className="sr-only">문항</span>
         </label>
         <textarea
           id="char-question"
@@ -271,7 +273,7 @@ export default function CharCounter() {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="자기소개서 문항을 붙여 넣으세요 (예: 지원 동기를 500자 이내로 작성해 주세요)"
-          className="max-h-32 min-h-8 flex-1 resize-none bg-transparent py-1 text-sm leading-6 text-ink [field-sizing:content] placeholder:text-ink/35 focus:outline-none"
+          className="max-h-32 min-h-8 flex-1 resize-none bg-transparent py-1 text-[15px] leading-6 font-semibold text-ink [field-sizing:content] placeholder:font-normal placeholder:text-ink/35 focus:outline-none"
         />
         {showSuggest && (
           <button
@@ -291,7 +293,7 @@ export default function CharCounter() {
             type="button"
             aria-label="문항 지우기"
             onClick={() => setQuestion("")}
-            className="mt-0.5 grid size-6 shrink-0 place-items-center rounded text-ink/40 hover:text-ink"
+            className="mt-0.5 grid size-6 shrink-0 place-items-center rounded text-ink/40 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:text-ink focus-visible:opacity-100"
           >
             <X aria-hidden className="size-3.5" />
           </button>
