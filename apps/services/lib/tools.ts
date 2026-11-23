@@ -1,7 +1,7 @@
 // 서비스 앱의 도구 목록. 메인·카테고리 페이지가 모두 이 파일을 읽는다.
 // node:test가 그대로 실행하도록 다른 모듈을 import하지 않는다.
 
-export type CategoryId = "life" | "productivity" | "text" | "creative" | "dev" | "game";
+export type CategoryId = "life" | "productivity" | "text" | "creative" | "dev" | "game" | "science";
 
 export type Category = {
   id: CategoryId;
@@ -57,6 +57,12 @@ export const CATEGORIES: Category[] = [
     label: "게임",
     description: "뜨개 도안을 한 코씩 채우거나, 수소로 시작해 철이 나올 때까지 원소를 합성해요.",
     badgeClass: "bg-[#ffdd94]",
+  },
+  {
+    id: "science",
+    label: "과학",
+    description: "탐사선이 찍은 원본 사진과 기록을 따라가며 우주를 둘러봐요.",
+    badgeClass: "bg-[#b5d4f0]",
   },
 ];
 
@@ -170,6 +176,16 @@ export const TOOLS: Tool[] = [
       "글을 붙여 넣으면 공백 포함·제외 글자 수, 바이트, 단어, 줄을 바로 세요. 글자 수 제한을 정하면 남은 글자를 막대로 보여 주고 넘친 부분은 빨갛게 칠해요. 드래그한 부분만 따로 세기도 하고, 문항을 붙여 넣으면 적힌 분량으로 제한을 바로 정해요. 옆에 메모장도 열어 둘 수 있어요.",
     tags: ["글자 수", "자기소개서", "자소서", "분량", "바이트 계산", "단어 수"],
     thumb: "/playground/char-counter.png",
+  },
+  {
+    slug: "voyager",
+    category: "science",
+    title: "49년만에 도달한 1일",
+    desc: "보이저 1호의 1광일 돌파 기념 연대기",
+    about:
+      "보이저 1호가 지구에서 1광일 떨어진 곳에 닿았어요. 1977년 발사부터 1광일까지, 보이저가 찍은 원본 사진과 기록을 8비트 연대기로 이었어요. 지금 지점이 지구에서 얼마나 먼지 막대와 3D 레이더로 보여 주고, 실어 보낸 골든 레코드와 1광일 너머의 엔딩도 볼 수 있어요.",
+    tags: ["보이저", "우주", "NASA", "탐사선", "창백한 푸른 점", "골든 레코드", "연대기", "8비트"],
+    thumb: "/playground/voyager.png",
   },
 ];
 

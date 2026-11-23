@@ -14,8 +14,14 @@ export type ToolGuideContent = {
  * 도구 안내 본문. 서버 컴포넌트라 초기 HTML에 텍스트가 그대로 들어간다 —
  * ToolShell 상단 바의 '사용 안내' 드로어(GuideDialog) 안에서 렌더된다.
  */
-export default function ToolGuide({ content }: { content: ToolGuideContent }) {
+const LABELS = {
+  ko: { guide: (n: string) => `${n} 안내`, steps: "사용 방법", notes: "알아 두면 좋은 점", faq: "자주 묻는 질문" },
+  en: { guide: (n: string) => `About ${n}`, steps: "How to use", notes: "Good to know", faq: "FAQ" },
+};
+
+export default function ToolGuide({ content, lang = "ko" }: { content: ToolGuideContent; lang?: "ko" | "en" }) {
   const { name, intro, steps, notes, faq } = content;
+  const l = LABELS[lang];
 
   return (
     <article aria-labelledby="tool-guide-title" className="text-ink">
@@ -24,7 +30,7 @@ export default function ToolGuide({ content }: { content: ToolGuideContent }) {
           id="tool-guide-title"
           className="text-2xl font-extrabold tracking-tight text-point"
         >
-          {name} 안내
+          {l.guide(name)}
         </h2>
         <div className="mt-4 flex flex-col gap-3 leading-relaxed">
           {intro.map((p) => (
@@ -33,7 +39,7 @@ export default function ToolGuide({ content }: { content: ToolGuideContent }) {
         </div>
 
         <section className="mt-12">
-          <h3 className="text-lg font-bold text-point">사용 방법</h3>
+          <h3 className="text-lg font-bold text-point">{l.steps}</h3>
           <ol className="mt-4 flex flex-col gap-4">
             {steps.map((step, i) => (
               <li key={step.title} className="flex gap-4">
@@ -50,7 +56,7 @@ export default function ToolGuide({ content }: { content: ToolGuideContent }) {
         </section>
 
         <section className="mt-12">
-          <h3 className="text-lg font-bold text-point">알아 두면 좋은 점</h3>
+          <h3 className="text-lg font-bold text-point">{l.notes}</h3>
           <div className="mt-4 grid gap-4">
             {notes.map((note) => (
               <div
@@ -65,7 +71,7 @@ export default function ToolGuide({ content }: { content: ToolGuideContent }) {
         </section>
 
         <section className="mt-12">
-          <h3 className="text-lg font-bold text-point">자주 묻는 질문</h3>
+          <h3 className="text-lg font-bold text-point">{l.faq}</h3>
           <dl className="mt-4 flex flex-col divide-y-2 divide-sub">
             {faq.map((item) => (
               <div key={item.q} className="py-4">

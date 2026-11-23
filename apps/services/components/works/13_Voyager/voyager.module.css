@@ -1,0 +1,551 @@
+/* 8비트 우주 — 모서리 1칸을 비운 2px 도트 테두리와 steps() 애니메이션만 쓴다 */
+
+.root {
+  /* 한국어 문장을 낱말 단위로 줄바꿈한다 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  --space: #0b0d2a;
+  --space-hi: #171a44;
+  --ink: #fcfcfc;
+  --mute: #9ca0d0;
+  --line: #5c5cd8;
+  --yellow: #f8d878;
+  --pink: #f878a8;
+  --cyan: #3cbcfc;
+
+  font-family: var(--font-galmuri), ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.75;
+  color: var(--ink);
+  background: var(--space);
+  -webkit-font-smoothing: none;
+}
+
+.frame {
+  background: var(--space-hi);
+  box-shadow:
+    0 -2px 0 0 var(--ink),
+    0 2px 0 0 var(--ink),
+    -2px 0 0 0 var(--ink),
+    2px 0 0 0 var(--ink),
+    4px 6px 0 0 rgb(0 0 0 / 0.45);
+}
+.frameActive {
+  background: var(--space-hi);
+  box-shadow:
+    0 -2px 0 0 var(--yellow),
+    0 2px 0 0 var(--yellow),
+    -2px 0 0 0 var(--yellow),
+    2px 0 0 0 var(--yellow),
+    inset 0 0 0 2px rgb(248 216 120 / 0.25),
+    4px 6px 0 0 rgb(0 0 0 / 0.45);
+}
+
+/* 지나간·다가올 카드는 어둡게 — 투명도를 쓰면 뒤의 별이 비친다 */
+.dim {
+  filter: brightness(0.55) saturate(0.6);
+}
+
+.badge {
+  display: inline-block;
+  padding: 0 6px;
+  font-weight: 700;
+  color: var(--space);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  background: var(--space-hi);
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow:
+    0 -2px 0 0 var(--ink),
+    0 2px 0 0 var(--ink),
+    -2px 0 0 0 var(--ink),
+    2px 0 0 0 var(--ink),
+    inset -2px -2px 0 0 #0b0d2a;
+}
+.btn:hover:not(:disabled) {
+  background: #2a2e6c;
+}
+.btn:active:not(:disabled) {
+  transform: translateY(2px);
+}
+.btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.btn:focus-visible,
+.node:focus-visible,
+.tab:focus-visible,
+.photoBtn:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 3px;
+}
+
+/* 거리 지도의 지구 → 보이저 궤적. 점선이 오른쪽으로 흘러 진행 방향을 보여 준다 */
+.trail {
+  background: repeating-linear-gradient(90deg, var(--cyan) 0 6px, transparent 6px 10px);
+  -webkit-mask-image: linear-gradient(90deg, rgb(0 0 0 / 0.25), #000);
+  mask-image: linear-gradient(90deg, rgb(0 0 0 / 0.25), #000);
+  animation: trail 0.8s steps(5) infinite;
+}
+@keyframes trail {
+  from {
+    background-position-x: 0;
+  }
+  to {
+    background-position-x: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trail {
+    animation: none;
+  }
+}
+
+/* 거리 지도의 출발점(지구): 노란 고리가 퍼졌다 사라진다 */
+.origin::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--yellow);
+  animation: origin 1.6s steps(4) infinite;
+}
+@keyframes origin {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .origin::after {
+    animation: none;
+  }
+}
+
+/* 1광일 돌파 축하: 도트 폭죽(터졌다 떨어지며 사라짐)과 흩날리는 색종이 */
+.celebrate {
+  animation: fadeIn 0.3s steps(3) both;
+}
+.spark {
+  position: absolute;
+  opacity: 0;
+  animation: spark 2.6s steps(14) infinite;
+}
+@keyframes spark {
+  0% {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  55% {
+    transform: translate(var(--dx), var(--dy));
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(var(--dx) * 1.1), calc(var(--dy) + 70px));
+    opacity: 0;
+  }
+}
+.flake {
+  position: absolute;
+  top: -12px;
+  animation-name: flake;
+  animation-timing-function: steps(24);
+  animation-iteration-count: infinite;
+}
+@keyframes flake {
+  from {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  to {
+    transform: translate(var(--drift), 110vh) rotate(720deg);
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spark,
+  .flake {
+    animation: none;
+    display: none;
+  }
+}
+
+/* 레이더 패널: 단색 형광 화면 */
+.radar {
+  --phos: rgb(120 255 170);
+  position: relative;
+  color: var(--phos);
+  background: radial-gradient(ellipse at 50% 55%, #062a18 0%, #03140c 70%);
+  box-shadow:
+    0 -2px 0 0 var(--phos),
+    0 2px 0 0 var(--phos),
+    -2px 0 0 0 var(--phos),
+    2px 0 0 0 var(--phos),
+    inset 0 0 28px rgb(120 255 170 / 0.14),
+    4px 6px 0 0 rgb(0 0 0 / 0.45);
+}
+.radar::after {
+  /* 주사선 */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgb(0 0 0 / 0.2) 0 1px, transparent 1px 3px);
+}
+.radarGlow {
+  text-shadow: 0 0 6px rgb(120 255 170 / 0.6);
+}
+.radarBtn {
+  position: relative;
+  z-index: 1;
+  border: 0;
+  padding: 1px 8px;
+  background: transparent;
+  color: var(--phos);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgb(120 255 170 / 0.5);
+}
+.radarBtn[aria-pressed="true"] {
+  background: var(--phos);
+  color: #03140c;
+}
+.radarBtn:focus-visible {
+  outline: 2px solid var(--phos);
+  outline-offset: 2px;
+}
+
+/* 엔딩: 1광일 표식이 물러나며 탐사선까지 새 선이 뻗는다 */
+/* 엔딩 별 띠: 같은 별을 두 벌 이어 붙여 끊김 없이 왼쪽으로 흐른다 */
+.starStrip {
+  animation: starStrip 40s linear infinite;
+}
+@keyframes starStrip {
+  to {
+    transform: translateX(-50%);
+  }
+}
+/* 엔딩 동안 배경 별 타일도 겹마다 다른 빠르기로 흐른다(--bx: 멈췄던 자리) */
+.starDrift {
+  animation: starDrift var(--dur, 20s) linear infinite;
+}
+@keyframes starDrift {
+  from {
+    background-position-x: var(--bx, 0px);
+  }
+  to {
+    background-position-x: calc(var(--bx, 0px) - 480px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .starStrip,
+  .starDrift {
+    animation: none;
+  }
+}
+
+/* 엔딩 동안 트랙(지나온 기록·표식)이 왼쪽으로 계속 흘러간다 */
+.endScroll {
+  animation: endScroll 200s linear forwards;
+}
+@keyframes endScroll {
+  to {
+    transform: translateX(-24000px);
+  }
+}
+.endLeave {
+  transform: translateX(75vw);
+  opacity: 0;
+  transition:
+    transform 7s cubic-bezier(0.55, 0, 0.9, 0.6),
+    opacity 2s ease 5s;
+}
+.creditIn {
+  animation: creditIn 0.5s steps(5) both;
+}
+@keyframes creditIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .endScroll {
+    animation: none;
+  }
+  .endLeave {
+    transition: opacity 1s;
+    transform: none;
+  }
+  .creditIn {
+    animation: none;
+  }
+}
+
+/* 첫 안내의 소리 버튼: 테두리 없이 픽셀 모서리를 깎은 채운 타일 */
+.soundBtn {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 64px;
+  border: 0;
+  cursor: pointer;
+  background: #2a2e6c;
+  clip-path: polygon(
+    0 6px, 6px 6px, 6px 0, calc(100% - 6px) 0, calc(100% - 6px) 6px, 100% 6px,
+    100% calc(100% - 6px), calc(100% - 6px) calc(100% - 6px), calc(100% - 6px) 100%,
+    6px 100%, 6px calc(100% - 6px), 0 calc(100% - 6px)
+  );
+}
+.soundBtn:hover {
+  background: #3a3e8c;
+}
+.soundBtn[aria-pressed="true"] {
+  background: #1d5a7c;
+}
+.soundBtn:active {
+  transform: translateY(2px);
+}
+.soundBtn:focus-visible {
+  outline: none;
+  background: #4a4ea8;
+}
+
+/* 첫 안내의 방향키·마우스 그림: 번갈아 눌리고 휠이 깜박인다 */
+.keyPress {
+  display: inline-block;
+  animation: keyPress 1.6s steps(1) infinite;
+}
+.keyPressLate {
+  animation-delay: 0.8s;
+}
+@keyframes keyPress {
+  0%,
+  30% {
+    transform: translateY(3px);
+    filter: brightness(0.85);
+  }
+  31%,
+  100% {
+    transform: none;
+    filter: none;
+  }
+}
+.wheel {
+  animation: wheel 0.9s steps(1) infinite;
+}
+@keyframes wheel {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .keyPress,
+  .wheel {
+    animation: none;
+  }
+}
+
+/* 엔딩 사진 더미: 흰 테두리 인화지처럼, 화면 폭에 따라 자리를 바꾼다 */
+.polaroid {
+  left: var(--xm);
+  top: var(--ym);
+  width: 104px;
+  padding: 5px 5px 4px;
+  background: #f4f1e8;
+  box-shadow: 3px 4px 0 0 rgb(0 0 0 / 0.45);
+  transition: transform 0.2s;
+}
+.polaroid:hover {
+  z-index: 20 !important;
+}
+.polaroidImg {
+  display: block;
+  width: 100%;
+  height: 72px;
+  object-fit: cover;
+  background: #000;
+}
+@media (min-width: 640px) {
+  .polaroid {
+    left: var(--x);
+    top: var(--y);
+    width: 184px;
+    padding: 8px 8px 6px;
+  }
+  .polaroidImg {
+    height: 132px;
+  }
+}
+
+/* 사진이 켜질 때: 옛날 TV처럼 가운데 가로줄에서 위아래로 펼쳐진다 */
+.tvOn {
+  animation: tvOn 0.55s steps(11) both;
+  transform-origin: 50% 50%;
+}
+@keyframes tvOn {
+  0% {
+    opacity: 0;
+    transform: scale(0.6, 0.004);
+  }
+  1% {
+    opacity: 1;
+    transform: scale(0.6, 0.004);
+    filter: brightness(4);
+  }
+  35% {
+    transform: scale(1, 0.004);
+    filter: brightness(3);
+  }
+  70% {
+    transform: scale(1, 1.03);
+    filter: brightness(1.4);
+  }
+  100% {
+    transform: none;
+    filter: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tvOn {
+    animation: none;
+  }
+}
+
+/* 골든 레코드 표지 위 번호 표식 */
+.spot {
+  border: 0;
+  background: var(--space);
+  color: var(--yellow);
+  cursor: pointer;
+  box-shadow:
+    0 0 0 2px var(--yellow),
+    2px 2px 0 2px rgb(0 0 0 / 0.5);
+}
+.spot[aria-pressed="true"] {
+  background: var(--yellow);
+  color: var(--space);
+  animation: hop 0.8s steps(2) infinite;
+}
+.spot:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* 스크롤바를 숨긴 가로 트랙 */
+.scroller {
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.scroller::-webkit-scrollbar {
+  display: none;
+}
+
+/* 지나온 길은 실선, 갈 길은 점선 */
+.pastLine {
+  height: 4px;
+  background: var(--line);
+  box-shadow: 0 2px 0 0 #2c2c88;
+}
+.futureLine {
+  height: 4px;
+  background: repeating-linear-gradient(90deg, var(--line) 0 8px, transparent 8px 16px);
+}
+
+.node {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+}
+
+.tab {
+  border: 0;
+  padding: 0 6px;
+  background: transparent;
+  color: var(--mute);
+  cursor: pointer;
+}
+.tab[aria-pressed="true"],
+.tab[aria-selected="true"] {
+  background: var(--ink);
+  color: var(--space);
+}
+
+.photoBtn {
+  display: block;
+  border: 0;
+  padding: 0;
+  background: #000;
+  cursor: zoom-in;
+  box-shadow: 0 0 0 2px #000;
+}
+
+.bob {
+  animation: bob 1.2s steps(2) infinite;
+}
+@keyframes bob {
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.signal {
+  animation: signal 1.6s steps(4) infinite;
+}
+@keyframes signal {
+  0% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+
+.twinkle {
+  animation: twinkle 2.4s steps(1) infinite;
+}
+@keyframes twinkle {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.hop {
+  animation: hop 0.8s steps(2) infinite;
+}
+@keyframes hop {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bob,
+  .signal,
+  .twinkle,
+  .hop {
+    animation: none;
+  }
+}

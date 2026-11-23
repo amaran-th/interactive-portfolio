@@ -251,6 +251,13 @@ export default function PrivacyPage() {
               정보가 CDN에 전달됩니다.
             </li>
             <li>
+              SoundCloud(w.soundcloud.com): &lsquo;49년만에 도달한 1일&rsquo;의 골든
+              레코드 창에서 인사말이나 지구의 소리를 펼칠 때만 NASA 공식 SoundCloud
+              플레이어를 불러옵니다. 이때 브라우저가 SoundCloud 서버에 접속해 IP
+              주소와 브라우저 정보가 전달되고, SoundCloud가 쿠키를 저장할 수
+              있습니다. 펼치지 않으면 접속하지 않습니다.
+            </li>
+            <li>
               Vercel: 사이트는 Vercel에서 호스팅합니다. 페이지를 전달하는
               과정에서 IP 주소, 브라우저 종류 같은 접속 정보가 호스팅 서버에서
               처리될 수 있으며, 처리 방식은{" "}

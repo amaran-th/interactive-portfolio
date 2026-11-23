@@ -11,9 +11,15 @@ import ToolGuide, { type ToolGuideContent } from "./ToolGuide";
  */
 export default function ToolShell({
   guide,
+  lang = "ko",
+  langPaths,
   children,
 }: {
   guide: ToolGuideContent;
+  /** 안내 드로어 언어(상단 바의 사이트 이동·개인정보처리방침은 한국어 그대로) */
+  lang?: "ko" | "en";
+  /** 언어판이 여럿인 도구만: 언어별 주소. 주면 상단 바에 한국어/English 선택기를 띄운다 */
+  langPaths?: { ko: string; en: string };
   children: React.ReactNode;
 }) {
   return (
@@ -39,14 +45,43 @@ export default function ToolShell({
           aria-label="서비스 정보"
           className="ml-auto flex shrink-0 items-center gap-3"
         >
+          {langPaths && (
+            <span
+              role="group"
+              aria-label={lang === "en" ? "Language" : "언어"}
+              className="flex items-center rounded-full border border-white/20 p-0.5 text-xs font-bold"
+            >
+              {(
+                [
+                  ["ko", "한국어"],
+                  ["en", "English"],
+                ] as const
+              ).map(([code, label]) => (
+                <Link
+                  key={code}
+                  href={langPaths[code]}
+                  hrefLang={code}
+                  lang={code}
+                  aria-label={label}
+                  aria-current={lang === code ? "page" : undefined}
+                  className={`rounded-full px-2.5 py-0.5 transition-colors ${
+                    lang === code ? "bg-white text-neutral-900" : "text-neutral-400 hover:text-white"
+                  }`}
+                >
+                  <span className="sm:hidden">{code.toUpperCase()}</span>
+                  <span className="hidden sm:inline">{label}</span>
+                </Link>
+              ))}
+            </span>
+          )}
           <Link
             href="/privacy"
             className="text-xs font-medium text-neutral-400 transition-colors hover:text-white"
           >
             개인정보처리방침
           </Link>
-          <GuideDialog toolName={guide.name}>
-            <ToolGuide content={guide} />
+          <GuideDialog toolName={guide.name} lang={lang}>
+            <ToolGuide content={guide} lang={lang} />
           </GuideDialog>
         </nav>
       </header>

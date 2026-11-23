@@ -8,13 +8,21 @@ import { useEffect, useRef } from "react";
  * 렌더된 ToolGuide라 닫혀 있어도 초기 HTML에 들어 있다 — 사용자가 버튼으로
  * 여는 접이식 콘텐츠다.
  */
+const LABELS = {
+  ko: { open: "사용 안내", title: (n: string) => `${n} 안내`, close: "안내 닫기" },
+  en: { open: "Guide", title: (n: string) => `About ${n}`, close: "Close guide" },
+};
+
 export default function GuideDialog({
   toolName,
+  lang = "ko",
   children,
 }: {
   toolName: string;
+  lang?: "ko" | "en";
   children: React.ReactNode;
 }) {
+  const l = LABELS[lang];
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   // 도구들은 window에서 keydown을 듣는다(숫자 키로 코 뜨기, 스페이스로 진행 등).
@@ -47,12 +55,12 @@ export default function GuideDialog({
         className="flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-0.5 text-xs font-bold text-white transition-colors hover:bg-white/20"
       >
         <CircleHelp className="size-3.5" />
-        사용 안내
+        {l.open}
       </button>
       <dialog
         ref={dialogRef}
         onClose={handleClose}
-        aria-label={`${toolName} 안내`}
+        aria-label={l.title(toolName)}
         // 드로어 바깥(::backdrop 영역)을 누르면 닫는다 — 클릭 대상이 dialog
         // 자신일 때만 바깥 클릭이다.
         onClick={(e) => {
@@ -62,11 +70,11 @@ export default function GuideDialog({
       >
         <div className="flex h-full flex-col bg-white text-ink sm:border-l-[2.5px] sm:border-point">
           <div className="flex shrink-0 items-center justify-between border-b-2 border-point bg-shade px-6 py-3">
-            <p className="text-sm font-bold text-point">사용 안내</p>
+            <p className="text-sm font-bold text-point">{l.open}</p>
             <button
               type="button"
               onClick={close}
-              aria-label="안내 닫기"
+              aria-label={l.close}
               className="rounded-full p-1.5 text-point transition-colors hover:bg-sub/60"
             >
               <X className="size-4" />

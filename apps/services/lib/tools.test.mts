@@ -21,7 +21,7 @@ test("모든 도구의 카테고리가 CATEGORIES에 있고 slug가 겹치지 �
 test("activeCategories는 도구가 있는 카테고리만 순서대로 돌려준다", () => {
   assert.deepEqual(
     activeCategories().map((c) => c.id),
-    ["productivity", "creative", "game"],
+    ["productivity", "creative", "game", "science"],
   );
 });
 
@@ -38,6 +38,7 @@ test("toolsIn은 카테고리의 도구를 TOOLS 순서로 돌려준다", () => 
   assert.deepEqual(slugs(toolsIn("creative")), ["visual-novel-studio", "nemo-nemo-beam", "monorism", "stage-lighting"]);
   assert.deepEqual(toolsIn("text"), []);
   assert.deepEqual(toolsIn("dev"), []);
+  assert.deepEqual(slugs(toolsIn("science")), ["voyager"]);
 });
 
 test("getCategory는 없는 id에 undefined", () => {
