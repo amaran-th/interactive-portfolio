@@ -15,7 +15,7 @@ export default function ToolCard({ tool }: { tool: Tool }) {
       className="group grid grid-cols-[4.5rem_1fr] gap-x-3 sm:flex sm:flex-col"
     >
       <div
-        className={`relative aspect-square overflow-hidden bg-shade transition-[translate,rotate,box-shadow] duration-150 group-hover:translate-x-[2px] group-hover:translate-y-[2px] group-hover:-rotate-2 group-hover:shadow-[1px_1px_0_0_var(--color-point)] ${STICKER}`}
+        className={`relative aspect-square overflow-hidden bg-shade transition-[translate,box-shadow] duration-150 group-hover:translate-x-[2px] group-hover:translate-y-[2px] group-hover:shadow-[1px_1px_0_0_var(--color-point)] ${STICKER}`}
       >
         {tool.thumb ? (
           <Image
