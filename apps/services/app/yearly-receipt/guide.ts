@@ -35,7 +35,7 @@ export const yearlyReceiptGuide: ToolGuideContent = {
     },
     {
       title: "SUBTOTAL과 TOTAL PAID",
-      body: "SUBTOTAL은 모든 하위 항목의 정가를 더한 값이고, TOTAL PAID는 실제로 결제된 금액의 합입니다. 영수증 맨 아래 막대 게이지는 TOTAL PAID가 SUBTOTAL에서 차지하는 비율을 보여 줍니다. 목표 옆 괄호 안의 숫자는 완전히 달성한 항목 수입니다.",
+      body: "SUBTOTAL은 모든 하위 항목의 정가를 더한 값이고, TOTAL PAID는 실제로 결제된 금액의 합입니다. 영수증 맨 아래 EXP 게이지와 퍼센트는 TOTAL PAID가 SUBTOTAL에서 차지하는 비율을 보여 줍니다. 목표 옆 괄호 안의 숫자는 완전히 달성한 항목 수입니다.",
     },
     {
       title: "숫자로 적은 목표가 기록하기 쉽다",

@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import EditView from "./EditView";
+import { galmuri } from "../_shared/galmuri";
 import ReceiptView from "./ReceiptView";
 import { useGoalsStorage } from "./useGoalsStorage";
+import r from "./retro.module.css";
 
 type Mode = "edit" | "receipt";
 
@@ -28,7 +30,9 @@ export default function YearlyReceipt() {
   };
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden bg-[#efe6d3]">
+    <div
+      className={`flex h-full w-full flex-col overflow-hidden ${galmuri.variable} ${r.root} ${r.desk}`}
+    >
       {/* 로드 전에는 편집 UI가 깜빡이지 않도록 빈 배경 유지 */}
       {!hydrated ? null : mode === "edit" ? (
         <EditView state={state} setState={setState} onOpen={handleOpen} />

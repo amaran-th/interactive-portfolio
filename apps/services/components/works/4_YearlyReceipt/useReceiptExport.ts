@@ -6,7 +6,7 @@ import { useCallback, useRef, useState } from "react";
 /** export 이미지 바깥에 두르는 여백(px, pixelRatio 2 기준) */
 const EXPORT_PADDING = 56;
 /** 여백 배경색 (영수증이 놓인 데스크 색과 동일) */
-const EXPORT_BG = "#efe6d3";
+const EXPORT_BG = "#c9d2a6";
 
 /**
  * 영수증 DOM을 PNG로 캡처하고, 바깥에 여백을 둘러 다운로드한다.
