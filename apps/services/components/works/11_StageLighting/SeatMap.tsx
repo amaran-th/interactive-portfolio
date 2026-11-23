@@ -109,8 +109,7 @@ export function SeatPicker({ store, seat, onSeat }: { store: Store; seat: SeatRe
   const stage = useShow(store, (s) => s.stage);
   return (
     <>
-      <p className="text-[11px] text-ink/60">좌석을 누르면 그 자리에서 무대를 봐요. 발코니는 흐리게 겹쳐 보여요.</p>
-      <p className="text-xs font-bold text-point">보는 자리: {seatLabel(stage, venue, seat)}</p>
+      <p className="text-xs font-bold text-point">현재 좌석: {seatLabel(stage, venue, seat)}</p>
       <SeatMapView store={store} seat={seat} onSeat={onSeat} />
     </>
   );
