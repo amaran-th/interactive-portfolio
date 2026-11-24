@@ -21,6 +21,8 @@ export default function Switch({
         compact ? "gap-1 text-xs text-gray-500" : "gap-1.5"
       }`}
     >
+      {/* 라벨 다음에 스위치 */}
+      {label && <span>{label}</span>}
       <button
         type="button"
         role="switch"
@@ -38,7 +40,6 @@ export default function Switch({
           }`}
         />
       </button>
-      {label && <span>{label}</span>}
     </label>
   );
 }
