@@ -79,7 +79,7 @@ export const works: WorkItem[] = [
 
   특징:
   - 입력한 목표는 자동 저장되어 새로고침 후에도 유지됩니다.`,
-    period: "2026.07.05 - 07.10",
+    period: "2026.07.05 - 11.24",
     platforms: [{ type: "mobile", specialized: true }, { type: "pc" }],
     embedPath: "/yearly-receipt",
     thumbnail: "/playground/yearly-receipt.png",

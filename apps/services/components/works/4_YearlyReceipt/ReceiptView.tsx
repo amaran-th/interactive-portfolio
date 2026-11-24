@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import PixelIcon from "./PixelIcon";
 import ReceiptPaper from "./ReceiptPaper";
 import r from "./retro.module.css";
@@ -24,6 +25,45 @@ export default function ReceiptView({
   const { goals, style } = state;
   const { receiptCaptureRef, isSaving, handleSave } =
     useReceiptExport(GOALS_YEAR);
+  const actionsRef = useRef<HTMLDivElement>(null);
+
+  // 키보드만으로: 처음엔 '이미지로 저장'에 포커스, 좌우(←→·A·D)로 단추 사이를 오가고 Enter로 누른다.
+  // Esc는 '수정하기'.
+  const live = useRef(onEdit);
+  useEffect(() => {
+    live.current = onEdit;
+  });
+  useEffect(() => {
+    const buttons = () => [
+      ...(actionsRef.current?.querySelectorAll<HTMLButtonElement>("button") ??
+        []),
+    ];
+    buttons()[0]?.focus({ preventScroll: true });
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (document.querySelector("dialog[open]")) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        live.current();
+        return;
+      }
+      const step =
+        // 한글 입력 상태에서도 되도록 A·D는 자판 위치(e.code)로 본다
+        (
+          { ArrowLeft: -1, KeyA: -1, ArrowRight: 1, KeyD: 1 } as Record<
+            string,
+            number
+          >
+        )[e.key] ?? ({ KeyA: -1, KeyD: 1 } as Record<string, number>)[e.code];
+      if (!step) return;
+      e.preventDefault();
+      const list = buttons();
+      const i = list.indexOf(document.activeElement as HTMLButtonElement);
+      list[(i + step + list.length) % list.length]?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-4 py-6">
@@ -82,6 +122,7 @@ export default function ReceiptView({
 
       {/* 액션 버튼 */}
       <div
+        ref={actionsRef}
         data-html-to-image-ignore="true"
         className="flex flex-wrap items-center justify-center gap-4 pb-1"
       >
@@ -93,10 +134,7 @@ export default function ReceiptView({
           <PixelIcon name="save" size={16} />
           {isSaving ? "저장 중…" : "이미지로 저장"}
         </button>
-        <button
-          onClick={onEdit}
-          className={`px-4 py-2 ${r.btn}`}
-        >
+        <button onClick={onEdit} className={`px-4 py-2 ${r.btn}`}>
           <PixelIcon name="pencil" size={16} /> 수정하기
         </button>
       </div>

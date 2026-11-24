@@ -22,10 +22,11 @@
   -moz-osx-font-smoothing: unset;
 }
 
-/* 데스크: 크림 바탕에 4px 간격 도트 */
+/* 데스크(게임기·프린터가 놓인 바탕): 액정의 올리브 녹색과 겹치지 않게 액정 테두리와 같은 계열의
+   흐린 남보라, 4px 간격 밝은 도트 */
 .desk {
-  background-color: var(--cream);
-  background-image: radial-gradient(rgb(29 36 20 / 0.12) 1px, transparent 1px);
+  background-color: #7f84a3;
+  background-image: radial-gradient(rgb(255 255 255 / 0.16) 1px, transparent 1px);
   background-size: 8px 8px;
 }
 
@@ -296,5 +297,631 @@
 @media (prefers-reduced-motion: reduce) {
   .blink {
     animation: none;
+  }
+}
+
+/* ── 휴대용 게임기 본체 (편집 화면) ── */
+/* 본체 모서리는 도트 계단으로 깎고, 오른쪽 아래만 크게 깎는다 */
+.shellWrap {
+  filter: drop-shadow(4px 6px 0 rgb(29 36 20 / 0.28));
+}
+.shell {
+  --body: #d9d5c7;
+  --body-lo: #aeaa9b;
+  --body-hi: #eeebe0;
+  --print: #4a4870;
+  background: var(--body);
+  box-shadow:
+    inset 4px 4px 0 0 var(--body-hi),
+    inset -4px -4px 0 0 var(--body-lo);
+  clip-path: polygon(
+    0 8px, 4px 8px, 4px 4px, 8px 4px, 8px 0,
+    calc(100% - 8px) 0, calc(100% - 8px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 8px, 100% 8px,
+    100% calc(100% - 40px), calc(100% - 4px) calc(100% - 40px), calc(100% - 4px) calc(100% - 28px),
+    calc(100% - 8px) calc(100% - 28px), calc(100% - 8px) calc(100% - 20px), calc(100% - 12px) calc(100% - 20px),
+    calc(100% - 12px) calc(100% - 14px), calc(100% - 18px) calc(100% - 14px), calc(100% - 18px) calc(100% - 8px),
+    calc(100% - 26px) calc(100% - 8px), calc(100% - 26px) calc(100% - 4px), calc(100% - 40px) calc(100% - 4px),
+    calc(100% - 40px) 100%,
+    8px 100%, 8px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 8px), 0 calc(100% - 8px)
+  );
+}
+/* 본체에 찍힌 글씨 */
+.printed {
+  color: var(--print, #4a4870);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.ridges {
+  width: 64px;
+  height: 10px;
+  background: repeating-linear-gradient(90deg, var(--body-lo) 0 4px, transparent 4px 8px);
+}
+
+/* 액정 테두리: 어두운 판, 오른쪽 아래만 크게 깎는다 */
+.bezel {
+  background: #55546a;
+  box-shadow:
+    inset 0 2px 0 0 #6c6b84,
+    inset 0 -2px 0 0 #3c3b4e;
+  clip-path: polygon(
+    0 4px, 4px 4px, 4px 0, calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px,
+    100% calc(100% - 24px), calc(100% - 4px) calc(100% - 24px), calc(100% - 4px) calc(100% - 16px),
+    calc(100% - 8px) calc(100% - 16px), calc(100% - 8px) calc(100% - 8px), calc(100% - 16px) calc(100% - 8px),
+    calc(100% - 16px) calc(100% - 4px), calc(100% - 24px) calc(100% - 4px), calc(100% - 24px) 100%,
+    4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px)
+  );
+}
+.led {
+  background: #f85858;
+  box-shadow: 0 0 6px 1px rgb(248 88 88 / 0.7);
+}
+
+/* 액정: 크림 바탕 + 안쪽 그늘 + 위에 덮는 도트 격자 */
+.lcd {
+  overflow: hidden;
+  background-color: var(--cream);
+  background-image: radial-gradient(rgb(29 36 20 / 0.12) 1px, transparent 1px);
+  background-size: 8px 8px;
+  box-shadow:
+    0 0 0 2px #2c2b3a;
+}
+.lcdGrid {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background:
+    repeating-linear-gradient(0deg, rgb(29 36 20 / 0.07) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgb(29 36 20 / 0.05) 0 1px, transparent 1px 3px);
+  box-shadow: inset 3px 3px 0 0 rgb(29 36 20 / 0.18);
+}
+
+/* 십자키 */
+.dpad {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+}
+.dpadArm,
+.dpadCenter {
+  position: absolute;
+  display: block;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  padding: 0;
+  background: #2e2d38;
+}
+.dpadCenter {
+  left: 32px;
+  top: 32px;
+  background: radial-gradient(circle, #24232c 0 6px, #2e2d38 6px);
+}
+.dpadUp { left: 32px; top: 0; box-shadow: inset 2px 2px 0 0 #4d4c5c; }
+.dpadDown { left: 32px; top: 64px; box-shadow: inset 0 -4px 0 0 #1a1920; }
+.dpadLeft { left: 0; top: 32px; box-shadow: inset 2px 2px 0 0 #4d4c5c, inset 0 -4px 0 0 #1a1920; }
+.dpadRight { left: 64px; top: 32px; box-shadow: inset 0 -4px 0 0 #1a1920; }
+button.dpadArm {
+  cursor: pointer;
+}
+button.dpadArm::after {
+  /* 화살표 자국 */
+  content: "";
+  position: absolute;
+  left: 12px;
+  width: 8px;
+  height: 4px;
+  background: #4d4c5c;
+}
+.dpadUp::after { top: 10px; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.dpadDown::after { bottom: 12px; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+button.dpadLeft::after,
+button.dpadRight::after { left: auto; top: 12px; width: 4px; height: 8px; }
+.dpadLeft::after { left: 10px !important; clip-path: polygon(0 50%, 100% 0, 100% 100%); }
+.dpadRight::after { right: 10px; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+
+/* 십자키 커서: 지금 고른 칸을 도트 점선으로 두르고 깜빡인다 */
+.lcd [data-pad-cursor] {
+  outline: 2px dashed var(--s4);
+  outline-offset: 2px;
+  animation: yr-cursor 1s steps(1) infinite;
+}
+@keyframes yr-cursor {
+  50% {
+    outline-color: transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lcd [data-pad-cursor] {
+    animation: none;
+  }
+}
+/* 눌린 팔만 움직이면 십자가 갈라지므로, 자리는 그대로 두고 안쪽 그늘로 눌림을 보인다 */
+button.dpadArm:active {
+  background: #1f1e26;
+  box-shadow: inset 0 3px 0 0 #121117;
+}
+button.dpadArm:focus-visible,
+.round:focus-visible,
+.pill:focus-visible {
+  outline: 2px solid #4a4870;
+  outline-offset: 3px;
+}
+
+/* A/B: 도트 계단으로 깎은 둥근 단추 */
+.round {
+  width: 48px;
+  height: 48px;
+  border: 0;
+  padding: 0;
+  background: #b83a54;
+  color: #f4d8de;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow:
+    inset 4px 4px 0 0 #d8607a,
+    inset -4px -6px 0 0 #7c2438;
+  clip-path: polygon(
+    16px 0, 32px 0, 32px 4px, 40px 4px, 40px 8px, 44px 8px, 44px 16px, 48px 16px,
+    48px 32px, 44px 32px, 44px 40px, 40px 40px, 40px 44px, 32px 44px, 32px 48px,
+    16px 48px, 16px 44px, 8px 44px, 8px 40px, 4px 40px, 4px 32px, 0 32px,
+    0 16px, 4px 16px, 4px 8px, 8px 8px, 8px 4px, 16px 4px
+  );
+}
+.round:active {
+  box-shadow: inset 4px 4px 0 0 #7c2438;
+  transform: translateY(2px);
+}
+
+/* SELECT/START: 납작한 고무 단추 */
+.pill {
+  width: 44px;
+  height: 12px;
+  border: 0;
+  padding: 0;
+  background: #7d7b8c;
+  cursor: pointer;
+  box-shadow:
+    inset 0 2px 0 0 #9a98a8,
+    inset 0 -2px 0 0 #5a586a;
+  clip-path: polygon(4px 0, calc(100% - 4px) 0, calc(100% - 4px) 2px, 100% 2px, 100% calc(100% - 2px), calc(100% - 4px) calc(100% - 2px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 2px), 0 calc(100% - 2px), 0 2px, 4px 2px);
+}
+.pill:active:not(:disabled) {
+  background: #5a586a;
+  transform: translateY(1px);
+}
+.pill:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 스피커 구멍 */
+.grille {
+  width: 44px;
+  height: 36px;
+  background: repeating-linear-gradient(90deg, #8f8b7c 0 4px, transparent 4px 10px);
+  clip-path: polygon(0 100%, 30% 0, 100% 0, 70% 100%);
+}
+
+@media (max-height: 640px) {
+  .dpad {
+    width: 72px;
+    height: 72px;
+  }
+  .dpadArm,
+  .dpadCenter {
+    width: 24px;
+    height: 24px;
+  }
+  .dpadCenter { left: 24px; top: 24px; }
+  .dpadUp { left: 24px; }
+  .dpadDown { left: 24px; top: 48px; }
+  .dpadLeft { top: 24px; }
+  .dpadRight { left: 48px; top: 24px; }
+  button.dpadArm::after { left: 8px; }
+  .dpadUp::after { top: 6px; }
+  .dpadDown::after { bottom: 8px; }
+}
+
+/* 키보드로 집은 목표·하위 항목: 진한 실선으로 두르고 살짝 띄운다 */
+.grabbed {
+  outline: 2px solid var(--s4);
+  outline-offset: 2px;
+  box-shadow: 4px 4px 0 0 var(--s3);
+}
+
+/* ── 목표 신청서 양식 ── */
+.sheet {
+  background: var(--s0);
+  box-shadow:
+    0 -2px 0 0 var(--ink),
+    0 2px 0 0 var(--ink),
+    -2px 0 0 0 var(--ink),
+    2px 0 0 0 var(--ink),
+    4px 6px 0 0 rgb(29 36 20 / 0.22);
+}
+.sheetHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 10px;
+  background: var(--s1);
+  border-bottom: 2px solid var(--ink);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+/* 목표 한 칸: 왼쪽 색인 탭 + 내용. 칸 사이는 굵은 줄 두 개(겹줄) */
+.formRow {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+}
+.formRow + .formRow {
+  border-top: 2px solid var(--ink);
+  box-shadow: inset 0 2px 0 0 var(--s0), inset 0 4px 0 0 var(--ink);
+}
+.indexTab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 8px;
+  background: var(--s4);
+  color: var(--s0);
+  border: 0;
+  border-right: 2px solid var(--ink);
+  cursor: grab;
+  line-height: 1.3;
+}
+.indexTab:hover {
+  background: var(--s3);
+}
+.indexTab:active {
+  cursor: grabbing;
+}
+/* 양식 칸 이름 */
+.caption {
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 400;
+  color: var(--s3);
+  letter-spacing: 0.1em;
+}
+/* 밑줄 칸: 평소 점선, 적을 때 실선 */
+.inputLine {
+  border: 0;
+  border-radius: 0;
+  border-bottom: 2px dotted var(--s3);
+  background: transparent;
+  color: var(--ink);
+  outline: none;
+}
+.inputLine::placeholder {
+  color: var(--faint);
+  font-weight: 400;
+}
+.inputLine:focus {
+  border-bottom-style: solid;
+  border-bottom-color: var(--ink);
+  background: var(--s1);
+}
+.inputLine::-webkit-inner-spin-button,
+.inputLine::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.inputLine[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+/* 달성률: 테두리 없는 글자. 숫자 밑에 아주 짧은 굵은 줄만 */
+.stamp {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding-bottom: 4px;
+  color: var(--ink);
+}
+/* 하위 항목 괘선 */
+.ruled > li {
+  border-bottom: 1px dashed var(--s2);
+}
+.ruled > li:last-child {
+  border-bottom: 0;
+}
+/* 양식의 네모 칸 선택지 */
+.opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--mute);
+  cursor: pointer;
+}
+.opt[aria-pressed="true"] {
+  color: var(--ink);
+  font-weight: 700;
+}
+.optMark {
+  width: 10px;
+  height: 10px;
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+.opt[aria-pressed="true"] .optMark {
+  background: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--ink), inset 0 0 0 3px var(--s0);
+}
+.opt:focus-visible,
+.indexTab:focus-visible {
+  outline: 2px solid var(--s3);
+  outline-offset: 2px;
+}
+
+/* ── 종이 설명서 (게임기 밖) ── */
+.paper {
+  --paper-ink: #2b2a24;
+  --paper-mute: #6b6858;
+  background-color: #f6f3e6;
+  background-image: repeating-linear-gradient(0deg, transparent 0 23px, rgb(43 42 36 / 0.08) 23px 24px);
+  color: var(--paper-ink);
+  box-shadow:
+    0 -2px 0 0 var(--paper-ink),
+    0 2px 0 0 var(--paper-ink),
+    -2px 0 0 0 var(--paper-ink),
+    2px 0 0 0 var(--paper-ink),
+    4px 6px 0 0 rgb(29 36 20 / 0.25);
+}
+.staple {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 28px;
+  height: 4px;
+  margin-left: -14px;
+  background: #9a9a9a;
+  box-shadow: inset 0 -2px 0 0 #6e6e6e;
+}
+.paperHead {
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  border-bottom: 2px solid var(--paper-ink);
+  padding-bottom: 2px;
+}
+.paperMute {
+  color: var(--paper-mute);
+}
+.paperRow + .paperRow {
+  border-top: 1px dashed rgb(43 42 36 / 0.3);
+}
+
+/* 캐러셀: 목표 한 장이 넘어오는 연출(도트 단위로 끊어서) */
+.pageIn {
+  animation: yr-page 0.18s steps(3, end) both;
+}
+@keyframes yr-page {
+  from {
+    transform: translateX(var(--page-from, 24px));
+    opacity: 0.4;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pageIn {
+    animation: none;
+  }
+}
+/* 넘김 단추·쪽 표시 */
+.pager {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 20px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.pager:hover {
+  background: var(--s0);
+}
+.pager[aria-disabled="true"] {
+  color: var(--faint);
+  cursor: default;
+}
+.pageDot {
+  width: 10px;
+  height: 10px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--s3);
+  cursor: pointer;
+}
+.pageDot[aria-current="true"] {
+  background: var(--ink);
+  box-shadow: none;
+}
+
+/* 밑줄 칸: 적힌 값은 진한 실선·굵게, 비어 있으면 흐린 점선과 옅은 예시 글 */
+.inputLine:not(:placeholder-shown) {
+  border-bottom-style: solid;
+  border-bottom-color: var(--ink);
+  font-weight: 700;
+}
+.inputLine:placeholder-shown {
+  border-bottom-color: var(--s2);
+}
+.inputLine::placeholder {
+  color: var(--s2);
+  opacity: 0.75;
+}
+
+/* 게임기 뒤에 깔린 설명서: 아래쪽은 본체에 가려지고, 위쪽 제목만 비스듬히 보인다 */
+.peek {
+  position: absolute;
+  right: 6%;
+  top: 20px;
+  width: 50%;
+  height: 72px;
+  z-index: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 14px 0;
+  border: 0;
+  background-color: #f6f3e6;
+  background-image: repeating-linear-gradient(0deg, transparent 0 23px, rgb(43 42 36 / 0.08) 23px 24px);
+  color: #2b2a24;
+  text-align: left;
+  cursor: pointer;
+  transform: rotate(6deg);
+  transform-origin: 100% 100%;
+  box-shadow:
+    0 -2px 0 0 #2b2a24,
+    -2px 0 0 0 #2b2a24,
+    2px 0 0 0 #2b2a24;
+  transition: translate 0.12s steps(2);
+}
+/* 마우스를 올리면 기울기는 그대로, 종이만 조금 더 빠져나온다 */
+.peek:hover {
+  translate: 0 -4px;
+}
+.peek:focus-visible {
+  outline: 2px solid #4a4870;
+  outline-offset: 3px;
+}
+
+/* 설명서 모달: 깔려 있던 자리(위·비스듬히)에서 내려와 반듯하게 펼쳐진다 */
+.manualDialog {
+  margin: auto;
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  padding: 4px 8px 8px 4px;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  font-family: var(--font-galmuri), ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.75;
+  -webkit-font-smoothing: none;
+}
+.manualDialog > section {
+  max-height: calc(100dvh - 64px);
+  overflow-y: auto;
+}
+.manualDialog[open] {
+  animation: yr-manual-in 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.manualDialog::backdrop {
+  background: rgb(11 14 8 / 0.55);
+  animation: yr-fade 0.5s ease-out both;
+}
+@keyframes yr-manual-in {
+  from {
+    transform: translateY(-40vh) rotate(6deg) scale(0.85);
+    opacity: 0;
+  }
+}
+@keyframes yr-fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .manualDialog[open],
+  .manualDialog::backdrop {
+    animation: none;
+  }
+}
+
+/* 모달 속 설명서: 오른쪽 아래 귀퉁이를 잘라 내고, 그 자리에 접어 올린 귀퉁이('알겠어요')를 얹는다.
+   clip-path가 바깥 그림자를 자르므로 테두리는 안쪽 그림자로, 종이 그림자는 dialog의 drop-shadow로 준다 */
+.manualDialog {
+  filter: drop-shadow(4px 6px 0 rgb(11 14 8 / 0.45));
+}
+.manualDialog .paper {
+  box-shadow: inset 0 0 0 2px var(--paper-ink);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 80px), calc(100% - 80px) 100%, 0 100%);
+}
+.dogEar {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 80px;
+  height: 80px;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--paper-ink);
+  /* 접힌 귀퉁이: 왼쪽 위 삼각형만 남기고, 접힌 선(대각선)을 진하게 */
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  background: linear-gradient(
+    to bottom right,
+    #e4dcc2 0 calc(50% - 2px),
+    var(--paper-ink) calc(50% - 2px) 50%,
+    transparent 50%
+  );
+  box-shadow:
+    inset 2px 2px 0 0 var(--paper-ink),
+    inset 6px 6px 0 0 rgb(43 42 36 / 0.12);
+}
+.dogEar > span {
+  position: absolute;
+  left: 25px;
+  top: 25px;
+  translate: -50% -50%;
+  rotate: -45deg;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.dogEar:hover {
+  background: linear-gradient(
+    to bottom right,
+    #d9cfb0 0 calc(50% - 2px),
+    var(--paper-ink) calc(50% - 2px) 50%,
+    transparent 50%
+  );
+}
+.dogEar:focus-visible {
+  outline: none;
+  background: linear-gradient(
+    to bottom right,
+    var(--paper-ink) 0 calc(50% - 2px),
+    var(--paper-ink) calc(50% - 2px) 50%,
+    transparent 50%
+  );
+  color: #f6f3e6;
+}
+
+/* 목표 위 고정 넘김 줄: 바탕 없이 아래 굵은 줄만 */
+.navBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0 4px;
+  border-bottom: 2px solid var(--ink);
+}
+
+/* 닫힐 때: 펼칠 때를 거꾸로 — 위로 비스듬히 올라가며 게임기 뒤로 사라진다 */
+.manualDialog[data-closing] {
+  animation: yr-manual-out 0.5s cubic-bezier(0.55, 0, 0.75, 0.2) forwards;
+}
+.manualDialog[data-closing]::backdrop {
+  animation: yr-fade-out 0.5s ease-in forwards;
+}
+@keyframes yr-manual-out {
+  to {
+    transform: translateY(-40vh) rotate(6deg) scale(0.85);
+    opacity: 0;
+  }
+}
+@keyframes yr-fade-out {
+  to {
+    opacity: 0;
   }
 }

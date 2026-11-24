@@ -183,7 +183,10 @@ export default function ReceiptPaper({
                               </span>
                             )}
                           </span>
-                          <span className={r.leader} style={{ color: t.line }} />
+                          <span
+                            className={r.leader}
+                            style={{ color: t.line }}
+                          />
                           <span className="shrink-0 tabular-nums">
                             {formatWon(itemPaid)}
                           </span>
