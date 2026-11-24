@@ -28,10 +28,6 @@ export default function ToolCard({ tool }: { tool: Tool }) {
         ) : (
           <ServiceThumbFallback title={tool.title} />
         )}
-        {/* 설명: 마우스가 있는 데스크톱에서만 hover·키보드 포커스 때 썸네일 위에 띄운다 */}
-        <p className="hidden sm:pointer-fine:absolute sm:pointer-fine:inset-0 sm:pointer-fine:flex sm:pointer-fine:items-center sm:pointer-fine:bg-point/90 sm:pointer-fine:p-3 sm:pointer-fine:text-[11px] sm:pointer-fine:leading-snug sm:pointer-fine:text-white sm:pointer-fine:opacity-0 sm:pointer-fine:transition-opacity sm:pointer-fine:group-hover:opacity-100 sm:pointer-fine:group-focus-visible:opacity-100">
-          {tool.about}
-        </p>
       </div>
       <div className="min-w-0 self-center sm:mt-2.5 sm:self-auto">
         <p className="font-bold text-point group-hover:underline group-hover:underline-offset-4">
@@ -39,10 +35,6 @@ export default function ToolCard({ tool }: { tool: Tool }) {
         </p>
         <p className="mt-0.5 text-xs font-medium text-main">{tool.desc}</p>
       </div>
-      {/* 모바일·터치 기기: 설명을 아래 전체 폭에 */}
-      <p className="col-span-2 mt-2 text-[13px] leading-relaxed text-ink/85 sm:pointer-fine:hidden sm:text-xs">
-        {tool.about}
-      </p>
     </Link>
   );
 }

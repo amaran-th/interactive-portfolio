@@ -97,7 +97,7 @@ export const works: WorkItem[] = [
   📷 이미지 import: 사진을 업로드하면 픽셀 크기와 안티에일리어싱을 조절하며 미리보기로 확인한 뒤 가져올 수 있습니다. 추출된 색상은 대표색 개수로 자동/수동 병합해 팔레트를 정리합니다.
 
   💾 내보내기: PNG·SVG·JPG로 내보낼 수 있고, 저장한 작품은 비주얼 노벨 스튜디오 등 다른 Work에서 그대로 재사용됩니다.`,
-    period: "2026.07.10 - 11.10",
+    period: "2026.07.10 - 11.25",
     platforms: [{ type: "pc", specialized: true }, { type: "mobile" }],
     embedPath: "/nemo-nemo-beam",
     thumbnail: "/playground/nemo-beam.png",
@@ -113,8 +113,9 @@ export const works: WorkItem[] = [
   💸 유연한 현금흐름: 수입·지출 항목마다 반복(무기한·기한·횟수) 또는 일시 발생을 선택할 수 있고, 지출에도 그룹을 지정할 수 있습니다.
 
   🔀 이체 규칙: 자산군 간 자금 흐름을 정기 또는 일시로 설정할 수 있어 예적금 만기, 전세보증금 반환 같은 일회성 변동도 반영하고, 흐름도에서 그 달의 이체 내역을 확인할 수 있습니다.`,
-    period: "2026.08.18 - 10.17",
+    period: "2026.08.18 - 11.25",
     platforms: [{ type: "pc" }, { type: "mobile" }],
+    thumbnail: "/playground/asset-simulator.png",
     embedPath: "/asset-simulator",
     path: "/asset-simulator",
   },

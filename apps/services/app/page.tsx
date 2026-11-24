@@ -52,7 +52,7 @@ export default function Home() {
                       {/* 카테고리 색 스티커를 살짝 기울여 붙인다 */}
                       <Link
                         href={`/category/${c.id}`}
-                        className={`inline-flex -rotate-2 items-center gap-1.5 rounded-full border-2 border-point py-0.5 pr-1 pl-3 text-sm font-bold text-point shadow-[2px_2px_0_0_var(--color-point)] ${c.badgeClass}`}
+                        className={`inline-flex items-center gap-1.5 rounded-full border-2 border-point py-0.5 pr-1 pl-3 text-sm font-bold text-point ${c.badgeClass}`}
                       >
                         {c.label}
                         <span className="rounded-full bg-white px-1.5 text-[11px] tabular-nums">
