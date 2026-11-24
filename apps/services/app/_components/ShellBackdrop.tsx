@@ -2,11 +2,19 @@
 
 import { useEffect, useRef } from "react";
 
+// 계산된 색이 불투명한지. Tailwind v4 색은 rgb()가 아니라 lab()/oklch()로 계산되므로 형식을 가리지 않는다.
+const alpha = (s: string) => {
+  const v = s.trim();
+  return v.endsWith("%") ? parseFloat(v) / 100 : parseFloat(v);
+};
 const opaque = (c: string) => {
-  const m = c.match(/rgba?\(([^)]+)\)/);
+  if (!c || c === "transparent") return false;
+  const m = c.match(/\(([^)]+)\)/);
   if (!m) return false;
-  const parts = m[1].split(/[\s,/]+/).filter(Boolean);
-  return parts.length < 4 || Number(parts[3]) >= 0.99;
+  const inner = m[1];
+  if (inner.includes("/")) return alpha(inner.split("/")[1]) >= 0.99; // lab(… / a), rgb(… / a)
+  const parts = inner.split(",");
+  return parts.length < 4 || alpha(parts[3]) >= 0.99; // rgba(r, g, b, a)
 };
 
 /**

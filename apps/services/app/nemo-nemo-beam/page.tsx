@@ -34,7 +34,7 @@ export default function PixelArtMakerPage() {
   return (
     <ToolShell guide={nemoNemoBeamGuide}>
       <main
-        className="min-h-0 flex-1 w-full overflow-hidden"
+        className="min-h-0 flex-1 w-full overflow-hidden bg-gray-950"
         style={{ cursor: CURSOR_NORMAL }}
       >
         <PixelArtMaker />
