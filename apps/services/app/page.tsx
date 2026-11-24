@@ -85,18 +85,6 @@ export default function Home() {
               쓰는 법이 궁금하면 각 도구 위쪽의 &lsquo;사용 안내&rsquo;를 눌러
               보세요.
             </p>
-            <p>
-              혼자 만들고 운영하는 사이트예요. 다른 작업은{" "}
-              <a
-                href="https://amaranth-portfolio.vercel.app"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-bold text-white underline decoration-white/40 decoration-2 underline-offset-4 hover:decoration-white"
-              >
-                포트폴리오
-              </a>
-              에 있어요.
-            </p>
           </div>
         </section>
       </SiteFooter>

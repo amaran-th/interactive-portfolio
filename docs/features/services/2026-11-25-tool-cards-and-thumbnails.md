@@ -25,3 +25,7 @@
 - `apps/services/app/page.tsx` — 카테고리 라벨 스타일
 - `apps/services/app/_components/ShellBackdrop.tsx` — 색 형식에 상관없는 불투명 판정
 - `apps/services/app/nemo-nemo-beam/page.tsx` — 검은 배경 고정
+
+## 포트폴리오 진입로
+- 포트폴리오를 완성하기 전까지 서비스 사이트에서 포트폴리오로 가는 링크를 두지 않는다. 메인 푸터 '이 사이트에 대해'의 포트폴리오 링크 줄을 지웠다.
+- 포트폴리오가 서비스 페이지를 iframe으로 띄우도록 허용하는 `next.config.ts`의 frame-ancestors 설정은 유지한다.
