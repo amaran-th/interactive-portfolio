@@ -22,8 +22,6 @@ import {
   GENDER_LABELS,
   HAIRS,
   HAIR_LABELS,
-  HANGS,
-  HANG_LABELS,
   HEIGHT_RANGE,
   type HangId,
   KNOBS,
@@ -38,7 +36,10 @@ import {
   STAGE_SHAPES,
   type Show,
   aimFixtures,
+  hangLabel,
   hangRange,
+  hangsOf,
+  isBoomHang,
   resolve,
   setActorGender,
   setChannel,
@@ -92,12 +93,14 @@ function channelKey(s: Show, selectedId: string | null): string {
 const ICON_BUTTON =
   "flex size-7 shrink-0 items-center justify-center rounded-md text-point hover:bg-point/10 disabled:opacity-40";
 
-function Header({
+export function Header({
   icon,
   kind,
   name,
   onName,
   onBegin,
+  solo,
+  onSolo,
   onDuplicate,
   onDelete,
 }: {
@@ -106,12 +109,15 @@ function Header({
   name?: string;
   onName?: (v: string) => void;
   onBegin: () => void;
+  /** 조명기 솔로(켜면 이 조명기만 100%) */
+  solo?: boolean;
+  onSolo?: () => void;
   onDuplicate?: () => void;
   onDelete?: () => void;
 }) {
   return (
     <div className="flex items-center gap-2 px-3 py-2">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-point text-white">{icon}</span>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-point text-on-point">{icon}</span>
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="text-[10px] font-bold text-point/70">{kind}</span>
         {onName ? (
@@ -122,12 +128,19 @@ function Header({
             maxLength={20}
             onFocus={onBegin}
             onChange={(e) => onName(e.target.value)}
-            className="min-w-0 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-bold text-ink hover:border-point/30 focus:border-point focus:bg-white/80 focus:outline-none"
+            className="min-w-0 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-bold text-ink hover:border-point/30 focus:border-point focus:bg-black/25 focus:outline-none"
           />
         ) : (
           <span className="truncate px-1 text-sm font-bold text-ink">{name}</span>
         )}
       </div>
+      {onSolo && (
+        <button type="button" aria-pressed={!!solo} onClick={onSolo}
+          title="이 조명기만 100%로 켜고 나머지는 잠시 꺼요. 저장된 값은 바뀌지 않아요."
+          className="h-7 shrink-0 rounded-md px-1.5 text-[11px] font-bold text-point hover:bg-point/10 aria-pressed:bg-point aria-pressed:text-on-point">
+          솔로
+        </button>
+      )}
       {onDuplicate && (
         <button type="button" onClick={onDuplicate} aria-label="복제" title="복제 (⌘/Ctrl+D)" className={ICON_BUTTON}>
           <Copy aria-hidden className="size-4" />
@@ -206,7 +219,7 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
           <label className="flex flex-col gap-0.5">
             <span className={LABEL}>자세</span>
             <select value={actor.pose} onFocus={onBegin} onChange={(e) => set({ pose: e.target.value as Pose })}
-              className="rounded-md border border-point/40 bg-white/80 px-2 py-1 text-xs text-ink">
+              className="rounded-md border border-point/40 bg-black/25 px-2 py-1 text-xs text-ink">
               {POSES.map((p) => <option key={p} value={p}>{POSE_LABELS[p]}</option>)}
             </select>
           </label>
@@ -235,7 +248,7 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
     const cueAim = cueParams.includes("target");
     const res = resolve(stage, fixture, level);
     const [lo, hi] = hangRange(stage, fixture.hang);
-    const boom = fixture.hang === "boomL" || fixture.hang === "boomR";
+    const boom = isBoomHang(stage, fixture.hang);
     const limit = TIERS[tier].shadows;
     const shadowLocked = !fixture.castShadow && shadowCount >= limit;
     const dx = res.target.x - res.position.x;
@@ -248,7 +261,7 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
     return (
       <div>
         <Header icon={<FixtureIcon kind={kind} className="size-5" />} kind={`조명기 · ${FIXTURE_LABELS[kind]}`} name={fixture.name}
-          onName={(name) => edit((s) => updateFixture(s, id, { name }))} onBegin={onBegin} onDuplicate={onDuplicate} onDelete={onDelete} />
+          onName={(name) => edit((s) => updateFixture(s, id, { name }))} onBegin={onBegin} solo={solo} onSolo={onSolo} onDuplicate={onDuplicate} onDelete={onDelete} />
         <Section title="큐 값">
           <Slider label="디머" value={level?.intensity ?? 0} min={0} max={1} step={0.01} format={pct} onBegin={onBegin}
             onChange={(intensity) => edit((s) => updateLevel(s, id, { intensity }))} />
@@ -260,10 +273,6 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
           {cueColor && (
             <ColorField label="색" value={res.color} onBegin={onBegin} onChange={(color) => edit((s) => updateLevel(s, id, { color }))} />
           )}
-          <button type="button" aria-pressed={solo} onClick={onSolo} className={`${SEGMENT} self-start`}
-            title="이 조명기만 100%로 켜고 나머지는 잠시 꺼요. 저장된 값은 바뀌지 않아요.">
-            솔로
-          </button>
         </Section>
         <Section title="위치·채널">
           <ChannelField key={`${id}-${fixture.channel}`} channel={fixture.channel} taken={takenChannels} onBegin={onBegin}
@@ -275,8 +284,8 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
             <span className={LABEL}>라인</span>
             <select value={fixture.hang} onFocus={onBegin}
               onChange={(e) => edit((s) => updateFixture(s, id, { hang: e.target.value as HangId }))}
-              className="rounded-md border border-point/40 bg-white/80 px-2 py-1 text-xs text-ink">
-              {HANGS.map((h) => <option key={h} value={h}>{HANG_LABELS[h]}</option>)}
+              className="rounded-md border border-point/40 bg-black/25 px-2 py-1 text-xs text-ink">
+              {hangsOf(stage).map((h) => <option key={h} value={h}>{hangLabel(stage, h)}</option>)}
             </select>
           </label>
           <NumberField label={boom ? "높이" : "좌우"} title={boom ? "붐 위 높이(m)" : "라인 위 좌우(m)"}
@@ -409,9 +418,9 @@ function ChannelField({
           if (error === null && draft !== "" && n !== channel) onCommit(n);
           else setDraft(String(channel));
         }}
-        className="w-20 rounded-md border border-point/40 bg-white/80 px-2 py-1 text-xs text-ink tabular-nums aria-invalid:border-red-600"
+        className="w-20 rounded-md border border-point/40 bg-black/25 px-2 py-1 text-xs text-ink tabular-nums aria-invalid:border-red-400"
       />
-      {error && <span id="fixture-channel-error" role="alert" className="text-[11px] font-bold text-red-600">{error}</span>}
+      {error && <span id="fixture-channel-error" role="alert" className="text-[11px] font-bold text-red-400">{error}</span>}
     </div>
   );
 }

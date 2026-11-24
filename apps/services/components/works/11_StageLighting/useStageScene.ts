@@ -21,11 +21,12 @@ import { buildMannequinGeometry, mannequinBox } from "./scene/mannequin";
 import { PropLayer } from "./scene/props";
 import { buildStage } from "./scene/stage";
 import { VenueLayer } from "./scene/venue";
-import { type Actor, type Fixture, HANGS, type HangId, type LookState, type Ray, type Resolved, type Show, type Vec3, hangPoint, hangRange, raySegment, resolve } from "./show";
+import { type Actor, type Fixture, type HangId, type LookState, type Ray, type Resolved, type Show, type Vec3, hangPoint, hangRange, hangsOf, isBoomHang, raySegment, resolve } from "./show";
 import { type Store, diffShow } from "./store";
 import { type SeatRef, seatView, venueBox } from "./venue";
 
 export type ViewMode = "edit" | "audience" | "plot";
+export type LookDir = "left" | "right" | "up" | "down";
 export type Pick = { type: "prop" | "actor" | "fixture" | "aim" | "line"; id: string } | null;
 export type ScreenPoint = { id: string; channel: number; color: string; x: number; y: number };
 
@@ -33,6 +34,8 @@ export type SceneApi = {
   requestRender(): void;
   applyLook(look: LookState, shadows: boolean): void;
   setView(v: ViewMode): void;
+  /** 객석 시점에서 키를 누르는 동안 고개를 돌린다(W·A·S·D). */
+  setLookKey(dir: LookDir, down: boolean): void;
   setWorkLight(on: boolean): void;
   setHouseLights(on: boolean): void;
   /** 객석 좌석마다 관객을 앉힌다. 고른 좌석(관객 시점 자리)은 비워 둔다. */
@@ -186,9 +189,15 @@ export function useStageScene(
     controls.edit.maxPolarAngle = Math.PI / 2 - 0.05;
     controls.edit.minDistance = 2;
     controls.edit.maxDistance = 60;
+    // 객석 시점은 좌석에 앉아 고개를 돌리는 시점이다. 회전 중심을 눈 바로 앞에 두면 카메라가 제자리에서 돈다.
+    // 회전 방향을 뒤집어(음수) 끄는 쪽으로 무대가 따라오게 한다. 확대는 거리 대신 화각(오페라글라스)으로 한다.
     controls.audience.enablePan = false;
-    controls.audience.minPolarAngle = 70 * DEG;
-    controls.audience.maxPolarAngle = 100 * DEG;
+    controls.audience.enableZoom = false;
+    controls.audience.rotateSpeed = -0.15;
+    // 극좌표각은 (눈 − 회전 중심) 방향 기준이라 90°보다 작을수록 아래를 본다: 아래 35°, 위 25°까지.
+    controls.audience.minPolarAngle = 55 * DEG;
+    controls.audience.maxPolarAngle = 115 * DEG;
+    const AUDIENCE_FOV = 50;
     controls.plot.enableRotate = false;
     controls.plot.screenSpacePanning = true;
     let view: ViewMode = "edit";
@@ -197,15 +206,17 @@ export function useStageScene(
 
     function placeAudience() {
       const { eye, target } = seatView(show.stage, show.venue, seat);
-      audience.position.set(eye.x, eye.y, eye.z);
-      controls.audience.target.set(target.x, target.y, target.z);
-      // 좌석에서 무대 쪽을 본 방위각을 기준으로 좌우 25°까지만 돌린다.
-      const az = Math.atan2(eye.x - target.x, eye.z - target.z);
-      controls.audience.minAzimuthAngle = az - 25 * DEG;
-      controls.audience.maxAzimuthAngle = az + 25 * DEG;
-      const dist = audience.position.distanceTo(controls.audience.target);
-      controls.audience.minDistance = dist * 0.6;
-      controls.audience.maxDistance = dist * 1.05;
+      // 회전 중심을 눈에서 무대 쪽으로 1cm 앞에 둔다.
+      const look = new THREE.Vector3(target.x - eye.x, target.y - eye.y, target.z - eye.z).normalize().multiplyScalar(0.01);
+      audience.position.set(eye.x - look.x, eye.y - look.y, eye.z - look.z);
+      controls.audience.target.set(eye.x, eye.y, eye.z);
+      controls.audience.minDistance = controls.audience.maxDistance = 0.01;
+      // 무대 가운데를 본 방위각을 기준으로 고개를 좌우 75°까지 돌린다.
+      const az = Math.atan2(-look.x, -look.z);
+      controls.audience.minAzimuthAngle = az - 75 * DEG;
+      controls.audience.maxAzimuthAngle = az + 75 * DEG;
+      audience.fov = AUDIENCE_FOV;
+      audience.updateProjectionMatrix();
       controls.audience.update();
     }
 
@@ -531,7 +542,7 @@ export function useStageScene(
       }
       const [lo, hi] = hangRange(show.stage, hang);
       const p = hangPoint(show.stage, hang, 0);
-      const boom = hang === "boomL" || hang === "boomR";
+      const boom = isBoomHang(show.stage, hang);
       const r = activeLine ? 0.07 : 0.055;
       if (boom) {
         lineHi.position.set(p.x, 2.3, p.z);
@@ -607,8 +618,43 @@ export function useStageScene(
       if (stats) stats.hazeActual = hazeActual;
     }
 
+    // 객석 시점 키보드 둘러보기: 누르고 있는 방향으로 초당 LOOK_SPEED만큼 고개를 돌린다.
+    const lookKeys = new Set<LookDir>();
+    let lookLast = 0;
+    const LOOK_SPEED = { yaw: 60 * DEG, pitch: 40 * DEG };
+    const lookOffset = new THREE.Vector3();
+    const lookSph = new THREE.Spherical();
+    function stepLook(now: number): boolean {
+      if (view !== "audience" || lookKeys.size === 0) {
+        lookLast = 0;
+        return false;
+      }
+      const dt = lookLast ? Math.min(0.1, (now - lookLast) / 1000) : 0;
+      lookLast = now;
+      const yaw = (lookKeys.has("left") ? 1 : 0) - (lookKeys.has("right") ? 1 : 0);
+      const pitch = (lookKeys.has("up") ? 1 : 0) - (lookKeys.has("down") ? 1 : 0);
+      // 카메라는 회전 중심(눈) 뒤 1cm에 있다. 이 오프셋을 돌리면 시선이 같은 쪽으로 돈다.
+      // 왼쪽을 보려면 방위각을 늘리고, 위를 보려면 극각을 늘린다(오프셋이 아래로 내려간다).
+      lookOffset.subVectors(audience.position, controls.audience.target);
+      lookSph.setFromVector3(lookOffset);
+      lookSph.theta += yaw * LOOK_SPEED.yaw * dt;
+      lookSph.phi += pitch * LOOK_SPEED.pitch * dt;
+      // 좌우 한계는 무대 쪽 방위각 기준 ±75°다. 원형 객석처럼 ±180°를 넘나드는 자리도 있어 기준에서 뺀 각으로 자른다.
+      const { minAzimuthAngle: lo, maxAzimuthAngle: hi } = controls.audience;
+      const mid = (lo + hi) / 2;
+      const half = (hi - lo) / 2;
+      const rel = Math.atan2(Math.sin(lookSph.theta - mid), Math.cos(lookSph.theta - mid));
+      lookSph.theta = mid + THREE.MathUtils.clamp(rel, -half, half);
+      lookSph.phi = THREE.MathUtils.clamp(lookSph.phi, controls.audience.minPolarAngle, controls.audience.maxPolarAngle);
+      lookOffset.setFromSpherical(lookSph);
+      audience.position.copy(controls.audience.target).add(lookOffset);
+      audience.lookAt(controls.audience.target);
+      cameraMoved = true;
+      return true;
+    }
+
     function stepAnimations(now: number): boolean {
-      let busy = false;
+      let busy = stepLook(now);
       if (houseFade) {
         const t = Math.min(1, (now - houseFade.start) / HOUSE_FADE_MS);
         houseLevel = houseFade.from + (houseFade.to - houseFade.from) * t;
@@ -857,7 +903,7 @@ export function useStageScene(
       const ray = { origin: { x: o.x, y: o.y, z: o.z }, dir: { x: dir.x, y: dir.y, z: dir.z } };
       let lineD = view === "plot" ? 0.6 : 0.35;
       let line: Pick = null;
-      for (const hang of HANGS) {
+      for (const hang of hangsOf(show.stage)) {
         const [lo, hi] = hangRange(show.stage, hang);
         const { dist } = raySegment(ray, hangPoint(show.stage, hang, lo), hangPoint(show.stage, hang, hi));
         if (dist < lineD) {
@@ -875,6 +921,11 @@ export function useStageScene(
         applyAll(look);
         if (shadows) shadowsPending = true;
         updateSelection();
+        requestRender();
+      },
+      setLookKey(dir, down) {
+        if (down) lookKeys.add(dir);
+        else lookKeys.delete(dir);
         requestRender();
       },
       setView(v) {
@@ -1028,6 +1079,16 @@ export function useStageScene(
     }
     const observer = new ResizeObserver(resize);
     observer.observe(container);
+    /** 객석 시점의 휠: 자리에서 움직이지 않고 화각만 좁혀 당겨 본다(20–60°). */
+    function onAudienceWheel(e: WheelEvent) {
+      if (view !== "audience") return;
+      e.preventDefault();
+      audience.fov = THREE.MathUtils.clamp(audience.fov * Math.exp(e.deltaY * 0.001), 20, 60);
+      audience.updateProjectionMatrix();
+      cameraMoved = true;
+      requestRender();
+    }
+    renderer.domElement.addEventListener("wheel", onAudienceWheel, { passive: false });
     controls.audience.enabled = false;
     controls.plot.enabled = false;
     resize();
@@ -1039,6 +1100,7 @@ export function useStageScene(
       apiRef.current = null;
       unsubscribe();
       observer.disconnect();
+      renderer.domElement.removeEventListener("wheel", onAudienceWheel);
       cancelAnimationFrame(frameReq);
       window.clearTimeout(restoreTimer);
       for (const c of Object.values(controls)) c.dispose();

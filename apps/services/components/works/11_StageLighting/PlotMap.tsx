@@ -8,8 +8,6 @@ import { bodiesOf, dragHeight, dropAt } from "./placement";
 import { stageBounds } from "./scene/stage";
 import {
   CUE_PARAMS,
-  HANGS,
-  HANG_LABELS,
   type HangId,
   type LineOffset,
   type MapPt,
@@ -19,6 +17,9 @@ import {
   fixtureMapPoint,
   hangFromMap,
   hangPoint,
+  hangLabel,
+  hangsOf,
+  isBoomHang,
   lineMapSegment,
   mapBounds,
   resolve,
@@ -51,6 +52,8 @@ type Props = {
   onPick: (id: string | null) => void;
   onPickLine: (hang: HangId) => void;
   onBegin: () => void;
+  /** 보기 전용(객석 시점): 누르면 고르기만 하고 끌어 옮기지 않는다. */
+  readOnly?: boolean;
 };
 
 const LABEL_ROOM = 1.6; // m. 라인 이름을 쓸 왼쪽 여백
@@ -59,7 +62,7 @@ const HOVER = "#ffe08a";
 const ACTIVE = "#ffb000";
 const deg = (r: number) => (r * 180) / Math.PI;
 
-export default function PlotMap({ store, sceneRef, mode, onMode, selectedId, selectedLine, onPick, onPickLine, onBegin }: Props) {
+export default function PlotMap({ store, sceneRef, mode, onMode, selectedId, selectedLine, onPick, onPickLine, onBegin, readOnly = false }: Props) {
   const show = useShow(store, (s) => s);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{ drag: Drag; pointerId: number; x: number; y: number; moved: boolean; raf: number; pt: MapPt } | null>(null);
@@ -95,7 +98,7 @@ export default function PlotMap({ store, sceneRef, mode, onMode, selectedId, sel
     const scene = sceneRef.current;
     const g = d.drag;
     if (g.type === "line") {
-      const next = dragLineOnMap(g.hang, g.start, d.pt.x - g.from.x, d.pt.z - g.from.z);
+      const next = dragLineOnMap(s.stage, g.hang, g.start, d.pt.x - g.from.x, d.pt.z - g.from.z);
       store.set(setLineOffset(s, g.hang, { dz: Math.round(next.dz * 20) / 20, dy: Math.round(next.dy * 20) / 20 }));
       return;
     }
@@ -137,10 +140,13 @@ export default function PlotMap({ store, sceneRef, mode, onMode, selectedId, sel
     }
   };
 
+  const grab = readOnly ? "cursor-pointer" : "cursor-grab";
+
   const start = (e: React.PointerEvent, drag: Drag) => {
     e.stopPropagation();
     if (e.button !== 0) return;
     itemDownRef.current = true;
+    if (readOnly) return; // 고르기만 한다
     svgRef.current?.setPointerCapture(e.pointerId);
     dragRef.current = { drag, pointerId: e.pointerId, x: e.clientX, y: e.clientY, moved: false, raf: 0, pt: toWorld(e.clientX, e.clientY) };
   };
@@ -211,14 +217,14 @@ export default function PlotMap({ store, sceneRef, mode, onMode, selectedId, sel
         mode === "split" ? "h-full w-full rounded-none border-y-0 border-l-0" : "w-72 rounded-md"
       }`}
     >
-      <div className="flex items-center justify-between gap-1 bg-point px-2 py-1 text-[11px] font-bold text-white">
+      <div className="flex items-center justify-between gap-1 bg-point px-2 py-1 text-[11px] font-bold text-on-point">
         <span>평면도 · 위에서 본 무대</span>
         <span className="flex gap-0.5">
-          <button type="button" className="hidden rounded p-0.5 hover:bg-white/20 md:block" aria-label={mode === "split" ? "작게 보기" : "화면 반으로 나눠 보기"}
+          <button type="button" className="hidden rounded p-0.5 hover:bg-black/15 md:block" aria-label={mode === "split" ? "작게 보기" : "화면 반으로 나눠 보기"}
             title={mode === "split" ? "작게 보기" : "화면 반으로 나눠 보기"} onClick={() => onMode(mode === "split" ? "mini" : "split")}>
             {mode === "split" ? <Minimize2 className="size-3.5" aria-hidden /> : <Maximize2 className="size-3.5" aria-hidden />}
           </button>
-          <button type="button" className="rounded p-0.5 hover:bg-white/20" aria-label="평면도 닫기" title="평면도 닫기" onClick={() => onMode("off")}>
+          <button type="button" className="rounded p-0.5 hover:bg-black/15" aria-label="평면도 닫기" title="평면도 닫기" onClick={() => onMode("off")}>
             <X className="size-3.5" aria-hidden />
           </button>
         </span>
@@ -276,25 +282,25 @@ export default function PlotMap({ store, sceneRef, mode, onMode, selectedId, sel
             <rect key={p.id} x={pos.x - r} y={pos.z - r} width={r * 2} height={r * 2} rx={0.08}
               transform={`rotate(${-deg(p.rotationY)} ${pos.x} ${pos.z})`}
               fill={p.color} fillOpacity={0.8} stroke={sel ? ACTIVE : "#ffffff66"} strokeWidth={sel ? 0.12 : 0.04}
-              className="cursor-grab" onPointerDown={(e) => onDownEntity(e, "prop", p.id, p.position)} />
+              className={grab} onPointerDown={(e) => onDownEntity(e, "prop", p.id, p.position)} />
           );
         })}
 
         {/* 라인(파이프) */}
-        {HANGS.map((hang) => {
+        {hangsOf(show.stage).map((hang) => {
           const [a, c] = lineMapSegment(show.stage, hang);
           const on = selectedLine === hang;
           const hov = hoverLine === hang;
-          const boom = hang === "boomL" || hang === "boomR";
+          const boom = isBoomHang(show.stage, hang);
           return (
-            <g key={hang} className="cursor-grab" onPointerDown={(e) => onDownLine(e, hang)}
+            <g key={hang} className={grab} onPointerDown={(e) => onDownLine(e, hang)}
               onPointerEnter={() => highlight(hang)} onPointerLeave={() => highlight(null)}>
               <line x1={a.x} y1={a.z} x2={c.x} y2={c.z} stroke="transparent" strokeWidth={0.6} strokeLinecap="round" />
               <line x1={a.x} y1={a.z} x2={c.x} y2={c.z} stroke={on ? ACTIVE : hov ? HOVER : "#8a8b95"}
                 strokeWidth={on ? 0.16 : hov ? 0.12 : 0.07} strokeLinecap="round" />
               <text x={boom ? a.x : a.x - 0.25} y={boom ? a.z + 0.55 : a.z + 0.14} textAnchor={boom ? "middle" : "end"} fontSize={0.36}
                 fontWeight={700} fill={on ? ACTIVE : hov ? HOVER : "#ffffff88"} className="pointer-events-none">
-                {HANG_LABELS[hang]}
+                {hangLabel(show.stage, hang)}
               </text>
             </g>
           );
@@ -305,7 +311,7 @@ export default function PlotMap({ store, sceneRef, mode, onMode, selectedId, sel
           const pos = at(a.id, a.position);
           const sel = a.id === selectedId;
           return (
-            <g key={a.id} className="cursor-grab" onPointerDown={(e) => onDownEntity(e, "actor", a.id, a.position)}>
+            <g key={a.id} className={grab} onPointerDown={(e) => onDownEntity(e, "actor", a.id, a.position)}>
               <circle cx={pos.x} cy={pos.z} r={0.3} fill={a.topColor} stroke={sel ? ACTIVE : "#ffffff"} strokeWidth={sel ? 0.12 : 0.05} />
               <text x={pos.x} y={pos.z + 0.7} textAnchor="middle" fontSize={0.32} fill="#ffffffcc" className="pointer-events-none">
                 {a.name}
@@ -324,13 +330,13 @@ export default function PlotMap({ store, sceneRef, mode, onMode, selectedId, sel
             <g key={f.id}>
               <line x1={pos.x} y1={pos.z} x2={tgt.x} y2={tgt.z} stroke={r.color} strokeOpacity={sel ? 0.9 : 0.25 + 0.5 * r.intensity}
                 strokeWidth={sel ? 0.06 : 0.035} strokeDasharray={r.intensity > 0 ? undefined : "0.15 0.12"} className="pointer-events-none" />
-              <g className="cursor-grab" onPointerDown={(e) => onDownFixture(e, f.id)}>
+              <g className={grab} onPointerDown={(e) => onDownFixture(e, f.id)}>
                 <circle cx={pos.x} cy={pos.z} r={0.3} fill="#1b1b6b" stroke={sel ? ACTIVE : r.color} strokeWidth={sel ? 0.12 : 0.08} />
                 <text x={pos.x} y={pos.z + 0.12} textAnchor="middle" fontSize={0.3} fontWeight={700} fill="#ffffff" className="pointer-events-none">
                   {f.channel}
                 </text>
               </g>
-              {sel && (
+              {sel && !readOnly && (
                 <g className="cursor-crosshair" onPointerDown={(e) => onDownAim(e, f.id, r.target)}>
                   <circle cx={tgt.x} cy={tgt.z} r={0.35} fill="transparent" stroke={ACTIVE} strokeWidth={0.07} />
                   <path d={`M${tgt.x - 0.5} ${tgt.z}H${tgt.x + 0.5}M${tgt.x} ${tgt.z - 0.5}V${tgt.z + 0.5}`} stroke={ACTIVE} strokeWidth={0.05} />
@@ -341,7 +347,9 @@ export default function PlotMap({ store, sceneRef, mode, onMode, selectedId, sel
         })}
       </svg>
       <p className="px-2 py-1 text-[10px] text-white/60">
-        조명기·인물·소품·라인을 끌어 옮겨요. 조명기를 고르면 십자 표시로 조준점을 끌 수 있어요.
+        {readOnly
+          ? "객석 시점에서는 눌러서 고르기만 해요. 옮기려면 편집·플롯 시점으로 바꿔요."
+          : "조명기·인물·소품·라인을 끌어 옮겨요. 조명기를 고르면 십자 표시로 조준점을 끌 수 있어요."}
       </p>
     </div>
   );

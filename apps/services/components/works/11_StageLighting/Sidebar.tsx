@@ -69,7 +69,7 @@ export default function Sidebar({ open, onOpen, tab, onTab, actions, outliner, i
         onClick={() => onOpen(true)}
         aria-label="사이드바 펼치기"
         title="사이드바 펼치기"
-        className="absolute right-0 bottom-3 z-20 flex h-24 w-6 items-center justify-center rounded-l-lg border border-r-0 border-white/50 bg-white/70 text-point shadow-lg backdrop-blur-md md:top-1/2 md:bottom-auto md:-translate-y-1/2"
+        className="absolute right-0 bottom-3 z-20 flex h-24 w-6 items-center justify-center rounded-l-lg border border-r-0 border-white/10 bg-surface/80 text-point shadow-lg backdrop-blur-md md:top-1/2 md:bottom-auto md:-translate-y-1/2"
       >
         <PanelRightOpen aria-hidden className="size-4" />
       </button>
@@ -81,7 +81,7 @@ export default function Sidebar({ open, onOpen, tab, onTab, actions, outliner, i
       ref={ref}
       aria-label="무대 요소와 속성"
       style={{ "--sidebar-w": `${width}px` } as React.CSSProperties}
-      className="absolute inset-x-2 bottom-2 z-20 flex h-[45%] flex-col rounded-xl border border-white/50 bg-white/70 text-ink shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-md md:inset-x-auto md:top-3 md:right-3 md:bottom-3 md:h-auto md:w-[var(--sidebar-w)]"
+      className="absolute inset-x-2 bottom-2 z-20 flex h-[45%] flex-col rounded-xl border border-white/10 bg-surface/80 text-ink shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-md md:inset-x-auto md:top-3 md:right-3 md:bottom-3 md:h-auto md:w-[var(--sidebar-w)]"
     >
       <div
         aria-hidden
@@ -107,7 +107,7 @@ export default function Sidebar({ open, onOpen, tab, onTab, actions, outliner, i
           <div
             role="region"
             aria-label={side.title}
-            className="absolute top-0 right-[calc(100%+0.5rem)] hidden max-h-full w-72 flex-col rounded-xl border border-white/50 bg-white/70 shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-md md:flex"
+            className="absolute top-0 right-[calc(100%+0.5rem)] hidden max-h-full w-72 flex-col rounded-xl border border-white/10 bg-surface/80 shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-md md:flex"
           >
             <div className="flex items-center justify-between border-b border-point/15 py-1 pr-1 pl-3">
               <h2 className="text-xs font-bold text-point">{side.title}</h2>
@@ -120,7 +120,7 @@ export default function Sidebar({ open, onOpen, tab, onTab, actions, outliner, i
           </div>
         ) : (
           <button type="button" onClick={() => setSideOpen(true)} aria-label={`${side.title} 펼치기`} title={`${side.title} 펼치기`}
-            className="absolute top-3 right-full hidden items-center gap-1 rounded-l-lg border border-r-0 border-white/50 bg-white/70 px-1 py-3 text-xs font-bold text-point shadow-lg backdrop-blur-md [writing-mode:vertical-rl] md:flex">
+            className="absolute top-3 right-full hidden items-center gap-1 rounded-l-lg border border-r-0 border-white/10 bg-surface/80 px-1 py-3 text-xs font-bold text-point shadow-lg backdrop-blur-md [writing-mode:vertical-rl] md:flex">
             <ChevronLeft aria-hidden className="size-3.5 rotate-90" />
             {side.title}
           </button>
@@ -129,7 +129,7 @@ export default function Sidebar({ open, onOpen, tab, onTab, actions, outliner, i
         <div role="tablist" aria-label="사이드바" className="flex gap-0.5">
           {SIDEBAR_TABS.map((t) => (
             <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => onTab(t.id)}
-              className="rounded-md px-2 py-1 text-xs font-bold text-point/70 hover:bg-point/10 aria-selected:bg-point aria-selected:text-white">
+              className="rounded-md px-2 py-1 text-xs font-bold text-point/70 hover:bg-point/10 aria-selected:bg-point aria-selected:text-on-point">
               {t.label}
             </button>
           ))}

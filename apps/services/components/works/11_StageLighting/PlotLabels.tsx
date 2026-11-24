@@ -37,7 +37,7 @@ export default function PlotLabels({ store, sceneRef, selectedId }: Props) {
         <span
           key={p.id}
           style={{ left: p.x, top: p.y, borderColor: p.color }}
-          className={`absolute flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-[3px] bg-point text-[10px] font-bold tabular-nums text-white ${
+          className={`absolute flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-[3px] bg-point text-[10px] font-bold tabular-nums text-on-point ${
             p.id === selectedId ? "ring-2 ring-[#ffd23f]" : ""
           }`}
         >

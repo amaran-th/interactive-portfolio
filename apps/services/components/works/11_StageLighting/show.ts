@@ -21,6 +21,8 @@ export type Stage = {
   backdropColor: string;
   /** 라인마다 옮긴 거리. 무대 크기를 바꿔도 기본 위치 기준이라 배치가 함께 따라간다. */
   rig: Record<HangId, LineOffset>;
+  /** 사용자가 더한 라인(기본 7개 라인 뒤에 붙는다). */
+  lines: CustomLine[];
 };
 
 export type PropKind = "chair" | "table" | "stairs" | "platform" | "pillar" | "box" | "doorframe";
@@ -61,7 +63,13 @@ export type Actor = {
   shoeColor: string;
 };
 
-export type HangId = "foh" | "e1" | "e2" | "e3" | "boomL" | "boomR" | "floor";
+/** 기본 라인은 아래 7개, 사용자가 더한 라인은 CustomLine.id("ln-…")를 쓴다. */
+export type BuiltinHang = "foh" | "e1" | "e2" | "e3" | "boomL" | "boomR" | "floor";
+export type HangId = string;
+/** 더한 라인의 종류. 무대 위 가로 파이프, 무대 왼쪽·오른쪽 세로 붐. */
+export type LineType = "pipe" | "boomL" | "boomR";
+/** at: 무대 앞 끝(0)에서 뒤 끝(1)까지 기본 앞뒤 위치. 옮긴 거리는 다른 라인처럼 rig에 둔다. */
+export type CustomLine = { id: string; name: string; type: LineType; at: number };
 export type FixtureKind = "profile" | "fresnel" | "par" | "follow" | "ledpar" | "cyc";
 export type ParLamp = "vnsp" | "nsp" | "mfl" | "wfl";
 
@@ -141,7 +149,7 @@ export type Resolved = {
   position: Vec3;
 };
 
-export const LIMITS = { fixtures: 24, props: 40, actors: 40, cues: 99 } as const;
+export const LIMITS = { fixtures: 24, props: 40, actors: 40, cues: 99, lines: 8 } as const;
 
 export const STAGE_SHAPES: StageShape[] = ["proscenium", "thrust", "round"];
 export const STAGE_LABELS: Record<StageShape, string> = { proscenium: "프로시니엄", thrust: "돌출", round: "원형" };
@@ -211,8 +219,8 @@ export const VENUE_KINDS_FOR: Record<StageShape, VenueKind[]> = {
   round: ["arena"],
 };
 
-export const HANGS: HangId[] = ["foh", "e1", "e2", "e3", "boomL", "boomR", "floor"];
-export const HANG_LABELS: Record<HangId, string> = {
+export const HANGS: BuiltinHang[] = ["foh", "e1", "e2", "e3", "boomL", "boomR", "floor"];
+export const HANG_LABELS: Record<BuiltinHang, string> = {
   foh: "FOH(객석 위)",
   e1: "1번 일렉트릭",
   e2: "2번 일렉트릭",
@@ -308,8 +316,30 @@ function clampVec(v: Vec3): Vec3 {
 
 // ── 걸 위치 ──
 
+export const LINE_TYPE_LABELS: Record<LineType, string> = { pipe: "위 파이프", boomL: "왼쪽 붐", boomR: "오른쪽 붐" };
+const isBuiltin = (h: HangId): h is BuiltinHang => (HANGS as string[]).includes(h);
+const customLine = (stage: Stage, h: HangId) => stage.lines?.find((l) => l.id === h);
+
+/** 무대의 모든 라인: 기본 7개 뒤에 더한 라인. */
+export function hangsOf(stage: Stage): HangId[] {
+  return [...HANGS, ...(stage.lines ?? []).map((l) => l.id)];
+}
+
+export function hangLabel(stage: Stage, h: HangId): string {
+  if (isBuiltin(h)) return HANG_LABELS[h];
+  const c = customLine(stage, h);
+  return c ? c.name.trim() || LINE_TYPE_LABELS[c.type] : "라인";
+}
+
+/** 붐이면 무대 왼쪽(-1)·오른쪽(1), 가로 라인이면 0. */
+export function boomSide(stage: Stage, h: HangId): -1 | 0 | 1 {
+  const t = isBuiltin(h) ? h : customLine(stage, h)?.type;
+  return t === "boomL" ? -1 : t === "boomR" ? 1 : 0;
+}
+export const isBoomHang = (stage: Stage, h: HangId) => boomSide(stage, h) !== 0;
+
 export function hangRange(stage: Stage, hang: HangId): [number, number] {
-  if (hang === "boomL" || hang === "boomR") return [0.5, 4];
+  if (isBoomHang(stage, hang)) return [0.5, 4];
   if (hang === "floor") return [-stage.width / 2, stage.width / 2];
   return [-(stage.width / 2 + 1), stage.width / 2 + 1];
 }
@@ -336,6 +366,13 @@ export function hangPoint(stage: Stage, hang: HangId, along: number): Vec3 {
     case "floor":
       return line(0.3, -d + 0.6);
   }
+  const c = customLine(stage, hang);
+  const at = c?.at ?? 0.5;
+  if (c && c.type !== "pipe") {
+    const side = c.type === "boomL" ? -1 : 1;
+    return { x: side * (w / 2 + 0.8 + dy), y: a, z: -d * at + dz };
+  }
+  return line(h, -d * at);
 }
 
 // ── 실제 빛 계산 ──
@@ -399,8 +436,12 @@ export const LINE_DZ = { min: -10, max: 10 };
 export const LINE_DY = { min: -3, max: 4 };
 const MIN_LINE_Y = 0.1;
 
-export function zeroRig(): Record<HangId, LineOffset> {
-  return Object.fromEntries(HANGS.map((h) => [h, { dz: 0, dy: 0 }])) as Record<HangId, LineOffset>;
+export function zeroRig(lines: CustomLine[] = []): Record<HangId, LineOffset> {
+  return Object.fromEntries([...HANGS, ...lines.map((l) => l.id)].map((h) => [h, { dz: 0, dy: 0 }]));
+}
+
+function clampLine(l: CustomLine): CustomLine {
+  return { ...l, name: l.name.slice(0, 20), at: Math.round(clamp(l.at, 0, 1) * 100) / 100 };
 }
 
 const clampOffset = (o: LineOffset): LineOffset => ({
@@ -409,9 +450,10 @@ const clampOffset = (o: LineOffset): LineOffset => ({
 });
 
 export function clampStage(s: Stage): Stage {
-  const rig = zeroRig();
-  for (const h of HANGS) if (s.rig?.[h]) rig[h] = clampOffset(s.rig[h]);
-  return { ...s, width: clamp(s.width, 4, 20), depth: clamp(s.depth, 3, 15), height: clamp(s.height, 3, 12), rig };
+  const lines = (s.lines ?? []).slice(0, LIMITS.lines).map(clampLine);
+  const rig = zeroRig(lines);
+  for (const h of Object.keys(rig)) if (s.rig?.[h]) rig[h] = clampOffset(s.rig[h]);
+  return { ...s, width: clamp(s.width, 4, 20), depth: clamp(s.depth, 3, 15), height: clamp(s.height, 3, 12), rig, lines };
 }
 
 function clampProp(p: Prop): Prop {
@@ -469,6 +511,8 @@ function clampFocus(f: Focus): Focus {
 }
 
 function clampFixture(stage: Stage, f: Fixture): Fixture {
+  // 지운 라인을 가리키면 1번 일렉트릭으로 옮긴다
+  if (!hangsOf(stage).includes(f.hang)) f = { ...f, hang: "e1" };
   const [lo, hi] = hangRange(stage, f.hang);
   return { ...f, name: f.name.slice(0, 20), along: clamp(f.along, lo, hi), focus: clampFocus(f.focus) };
 }
@@ -503,7 +547,7 @@ export function raySegment(ray: Ray, a: Vec3, b: Vec3): { dist: number; s: numbe
 export function hangFromRay(stage: Stage, ray: Ray, current: HangId | null): { hang: HangId; along: number } {
   let best = { hang: current ?? ("e1" as HangId), along: 0 };
   let bestD = Infinity;
-  for (const hang of HANGS) {
+  for (const hang of hangsOf(stage)) {
     const [lo, hi] = hangRange(stage, hang);
     const { dist, s } = raySegment(ray, hangPoint(stage, hang, lo), hangPoint(stage, hang, hi));
     const d = hang === current ? dist - HANG_STICKY : dist;
@@ -572,6 +616,7 @@ const STAGE_DEFAULT: Stage = {
   floorColor: "#3a3a40",
   backdropColor: "#202028",
   rig: zeroRig(),
+  lines: [],
 };
 
 export function defaultShow(): Show {
@@ -865,8 +910,11 @@ function vec(v: unknown): Vec3 {
   return { x: num(o.x), y: num(o.y), z: num(o.z) };
 }
 
+const LINE_TYPES: LineType[] = ["pipe", "boomL", "boomR"];
+
 function readStage(v: unknown): Stage {
   const so = obj(v);
+  const lines = readLines(so.lines);
   return clampStage({
     shape: oneOf(so.shape, STAGE_SHAPES),
     width: num(so.width),
@@ -874,16 +922,28 @@ function readStage(v: unknown): Stage {
     height: num(so.height),
     floorColor: color(so.floorColor),
     backdropColor: color(so.backdropColor),
-    rig: readRig(so.rig),
+    rig: readRig(so.rig, lines),
+    lines,
+  });
+}
+
+// 더한 라인이 없던 저장본은 빈 목록
+function readLines(v: unknown): CustomLine[] {
+  if (v === undefined) return [];
+  return arr(v).slice(0, LIMITS.lines).map((x) => {
+    const l = obj(x);
+    const id = str(l.id);
+    if (isBuiltin(id)) fail();
+    return { id, name: str(l.name), type: oneOf(l.type, LINE_TYPES), at: num(l.at) };
   });
 }
 
 // 라인 위치가 없던 저장본은 기본 위치(옮긴 거리 0)
-function readRig(v: unknown): Record<HangId, LineOffset> {
-  const rig = zeroRig();
+function readRig(v: unknown, lines: CustomLine[]): Record<HangId, LineOffset> {
+  const rig = zeroRig(lines);
   if (v === undefined) return rig;
   const o = obj(v);
-  for (const h of HANGS) {
+  for (const h of Object.keys(rig)) {
     if (o[h] === undefined) continue;
     const l = obj(o[h]);
     rig[h] = { dz: num(l.dz), dy: num(l.dy) };
@@ -1009,7 +1069,7 @@ function readShow(o: Obj, version: 2 | 3 | 4 | 5): Show {
       const channel = num(f.channel);
       if (!Number.isInteger(channel) || channel < 1 || channel > 99 || seen.has(channel)) fail();
       seen.add(channel);
-      const line = version === 4 ? nearestHang(stage, vec(f.position)) : { hang: oneOf(f.hang, HANGS), along: num(f.along) };
+      const line = version === 4 ? nearestHang(stage, vec(f.position)) : { hang: oneOf(f.hang, hangsOf(stage)), along: num(f.along) };
       return clampFixture(stage, {
         id: str(f.id),
         channel,
@@ -1075,8 +1135,8 @@ function sharpnessFor(kind: FixtureKind, softness: number): number {
 function nearestHang(stage: Stage, p: Vec3): { hang: HangId; along: number } {
   let best = { hang: "e1" as HangId, along: 0 };
   let bestD = Infinity;
-  for (const hang of HANGS) {
-    const boom = hang === "boomL" || hang === "boomR";
+  for (const hang of hangsOf(stage)) {
+    const boom = isBoomHang(stage, hang);
     const [lo, hi] = hangRange(stage, hang);
     const along = clamp(boom ? p.y : p.x, lo, hi);
     const q = hangPoint(stage, hang, along);
@@ -1164,6 +1224,61 @@ export function deserialize(text: string): { show: Show; migrated: boolean } | n
 
 export function setLineOffset(show: Show, hang: HangId, offset: LineOffset): Show {
   return updateStage(show, { rig: { ...show.stage.rig, [hang]: clampOffset(offset) } });
+}
+
+// ── 라인 더하기·지우기 ──
+
+/** 새 라인의 기본 앞뒤 위치: 같은 종류 라인과 가장 멀리 떨어진 자리. */
+function freeSpot(stage: Stage, type: LineType): number {
+  const taken =
+    type === "pipe"
+      ? [0.2, 0.5, 0.8, ...stage.lines.filter((l) => l.type === "pipe").map((l) => l.at)]
+      : [0.5, ...stage.lines.filter((l) => l.type === type).map((l) => l.at)];
+  let best = 0.35;
+  let bestGap = -1;
+  for (let at = 0.05; at <= 0.951; at += 0.05) {
+    const gap = Math.min(...taken.map((t) => Math.abs(t - at)));
+    // 똑같이 떨어져 있으면 무대 가운데 쪽(앞·뒤 끝보다 쓰기 좋다)
+    if (gap > bestGap + 1e-9 || (Math.abs(gap - bestGap) < 1e-9 && Math.abs(at - 0.5) < Math.abs(best - 0.5) - 1e-9)) {
+      bestGap = gap;
+      best = Math.round(at * 100) / 100;
+    }
+  }
+  return best;
+}
+
+function newLineName(stage: Stage, type: LineType): string {
+  if (type === "pipe") return `${4 + stage.lines.filter((l) => l.type === "pipe").length}번 일렉트릭`;
+  return `${LINE_TYPE_LABELS[type]} ${2 + stage.lines.filter((l) => l.type === type).length}`;
+}
+
+/** 라인을 하나 더한다. 한도에 닿았으면 그대로 돌려준다. 새 라인 id는 stage.lines의 마지막 항목이다. */
+export function addLine(show: Show, type: LineType): Show {
+  const st = show.stage;
+  if (st.lines.length >= LIMITS.lines) return show;
+  const line: CustomLine = { id: newId("ln"), name: newLineName(st, type), type, at: freeSpot(st, type) };
+  return updateStage(show, { lines: [...st.lines, line], rig: { ...st.rig, [line.id]: { dz: 0, dy: 0 } } });
+}
+
+export function renameLine(show: Show, id: HangId, name: string): Show {
+  if (!customLine(show.stage, id)) return show;
+  return updateStage(show, { lines: show.stage.lines.map((l) => (l.id === id ? { ...l, name } : l)) });
+}
+
+/** 더한 라인을 지운다. 걸려 있던 조명기는 가장 가까운 다른 라인으로 옮겨 건다. */
+export function removeLine(show: Show, id: HangId): Show {
+  if (!customLine(show.stage, id)) return show;
+  const rig = { ...show.stage.rig };
+  delete rig[id];
+  const next = updateStage(show, { lines: show.stage.lines.filter((l) => l.id !== id), rig });
+  const fixtures = show.fixtures.map((f) =>
+    f.hang === id ? clampFixture(next.stage, { ...f, ...nearestHang(next.stage, hangPoint(show.stage, f.hang, f.along)) }) : f,
+  );
+  return { ...next, fixtures };
+}
+
+export function isCustomLine(stage: Stage, id: HangId): boolean {
+  return !!customLine(stage, id);
 }
 
 export function resetLine(show: Show, hang: HangId): Show {
@@ -1254,8 +1369,6 @@ export type MapPt = { x: number; z: number };
 const BOOM_MAP_SCALE = 0.35; // 붐 높이 1m를 평면도에서 이만큼(m) 앞뒤로 펼친다
 const MAP_MARGIN = 1;
 
-const isBoomHang = (h: HangId) => h === "boomL" || h === "boomR";
-
 export function deckOutline(stage: Stage): { kind: "circle"; cx: number; cz: number; r: number } | { kind: "rects"; rects: { x: number; z: number; w: number; h: number }[] } {
   const { width: w, depth: d } = stage;
   if (stage.shape === "round") return { kind: "circle", cx: 0, cz: -d / 2, r: Math.min(w, d) / 2 };
@@ -1267,7 +1380,7 @@ export function deckOutline(stage: Stage): { kind: "circle"; cx: number; cz: num
 /** 라인 위 자리의 평면도 위치. 붐 꼭대기는 무대 안쪽(위)으로 펼친다. */
 export function fixtureMapPoint(stage: Stage, hang: HangId, along: number): MapPt {
   const p = hangPoint(stage, hang, along);
-  if (!isBoomHang(hang)) return { x: p.x, z: p.z };
+  if (!isBoomHang(stage, hang)) return { x: p.x, z: p.z };
   const [lo, hi] = hangRange(stage, hang);
   return { x: p.x, z: p.z - (p.y - (lo + hi) / 2) * BOOM_MAP_SCALE };
 }
@@ -1289,7 +1402,7 @@ function pointSegment(p: MapPt, a: MapPt, b: MapPt): { dist: number; s: number }
 export function hangFromMap(stage: Stage, p: MapPt, current: HangId | null): { hang: HangId; along: number } {
   let best = { hang: current ?? ("e1" as HangId), along: 0 };
   let bestD = Infinity;
-  for (const hang of HANGS) {
+  for (const hang of hangsOf(stage)) {
     const [lo, hi] = hangRange(stage, hang);
     const [a, b] = lineMapSegment(stage, hang);
     const { dist, s } = pointSegment(p, a, b);
@@ -1303,14 +1416,15 @@ export function hangFromMap(stage: Stage, p: MapPt, current: HangId | null): { h
 }
 
 /** 평면도에서 라인을 (dx, dz)만큼 끈 결과. 가로 라인은 앞뒤만, 붐은 바깥으로 끌면 무대에서 멀어진다. */
-export function dragLineOnMap(hang: HangId, start: LineOffset, dx: number, dz: number): LineOffset {
-  if (!isBoomHang(hang)) return { ...start, dz: start.dz + dz };
-  return { dz: start.dz + dz, dy: start.dy + (hang === "boomL" ? -dx : dx) };
+export function dragLineOnMap(stage: Stage, hang: HangId, start: LineOffset, dx: number, dz: number): LineOffset {
+  const side = boomSide(stage, hang);
+  if (side === 0) return { ...start, dz: start.dz + dz };
+  return { dz: start.dz + dz, dy: start.dy + side * dx };
 }
 
 /** 평면도에 담을 범위: 무대 바닥·라인·인물·소품·조준점에 여백 1m. */
 export function mapBounds(show: Show): { minX: number; maxX: number; minZ: number; maxZ: number } {
-  const pts: MapPt[] = HANGS.flatMap((h) => lineMapSegment(show.stage, h));
+  const pts: MapPt[] = hangsOf(show.stage).flatMap((h) => lineMapSegment(show.stage, h));
   const deck = deckOutline(show.stage);
   if (deck.kind === "circle") pts.push({ x: -deck.r, z: deck.cz - deck.r }, { x: deck.r, z: deck.cz + deck.r });
   else for (const r of deck.rects) pts.push({ x: r.x, z: r.z }, { x: r.x + r.w, z: r.z + r.h });

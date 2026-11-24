@@ -12,6 +12,8 @@ import {
   GENDER_LABELS,
   type Gender,
   LIMITS,
+  LINE_TYPE_LABELS,
+  type LineType,
   PROP_KINDS,
   PROP_SPECS,
   type PropKind,
@@ -20,7 +22,12 @@ import type { Store } from "./store";
 import { BUTTON, LABEL } from "./ui";
 import { useShow } from "./useShow";
 
-export type AddItem = { type: "prop"; kind: PropKind } | { type: "actor"; gender: Gender } | { type: "fixture"; kind: FixtureKind };
+export type AddItem =
+  | { type: "prop"; kind: PropKind }
+  | { type: "actor"; gender: Gender }
+  | { type: "fixture"; kind: FixtureKind }
+  | { type: "line"; lineType: LineType };
+const LINE_TYPES: LineType[] = ["pipe", "boomL", "boomR"];
 
 export default function AddMenu({
   store,
@@ -32,8 +39,8 @@ export default function AddMenu({
   /** 무대 요소 탭은 소품·인물만, 조명기 탭은 조명기만 보여 준다. */
   only: "elements" | "fixtures";
 }) {
-  const counts = useShow(store, (s) => `${s.props.length}|${s.actors.length}|${s.fixtures.length}`);
-  const [nProps, nActors, nFixtures] = counts.split("|").map(Number);
+  const counts = useShow(store, (s) => `${s.props.length}|${s.actors.length}|${s.fixtures.length}|${s.stage.lines.length}`);
+  const [nProps, nActors, nFixtures, nLines] = counts.split("|").map(Number);
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -63,7 +70,7 @@ export default function AddMenu({
         <Plus aria-hidden className="size-4" /> 추가
       </button>
       {open && (
-        <div className="absolute top-full right-0 z-30 mt-1 flex w-max gap-x-4 rounded-lg border-2 border-point bg-white p-2 shadow-[3px_3px_0_0_var(--color-point)]">
+        <div className="absolute top-full right-0 z-30 mt-1 flex w-max gap-x-4 rounded-lg border-2 border-point bg-surface p-2 shadow-[3px_3px_0_0_var(--color-point)]">
           {only === "elements" && (
           <div className="flex flex-col gap-0.5">
             <p className={LABEL}>소품</p>
@@ -85,11 +92,39 @@ export default function AddMenu({
               <MenuItem key={k} icon={<FixtureIcon kind={k} />} label={FIXTURE_LABELS[k]} disabledReason={full(nFixtures, LIMITS.fixtures)}
                 onClick={() => pick({ type: "fixture", kind: k })} />
             ))}
+            <p className={`${LABEL} mt-1`}>라인</p>
+            {LINE_TYPES.map((t) => (
+              <MenuItem key={t} icon={<LineIcon type={t} />} label={LINE_TYPE_LABELS[t]} disabledReason={full(nLines, LIMITS.lines)}
+                onClick={() => pick({ type: "line", lineType: t })} />
+            ))}
           </div>
           )}
         </div>
       )}
     </div>
+  );
+}
+
+/** 가로 파이프(위 파이프)·세로 기둥(붐) 모양 아이콘 */
+function LineIcon({ type }: { type: LineType }) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden className="size-4" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round">
+      {type === "pipe" ? (
+        <>
+          <path d="M1.5 4h13" />
+          <path d="M5 4v2.5M11 4v2.5" />
+          <circle cx={5} cy={8.5} r={1.6} />
+          <circle cx={11} cy={8.5} r={1.6} />
+        </>
+      ) : (
+        <>
+          <path d={type === "boomL" ? "M4 1.5v13" : "M12 1.5v13"} />
+          <path d={type === "boomL" ? "M4 5h3M4 10h3" : "M12 5H9M12 10H9"} />
+          <circle cx={type === "boomL" ? 9 : 7} cy={5} r={1.5} />
+          <circle cx={type === "boomL" ? 9 : 7} cy={10} r={1.5} />
+        </>
+      )}
+    </svg>
   );
 }
 

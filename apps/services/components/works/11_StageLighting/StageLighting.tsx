@@ -6,6 +6,7 @@ import { isTextEntryTarget } from "@/components/works/_shared/imageInput";
 import CueBar from "./CueBar";
 import Inspector from "./Inspector";
 import LinePanel from "./LinePanel";
+import { DARK_THEME } from "./ui";
 import Outliner from "./Outliner";
 import PlotLabels from "./PlotLabels";
 import PlotMap, { type PlotMapMode } from "./PlotMap";
@@ -18,17 +19,22 @@ import { dragHeight, dropAt } from "./placement";
 import { stageBounds } from "./scene/stage";
 import {
   CUE_PARAMS,
-  HANG_LABELS,
   type HangId,
   type LineOffset,
   type Show,
   type Vec3,
   hangFromRay,
+  hangLabel,
+  hangsOf,
+  isBoomHang,
+  isCustomLine,
+  removeLine,
   rayAtY,
   rayAtZ,
   setLineOffset,
   hangPoint,
   addActor,
+  addLine,
   addFixture,
   addProp,
   duplicateEntity,
@@ -47,8 +53,11 @@ import AddMenu, { type AddItem } from "./AddMenu";
 import Toolbar from "./Toolbar";
 import { useCuePlayback } from "./useCuePlayback";
 import { useShow } from "./useShow";
-import { type ViewMode, useStageScene } from "./useStageScene";
+import { type LookDir, type ViewMode, useStageScene } from "./useStageScene";
 import { type SeatRef, clampSeat, defaultSeat, seatLabel, stepSeat } from "./venue";
+
+/** 객석 시점 둘러보기 키(물리 키 위치) */
+const LOOK_KEYS: Record<string, LookDir> = { KeyA: "left", KeyD: "right", KeyW: "up", KeyS: "down" };
 
 type Drag = {
   type: "prop" | "actor" | "aim" | "fixture";
@@ -105,7 +114,9 @@ export default function StageLighting() {
   const [soloId, setSoloId] = useState<string | null>(null);
   const [tab, setTab] = useState<SidebarTab>("stage");
   // 고른 라인(파이프). 3D에서 진하게 칠하고 라인 패널에서 그 칸을 펼친다.
-  const [selectedLine, setSelectedLine] = useState<HangId | null>(null);
+  const [selectedLineRaw, setSelectedLine] = useState<HangId | null>(null);
+  // 지운 라인을 고른 채로 남지 않게, 지금 무대에 있는 라인만 고른 것으로 본다
+  const selectedLine = useShow(store, (s) => (selectedLineRaw && hangsOf(s.stage).includes(selectedLineRaw) ? selectedLineRaw : null));
   // 평면도: 넓은 화면은 작게 띄운 채로 시작하고, 좁은 화면은 접어 둔다
   const [mapMode, setMapMode] = useState<PlotMapMode>(() =>
     typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches ? "mini" : "off",
@@ -130,6 +141,8 @@ export default function StageLighting() {
   const haze = useShow(store, (s) => s.live.haze);
   const ambient = useShow(store, (s) => s.ambient);
   const [view, setView] = useState<ViewMode>("edit");
+  /** 무대 위 요소를 끌어 옮기는 건 편집·플롯 시점에서만 한다. 객석 시점은 보기 전용이다. */
+  const editable = view !== "audience";
   const [workLight, setWorkLight] = useState(true);
   const [quality, setQuality] = useState<Quality>(loadQuality);
   const [tier, setTier] = useState<Tier>(0);
@@ -208,6 +221,15 @@ export default function StageLighting() {
   const add = (item: AddItem) => {
     beginEdit();
     const s = store.get();
+    if (item.type === "line") {
+      // 새 라인은 무대 위 요소가 아니라 바로 고르고 라인 패널에서 펼쳐 보인다
+      const next = addLine(s, item.lineType);
+      if (next === s) return;
+      store.set(next);
+      setPickedId(null);
+      setSelectedLine(next.stage.lines[next.stage.lines.length - 1].id);
+      return;
+    }
     const next =
       item.type === "prop" ? addProp(s, item.kind) : item.type === "actor" ? addActor(s, item.gender) : addFixture(s, item.kind);
     if (next !== s) placeNew(s, next);
@@ -327,7 +349,7 @@ export default function StageLighting() {
       setLineLabel({
         x: d.clientX - r.left + 14,
         y: d.clientY - r.top + 14,
-        text: `${HANG_LABELS[d.hang]} · 앞뒤 ${sign(o.dz)} · ${d.boom ? "거리" : "높이"} ${sign(o.dy)}`,
+        text: `${hangLabel(s2.stage, d.hang)} · 앞뒤 ${sign(o.dz)} · ${d.boom ? "거리" : "높이"} ${sign(o.dy)}`,
       });
   };
 
@@ -339,6 +361,10 @@ export default function StageLighting() {
     h.y = e.clientY;
     if (h.raf || e.pointerType !== "mouse") return;
     const el = e.currentTarget;
+    if (!editable) {
+      el.style.cursor = "";
+      return;
+    }
     h.raf = requestAnimationFrame(() => {
       h.raf = 0;
       const scene = sceneRef.current;
@@ -361,7 +387,8 @@ export default function StageLighting() {
   const onPointerDownCapture = (e: React.PointerEvent<HTMLDivElement>) => {
     downRef.current = { x: e.clientX, y: e.clientY };
     const scene = sceneRef.current;
-    if (!scene || e.button !== 0) return;
+    // 객석 시점은 보기 전용이다: 무엇을 눌러도 고개만 돌린다.
+    if (!scene || e.button !== 0 || !editable) return;
     const hit = scene.pick(e.clientX, e.clientY);
     if (!hit) return; // 빈 곳: 카메라 조작
     e.stopPropagation(); // 캔버스의 OrbitControls까지 가지 않게
@@ -378,7 +405,7 @@ export default function StageLighting() {
       const d: LineDrag = {
         hang,
         pointerId: e.pointerId,
-        boom: hang === "boomL" || hang === "boomR",
+        boom: isBoomHang(store.get().stage, hang),
         shift: e.shiftKey,
         wantShift: e.shiftKey,
         start: store.get().stage.rig[hang],
@@ -517,7 +544,7 @@ export default function StageLighting() {
         else undo();
         return;
       }
-      if (mod && e.key.toLowerCase() === "d") {
+      if (mod && e.key.toLowerCase() === "d" && editable) {
         e.preventDefault(); // 브라우저 북마크 단축키 대신 복제
         duplicateSelected();
         return;
@@ -529,15 +556,25 @@ export default function StageLighting() {
         e.preventDefault();
         go();
       } else if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedId) {
+        if (selectedId && editable) {
           e.preventDefault();
           removeSelected();
+        } else if (!selectedId && selectedLine && editable && isCustomLine(store.get().stage, selectedLine)) {
+          // 더한 라인을 골랐으면 그 라인을 지운다(기본 라인은 지울 수 없다)
+          e.preventDefault();
+          beginEdit();
+          store.set(removeLine(store.get(), selectedLine));
+          setSelectedLine(null);
         }
       } else if (view === "audience" && seat && e.key.startsWith("Arrow") && !e.altKey && !e.metaKey && !e.ctrlKey) {
         // 객석 시점: 방향키로 옆·앞·뒤 자리로 옮겨 앉는다(무대를 보는 관객 기준)
         e.preventDefault();
         const dir = ({ ArrowLeft: "left", ArrowRight: "right", ArrowUp: "front", ArrowDown: "back" } as const)[e.key as "ArrowLeft"];
         if (dir) setSeatPick(stepSeat(stageForSeat, venue, seat, dir));
+      } else if (view === "audience" && LOOK_KEYS[e.code]) {
+        // 객석 시점: W·A·S·D를 누르는 동안 고개를 돌린다(한글 입력 상태에서도 되게 e.code로 본다)
+        e.preventDefault();
+        sceneRef.current?.setLookKey(LOOK_KEYS[e.code], true);
       } else if (e.key === "Escape") {
         setPickedId(null);
       }
@@ -545,12 +582,26 @@ export default function StageLighting() {
   });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => keyRef.current(e);
+    // 둘러보기 키는 시점·포커스와 상관없이 떼면 멈추고, 창을 벗어나면 모두 놓는다
+    const onKeyUp = (e: KeyboardEvent) => {
+      const dir = LOOK_KEYS[e.code];
+      if (dir) sceneRef.current?.setLookKey(dir, false);
+    };
+    const onBlur = () => {
+      for (const dir of Object.values(LOOK_KEYS)) sceneRef.current?.setLookKey(dir, false);
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [sceneRef]);
 
   return (
-    <div className="flex h-full flex-col bg-white text-ink">
+    <div style={DARK_THEME} className="flex h-full flex-col bg-surface text-ink">
       <Toolbar
         store={store}
         view={view}
@@ -570,11 +621,6 @@ export default function StageLighting() {
         audience={audienceOn}
         onAudience={setAudienceOn}
         seatLabel={seatLabel(stageForSeat, venue, seat)}
-        onSeatMap={() => {
-          setPickedId(null);
-          setTab("stage");
-          setSidebarOpen(true);
-        }}
         onHaze={(v) => {
           // 슬라이더로 정한 농도는 바로 보이게 한다(큐 재생 때만 천천히 차오른다).
           sceneRef.current?.setHazeTarget(v, true);
@@ -596,7 +642,7 @@ export default function StageLighting() {
         >
           {view === "plot" && !fatal && <PlotLabels store={store} sceneRef={sceneRef} selectedId={selectedId} />}
           {lineLabel && (
-            <span className="pointer-events-none absolute z-20 rounded-md bg-point px-2 py-1 text-[11px] font-bold tabular-nums text-white shadow"
+            <span className="pointer-events-none absolute z-20 rounded-md bg-point px-2 py-1 text-[11px] font-bold tabular-nums text-on-point shadow"
               style={{ left: lineLabel.x, top: lineLabel.y }}>
               {lineLabel.text}
             </span>
@@ -607,7 +653,7 @@ export default function StageLighting() {
             </p>
           )}
           {notice && !fatal && (
-            <p role="alert" className="absolute top-3 left-1/2 z-30 max-w-[90%] -translate-x-1/2 rounded-md border-2 border-point bg-white px-3 py-1.5 text-xs font-bold text-point shadow-[2px_2px_0_0_var(--color-point)]">
+            <p role="alert" className="absolute top-3 left-1/2 z-30 max-w-[90%] -translate-x-1/2 rounded-md border-2 border-point bg-surface px-3 py-1.5 text-xs font-bold text-point shadow-[2px_2px_0_0_var(--color-point)]">
               {notice}
             </p>
           )}
@@ -615,15 +661,15 @@ export default function StageLighting() {
         {mapMode === "split" ? (
           <div className="absolute inset-y-0 left-0 z-20 hidden w-1/2 md:block">
             <PlotMap store={store} sceneRef={sceneRef} mode="split" onMode={setMapMode} selectedId={selectedId} selectedLine={selectedLine}
-              onPick={setPickedId} onPickLine={(h) => { setPickedId(null); setSelectedLine(h); setTab("fixtures"); }} onBegin={beginEdit} />
+              onPick={setPickedId} onPickLine={(h) => { setPickedId(null); setSelectedLine(h); setTab("fixtures"); }} readOnly={!editable} onBegin={beginEdit} />
           </div>
         ) : mapMode === "mini" && view !== "plot" ? (
           <div className="absolute left-3 z-20" style={{ bottom: inset.bottom + 12 }}>
             <PlotMap store={store} sceneRef={sceneRef} mode="mini" onMode={setMapMode} selectedId={selectedId} selectedLine={selectedLine}
-              onPick={setPickedId} onPickLine={(h) => { setPickedId(null); setSelectedLine(h); setTab("fixtures"); }} onBegin={beginEdit} />
+              onPick={setPickedId} onPickLine={(h) => { setPickedId(null); setSelectedLine(h); setTab("fixtures"); }} readOnly={!editable} onBegin={beginEdit} />
           </div>
         ) : mapMode === "off" ? (
-          <button type="button" className="absolute left-3 z-20 rounded-md border-2 border-point bg-white px-2 py-1 text-xs font-bold text-point shadow-[2px_2px_0_0_var(--color-point)] hover:bg-shade"
+          <button type="button" className="absolute left-3 z-20 rounded-md border-2 border-point bg-surface px-2 py-1 text-xs font-bold text-point shadow-[2px_2px_0_0_var(--color-point)] hover:bg-shade"
             style={{ bottom: inset.bottom + 12 }} onClick={() => setMapMode("mini")}>
             평면도 보기
           </button>
@@ -651,6 +697,7 @@ export default function StageLighting() {
           outliner={
             tab === "stage" ? undefined : (
               <Outliner store={store} selectedId={selectedId} onPick={setPickedId} onBegin={beginEdit}
+                selectedLine={selectedLine} onPickLine={(h) => { setPickedId(null); setSelectedLine(h); }}
                 groups={tab === "elements" ? ["people", "props"] : ["fixtures"]} />
             )
           }

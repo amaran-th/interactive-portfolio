@@ -45,7 +45,7 @@ export default function CueBar({ store, playback, progressRef, onBegin, onGo, au
   };
 
   return (
-    <div className="flex shrink-0 flex-col gap-2 border-t-2 border-point bg-white px-3 py-2">
+    <div className="flex shrink-0 flex-col gap-2 border-t-2 border-point bg-surface px-3 py-2">
       <div className="flex items-center gap-2">
         <span className={LABEL}>큐</span>
         <ol aria-label="큐 목록" className="flex min-w-0 flex-1 gap-1 overflow-x-auto pb-1">
@@ -53,7 +53,7 @@ export default function CueBar({ store, playback, progressRef, onBegin, onGo, au
             <li key={c.id}>
               <button type="button" aria-current={c.id === playback.currentCueId ? "true" : undefined}
                 onClick={() => playback.jump(c.id)} title={`${c.name} · 페이드 ${c.fadeSec}초`}
-                className="flex max-w-40 items-center gap-1 rounded-md border-2 border-point bg-white px-2 py-1 text-xs font-bold whitespace-nowrap text-point hover:bg-shade aria-[current]:bg-point aria-[current]:text-white">
+                className="flex max-w-40 items-center gap-1 rounded-md border-2 border-point bg-surface px-2 py-1 text-xs font-bold whitespace-nowrap text-point hover:bg-shade aria-[current]:bg-point aria-[current]:text-on-point">
                 <span className="tabular-nums">{c.number}</span>
                 <span className="truncate font-normal">{c.name}</span>
               </button>
@@ -97,7 +97,7 @@ export default function CueBar({ store, playback, progressRef, onBegin, onGo, au
             <SkipBack aria-hidden className="size-4" /> BACK
           </button>
           <button type="button" onClick={onGo} title="다음 큐로 페이드 (Space)"
-            className="relative flex items-center gap-1 overflow-hidden rounded-md border-2 border-point bg-point px-3 py-1 text-xs font-bold text-white hover:bg-point/90">
+            className="relative flex items-center gap-1 overflow-hidden rounded-md border-2 border-point bg-point px-3 py-1 text-xs font-bold text-on-point hover:bg-point/90">
             <div ref={progressRef} aria-hidden className="absolute inset-0 origin-left bg-main/70" style={{ transform: "scaleX(0)" }} />
             <span className="relative flex items-center gap-1">
               <Play aria-hidden className="size-4" /> {playback.playing ? "재생 중" : "GO"}

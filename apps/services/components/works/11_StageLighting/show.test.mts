@@ -4,6 +4,7 @@ import {
   defaultShow, addFixture, addProp, removeEntity, saveCue, updateStage, updateActor, updateCue,
   updateLevel, updateFocus, updateFixture, setChannel, hangPoint, hangFromRay, resolve,
   serialize, deserialize, LIMITS, GELS, setActorGender, duplicateEntity, updateTemplate,
+  addLine, removeLine, renameLine, hangsOf, hangLabel, isBoomHang,
 } from "./show.ts";
 
 // v4 저장본처럼 조명기 위치를 라인 대신 좌표(position)로 바꾼다
@@ -385,4 +386,74 @@ test("광선과 평면의 교점", async () => {
   assert.deepEqual(rayAtY(ray, 4), { x: 0, z: 4 });
   assert.deepEqual(rayAtZ(ray, 2), { x: 0, y: 2 });
   assert.equal(rayAtY({ origin: { x: 0, y: 1, z: 0 }, dir: { x: 1, y: 0, z: 0 } }, 4), null);
+});
+
+// ── 더한 라인 ──
+test("라인 더하기: 위 파이프·붐이 기본 라인 뒤에 붙고 이름·위치가 정해진다", () => {
+  let s = addLine(defaultShow(), "pipe");
+  s = addLine(s, "boomL");
+  const [pipe, boom] = s.stage.lines;
+  assert.deepEqual(hangsOf(s.stage).slice(-2), [pipe.id, boom.id]);
+  assert.equal(hangLabel(s.stage, pipe.id), "4번 일렉트릭");
+  assert.equal(hangLabel(s.stage, boom.id), "왼쪽 붐 2");
+  assert.equal(isBoomHang(s.stage, boom.id), true);
+  // 위 파이프는 무대 높이, 기존 일렉트릭(0.2·0.5·0.8)과 겹치지 않는 앞뒤 자리
+  const p = hangPoint(s.stage, pipe.id, 0);
+  assert.equal(p.y, s.stage.height);
+  for (const h of ["e1", "e2", "e3"]) assert.ok(Math.abs(hangPoint(s.stage, h, 0).z - p.z) > 0.5);
+  // 붐은 무대 왼쪽 바깥에 세로로 선다
+  const b = hangPoint(s.stage, boom.id, 2);
+  assert.ok(b.x < -s.stage.width / 2);
+  assert.equal(b.y, 2);
+});
+
+test("라인 더하기: 한도까지만 더한다", () => {
+  let s = defaultShow();
+  for (let i = 0; i < LIMITS.lines + 2; i++) s = addLine(s, "pipe");
+  assert.equal(s.stage.lines.length, LIMITS.lines);
+});
+
+test("라인 지우기: 기본 라인은 못 지우고, 걸린 조명기는 가까운 라인으로 옮긴다", () => {
+  let s = addLine(defaultShow(), "pipe");
+  const id = s.stage.lines[0].id;
+  const fx = s.fixtures[2].id;
+  s = updateFixture(s, fx, { hang: id });
+  assert.equal(s.fixtures[2].hang, id);
+  assert.equal(removeLine(s, "e1"), s);
+  const after = removeLine(s, id);
+  assert.equal(after.stage.lines.length, 0);
+  assert.equal(after.stage.rig[id], undefined);
+  assert.ok(hangsOf(after.stage).includes(after.fixtures[2].hang));
+  assert.ok(["e1", "e2", "e3"].includes(after.fixtures[2].hang));
+});
+
+test("라인 이름: 비우면 종류 이름을 보여 준다", () => {
+  let s = addLine(defaultShow(), "boomR");
+  const id = s.stage.lines[0].id;
+  s = renameLine(s, id, "");
+  assert.equal(hangLabel(s.stage, id), "오른쪽 붐");
+  s = renameLine(s, id, "SR 붐");
+  assert.equal(hangLabel(s.stage, id), "SR 붐");
+});
+
+test("더한 라인과 그 라인의 조명기가 저장·불러오기를 거쳐도 그대로다", () => {
+  let s = addLine(defaultShow(), "pipe");
+  const id = s.stage.lines[0].id;
+  s = updateFixture(s, s.fixtures[0].id, { hang: id, along: 1.5 });
+  const back = deserialize(serialize(s))!;
+  assert.equal(back.migrated, false);
+  assert.deepEqual(back.show.stage.lines, s.stage.lines);
+  assert.equal(back.show.fixtures[0].hang, id);
+  assert.equal(back.show.fixtures[0].along, 1.5);
+  // lines가 없던 예전 저장본도 읽는다
+  const old = JSON.parse(serialize(defaultShow()));
+  delete old.stage.lines;
+  assert.deepEqual(deserialize(JSON.stringify(old))!.show.stage.lines, []);
+});
+
+test("라인 더하기: 새 위 파이프는 앞뒤 끝보다 가운데 쪽 빈자리에 건다", () => {
+  const s = addLine(defaultShow(), "pipe");
+  assert.equal(s.stage.lines[0].at, 0.35);
+  const s2 = addLine(s, "pipe");
+  assert.equal(s2.stage.lines[1].at, 0.65);
 });

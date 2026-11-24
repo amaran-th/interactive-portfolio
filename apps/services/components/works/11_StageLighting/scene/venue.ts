@@ -2,7 +2,7 @@
 // 모두 정적 메시 몇 개로 합쳐 드로우콜을 늘리지 않는다. 객석은 그림자를 받기만 한다.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { type HangId, type Stage, type Venue, hangPoint, hangRange } from "../show";
+import { type Stage, type Venue, hangPoint, hangRange, hangsOf, isBoomHang } from "../show";
 import { HOUSE_FLOOR, riserBoxes, seatLayout, venueBox } from "../venue";
 import { disposeGroup } from "./dispose";
 
@@ -84,14 +84,15 @@ export class VenueLayer {
 
     // 배턴(가로 파이프)과 붐(세로 기둥)
     const pipes: THREE.BufferGeometry[] = [];
-    for (const hang of ["foh", "e1", "e2", "e3"] as HangId[]) {
-      const [lo, hi] = hangRange(stage, hang);
+    for (const hang of hangsOf(stage)) {
+      if (hang === "floor") continue; // 바닥 라인은 파이프 없이 바닥에 놓는다
       const p = hangPoint(stage, hang, 0);
-      pipes.push(new THREE.CylinderGeometry(0.03, 0.03, hi - lo + 0.6, 8).rotateZ(Math.PI / 2).translate(0, p.y + 0.3, p.z));
-    }
-    for (const hang of ["boomL", "boomR"] as HangId[]) {
-      const p = hangPoint(stage, hang, 0);
-      pipes.push(new THREE.CylinderGeometry(0.03, 0.03, 4.6, 8).translate(p.x, 2.3, p.z));
+      if (isBoomHang(stage, hang)) {
+        pipes.push(new THREE.CylinderGeometry(0.03, 0.03, 4.6, 8).translate(p.x, 2.3, p.z));
+      } else {
+        const [lo, hi] = hangRange(stage, hang);
+        pipes.push(new THREE.CylinderGeometry(0.03, 0.03, hi - lo + 0.6, 8).rotateZ(Math.PI / 2).translate(0, p.y + 0.3, p.z));
+      }
     }
     const pipeMesh = new THREE.Mesh(mergeGeometries(pipes)!, std("#55565c", { roughness: 0.5, metalness: 0.6 }));
     this.group.add(pipeMesh);

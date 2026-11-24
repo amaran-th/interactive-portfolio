@@ -29,6 +29,9 @@
   --color-sub: #a8cce3;
   --color-shade: #d9f0ff;
   --color-ink: #2e353f;
+  /* 패널 바탕과 point 위 글자. 밝은 테마에선 흰색이고, 조명 연습실은 어두운 값으로 덮어쓴다. */
+  --color-surface: #ffffff;
+  --color-on-point: #ffffff;
 }
 
 @utility font-knit-muffler {

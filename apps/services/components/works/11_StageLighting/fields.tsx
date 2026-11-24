@@ -241,7 +241,7 @@ export function NumberField({
             onChange(next);
           }
         }}
-        className="w-full min-w-0 rounded-md border border-point/40 bg-white/80 px-1.5 py-0.5 text-right text-xs tabular-nums text-ink focus:border-point focus:outline-none"
+        className="w-full min-w-0 rounded-md border border-point/40 bg-black/25 px-1.5 py-0.5 text-right text-xs tabular-nums text-ink focus:border-point focus:outline-none"
       />
       {unit && <span className="shrink-0 text-[11px] text-ink/60">{unit}</span>}
     </div>

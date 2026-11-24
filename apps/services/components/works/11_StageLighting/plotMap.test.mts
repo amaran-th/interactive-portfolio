@@ -42,10 +42,10 @@ test("평면도 위치 → 라인과 라인 위 자리(왕복), 지금 라인은
 
 test("라인 끌기: 가로 라인은 앞뒤만, 붐은 바깥으로 끌면 무대에서 멀어진다", () => {
   const s = defaultShow().stage;
-  assert.deepEqual(dragLineOnMap("e1", { dz: 0.5, dy: 1 }, 3, -1), { dz: -0.5, dy: 1 });
-  assert.deepEqual(dragLineOnMap("boomL", { dz: 0, dy: 0 }, -1, 2), { dz: 2, dy: 1 });
-  assert.deepEqual(dragLineOnMap("boomR", { dz: 0, dy: 0 }, -1, 0), { dz: 0, dy: -1 });
-  const moved = setLineOffset(defaultShow(), "e1", dragLineOnMap("e1", s.rig.e1, 0, 1.5)).stage;
+  assert.deepEqual(dragLineOnMap(s, "e1", { dz: 0.5, dy: 1 }, 3, -1), { dz: -0.5, dy: 1 });
+  assert.deepEqual(dragLineOnMap(s, "boomL", { dz: 0, dy: 0 }, -1, 2), { dz: 2, dy: 1 });
+  assert.deepEqual(dragLineOnMap(s, "boomR", { dz: 0, dy: 0 }, -1, 0), { dz: 0, dy: -1 });
+  const moved = setLineOffset(defaultShow(), "e1", dragLineOnMap(s, "e1", s.rig.e1, 0, 1.5)).stage;
   near(lineMapSegment(moved, "e1")[0].z, lineMapSegment(s, "e1")[0].z + 1.5);
 });
 
