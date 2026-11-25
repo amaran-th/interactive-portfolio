@@ -221,13 +221,13 @@ export const VENUE_KINDS_FOR: Record<StageShape, VenueKind[]> = {
 
 export const HANGS: BuiltinHang[] = ["foh", "e1", "e2", "e3", "boomL", "boomR", "floor"];
 export const HANG_LABELS: Record<BuiltinHang, string> = {
-  foh: "FOH(객석 위)",
-  e1: "1번 일렉트릭",
-  e2: "2번 일렉트릭",
-  e3: "3번 일렉트릭",
-  boomL: "왼쪽 붐",
-  boomR: "오른쪽 붐",
-  floor: "바닥",
+  foh: "FOH",
+  e1: "Electric 1",
+  e2: "Electric 2",
+  e3: "Electric 3",
+  boomL: "Boom L",
+  boomR: "Boom R",
+  floor: "Floor",
 };
 
 export const PROP_SPECS: Record<PropKind, { label: string; scale: Vec3; color: string }> = {
@@ -241,29 +241,29 @@ export const PROP_SPECS: Record<PropKind, { label: string; scale: Vec3; color: s
 };
 
 export const FIXTURE_LABELS: Record<FixtureKind, string> = {
-  profile: "프로필",
-  fresnel: "프레넬",
+  profile: "Profile",
+  fresnel: "Fresnel",
   par: "PAR",
-  follow: "팔로우 스팟",
+  follow: "Follow spot",
   ledpar: "LED PAR",
-  cyc: "호리존트 LED",
+  cyc: "Cyc LED",
 };
 
 export const GELS: { name: string; color: string }[] = [
-  { name: "오픈(젤 없음)", color: "#fff1dc" },
-  { name: "페일 앰버", color: "#ffe2b0" },
-  { name: "웜 앰버", color: "#ffbf6e" },
-  { name: "오렌지", color: "#ff8a2a" },
-  { name: "레드", color: "#e0242a" },
-  { name: "핑크", color: "#ff8fb4" },
-  { name: "매젠타", color: "#d62a9a" },
-  { name: "라벤더", color: "#b9a2e8" },
-  { name: "퍼플", color: "#6a2fc0" },
-  { name: "딥 블루", color: "#1c2fb8" },
-  { name: "CT 블루", color: "#cfe0ff" },
-  { name: "스카이 블루", color: "#6fb4ff" },
-  { name: "시안", color: "#2ad0e0" },
-  { name: "그린", color: "#3cc24a" },
+  { name: "Open (no gel)", color: "#fff1dc" },
+  { name: "Pale Amber", color: "#ffe2b0" },
+  { name: "Warm Amber", color: "#ffbf6e" },
+  { name: "Orange", color: "#ff8a2a" },
+  { name: "Red", color: "#e0242a" },
+  { name: "Pink", color: "#ff8fb4" },
+  { name: "Magenta", color: "#d62a9a" },
+  { name: "Lavender", color: "#b9a2e8" },
+  { name: "Purple", color: "#6a2fc0" },
+  { name: "Deep Blue", color: "#1c2fb8" },
+  { name: "CT Blue", color: "#cfe0ff" },
+  { name: "Sky Blue", color: "#6fb4ff" },
+  { name: "Cyan", color: "#2ad0e0" },
+  { name: "Green", color: "#3cc24a" },
 ];
 const OPEN = GELS[0].color;
 
@@ -280,11 +280,11 @@ export const KNOBS: Record<
   FixtureKind,
   { zoom?: [string, number, number]; sharp?: [string, number, number]; softness?: number; angle?: number }
 > = {
-  profile: { zoom: ["줌", 15, 50], sharp: ["초점", 0.6, 0.05] },
-  fresnel: { zoom: ["스팟 ↔ 플러드", 15, 70], softness: 0.75 },
+  profile: { zoom: ["Zoom", 15, 50], sharp: ["초점", 0.6, 0.05] },
+  fresnel: { zoom: ["Spot ↔ Flood", 15, 70], softness: 0.75 },
   par: { softness: 0.5 },
-  follow: { zoom: ["아이리스", 4, 20], sharp: ["초점", 0.5, 0.05] },
-  ledpar: { zoom: ["렌즈", 15, 40], softness: 0.5 },
+  follow: { zoom: ["Iris", 4, 20], sharp: ["초점", 0.5, 0.05] },
+  ledpar: { zoom: ["Zoom", 15, 40], softness: 0.5 },
   cyc: { angle: 90, softness: 0.9 },
 };
 
@@ -316,7 +316,7 @@ function clampVec(v: Vec3): Vec3 {
 
 // ── 걸 위치 ──
 
-export const LINE_TYPE_LABELS: Record<LineType, string> = { pipe: "위 파이프", boomL: "왼쪽 붐", boomR: "오른쪽 붐" };
+export const LINE_TYPE_LABELS: Record<LineType, string> = { pipe: "Electric", boomL: "Boom L", boomR: "Boom R" };
 const isBuiltin = (h: HangId): h is BuiltinHang => (HANGS as string[]).includes(h);
 const customLine = (stage: Stage, h: HangId) => stage.lines?.find((l) => l.id === h);
 
@@ -624,10 +624,10 @@ export function defaultShow(): Show {
   const fx = [
     makeFixture(1, "profile", "앞 왼쪽", "foh", -2, { target: { x: -1, y: 0, z: -3 }, zoom: 0.3, sharpness: 0.9 }, true),
     makeFixture(2, "profile", "앞 오른쪽", "foh", 2, { target: { x: 1, y: 0, z: -3 }, zoom: 0.3, sharpness: 0.9 }, true),
-    makeFixture(3, "fresnel", "위 왼쪽", "e1", -2, { target: { x: -1.5, y: 0, z: -3 }, gel: gel("웜 앰버") }, true),
-    makeFixture(4, "fresnel", "위 오른쪽", "e1", 2, { target: { x: 1.5, y: 0, z: -3 }, gel: gel("웜 앰버") }, true),
-    makeFixture(5, "par", "역광 왼쪽", "e3", -2.5, { target: { x: -1, y: 0, z: -2.5 }, gel: gel("딥 블루") }, true),
-    makeFixture(6, "par", "역광 오른쪽", "e3", 2.5, { target: { x: 1, y: 0, z: -2.5 }, gel: gel("딥 블루") }, true),
+    makeFixture(3, "fresnel", "위 왼쪽", "e1", -2, { target: { x: -1.5, y: 0, z: -3 }, gel: gel("Warm Amber") }, true),
+    makeFixture(4, "fresnel", "위 오른쪽", "e1", 2, { target: { x: 1.5, y: 0, z: -3 }, gel: gel("Warm Amber") }, true),
+    makeFixture(5, "par", "역광 왼쪽", "e3", -2.5, { target: { x: -1, y: 0, z: -2.5 }, gel: gel("Deep Blue") }, true),
+    makeFixture(6, "par", "역광 오른쪽", "e3", 2.5, { target: { x: 1, y: 0, z: -2.5 }, gel: gel("Deep Blue") }, true),
     makeFixture(7, "cyc", "호리존트", "floor", 0, { target: { x: 0, y: 4, z: -8 } }, false),
     makeFixture(8, "follow", "팔로우", "foh", 0, { target: { x: 0, y: 0, z: -3 }, zoom: 0.3, sharpness: 0.7 }, false),
   ];
@@ -1248,7 +1248,7 @@ function freeSpot(stage: Stage, type: LineType): number {
 }
 
 function newLineName(stage: Stage, type: LineType): string {
-  if (type === "pipe") return `${4 + stage.lines.filter((l) => l.type === "pipe").length}번 일렉트릭`;
+  if (type === "pipe") return `Electric ${4 + stage.lines.filter((l) => l.type === "pipe").length}`;
   return `${LINE_TYPE_LABELS[type]} ${2 + stage.lines.filter((l) => l.type === type).length}`;
 }
 
@@ -1326,11 +1326,11 @@ export function addPresetRig(show: Show): Show {
   const plan: { kind: FixtureKind; name: string; hang: HangId; along: number; target: Vec3; gel?: string; intensity: number }[] = [
     { kind: "profile", name: "앞 왼쪽", hang: "foh", along: -2, target: { x: -1.5, y: 0, z: -d * 0.4 }, intensity: 0.7 },
     { kind: "profile", name: "앞 오른쪽", hang: "foh", along: 2, target: { x: 1.5, y: 0, z: -d * 0.4 }, intensity: 0.7 },
-    { kind: "fresnel", name: "위 왼쪽", hang: "e1", along: -3, target: { x: -2.5, y: 0, z: -d * 0.4 }, gel: gel("웜 앰버"), intensity: 0.5 },
-    { kind: "fresnel", name: "위 가운데", hang: "e1", along: 0, target: { x: 0, y: 0, z: -d * 0.4 }, gel: gel("웜 앰버"), intensity: 0.5 },
-    { kind: "fresnel", name: "위 오른쪽", hang: "e1", along: 3, target: { x: 2.5, y: 0, z: -d * 0.4 }, gel: gel("웜 앰버"), intensity: 0.5 },
-    { kind: "par", name: "역광 왼쪽", hang: "e3", along: -2, target: { x: -1.5, y: 0, z: -d * 0.35 }, gel: gel("딥 블루"), intensity: 0 },
-    { kind: "par", name: "역광 오른쪽", hang: "e3", along: 2, target: { x: 1.5, y: 0, z: -d * 0.35 }, gel: gel("딥 블루"), intensity: 0 },
+    { kind: "fresnel", name: "위 왼쪽", hang: "e1", along: -3, target: { x: -2.5, y: 0, z: -d * 0.4 }, gel: gel("Warm Amber"), intensity: 0.5 },
+    { kind: "fresnel", name: "위 가운데", hang: "e1", along: 0, target: { x: 0, y: 0, z: -d * 0.4 }, gel: gel("Warm Amber"), intensity: 0.5 },
+    { kind: "fresnel", name: "위 오른쪽", hang: "e1", along: 3, target: { x: 2.5, y: 0, z: -d * 0.4 }, gel: gel("Warm Amber"), intensity: 0.5 },
+    { kind: "par", name: "역광 왼쪽", hang: "e3", along: -2, target: { x: -1.5, y: 0, z: -d * 0.35 }, gel: gel("Deep Blue"), intensity: 0 },
+    { kind: "par", name: "역광 오른쪽", hang: "e3", along: 2, target: { x: 1.5, y: 0, z: -d * 0.35 }, gel: gel("Deep Blue"), intensity: 0 },
     { kind: "cyc", name: "호리존트", hang: "floor", along: 0, target: { x: 0, y: 4, z: -d }, intensity: 0.4 },
   ];
   let out = show;

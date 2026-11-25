@@ -6,7 +6,7 @@ import { Copy, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { ColorField, NumberField, Section, Segmented, Slider, Vec3Field } from "./fields";
 import GelPicker from "./GelPicker";
-import { FixtureIcon, PersonIcon, PropIcon, StageIcon } from "./icons";
+import { FixtureIcon, PersonIcon, PropIcon } from "./icons";
 import { propNames } from "./Outliner";
 import { TIERS, type Tier } from "./quality";
 import { SeatPicker, VenueFields } from "./SeatMap";
@@ -52,7 +52,7 @@ import {
   usesCueColor,
 } from "./show";
 import type { Store } from "./store";
-import { LABEL, SEGMENT } from "./ui";
+import { FIELD_LABEL, SEGMENT } from "./ui";
 import { useShow } from "./useShow";
 import type { SeatRef } from "./venue";
 
@@ -91,7 +91,7 @@ function channelKey(s: Show, selectedId: string | null): string {
 }
 
 const ICON_BUTTON =
-  "flex size-7 shrink-0 items-center justify-center rounded-md text-point hover:bg-point/10 disabled:opacity-40";
+  "flex size-7 shrink-0 items-center justify-center rounded-md text-ink hover:bg-white/10 disabled:opacity-40";
 
 export function Header({
   icon,
@@ -117,9 +117,9 @@ export function Header({
 }) {
   return (
     <div className="flex items-center gap-2 px-3 py-2">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-point text-on-point">{icon}</span>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-white/10 text-ink">{icon}</span>
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[10px] font-bold text-point/70">{kind}</span>
+        <span className="text-[10px] font-bold text-ink/70">{kind}</span>
         {onName ? (
           <input
             type="text"
@@ -137,8 +137,8 @@ export function Header({
       {onSolo && (
         <button type="button" aria-pressed={!!solo} onClick={onSolo}
           title="이 조명기만 100%로 켜고 나머지는 잠시 꺼요. 저장된 값은 바뀌지 않아요."
-          className="h-7 shrink-0 rounded-md px-1.5 text-[11px] font-bold text-point hover:bg-point/10 aria-pressed:bg-point aria-pressed:text-on-point">
-          솔로
+          className="h-7 shrink-0 rounded-md px-1.5 text-[11px] font-bold text-ink hover:bg-white/10 aria-pressed:bg-point aria-pressed:text-on-point">
+          Solo
         </button>
       )}
       {onDuplicate && (
@@ -168,7 +168,7 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
 
   const edit = (fn: (s: Show) => Show) => store.set(fn(store.get()));
   const rot = (rad: number, apply: (r: number) => void) => (
-    <NumberField label="방향" title="바라보는 방향(°)" value={toDeg(rad)} min={0} max={359} step={1} digits={0} unit="°"
+    <NumberField align label="방향" title="바라보는 방향(°)" value={toDeg(rad)} min={0} max={359} step={1} digits={0} unit="°"
       onBegin={onBegin} onChange={(v) => apply(v / DEG)} />
   );
 
@@ -179,12 +179,12 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
         <Header icon={<PropIcon kind={prop.kind} className="size-5" />} kind={`소품 · ${PROP_SPECS[prop.kind].label}`} name={propName}
           onBegin={onBegin} onDuplicate={onDuplicate} onDelete={onDelete} />
         <Section title="위치">
-          <Vec3Field label="X 좌우 · Y 높이 · Z 앞뒤" value={prop.position} axes={POS_AXES} onBegin={onBegin}
+          <Vec3Field label="좌표(m)" value={prop.position} axes={POS_AXES} onBegin={onBegin}
             onChange={(position) => edit((s) => updateProp(s, id, { position }))} />
           {rot(prop.rotationY, (rotationY) => edit((s) => updateProp(s, id, { rotationY })))}
         </Section>
         <Section title="크기">
-          <Vec3Field label="X 폭 · Y 높이 · Z 깊이" value={prop.scale} axes={SIZE_AXES} onBegin={onBegin}
+          <Vec3Field label="크기(m)" value={prop.scale} axes={SIZE_AXES} onBegin={onBegin}
             onChange={(scale) => edit((s) => updateProp(s, id, { scale }))} />
         </Section>
         <Section title="색">
@@ -203,23 +203,27 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
         <Header icon={<PersonIcon gender={actor.gender} className="size-5" />} kind={`인물 · ${GENDER_LABELS[actor.gender]}`}
           name={actor.name} onName={(name) => set({ name })} onBegin={onBegin} onDuplicate={onDuplicate} onDelete={onDelete} />
         <Section title="위치">
-          <Vec3Field label="X 좌우 · Y 높이 · Z 앞뒤" value={actor.position} axes={POS_AXES} onBegin={onBegin}
+          <Vec3Field label="좌표(m)" value={actor.position} axes={POS_AXES} onBegin={onBegin}
             onChange={(position) => set({ position })} />
-          <p className="text-[11px] text-ink/60">단·계단·탁자·상자 위로 끌면 그 위에 올라서요.</p>
           {rot(actor.rotationY, (rotationY) => set({ rotationY }))}
         </Section>
         <Section title="사람">
           <Segmented label="성별" value={actor.gender} options={GENDERS.map((g) => ({ value: g, label: GENDER_LABELS[g] }))}
             onPick={(g) => { onBegin(); edit((s) => setActorGender(s, id, g)); }} />
-          <NumberField label="키" title={`키(cm, ${Math.round(range.min * 100)}–${Math.round(range.max * 100)})`}
-            value={Math.round(actor.height * 100)} min={range.min * 100} max={range.max * 100} step={1} digits={0} unit="cm"
-            onBegin={onBegin} onChange={(cm) => set({ height: cm / 100 })} />
-          <Segmented label="체형" value={actor.build} options={BUILDS.map((b) => ({ value: b, label: BUILD_LABELS[b] }))}
-            onPick={(build) => { onBegin(); set({ build }); }} />
-          <label className="flex flex-col gap-0.5">
-            <span className={LABEL}>자세</span>
+          {/* 키와 체형은 한 줄에 둔다 */}
+          <div className="flex items-start gap-2">
+            <div className="w-32 shrink-0">
+              <NumberField label="키" align title={`키(cm, ${Math.round(range.min * 100)}–${Math.round(range.max * 100)})`}
+                value={Math.round(actor.height * 100)} min={range.min * 100} max={range.max * 100} step={1} digits={0} unit="cm"
+                onBegin={onBegin} onChange={(cm) => set({ height: cm / 100 })} />
+            </div>
+            <Segmented compact label="체형" value={actor.build} options={BUILDS.map((b) => ({ value: b, label: BUILD_LABELS[b] }))}
+              onPick={(build) => { onBegin(); set({ build }); }} />
+          </div>
+          <label className="flex items-center gap-2">
+            <span className={FIELD_LABEL}>자세</span>
             <select value={actor.pose} onFocus={onBegin} onChange={(e) => set({ pose: e.target.value as Pose })}
-              className="rounded-md border border-point/40 bg-black/25 px-2 py-1 text-xs text-ink">
+              className="min-w-0 flex-1 rounded-md border border-white/15 bg-black/25 px-2 py-1 text-xs text-ink">
               {POSES.map((p) => <option key={p} value={p}>{POSE_LABELS[p]}</option>)}
             </select>
           </label>
@@ -262,8 +266,8 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
       <div>
         <Header icon={<FixtureIcon kind={kind} className="size-5" />} kind={`조명기 · ${FIXTURE_LABELS[kind]}`} name={fixture.name}
           onName={(name) => edit((s) => updateFixture(s, id, { name }))} onBegin={onBegin} solo={solo} onSolo={onSolo} onDuplicate={onDuplicate} onDelete={onDelete} />
-        <Section title="큐 값">
-          <Slider label="디머" value={level?.intensity ?? 0} min={0} max={1} step={0.01} format={pct} onBegin={onBegin}
+        <Section title="Cue">
+          <Slider label="Dimmer" value={level?.intensity ?? 0} min={0} max={1} step={0.01} format={pct} onBegin={onBegin}
             onChange={(intensity) => edit((s) => updateLevel(s, id, { intensity }))} />
           {cueParams.includes("zoom") && knobs.zoom && (
             <Slider label={knobs.zoom[0]} value={zoomValue} min={0} max={1} step={0.01} format={zoomDeg(knobs.zoom)}
@@ -280,26 +284,26 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
           <Segmented<FixtureKind> label="종류" value={kind}
             options={FIXTURE_KINDS.map((k) => ({ value: k, label: FIXTURE_LABELS[k] }))}
             onPick={(k) => { onBegin(); edit((s) => updateFixture(s, id, { kind: k })); }} />
-          <label className="flex flex-col gap-0.5">
-            <span className={LABEL}>라인</span>
+          <label className="flex items-center gap-2">
+            <span className={FIELD_LABEL}>라인</span>
             <select value={fixture.hang} onFocus={onBegin}
               onChange={(e) => edit((s) => updateFixture(s, id, { hang: e.target.value as HangId }))}
-              className="rounded-md border border-point/40 bg-black/25 px-2 py-1 text-xs text-ink">
+              className="min-w-0 flex-1 rounded-md border border-white/15 bg-black/25 px-2 py-1 text-xs text-ink">
               {hangsOf(stage).map((h) => <option key={h} value={h}>{hangLabel(stage, h)}</option>)}
             </select>
           </label>
-          <NumberField label={boom ? "높이" : "좌우"} title={boom ? "붐 위 높이(m)" : "라인 위 좌우(m)"}
+          <NumberField align label={boom ? "높이" : "좌우"} title={boom ? "붐 위 높이(m)" : "라인 위 좌우(m)"}
             value={Math.min(hi, Math.max(lo, fixture.along))} min={lo} max={hi} step={0.1} digits={1} unit="m"
             onBegin={onBegin} onChange={(along) => edit((s) => updateFixture(s, id, { along }))} />
           <p className="text-[11px] text-ink/60">3D에서 몸체를 끌면 라인을 따라 움직이고, 다른 라인 가까이 끌면 그 라인으로 옮겨 걸려요.</p>
           <label className="flex items-center gap-2" title={shadowLocked ? `그림자는 지금 품질에서 최대 ${limit}대예요` : undefined}>
+            <span className={FIELD_LABEL}>그림자</span>
             <input type="checkbox" checked={fixture.castShadow} disabled={shadowLocked} className="accent-point"
               onChange={(e) => { onBegin(); edit((s) => updateFixture(s, id, { castShadow: e.target.checked })); }} />
-            <span className={LABEL}>그림자</span>
             {shadowLocked && <span className="text-[11px] text-ink/60">최대 {limit}대</span>}
           </label>
         </Section>
-        <Section title="포커스">
+        <Section title="Focus">
           {knobs.zoom && !cueParams.includes("zoom") && (
             <Slider label={knobs.zoom[0]} value={fixture.focus.zoom} min={0} max={1} step={0.01} format={zoomDeg(knobs.zoom)}
               onBegin={onBegin} onChange={(zoom) => edit((s) => updateFocus(s, id, { zoom }))} />
@@ -315,30 +319,19 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
               onPick={(lamp) => { onBegin(); edit((s) => updateFocus(s, id, { lamp })); }} />
           )}
           {cueColor ? (
-            <p className="text-[11px] text-ink/60">색은 큐마다 바꿔요. 위 큐 값에서 골라요.</p>
+            <p className="text-[11px] text-ink/60">색은 큐마다 바꿔요. 위 Cue에서 골라요.</p>
           ) : (
             <GelPicker value={fixture.focus.gel} onBegin={onBegin} onChange={(gel) => edit((s) => updateFocus(s, id, { gel }))} />
           )}
           <div className="flex flex-wrap gap-1">
             <button type="button" className={SEGMENT} onClick={() => { onBegin(); edit((s) => aimFixtures(s, [id], "center")); }}>
-              가운데 비추기
+              Focus center
             </button>
             <button type="button" className={SEGMENT} onClick={() => { onBegin(); edit((s) => aimFixtures(s, [id], "actor")); }}
               title="이 조명기에서 가장 가까운 인물을 비춰요">
-              가까운 인물 비추기
+              Focus nearest actor
             </button>
           </div>
-          {cueAim ? (
-            <p className="text-[11px] text-ink/60">조준과 아이리스는 큐마다 바꿔요.</p>
-          ) : (
-            <>
-              <p className="text-[11px] text-ink/60">무대 위 노란 고리를 끌어 비출 곳을 정해요.</p>
-              <p className="flex gap-3 text-[11px] tabular-nums text-ink/70">
-                <span>팬 {pan}°</span>
-                <span>틸트 {tilt}°</span>
-              </p>
-            </>
-          )}
         </Section>
       </div>
     );
@@ -346,24 +339,25 @@ export default function Inspector({ store, selectedId, tier, solo, seat, onSeat,
 
   return (
     <div>
-      <Header icon={<StageIcon className="size-5" />} kind="무대·객석" name="무대와 객석" onBegin={onBegin} />
       <Section title="무대">
         <Segmented label="형태" value={stage.shape}
           options={STAGE_SHAPES.map((v) => ({ value: v, label: STAGE_LABELS[v] }))}
           onPick={(shape) => { onBegin(); edit((s) => updateStage(s, { shape })); }} />
         <div className="grid grid-cols-3 gap-1.5">
-          <NumberField label="폭" title="무대 폭(m)" value={stage.width} min={4} max={20} step={0.5} digits={1} onBegin={onBegin}
+          <NumberField label="폭(m)" title="무대 폭(m)" value={stage.width} min={4} max={20} step={0.5} digits={1} onBegin={onBegin}
             onChange={(width) => edit((s) => updateStage(s, { width }))} />
-          <NumberField label="깊이" title="무대 깊이(m)" value={stage.depth} min={3} max={15} step={0.5} digits={1} onBegin={onBegin}
+          <NumberField label="깊이(m)" title="무대 깊이(m)" value={stage.depth} min={3} max={15} step={0.5} digits={1} onBegin={onBegin}
             onChange={(depth) => edit((s) => updateStage(s, { depth }))} />
-          <NumberField label="높이" title="무대 높이(m)" value={stage.height} min={3} max={12} step={0.5} digits={1} onBegin={onBegin}
+          <NumberField label="높이(m)" title="무대 높이(m)" value={stage.height} min={3} max={12} step={0.5} digits={1} onBegin={onBegin}
             onChange={(height) => edit((s) => updateStage(s, { height }))} />
         </div>
-        <ColorField label="바닥" value={stage.floorColor} onBegin={onBegin} onChange={(floorColor) => edit((s) => updateStage(s, { floorColor }))} />
-        {stage.shape !== "round" && (
-          <ColorField label="배경막" value={stage.backdropColor} onBegin={onBegin}
-            onChange={(backdropColor) => edit((s) => updateStage(s, { backdropColor }))} />
-        )}
+        <div className="grid grid-cols-2 gap-3">
+          <ColorField label="바닥" value={stage.floorColor} onBegin={onBegin} onChange={(floorColor) => edit((s) => updateStage(s, { floorColor }))} />
+          {stage.shape !== "round" && (
+            <ColorField label="배경막" value={stage.backdropColor} onBegin={onBegin}
+              onChange={(backdropColor) => edit((s) => updateStage(s, { backdropColor }))} />
+          )}
+        </div>
       </Section>
       <Section title="객석">
         <VenueFields store={store} onBegin={onBegin} />
@@ -397,8 +391,8 @@ function ChannelField({
   const dup = valid && taken.split(",").includes(String(n));
   const error = draft === "" ? null : !valid ? "1부터 99까지 쓸 수 있어요" : dup ? `채널 ${n}번은 이미 써요` : null;
   return (
-    <div className="flex flex-col gap-0.5">
-      <label htmlFor="fixture-channel" className={LABEL}>채널</label>
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+      <label htmlFor="fixture-channel" className={FIELD_LABEL}>채널</label>
       <input
         id="fixture-channel"
         type="number"
@@ -418,7 +412,7 @@ function ChannelField({
           if (error === null && draft !== "" && n !== channel) onCommit(n);
           else setDraft(String(channel));
         }}
-        className="w-20 rounded-md border border-point/40 bg-black/25 px-2 py-1 text-xs text-ink tabular-nums aria-invalid:border-red-400"
+        className="w-20 rounded-md border border-white/15 bg-black/25 px-2 py-1 text-xs text-ink tabular-nums aria-invalid:border-red-400"
       />
       {error && <span id="fixture-channel-error" role="alert" className="text-[11px] font-bold text-red-400">{error}</span>}
     </div>

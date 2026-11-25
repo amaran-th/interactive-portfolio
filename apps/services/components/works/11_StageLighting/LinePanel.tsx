@@ -11,9 +11,7 @@ import {
   LINE_DZ,
   type Show,
   addPresetRig,
-  LINE_TYPE_LABELS,
   aimFixtures,
-  boomSide,
   hangLabel,
   hangsOf,
   isBoomHang,
@@ -45,10 +43,10 @@ export default function LinePanel({ store, onBegin, selected }: { store: Store; 
       <div className="flex flex-col gap-1.5 p-3">
         <button type="button" className={BUTTON} disabled={full >= 24} onClick={() => edit(addPresetRig)}
           title="앞조명 2, 윗조명 3, 역광 2, 호리존트 1을 지금 조명기에 더해 걸어요">
-          기본 조명 배치 걸기
+          기본 배치로
         </button>
         <p className="text-[11px] text-ink/60">
-          목록의 라인 폴더 이름이나 3D 화면의 라인(파이프)을 누르면 그 라인의 위치와 도구가 여기에 나와요. 조명기를 고르면 그 속성이 나와요. 라인은 ‘추가’ 메뉴에서 더해요.
+          조명 라인 또는 조명을 선택하세요.
         </p>
       </div>
     );
@@ -56,12 +54,11 @@ export default function LinePanel({ store, onBegin, selected }: { store: Store; 
   const boom = isBoomHang(stage, h);
   const custom = isCustomLine(stage, h);
   const off = stage.rig[h];
-  const type = boom ? (boomSide(stage, h) < 0 ? "boomL" : "boomR") : "pipe";
   const idsOn = () => store.get().fixtures.filter((f) => f.hang === h).map((f) => f.id);
 
   return (
     <div>
-      <Header icon={<Folder aria-hidden className="size-5" />} kind={`라인 · ${h === "floor" ? "바닥" : LINE_TYPE_LABELS[type]} · 조명기 ${count}대`}
+      <Header icon={<Folder aria-hidden className="size-5" />} kind={`라인 · ${h === "floor" ? "Floor" : boom ? "Boom" : "Pipe"} · 조명기 ${count}대`}
         name={custom ? (stage.lines.find((l) => l.id === h)?.name ?? "") : hangLabel(stage, h)}
         onName={custom ? (v) => store.set(renameLine(store.get(), h, v)) : undefined}
         onBegin={onBegin}
@@ -78,14 +75,14 @@ export default function LinePanel({ store, onBegin, selected }: { store: Store; 
         <div className="flex flex-wrap gap-1">
           <button type="button" className={SEGMENT} disabled={count < 2} onClick={() => edit((s) => spreadLine(s, h))}
             title="걸린 조명기를 라인 전체에 같은 간격으로 펼쳐요">
-            고르게 펼치기
+            Spread
           </button>
           <button type="button" className={SEGMENT} disabled={count === 0} onClick={() => edit((s) => aimFixtures(s, idsOn(), "center"))}
             title="이 라인의 조명기를 모두 무대 가운데로 겨눠요">
-            가운데 비추기
+            Focus center
           </button>
           <button type="button" className={SEGMENT} disabled={off.dz === 0 && off.dy === 0} onClick={() => edit((s) => resetLine(s, h))}>
-            기본 위치로
+            Reset
           </button>
         </div>
         <p className="text-[11px] text-ink/60">

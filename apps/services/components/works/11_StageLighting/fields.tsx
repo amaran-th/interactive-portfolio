@@ -3,7 +3,7 @@
 // 속성 패널 입력 칸. 조작을 시작할 때 onBegin(실행 취소 지점·재생 멈춤)을 부른다.
 import { ChevronDown } from "lucide-react";
 import { useId, useRef, useState } from "react";
-import { LABEL, SEGMENT } from "./ui";
+import { COLOR_INPUT, FIELD_LABEL, LABEL, SEGMENT } from "./ui";
 
 type Begin = { onBegin: () => void };
 
@@ -26,11 +26,8 @@ export function Slider({
   onChange: (v: number) => void;
 }) {
   return (
-    <label className="flex flex-col gap-0.5">
-      <span className="flex justify-between">
-        <span className={LABEL}>{label}</span>
-        <span className="text-[11px] tabular-nums text-ink/70">{format ? format(value) : value}</span>
-      </span>
+    <label className="flex items-center gap-2">
+      <span className={FIELD_LABEL}>{label}</span>
       <input
         type="range"
         min={min}
@@ -40,8 +37,9 @@ export function Slider({
         onPointerDown={onBegin}
         onKeyDown={onBegin}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="accent-point"
+        className="min-w-0 flex-1 accent-point"
       />
+      <span className="w-16 shrink-0 text-right text-[11px] whitespace-nowrap tabular-nums text-ink/70">{format ? format(value) : value}</span>
     </label>
   );
 }
@@ -54,10 +52,11 @@ export function ColorField({
   onChange,
 }: Begin & { label: string; value: string; presets?: string[]; onChange: (v: string) => void }) {
   return (
-    <label className="flex items-center justify-between gap-2">
-      <span className={LABEL}>{label}</span>
+    // label로 감싸면 줄 어디를 눌러도 색 고르기 창이 열려서, 색 칸만 누를 수 있게 div로 둔다
+    <div className="flex items-center gap-2">
+      <span className={FIELD_LABEL}>{label}</span>
       {presets && (
-        <span className="ml-auto flex gap-1">
+        <span className="flex gap-1">
           {presets.map((c) => (
             <button
               key={c}
@@ -65,12 +64,11 @@ export function ColorField({
               aria-label={`${label} ${c}`}
               aria-pressed={c === value.toLowerCase()}
               style={{ backgroundColor: c }}
-              onClick={(e) => {
-                e.preventDefault();
+              onClick={() => {
                 onBegin();
                 onChange(c);
               }}
-              className="size-5 rounded-full border border-point/40 aria-pressed:ring-2 aria-pressed:ring-point"
+              className="size-5 rounded-full border border-white/15 aria-pressed:ring-2 aria-pressed:ring-point"
             />
           ))}
         </span>
@@ -81,9 +79,10 @@ export function ColorField({
         onFocus={onBegin}
         onClick={onBegin}
         onChange={(e) => onChange(e.target.value)}
-        className="h-6 w-10 cursor-pointer rounded border-2 border-point"
+        aria-label={label}
+        className={`${COLOR_INPUT} ml-auto`}
       />
-    </label>
+    </div>
   );
 }
 
@@ -95,15 +94,15 @@ export function TextField({
   onChange,
 }: Begin & { label: string; value: string; maxLength: number; onChange: (v: string) => void }) {
   return (
-    <label className="flex flex-col gap-0.5">
-      <span className={LABEL}>{label}</span>
+    <label className="flex items-center gap-2">
+      <span className={FIELD_LABEL}>{label}</span>
       <input
         type="text"
         value={value}
         maxLength={maxLength}
         onFocus={onBegin}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-md border-2 border-point px-2 py-1 text-xs text-ink"
+        className="min-w-0 flex-1 rounded-md border border-white/15 bg-black/25 px-2 py-1 text-xs text-ink"
       />
     </label>
   );
@@ -114,23 +113,26 @@ export function Segmented<T extends string>({
   value,
   options,
   onPick,
+  compact = false,
 }: {
   label: string;
   value: T;
   options: { value: T; label: string }[];
   onPick: (v: T) => void;
+  /** 라벨 칸 폭을 맞추지 않고 글자만큼만 쓴다(한 줄에 두 필드를 놓을 때) */
+  compact?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className={LABEL}>{label}</span>
-      <div role="group" aria-label={label} className="flex flex-wrap gap-1">
+    <div className="flex min-w-0 items-start gap-2">
+      <span className={`${compact ? `${LABEL} shrink-0` : FIELD_LABEL} pt-1.5`}>{label}</span>
+      <div role="group" aria-label={label} className="flex min-w-0 flex-1 flex-wrap gap-1">
         {options.map((o) => (
           <button
             key={o.value}
             type="button"
             aria-pressed={o.value === value}
             onClick={() => o.value !== value && onPick(o.value)}
-            className={SEGMENT}
+            className={compact ? SEGMENT.replace("px-2", "px-1.5") : SEGMENT}
           >
             {o.label}
           </button>
@@ -153,10 +155,13 @@ export function NumberField({
   step,
   digits = 2,
   unit,
+  align = false,
   onBegin,
   onChange,
 }: Begin & {
   label: string;
+  /** 다른 필드와 라벨 칸 폭을 맞춘다(혼자 한 줄을 쓰는 칸) */
+  align?: boolean;
   title?: string;
   value: number;
   min: number;
@@ -180,11 +185,11 @@ export function NumberField({
     if (draft.trim() !== "" && Number.isFinite(n) && fit(n) !== value) onChange(fit(n));
   };
   return (
-    <div className="flex min-w-0 items-center gap-1">
+    <div className={`flex min-w-0 items-center ${align ? "gap-2" : "gap-1"}`}>
       <label
         htmlFor={id}
         title={title ? `${title} — 좌우로 끌어 바꾸기` : "좌우로 끌어 바꾸기"}
-        className={`${LABEL} shrink-0 cursor-ew-resize touch-none select-none`}
+        className={`${align ? FIELD_LABEL : `${LABEL} shrink-0`} cursor-ew-resize touch-none select-none`}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
           e.preventDefault(); // 포커스·글자 선택을 옮기지 않는다
@@ -241,7 +246,7 @@ export function NumberField({
             onChange(next);
           }
         }}
-        className="w-full min-w-0 rounded-md border border-point/40 bg-black/25 px-1.5 py-0.5 text-right text-xs tabular-nums text-ink focus:border-point focus:outline-none"
+        className="w-full min-w-0 rounded-md border border-white/15 bg-black/25 px-1.5 py-0.5 text-right text-xs tabular-nums text-ink focus:border-point focus:outline-none"
       />
       {unit && <span className="shrink-0 text-[11px] text-ink/60">{unit}</span>}
     </div>
@@ -266,9 +271,9 @@ export function Vec3Field({
   onChange: (v: { x: number; y: number; z: number }) => void;
 }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className={LABEL}>{label}</span>
-      <div className="grid grid-cols-3 gap-1.5">
+    <div className="flex items-center gap-2">
+      <span className={FIELD_LABEL}>{label}</span>
+      <div className="grid min-w-0 flex-1 grid-cols-3 gap-1.5">
         {(["x", "y", "z"] as const).map((k) => (
           <NumberField key={k} label={k.toUpperCase()} title={axes[k].title} value={value[k]} min={axes[k].min} max={axes[k].max}
             step={step} onBegin={onBegin} onChange={(v) => onChange({ ...value, [k]: v })} />
@@ -282,13 +287,13 @@ export function Vec3Field({
 export function Section({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section className="border-t border-point/15">
+    <section className="border-t border-white/10">
       <h3>
         <button
           type="button"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className="flex w-full items-center justify-between px-3 py-2 text-xs font-bold text-point hover:bg-point/5"
+          className="flex w-full items-center justify-between px-3 py-2 text-xs font-bold text-ink hover:bg-white/10"
         >
           {title}
           <ChevronDown aria-hidden className={`size-4 transition-transform ${open ? "" : "-rotate-90"}`} />

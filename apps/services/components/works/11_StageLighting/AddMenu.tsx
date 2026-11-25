@@ -70,7 +70,7 @@ export default function AddMenu({
         <Plus aria-hidden className="size-4" /> 추가
       </button>
       {open && (
-        <div className="absolute top-full right-0 z-30 mt-1 flex w-max gap-x-4 rounded-lg border-2 border-point bg-surface p-2 shadow-[3px_3px_0_0_var(--color-point)]">
+        <div className="absolute top-full right-0 z-30 mt-1 flex w-max gap-x-4 rounded-lg border border-white/15 bg-surface p-2">
           {only === "elements" && (
           <div className="flex flex-col gap-0.5">
             <p className={LABEL}>소품</p>
@@ -131,7 +131,7 @@ function LineIcon({ type }: { type: LineType }) {
 function MenuItem({ icon, label, disabledReason, onClick }: { icon: React.ReactNode; label: string; disabledReason?: string; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} disabled={!!disabledReason} title={disabledReason}
-      className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-xs font-bold text-point hover:bg-shade disabled:opacity-40">
+      className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-xs font-bold text-ink hover:bg-shade disabled:opacity-40">
       {icon}
       {label}
     </button>

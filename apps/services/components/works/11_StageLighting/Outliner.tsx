@@ -23,7 +23,7 @@ type Props = {
 };
 const DRAG_TYPE = "application/x-stage-fixture";
 
-const ROW = "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-ink hover:bg-point/10 aria-[current=true]:bg-point aria-[current=true]:text-on-point";
+const ROW = "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-ink hover:bg-white/10 aria-[current=true]:bg-point/20 aria-[current=true]:font-bold";
 
 /** 소품은 이름이 없어 종류별 번호를 붙인다(의자 1, 의자 2…). */
 export function propNames(props: Show["props"]): Map<string, string> {
@@ -71,7 +71,7 @@ export default function Outliner({ store, selectedId, onPick, onBegin, groups, s
           <span
             aria-hidden
             style={{ borderColor: r.color }}
-            className="flex size-5 shrink-0 items-center justify-center rounded-full border-2 bg-point text-[10px] font-bold tabular-nums text-on-point"
+            className="flex size-5 shrink-0 items-center justify-center rounded-full border-2 bg-white/10 text-[10px] font-bold tabular-nums text-ink"
           >
             {f.channel}
           </span>
@@ -100,7 +100,7 @@ export default function Outliner({ store, selectedId, onPick, onBegin, groups, s
       type="button"
       aria-expanded={!closed[g]}
       onClick={() => setClosed((c) => ({ ...c, [g]: !c[g] }))}
-      className="flex w-full items-center gap-1 px-2 pt-2 pb-0.5 text-[11px] font-bold text-point/80"
+      className="flex w-full items-center gap-1 px-2 pt-2 pb-0.5 text-[11px] font-bold text-ink/70"
     >
       <ChevronDown aria-hidden className={`size-3.5 transition-transform ${closed[g] ? "-rotate-90" : ""}`} />
       {title}
@@ -162,14 +162,14 @@ export default function Outliner({ store, selectedId, onPick, onBegin, groups, s
                 if (id) moveTo(id, hang);
               }}
               className={`rounded-md ${dropOn === hang ? "bg-shade ring-2 ring-point/60 ring-inset" : ""}`}>
-              <div className={`flex items-center gap-0.5 px-1 pt-1.5 ${selectedLine === hang ? "text-[#ffc552]" : "text-point/80"}`}>
+              <div className={`flex items-center gap-0.5 px-1 pt-1.5 ${selectedLine === hang ? "rounded-md bg-point/15 text-point" : "text-ink/75"}`}>
                 <button type="button" aria-expanded={open} aria-label={`${label} ${open ? "접기" : "펼치기"}`}
                   onClick={() => setClosedLines((c) => ({ ...c, [hang]: open }))}
-                  className="rounded p-0.5 hover:bg-point/10">
+                  className="rounded p-0.5 hover:bg-white/10">
                   <ChevronDown aria-hidden className={`size-3.5 transition-transform ${open ? "" : "-rotate-90"}`} />
                 </button>
                 <button type="button" onClick={() => onPickLine?.(hang)} title="이 라인 고르기"
-                  className="flex min-w-0 items-center gap-1.5 rounded px-1 py-0.5 text-[11px] font-bold hover:bg-point/10">
+                  className="flex min-w-0 items-center gap-1.5 rounded px-1 py-0.5 text-[11px] font-bold hover:bg-white/10">
                   <Folder aria-hidden className="size-3.5 shrink-0" />
                   <span className="truncate">{label}</span>
                   <span className="font-normal text-ink/50">{on.length}</span>

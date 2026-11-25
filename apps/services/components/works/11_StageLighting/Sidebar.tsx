@@ -69,7 +69,7 @@ export default function Sidebar({ open, onOpen, tab, onTab, actions, outliner, i
         onClick={() => onOpen(true)}
         aria-label="사이드바 펼치기"
         title="사이드바 펼치기"
-        className="absolute right-0 bottom-3 z-20 flex h-24 w-6 items-center justify-center rounded-l-lg border border-r-0 border-white/10 bg-surface/80 text-point shadow-lg backdrop-blur-md md:top-1/2 md:bottom-auto md:-translate-y-1/2"
+        className="absolute right-0 bottom-3 z-20 flex h-24 w-6 items-center justify-center rounded-l-lg border border-r-0 border-white/10 bg-surface/80 text-ink shadow-lg backdrop-blur-md md:top-1/2 md:bottom-auto md:-translate-y-1/2"
       >
         <PanelRightOpen aria-hidden className="size-4" />
       </button>
@@ -86,7 +86,7 @@ export default function Sidebar({ open, onOpen, tab, onTab, actions, outliner, i
       <div
         aria-hidden
         title="끌어서 너비 바꾸기"
-        className="absolute inset-y-0 left-0 z-10 hidden w-1.5 cursor-ew-resize touch-none hover:bg-point/20 md:block"
+        className="absolute inset-y-0 left-0 z-10 hidden w-1.5 cursor-ew-resize touch-none hover:bg-white/10 md:block"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           drag.current = { x: e.clientX, w: width };
@@ -109,10 +109,10 @@ export default function Sidebar({ open, onOpen, tab, onTab, actions, outliner, i
             aria-label={side.title}
             className="absolute top-0 right-[calc(100%+0.5rem)] hidden max-h-full w-72 flex-col rounded-xl border border-white/10 bg-surface/80 shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-md md:flex"
           >
-            <div className="flex items-center justify-between border-b border-point/15 py-1 pr-1 pl-3">
-              <h2 className="text-xs font-bold text-point">{side.title}</h2>
+            <div className="flex items-center justify-between border-b border-white/10 py-1 pr-1 pl-3">
+              <h2 className="text-xs font-bold text-ink">{side.title}</h2>
               <button type="button" onClick={() => setSideOpen(false)} aria-label={`${side.title} 접기`} title="접기"
-                className="flex size-7 items-center justify-center rounded-md text-point hover:bg-point/10">
+                className="flex size-7 items-center justify-center rounded-md text-ink hover:bg-white/10">
                 <PanelRightClose aria-hidden className="size-4" />
               </button>
             </div>
@@ -120,16 +120,16 @@ export default function Sidebar({ open, onOpen, tab, onTab, actions, outliner, i
           </div>
         ) : (
           <button type="button" onClick={() => setSideOpen(true)} aria-label={`${side.title} 펼치기`} title={`${side.title} 펼치기`}
-            className="absolute top-3 right-full hidden items-center gap-1 rounded-l-lg border border-r-0 border-white/10 bg-surface/80 px-1 py-3 text-xs font-bold text-point shadow-lg backdrop-blur-md [writing-mode:vertical-rl] md:flex">
+            className="absolute top-3 right-full hidden items-center gap-1 rounded-l-lg border border-r-0 border-white/10 bg-surface/80 px-1 py-3 text-xs font-bold text-ink shadow-lg backdrop-blur-md [writing-mode:vertical-rl] md:flex">
             <ChevronLeft aria-hidden className="size-3.5 rotate-90" />
             {side.title}
           </button>
         ))}
-      <div className="flex items-center justify-between border-b border-point/15 py-1 pr-1 pl-2">
+      <div className="flex items-center justify-between border-b border-white/10 py-1 pr-1 pl-2">
         <div role="tablist" aria-label="사이드바" className="flex gap-0.5">
           {SIDEBAR_TABS.map((t) => (
             <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => onTab(t.id)}
-              className="rounded-md px-2 py-1 text-xs font-bold text-point/70 hover:bg-point/10 aria-selected:bg-point aria-selected:text-on-point">
+              className="rounded-md px-2 py-1 text-xs font-bold text-ink/70 hover:bg-white/10 aria-selected:bg-point aria-selected:text-on-point">
               {t.label}
             </button>
           ))}
@@ -141,14 +141,14 @@ export default function Sidebar({ open, onOpen, tab, onTab, actions, outliner, i
             onClick={() => onOpen(false)}
             aria-label="사이드바 접기"
             title="사이드바 접기"
-            className="flex size-7 items-center justify-center rounded-md text-point hover:bg-point/10"
+            className="flex size-7 items-center justify-center rounded-md text-ink hover:bg-white/10"
           >
             <PanelRightClose aria-hidden className="size-4" />
           </button>
         </div>
       </div>
       {outliner && <div className="max-h-[40%] shrink-0 overflow-auto px-1">{outliner}</div>}
-      <div className={`min-h-0 flex-1 overflow-auto ${outliner ? "border-t-2 border-point/20" : ""}`}>{inspector}</div>
+      <div className={`min-h-0 flex-1 overflow-auto ${outliner ? "border-t border-white/10" : ""}`}>{inspector}</div>
     </aside>
   );
 }

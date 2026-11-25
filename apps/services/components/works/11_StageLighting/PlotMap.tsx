@@ -213,18 +213,18 @@ export default function PlotMap({ store, sceneRef, mode, onMode, selectedId, sel
 
   return (
     <div
-      className={`flex flex-col overflow-hidden border-2 border-point bg-[#0d0d12]/90 shadow-[2px_2px_0_0_var(--color-point)] backdrop-blur ${
+      className={`flex flex-col overflow-hidden border border-white/15 bg-[#0d0d12]/90 backdrop-blur ${
         mode === "split" ? "h-full w-full rounded-none border-y-0 border-l-0" : "w-72 rounded-md"
       }`}
     >
-      <div className="flex items-center justify-between gap-1 bg-point px-2 py-1 text-[11px] font-bold text-on-point">
+      <div className="flex items-center justify-between gap-1 border-b border-white/10 bg-white/5 px-2 py-1 text-[11px] font-bold text-ink">
         <span>평면도 · 위에서 본 무대</span>
         <span className="flex gap-0.5">
-          <button type="button" className="hidden rounded p-0.5 hover:bg-black/15 md:block" aria-label={mode === "split" ? "작게 보기" : "화면 반으로 나눠 보기"}
+          <button type="button" className="hidden rounded p-0.5 hover:bg-white/10 md:block" aria-label={mode === "split" ? "작게 보기" : "화면 반으로 나눠 보기"}
             title={mode === "split" ? "작게 보기" : "화면 반으로 나눠 보기"} onClick={() => onMode(mode === "split" ? "mini" : "split")}>
             {mode === "split" ? <Minimize2 className="size-3.5" aria-hidden /> : <Maximize2 className="size-3.5" aria-hidden />}
           </button>
-          <button type="button" className="rounded p-0.5 hover:bg-black/15" aria-label="평면도 닫기" title="평면도 닫기" onClick={() => onMode("off")}>
+          <button type="button" className="rounded p-0.5 hover:bg-white/10" aria-label="평면도 닫기" title="평면도 닫기" onClick={() => onMode("off")}>
             <X className="size-3.5" aria-hidden />
           </button>
         </span>
@@ -346,11 +346,6 @@ export default function PlotMap({ store, sceneRef, mode, onMode, selectedId, sel
           );
         })}
       </svg>
-      <p className="px-2 py-1 text-[10px] text-white/60">
-        {readOnly
-          ? "객석 시점에서는 눌러서 고르기만 해요. 옮기려면 편집·플롯 시점으로 바꿔요."
-          : "조명기·인물·소품·라인을 끌어 옮겨요. 조명기를 고르면 십자 표시로 조준점을 끌 수 있어요."}
-      </p>
     </div>
   );
 }

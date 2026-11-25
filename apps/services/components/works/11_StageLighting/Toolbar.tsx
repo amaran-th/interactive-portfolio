@@ -11,7 +11,7 @@ import type { ViewMode } from "./useStageScene";
 const VIEWS: { value: ViewMode; label: string }[] = [
   { value: "edit", label: "편집" },
   { value: "audience", label: "객석" },
-  { value: "plot", label: "플롯" },
+  { value: "plot", label: "평면도" },
 ];
 const QUALITIES: { value: Quality; label: string }[] = [
   { value: "auto", label: "자동" },
@@ -47,11 +47,11 @@ type Props = {
 function Switch({ on, onChange, title, children }: { on: boolean; onChange: (on: boolean) => void; title: string; children: ReactNode }) {
   return (
     <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)} title={title}
-      className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-bold text-point hover:bg-shade">
+      className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-bold text-ink hover:bg-shade">
       {/* 라벨 다음에 스위치 */}
       {children}
-      <span aria-hidden className={`relative h-4 w-7 shrink-0 rounded-full border-2 border-point transition-colors ${on ? "bg-point" : "bg-surface"}`}>
-        <span className={`absolute top-1/2 size-2 -translate-y-1/2 rounded-full transition-[left] ${on ? "left-[14px] bg-surface" : "left-0.5 bg-point"}`} />
+      <span aria-hidden className={`relative h-4 w-7 shrink-0 rounded-full border border-white/15 transition-colors ${on ? "bg-point" : "bg-surface"}`}>
+        <span className={`absolute top-1/2 size-2 -translate-y-1/2 rounded-full transition-[left] ${on ? "left-[14px] bg-surface" : "left-0.5 bg-ink/60"}`} />
       </span>
     </button>
   );
@@ -63,7 +63,7 @@ export default function Toolbar(p: Props) {
   const qualityLabel = (q: Quality, label: string) => (q === "auto" && p.quality === "auto" && p.tier > 0 ? "자동(낮춤)" : label);
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b-2 border-point bg-surface px-3 py-2">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-white/15 bg-surface px-3 py-2">
       <div role="group" aria-label="시점" className="flex items-center gap-1.5">
         <span className={LABEL}>시점</span>
         <div className={SEG_GROUP}>
@@ -77,13 +77,13 @@ export default function Toolbar(p: Props) {
 
       {p.view === "audience" && (
         <p className="flex items-center gap-1 text-xs text-ink" aria-live="polite">
-          <Armchair aria-hidden className="size-4 text-point" />
+          <Armchair aria-hidden className="size-4 text-ink" />
           <span className={LABEL}>현재 좌석</span>
           <span className="font-bold">{p.seatLabel}</span>
         </p>
       )}
 
-      <div className="flex items-center gap-0.5 border-l border-point/20 pl-2">
+      <div className="flex items-center gap-0.5 border-l border-white/10 pl-2">
         <Switch on={p.workLight} onChange={p.onWorkLight} title="조명을 모두 꺼도 무대가 보이게 비추는 약한 불">
           {p.workLight ? <Lightbulb aria-hidden className="size-4" /> : <LightbulbOff aria-hidden className="size-4" />}
           작업등
@@ -99,16 +99,16 @@ export default function Toolbar(p: Props) {
       </div>
 
       <label className="flex items-center gap-1.5" title="유도등·통로등 같은 약한 불빛과, 무대에서 튕겨 나온 빛의 세기. 큐에는 들어가지 않아요">
-        <span className={LABEL}>잔광</span>
-        <input type="range" min={0} max={1} step={0.01} value={p.ambient} aria-label="잔광 세기"
+        <span className={LABEL}>Ambient</span>
+        <input type="range" min={0} max={1} step={0.01} value={p.ambient} aria-label="Ambient 세기"
           onPointerDown={p.onBegin} onKeyDown={p.onBegin} onChange={(e) => p.onAmbient(Number(e.target.value))}
           className="w-20 accent-point" />
         <span className="w-8 text-[11px] tabular-nums text-ink/70">{Math.round(p.ambient * 100)}%</span>
       </label>
 
       <label className="flex items-center gap-1.5">
-        <span className={LABEL}>헤이즈</span>
-        <input type="range" min={0} max={1} step={0.01} value={p.haze} aria-label="헤이즈 농도"
+        <span className={LABEL}>Haze</span>
+        <input type="range" min={0} max={1} step={0.01} value={p.haze} aria-label="Haze 농도"
           onPointerDown={p.onBegin} onKeyDown={p.onBegin} onChange={(e) => p.onHaze(Number(e.target.value))}
           className="w-20 accent-point" />
         <span className="w-8 text-[11px] tabular-nums text-ink/70">{Math.round(p.haze * 100)}%</span>

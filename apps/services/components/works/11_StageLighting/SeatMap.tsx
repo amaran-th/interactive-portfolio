@@ -23,7 +23,7 @@ export function SeatMapView({ store, seat, onSeat }: { store: Store; seat: SeatR
       viewBox={`${box.minX} ${box.minZ} ${box.maxX - box.minX} ${box.maxZ - box.minZ}`}
       role="img"
       aria-label="좌석 지도"
-      className="max-h-80 w-full rounded-md border-2 border-point bg-[#17171c] select-none"
+      className="max-h-80 w-full rounded-md border border-white/15 bg-[#17171c] select-none"
       onClick={(e) => {
         const el = (e.target as Element).closest<SVGElement>("[data-pick]");
         if (el) onSeat({ blockId: el.dataset.block!, row: Number(el.dataset.row), seat: Number(el.dataset.seat) });
@@ -86,9 +86,7 @@ export function VenueFields({ store, onBegin }: { store: Store; onBegin: () => v
       {kinds.length > 1 ? (
         <Segmented<VenueKind> label="극장 종류" value={t.kind} options={kinds.map((k) => ({ value: k, label: VENUE_LABELS[k] }))}
           onPick={(kind) => { onBegin(); set({ kind }); }} />
-      ) : (
-        <p className="text-[11px] text-ink/70">객석 종류: {VENUE_LABELS[t.kind]}</p>
-      )}
+      ) : ""}
       {slider("rows", t.kind === "grand" ? "1층 줄 수" : "줄 수", 4, 25, 1, (v) => `${v}줄`)}
       {slider("width", t.kind === "arena" ? "면마다 좌석(최대)" : "가운데 첫 줄 좌석", 6, 30, 1, (v) => `${v}석`)}
       {t.kind !== "arena" && slider("widen", "뒷줄로 늘어나는 좌석", 0, 1, 0.1, (v) => (v === 0 ? "없음" : `줄마다 ${v.toFixed(1)}석`))}
@@ -96,9 +94,9 @@ export function VenueFields({ store, onBegin }: { store: Store; onBegin: () => v
       {slider("aisle", "통로 폭", 1, 2, 0.1, (v) => `${v.toFixed(1)}m`)}
       {slider("gap", "무대와 첫 줄 사이", 1, 4, 0.1, (v) => `${v.toFixed(1)}m`)}
       {t.kind === "grand" && slider("balconyRows", "발코니 줄 수", 3, 10, 1, (v) => `${v}줄`)}
-      <button type="button" className={`${BUTTON} self-start`} title="이 무대 형태의 기본 객석으로 되돌려요"
+      <button type="button" className={`${BUTTON} self-start`} title="이 무대 형태의 기본 객석 설정으로 되돌려요"
         onClick={() => { onBegin(); store.set({ ...store.get(), venue: { template: defaultTemplate(stage.shape) } }); }}>
-        <RotateCcw aria-hidden className="size-4" /> 기본 객석으로
+        <RotateCcw aria-hidden className="size-4" /> 기본 설정으로
       </button>
     </>
   );
@@ -109,7 +107,7 @@ export function SeatPicker({ store, seat, onSeat }: { store: Store; seat: SeatRe
   const stage = useShow(store, (s) => s.stage);
   return (
     <>
-      <p className="text-xs font-bold text-point">현재 좌석: {seatLabel(stage, venue, seat)}</p>
+      <p className="text-xs font-bold text-ink">현재 좌석: {seatLabel(stage, venue, seat)}</p>
       <SeatMapView store={store} seat={seat} onSeat={onSeat} />
     </>
   );

@@ -653,7 +653,7 @@ export default function StageLighting() {
             </p>
           )}
           {notice && !fatal && (
-            <p role="alert" className="absolute top-3 left-1/2 z-30 max-w-[90%] -translate-x-1/2 rounded-md border-2 border-point bg-surface px-3 py-1.5 text-xs font-bold text-point shadow-[2px_2px_0_0_var(--color-point)]">
+            <p role="alert" className="absolute top-3 left-1/2 z-30 max-w-[90%] -translate-x-1/2 rounded-md border border-white/15 bg-surface px-3 py-1.5 text-xs font-bold text-ink">
               {notice}
             </p>
           )}
@@ -669,7 +669,7 @@ export default function StageLighting() {
               onPick={setPickedId} onPickLine={(h) => { setPickedId(null); setSelectedLine(h); setTab("fixtures"); }} readOnly={!editable} onBegin={beginEdit} />
           </div>
         ) : mapMode === "off" ? (
-          <button type="button" className="absolute left-3 z-20 rounded-md border-2 border-point bg-surface px-2 py-1 text-xs font-bold text-point shadow-[2px_2px_0_0_var(--color-point)] hover:bg-shade"
+          <button type="button" className="absolute left-3 z-20 rounded-md border border-white/15 bg-surface px-2 py-1 text-xs font-bold text-ink hover:bg-shade"
             style={{ bottom: inset.bottom + 12 }} onClick={() => setMapMode("mini")}>
             평면도 보기
           </button>
@@ -712,7 +712,7 @@ export default function StageLighting() {
               tab === "fixtures" ? (
                 <LinePanel store={store} onBegin={beginEdit} selected={selectedLine} />
               ) : (
-                <p className="p-3 text-xs text-ink/60">목록이나 3D 화면에서 인물·소품을 고르면 여기에 속성이 나와요.</p>
+                <p className="p-3 text-xs text-ink/60">인물 또는 소품을 선택하세요.</p>
               )
             )
           }

@@ -394,8 +394,8 @@ test("라인 더하기: 위 파이프·붐이 기본 라인 뒤에 붙고 이름
   s = addLine(s, "boomL");
   const [pipe, boom] = s.stage.lines;
   assert.deepEqual(hangsOf(s.stage).slice(-2), [pipe.id, boom.id]);
-  assert.equal(hangLabel(s.stage, pipe.id), "4번 일렉트릭");
-  assert.equal(hangLabel(s.stage, boom.id), "왼쪽 붐 2");
+  assert.equal(hangLabel(s.stage, pipe.id), "Electric 4");
+  assert.equal(hangLabel(s.stage, boom.id), "Boom L 2");
   assert.equal(isBoomHang(s.stage, boom.id), true);
   // 위 파이프는 무대 높이, 기존 일렉트릭(0.2·0.5·0.8)과 겹치지 않는 앞뒤 자리
   const p = hangPoint(s.stage, pipe.id, 0);
@@ -431,7 +431,7 @@ test("라인 이름: 비우면 종류 이름을 보여 준다", () => {
   let s = addLine(defaultShow(), "boomR");
   const id = s.stage.lines[0].id;
   s = renameLine(s, id, "");
-  assert.equal(hangLabel(s.stage, id), "오른쪽 붐");
+  assert.equal(hangLabel(s.stage, id), "Boom R");
   s = renameLine(s, id, "SR 붐");
   assert.equal(hangLabel(s.stage, id), "SR 붐");
 });

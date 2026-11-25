@@ -7,7 +7,7 @@ import { type SeatRef, type SeatStep, blockSeats, clampSeat, stepSeat, venueBloc
 import { LABEL } from "./ui";
 
 const STEP_BUTTON =
-  "flex size-7 items-center justify-center rounded-md border-2 border-point bg-surface text-point hover:bg-shade disabled:opacity-40";
+  "flex size-7 items-center justify-center rounded-md border border-white/15 bg-surface text-ink hover:bg-shade disabled:opacity-40";
 
 function Counter({ label, value, max, onChange }: { label: string; value: number; max: number; onChange: (v: number) => void }) {
   return (
@@ -22,7 +22,7 @@ function Counter({ label, value, max, onChange }: { label: string; value: number
             const v = Number(e.target.value);
             if (Number.isFinite(v) && v >= 1) onChange(v);
           }}
-          className="w-11 rounded-md border border-point/40 bg-black/25 px-1 py-1 text-center text-xs tabular-nums text-ink" />
+          className="w-11 rounded-md border border-white/15 bg-black/25 px-1 py-1 text-center text-xs tabular-nums text-ink" />
         <button type="button" className={STEP_BUTTON} aria-label={`${label} 하나 늘리기`} disabled={value >= max} onClick={() => onChange(value + 1)}>
           <Plus aria-hidden className="size-3.5" />
         </button>
@@ -62,7 +62,7 @@ export default function SeatSelect({ stage, venue, seat, onSeat }: { stage: Stag
         <label className="flex items-center gap-2">
           <span className={`${LABEL} w-7 shrink-0`}>구역</span>
           <select value={block.id} onChange={(e) => pick({ ...seat, blockId: e.target.value })}
-            className="min-w-0 flex-1 rounded-md border border-point/40 bg-black/25 px-2 py-1 text-xs text-ink">
+            className="min-w-0 flex-1 rounded-md border border-white/15 bg-black/25 px-2 py-1 text-xs text-ink">
             {blocks.map((b) => (
               <option key={b.id} value={b.id}>{b.name}</option>
             ))}
