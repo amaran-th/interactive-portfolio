@@ -18,7 +18,7 @@
 - 접힌 상태에서는 현재 큐 한 줄(누르면 펴짐)과 BACK·GO만 남는다.
 
 ## 도트 파비콘
-- `app/stage-lighting/icon.svg`: 파이프에 매달린 조명기가 앰버 빛을 바닥에 비추는 16×16 그림.
+- `app/stage-lighting/icon.svg`: 조명기가 앰버 빛을 바닥에 비추는 16×16 그림. 배경은 투명이고, 탭 색과 관계없이 보이도록 빛줄기 투명도를 높게 잡았다.
 - `app/color-picker/icon.svg`: 빨간 고무 꼭지 스포이트와 파란 색 방울.
 - 같은 색이 이어지는 칸을 `<rect>` 하나로 합치고 `shape-rendering="crispEdges"`로 그린다. 보이저 라우트의 `icon.svg`가 Turbopack 패닉을 일으킨 적이 있어 배포 전 `npm run build`로 확인한다.
 
