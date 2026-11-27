@@ -2,7 +2,7 @@
 
 import { Search } from "lucide-react";
 import { createContext, useContext, useState, type ReactNode } from "react";
-import { normalizeQuery, searchTools } from "@/lib/tools";
+import { normalizeQuery, searchTools, TOOLS, type Tool } from "@/lib/tools";
 import { STICKER } from "./ToolCard";
 import ToolGrid from "./ToolGrid";
 
@@ -66,10 +66,10 @@ export function ToolSearchInput() {
 }
 
 /** 검색어가 없으면 서버가 그린 children(카테고리 목록)을, 있으면 결과 그리드를 보여 준다. */
-export function ToolSearchResults({ children }: { children: ReactNode }) {
+export function ToolSearchResults({ children, tools = TOOLS }: { children: ReactNode; tools?: Tool[] }) {
   const { searchQuery } = useSearch();
   const searching = normalizeQuery(searchQuery) !== "";
-  const results = searching ? searchTools(searchQuery) : [];
+  const results = searching ? searchTools(searchQuery, tools) : [];
 
   return (
     <>

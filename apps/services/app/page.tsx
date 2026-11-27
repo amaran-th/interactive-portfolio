@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { activeCategories, TOOLS, toolsIn } from "@/lib/tools";
+import { CATEGORIES, TOOLS } from "@/lib/tools";
 import SiteFooter from "./_components/SiteFooter";
 import ToolGrid from "./_components/ToolGrid";
 import {
@@ -17,6 +17,10 @@ export const metadata: Metadata = {
 // 카테고리마다 한 줄: 왼쪽 제목 칸 + 오른쪽 도구 목록,
 // 줄 사이는 옅은 구분선. 모바일에서는 제목이 위로 올라간다.
 const ROW = "py-6 sm:grid sm:grid-cols-[8rem_1fr] sm:gap-6";
+const HOME_TOOLS = TOOLS.filter((tool) => tool.slug !== "stellar-forge");
+const homeToolsIn = (categoryId: string) =>
+  HOME_TOOLS.filter((tool) => tool.category === categoryId);
+const HOME_CATEGORIES = CATEGORIES.filter((category) => homeToolsIn(category.id).length > 0);
 
 export default function Home() {
   return (
@@ -29,7 +33,7 @@ export default function Home() {
               Amaranth Site
             </h1>
             <p className="mt-1.5 text-sm break-keep text-ink/80">
-              브라우저에서 바로 쓰는 작은 도구 {TOOLS.length}개
+              브라우저에서 바로 쓰는 작은 도구 {HOME_TOOLS.length}개
             </p>
             <div className="mt-6">
               <ToolSearchInput />
@@ -40,9 +44,9 @@ export default function Home() {
         {/* 물방울 점무늬는 기본 썸네일(ServiceThumbFallback)의 배경과 같은 무늬다 */}
         <div className="flex-1 bg-[radial-gradient(var(--color-shade)_2.5px,transparent_2.5px)] bg-size-[22px_22px]">
           <main className="mx-auto w-full max-w-6xl px-5 pb-12">
-            <ToolSearchResults>
+            <ToolSearchResults tools={HOME_TOOLS}>
               <div className="divide-y-2 divide-dashed divide-point/20">
-                {activeCategories().map((c) => (
+                {HOME_CATEGORIES.map((c) => (
                   <section
                     key={c.id}
                     aria-labelledby={`category-${c.id}`}
@@ -56,12 +60,12 @@ export default function Home() {
                       >
                         {c.label}
                         <span className="rounded-full bg-white px-1.5 text-[11px] tabular-nums">
-                          {toolsIn(c.id).length}
+                          {homeToolsIn(c.id).length}
                         </span>
                       </Link>
                     </h2>
                     <ToolGrid
-                      tools={toolsIn(c.id)}
+                      tools={homeToolsIn(c.id)}
                       cols="sm:grid-cols-3 lg:grid-cols-5"
                     />
                   </section>

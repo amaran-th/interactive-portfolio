@@ -121,6 +121,50 @@ export const works: WorkItem[] = [
   },
   {
     id: 7,
+    title: "문자 인코딩 변환기",
+    description: `글자를 넣으면 유니코드 코드포인트와 UTF-8, UTF-16, EUC-KR, ASCII 바이트를 확인하고, 코드나 바이트를 넣으면 글자로 되돌리는 도구입니다.
+
+문자마다 인코딩 결과를 표로 보여 주며, 16진수·10진수·2진수 표기를 고르고 결과를 복사할 수 있습니다. 계산은 브라우저 안에서만 처리합니다.`,
+    platforms: [{ type: "pc" }, { type: "mobile" }],
+    embedPath: "/text-encoding",
+    thumbnail: "/playground/text-encoding.png",
+    path: "/text-encoding",
+  },
+  {
+    id: 8,
+    title: "색상 추출기",
+    description: `이미지나 화면에서 원하는 지점의 색을 뽑아 HEX, RGB, HSL 코드로 확인하는 도구입니다.
+
+이미지에서 많이 쓰인 색으로 팔레트를 만들고, 직접 색을 모아 나만의 팔레트를 구성할 수 있습니다. 결과는 PNG로 저장할 수 있습니다.`,
+    platforms: [{ type: "pc" }, { type: "mobile" }],
+    embedPath: "/color-picker",
+    thumbnail: "/playground/color-picker.png",
+    path: "/color-picker",
+  },
+  {
+    id: 9,
+    title: "모노리즘",
+    description: `칩을 뒤집고 빼거나 놓으며 앞뒷면을 조합해 만드는 모자이크 아트입니다.
+
+칩 모양과 색을 고르고, 확대·이동하며 판을 꾸밀 수 있습니다. 작업은 저장하고 나중에 다시 이어서 편집할 수 있습니다.`,
+    platforms: [{ type: "pc" }, { type: "mobile" }],
+    embedPath: "/monorism",
+    thumbnail: "/playground/monorism-chips.png",
+    path: "/monorism",
+  },
+  {
+    id: 10,
+    title: "조명 연습실",
+    description: `무대와 객석을 꾸미고 조명기를 배치해 조명 큐를 만들고 재생하는 무대 조명 시뮬레이터입니다.
+
+무대 형태와 객석, 인물·소품·조명기를 설정하고 객석 시점과 평면도에서 빛을 확인할 수 있습니다.`,
+    platforms: [{ type: "pc" }, { type: "mobile" }],
+    embedPath: "/stage-lighting",
+    thumbnail: "/playground/stage-lighting.png",
+    path: "/stage-lighting",
+  },
+  {
+    id: 11,
     title: "글자수 세기",
     description: `글을 쓰거나 붙여 넣는 즉시 공백 포함·공백 제외 글자 수, 바이트, 단어, 줄·문단 수를 세는 도구입니다.
 
@@ -142,7 +186,7 @@ export const works: WorkItem[] = [
     path: "/char-counter",
   },
   {
-    id: 8,
+    id: 12,
     title: "49년만에 도달한 1일",
     description: `보이저 1호가 지구에서 1광일(25,902,068,356km)에 닿은 2026년 11월 18일을 기념해 만든 8비트 연대기입니다.
 
