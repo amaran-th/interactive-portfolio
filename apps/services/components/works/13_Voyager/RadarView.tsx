@@ -37,10 +37,12 @@ export default function RadarPanel({
   return (
     <section aria-label={t.radarLabel} className={`relative z-20 mx-3 mb-2 px-3 py-2 sm:mx-6 sm:px-4 ${v.radar}`}>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 tabular-nums">
-        <span className="opacity-70">DIST/EARTH</span>
-        <span className={`text-[22px] leading-[1.5] font-bold ${v.radarGlow}`}>{fmtKm(auToKm(au), lang)}</span>
+        <span className="inline-flex shrink-0 items-baseline gap-1 whitespace-nowrap">
+          <span className="opacity-70">DIST/EARTH</span>
+          <span className={`text-[22px] leading-[1.5] font-bold ${v.radarGlow}`}>{fmtKm(auToKm(au), lang)}</span>
+        </span>
         <span className="hidden opacity-70 sm:inline">{au.toFixed(au < 1 ? 3 : 1)} AU</span>
-        <span>
+        <span className="shrink-0 whitespace-nowrap">
           <span className="opacity-70">LIGHT </span>
           {fmtLight(lightSec(au), lang)}
         </span>

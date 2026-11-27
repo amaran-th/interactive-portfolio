@@ -330,6 +330,88 @@ export default function ColorPicker() {
       ? hover.clientY - LOUPE_OFFSET - LOUPE_PX - 24
       : (hover?.clientY ?? 0) + LOUPE_OFFSET;
 
+  const selectedColorDetails = (
+    <>
+      {/* 견본 동그라미와 코드 세 줄. 코드 줄 높이를 고정해 색 선택 전후로 아래가 밀리지 않는다 */}
+      <div className="flex h-18 items-center gap-3">
+        <div className="relative size-14 shrink-0">
+          <button
+            type="button"
+            aria-label="색상 직접 선택"
+            title="색상 직접 선택"
+            onClick={(e) => e.currentTarget.parentElement?.querySelector<HTMLInputElement>('input[type="color"]')?.click()}
+            className={`absolute inset-0 size-full cursor-pointer ${s.blob} ${current ? "" : "border-dashed! bg-white/50"}`}
+            style={current ? { backgroundColor: formatHex(current) } : undefined}
+          />
+          <input
+            type="color"
+            aria-label="색상 직접 선택"
+            value={currentHex ?? "#000000"}
+            onChange={(e) => {
+              const rgb = hexToRgb(e.currentTarget.value);
+              if (rgb) choose(rgb);
+            }}
+            className="pointer-events-none absolute inset-0 size-full opacity-0"
+            tabIndex={-1}
+          />
+        </div>
+        {current ? (
+          <ul className="min-w-0 flex-1">
+            {FORMATS.map(({ label, format }) => (
+              <li key={label}>
+                <button
+                  type="button"
+                  aria-label={`${label} 복사`}
+                  onClick={() => copy(format(current))}
+                  className={`group flex w-full items-center gap-2 px-1.5 py-0.5 text-left ${s.row}`}
+                >
+                  <span className={`w-10 shrink-0 text-xl leading-5 text-ink/55 ${s.pen}`}>{label}</span>
+                  <span className="truncate font-mono text-sm text-ink">{format(current)}</span>
+                  <Copy aria-hidden strokeWidth={1.75} className="ml-auto size-3.5 shrink-0 text-ink/40 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className={`text-xl leading-6 text-ink/50 ${s.pen}`}>이미지나 팔레트를 누르면 여기에 색이 나와요</p>
+        )}
+      </div>
+      <button
+        type="button"
+        disabled={!canAdd}
+        onClick={() => currentHex && setCustom((c) => [...c, currentHex])}
+        className={`self-start px-3 text-xl leading-8 ${s.btn} ${s.pen}`}
+      >
+        <Plus aria-hidden className="size-4" strokeWidth={1.75} />
+        {currentHex && custom.includes(currentHex)
+          ? "내 팔레트에 담김"
+          : custom.length >= MAX_CUSTOM
+            ? "내 팔레트가 가득 찼어요"
+            : "내 팔레트에 담기"}
+      </button>
+      {notice && <p role="status" className={`text-xl leading-6 text-main ${s.pen}`}>{notice}</p>}
+    </>
+  );
+  const recentColors = recent.length > 0 && (
+    <div>
+      <h2 className={`text-2xl leading-7 ${s.pen}`}>최근 고른 색</h2>
+      <ul className="mt-2 flex flex-wrap gap-2">
+        {recent.map((c) => (
+          <li key={formatHex(c)}>
+            <button
+              type="button"
+              aria-label={`${formatHex(c)} 다시 고르기`}
+              title={formatHex(c)}
+              onClick={() => choose(c)}
+              className={`size-7 transition-transform hover:scale-110 ${s.chip}`}
+              style={{ backgroundColor: formatHex(c) }}
+            />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
   return (
     <div className={`min-h-full lg:h-full ${penFont.variable} ${s.root}`}>
     <div className="mx-auto grid min-h-full max-w-6xl gap-x-8 gap-y-4 p-4 sm:p-6 lg:h-full lg:grid-cols-[1fr_22rem] lg:grid-rows-[auto_1fr]">
@@ -341,7 +423,7 @@ export default function ColorPicker() {
           <>
             {/* 이미지 아래에 팔레트 막대를 이어 붙인 한 장의 카드 — 색 조합 카드처럼 보이게.
                 남은 자리(area) 가운데에 카드를 두고, 카드는 이미지 폭에 맞춰 줄어든다 */}
-            <div ref={areaRef} className="flex h-[60vh] min-h-80 items-center justify-center lg:h-auto lg:min-h-0 lg:flex-1">
+            <div ref={areaRef} className="flex h-[42vh] min-h-56 items-center justify-center lg:h-auto lg:min-h-0 lg:flex-1">
               <div
                 className={`flex ${s.sheet} ${shown?.vertical ? "flex-row" : "flex-col"}`}
                 style={{ padding: CARD_GAP, gap: CARD_GAP }}
@@ -413,8 +495,8 @@ export default function ColorPicker() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <label className={`flex items-center gap-2 text-2xl ${s.pen}`}>
-                컬러 팔레트 <span className="w-7 tabular-nums">{count}색</span>
+              <label className={`flex shrink-0 items-center gap-2 whitespace-nowrap text-2xl ${s.pen}`}>
+                컬러 팔레트 <span className="shrink-0 whitespace-nowrap tabular-nums">{count}색</span>
                 <input
                   type="range"
                   aria-label="컬러 팔레트 색 개수"
@@ -429,21 +511,22 @@ export default function ColorPicker() {
                 <div className="ml-auto flex gap-2">
                   <button type="button" onClick={downloadCard} className={`${SMALL_BUTTON} flex items-center gap-1`}>
                     <Download aria-hidden className="size-4" strokeWidth={1.75} />
-                    PNG 저장
+                    <span className="sm:hidden">저장</span>
+                    <span className="hidden sm:inline">PNG 저장</span>
                   </button>
                 </div>
               )}
             </div>
-            <ImageDropZone input={input} compact classNames={DROP_ZONE} />
+            <ImageDropZone input={input} compact mobileSimple classNames={DROP_ZONE} />
           </>
         ) : (
-          <ImageDropZone input={input} classNames={DROP_ZONE} />
+          <ImageDropZone input={input} mobileSimple classNames={DROP_ZONE} />
         )}
       </section>
 
       <aside className="flex flex-col gap-5 lg:min-h-0 lg:overflow-y-auto lg:pr-1 lg:pb-1">
-        {/* 고른 색 — 이미지 클릭, 화면 색상 추출, 팔레트 막대가 모두 여기로 온다 */}
-        <section aria-label="고른 색" className="flex flex-col gap-3">
+        {/* 화면 스포이트와 선택 결과는 데스크톱에서만 별도 표시한다 */}
+        <section aria-label="고른 색" className="hidden flex-col gap-3 sm:flex">
           {screenPickSupported ? (
             <button
               type="button"
@@ -459,76 +542,8 @@ export default function ColorPicker() {
             </p>
           )}
 
-          {/* 견본 동그라미 하나와 코드 세 줄. 줄을 누르면 그 형식으로 복사한다.
-              코드 세 줄(24px×3)만큼 높이를 고정해, 색이 생기기 전후로 아래가 밀리지 않는다 */}
-          <div className="flex h-18 items-center gap-3">
-            <div
-              aria-hidden
-              className={`size-14 shrink-0 ${s.blob} ${current ? "" : "border-dashed! bg-white/50"}`}
-              style={current ? { backgroundColor: formatHex(current) } : undefined}
-            />
-            {current ? (
-              <ul className="min-w-0 flex-1">
-                {FORMATS.map(({ label, format }) => (
-                  <li key={label}>
-                    <button
-                      type="button"
-                      aria-label={`${label} 복사`}
-                      onClick={() => copy(format(current))}
-                      className={`group flex w-full items-center gap-2 px-1.5 py-0.5 text-left ${s.row}`}
-                    >
-                      <span className={`w-10 shrink-0 text-xl leading-5 text-ink/55 ${s.pen}`}>{label}</span>
-                      <span className="truncate font-mono text-sm text-ink">{format(current)}</span>
-                      <Copy aria-hidden strokeWidth={1.75} className="ml-auto size-3.5 shrink-0 text-ink/40 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className={`text-xl leading-6 text-ink/50 ${s.pen}`}>이미지나 팔레트를 누르면 여기에 색이 나와요</p>
-            )}
-          </div>
-
-          {/* 고른 색을 아래 '내 팔레트'에 담는다. 이미 담았거나 가득 차면 흐려진다 */}
-          <button
-            type="button"
-            disabled={!canAdd}
-            onClick={() => currentHex && setCustom((c) => [...c, currentHex])}
-            className={`self-start px-3 text-xl leading-8 ${s.btn} ${s.pen}`}
-          >
-            <Plus aria-hidden className="size-4" strokeWidth={1.75} />
-            {currentHex && custom.includes(currentHex)
-              ? "내 팔레트에 담김"
-              : custom.length >= MAX_CUSTOM
-                ? "내 팔레트가 가득 찼어요"
-                : "내 팔레트에 담기"}
-          </button>
-
-          {notice && (
-            <p role="status" className={`text-xl leading-6 text-main ${s.pen}`}>
-              {notice}
-            </p>
-          )}
-
-          {recent.length > 0 && (
-            <div>
-              <h2 className={`text-2xl leading-7 ${s.pen}`}>최근 고른 색</h2>
-              <ul className="mt-2 flex flex-wrap gap-2">
-                {recent.map((c) => (
-                  <li key={formatHex(c)}>
-                    <button
-                      type="button"
-                      aria-label={`${formatHex(c)} 다시 고르기`}
-                      title={formatHex(c)}
-                      onClick={() => choose(c)}
-                      className={`size-7 transition-transform hover:scale-110 ${s.chip}`}
-                      style={{ backgroundColor: formatHex(c) }}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {selectedColorDetails}
+          {recentColors}
         </section>
 
         {/* 내 팔레트 — 사진 없이 막대만 있는 카드. 고른 색을 담아 직접 만든다 */}
@@ -538,24 +553,10 @@ export default function ColorPicker() {
             <h2 className={`text-3xl leading-none ${s.pen}`}>
               <span className={s.marker}>내 팔레트</span>
             </h2>
-            <span className={`text-xl text-ink/50 tabular-nums ${s.pen}`}>
-              {custom.length}/{MAX_CUSTOM}
-            </span>
-            {custom.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setCustom([])}
-                className={`ml-auto text-xl text-ink/50 underline-offset-2 hover:text-main hover:underline ${s.pen}`}
-              >
-                초기화
-              </button>
-            )}
-            {custom.length > 0 && (
-              <button type="button" onClick={downloadCustom} className={`${SMALL_BUTTON} flex items-center gap-1`}>
-                <Download aria-hidden className="size-3.5" />
-                PNG 저장
-              </button>
-            )}
+          </div>
+          <div className="flex flex-col gap-3 sm:hidden">
+            {selectedColorDetails}
+            {recentColors}
           </div>
           <div className={s.sheet} style={{ padding: CARD_GAP }}>
             <ul ref={customRef} aria-label="내 팔레트 색" className="relative flex" style={{ height: CUSTOM_BAR, gap: CARD_GAP }}>
@@ -662,6 +663,27 @@ export default function ColorPicker() {
                 })
               )}
             </ul>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className={`shrink-0 text-xl text-ink/50 tabular-nums ${s.pen}`}>
+              {custom.length}/{MAX_CUSTOM}
+            </span>
+            {custom.length > 0 && (
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCustom([])}
+                  className={`text-xl text-ink/50 underline-offset-2 hover:text-main hover:underline ${s.pen}`}
+                >
+                  초기화
+                </button>
+                <button type="button" onClick={downloadCustom} className={`${SMALL_BUTTON} flex items-center gap-1`}>
+                  <Download aria-hidden className="size-3.5" />
+                  <span className="sm:hidden">저장</span>
+                  <span className="hidden sm:inline">PNG 저장</span>
+                </button>
+              </div>
+            )}
           </div>
         </section>
       </aside>

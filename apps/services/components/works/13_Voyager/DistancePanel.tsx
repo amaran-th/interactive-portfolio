@@ -71,10 +71,12 @@ export default function DistancePanel({ au, sunAu, ms }: { au: number; sunAu: nu
   return (
     <section aria-label={t.distLabel} className={`relative z-20 mx-3 mb-2 px-3 py-2 sm:mx-6 sm:px-4 ${v.frame}`}>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 tabular-nums">
-        <span className="font-bold text-[var(--yellow)]">{t.fromEarth}</span>
-        <span className="text-[24px] leading-[1.5] font-bold text-[var(--cyan)]">{fmtKm(auToKm(au), lang)}</span>
+        <span className="inline-flex shrink-0 items-baseline gap-1 whitespace-nowrap">
+          <span className="font-bold text-[var(--yellow)]">{t.fromEarth}</span>
+          <span className="text-[24px] leading-[1.5] font-bold text-[var(--cyan)]">{fmtKm(auToKm(au), lang)}</span>
+        </span>
         <span className="hidden text-[var(--mute)] sm:inline">{au.toFixed(au < 1 ? 3 : 1)} AU</span>
-        <span>
+        <span className="shrink-0 whitespace-nowrap">
           <span className="text-[var(--mute)]">{t.byLight}</span>
           <b>{fmtLight(lightSec(au), lang)}</b>
         </span>
