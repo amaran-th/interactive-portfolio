@@ -124,6 +124,9 @@ export default function VoyagerTimeline({ lang = "ko" }: { lang?: Lang }) {
 
   // 트랙 가운데(탐사선 위치)에 해당하는 날짜·사건을 구한다
   const sync = useCallback(() => {
+    // 엔딩 중에는 트랙이 애니메이션으로 움직인다. 이때 scroll snap의 보정값을
+    // 다시 활성 기록으로 반영하면 마지막 거리·날짜 수치가 거꾸로 움직인다.
+    if (ending) return;
     const el = scrollerRef.current;
     if (!el) return;
     const c = el.scrollLeft; // 트랙 좌표 0이 화면 가운데에서 시작하므로 scrollLeft가 곧 가운데 좌표다
@@ -154,7 +157,7 @@ export default function VoyagerTimeline({ lang = "ko" }: { lang?: Lang }) {
       s.style.backgroundPositionX = bx;
       s.style.setProperty("--bx", bx);
     });
-  }, [layout]);
+  }, [layout, ending]);
 
   useEffect(() => {
     const el = scrollerRef.current;
@@ -284,34 +287,40 @@ export default function VoyagerTimeline({ lang = "ko" }: { lang?: Lang }) {
         />
       ))}
 
-      {/* 정보 패널 — 모바일은 두 줄(제목·날짜 / 이동·골든 레코드), 넓은 화면은 한 줄 */}
+      {/* 정보 패널 — 모바일에서도 제목·날짜·이동일을 한 줄로 둔다 */}
       <header
         inert={panelsOff}
         className={`relative z-20 px-3 pt-3 transition-opacity duration-[2000ms] sm:px-6 sm:pt-4 ${panelsOff ? "opacity-0" : ""}`}
       >
-        <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2 sm:gap-x-6 sm:px-4 ${v.frame}`}>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Sprite name="voyager" scale={2} />
-            <div className="leading-tight">
-              <p className="font-bold text-[var(--yellow)]">VOYAGER 1</p>
-              <p className="hidden text-[var(--mute)] sm:block">{t.chronicle}</p>
-            </div>
+        <div className={`flex items-center gap-2 px-2 py-1.5 sm:gap-x-6 sm:px-4 sm:py-2 ${v.frame}`}>
+          <div className="flex shrink-0 items-center gap-1 sm:gap-3">
+            <span className="hidden sm:inline-flex"><Sprite name="voyager" scale={2} /></span>
+            <p className="font-bold text-[var(--yellow)]">VOYAGER 1</p>
+            <p className="hidden text-[var(--mute)] sm:block">{t.chronicle}</p>
           </div>
-          <dl className="ml-auto flex gap-3 tabular-nums sm:ml-0 sm:gap-5">
+          <dl className="ml-auto flex min-w-0 gap-2 tabular-nums sm:ml-0 sm:gap-5">
             <div>
               <dt className="sr-only text-[var(--mute)] sm:not-sr-only">DATE</dt>
-              <dd className="font-bold">{fmtDate(nowMs)}</dd>
+              <dd className="text-[10px] font-bold sm:text-xs">{fmtDate(nowMs)}</dd>
             </div>
             <div>
               <dt className="sr-only text-[var(--mute)] sm:not-sr-only">MISSION</dt>
-              <dd className="font-bold">{t.days(days)}</dd>
+              <dd className="text-[10px] font-bold sm:text-xs">{t.days(days)}</dd>
             </div>
           </dl>
-          <div className="flex basis-full items-center justify-between gap-2 sm:ml-auto sm:basis-auto sm:gap-3">
+          <div className="ml-auto flex shrink-0 items-center gap-1 sm:hidden">
+            <button type="button" className={`${v.btn} !h-7 !min-w-7 !px-1`} onClick={() => setRecordOpen(true)} aria-label={t.goldenRecord} title={t.goldenRecord}>
+              <Sprite name="record" scale={1.5} />
+            </button>
+            <button type="button" className={`${v.btn} !h-7 !min-w-7 !px-1`} aria-pressed={bgm.playing} onClick={bgm.toggle} aria-label={bgm.playing ? t.bgmOff : t.bgmOn} title={bgm.playing ? t.bgmOff : t.bgmOn}>
+              <Sprite name={bgm.playing ? "speaker" : "mute"} scale={1.5} />
+            </button>
+          </div>
+          <div className="hidden items-center gap-2 sm:ml-auto sm:flex sm:gap-3">
             <div className="flex items-center gap-2">
               <button type="button" className={`${v.btn} gap-1.5`} onClick={() => setRecordOpen(true)}>
                 <Sprite name="record" scale={2} />
-                {t.goldenRecord}
+                <span>{t.goldenRecord}</span>
               </button>
               <button
                 type="button"
@@ -334,9 +343,7 @@ export default function VoyagerTimeline({ lang = "ko" }: { lang?: Lang }) {
               >
                 ◀
               </button>
-              <span className="w-10 text-center tabular-nums sm:w-12">
-                {String(active + 1).padStart(2, "0")}/{EVENTS.length}
-              </span>
+              <span className="w-10 text-center tabular-nums sm:w-12">{active === EVENTS.length - 1 ? "END" : active + 1}</span>
               <button
                 type="button"
                 className={v.btn}
@@ -372,7 +379,7 @@ export default function VoyagerTimeline({ lang = "ko" }: { lang?: Lang }) {
           tabIndex={0}
           aria-label={t.trackLabel}
           inert={ending}
-          className={`absolute inset-0 overflow-x-auto overflow-y-hidden focus:outline-none max-sm:snap-x max-sm:snap-mandatory ${v.scroller} ${
+          className={`absolute inset-0 overflow-y-hidden focus:outline-none ${ending ? "overflow-hidden" : "overflow-x-auto max-sm:snap-x max-sm:snap-mandatory"} ${v.scroller} ${
             ending ? "pointer-events-none" : ""
           }`}
         >
@@ -409,6 +416,14 @@ export default function VoyagerTimeline({ lang = "ko" }: { lang?: Lang }) {
           </ol>
         </div>
 
+        {/* 모바일 이동 버튼은 보이저 아래 좌우 끝에 고정한다 */}
+        {!ending && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-2 z-20 flex items-center justify-between px-4 sm:hidden">
+            <button type="button" className={`${v.btn} ${v.mobileNav} pointer-events-auto`} onClick={() => goTo(active - 1)} disabled={active === 0} aria-label={t.prev}>◀</button>
+            <button type="button" className={`${v.btn} ${v.mobileNav} pointer-events-auto`} onClick={() => (active === EVENTS.length - 1 ? setEnding(true) : goTo(active + 1))} aria-label={active === EVENTS.length - 1 ? t.beyond : t.next}>▶</button>
+          </div>
+        )}
+
         {/* 탐사선은 화면 가운데에 머물고 기록이 밑으로 지나간다 */}
         <div
           aria-hidden
@@ -433,7 +448,6 @@ export default function VoyagerTimeline({ lang = "ko" }: { lang?: Lang }) {
 
       <p className={`relative z-20 px-4 pb-2 text-center text-[var(--mute)] transition-opacity duration-[2000ms] sm:px-6 ${panelsOff ? "opacity-0" : ""}`}>
         <span className="hidden sm:inline">{t.footerMove}</span>
-        {t.footerRest}
       </p>
 
       {intro && (
@@ -566,15 +580,18 @@ const EventSlot = memo(function EventSlot({
           maxHeight: `calc(100% - ${LINE_BOTTOM + 84}px)`,
         }}
       >
-        <div className="flex items-center gap-2">
+        <div className="hidden items-center gap-2 sm:flex">
           <span className={v.badge} style={{ background: e.kind === "photo" ? "var(--cyan)" : "var(--pink)" }}>
             {e.kind === "photo" ? "PHOTO" : "LOG"}
           </span>
           <span className="text-[var(--mute)] tabular-nums">{e.date.replaceAll("-", ".")}</span>
         </div>
-        <h2 className={`font-bold ${isFinal ? "text-[24px] leading-[1.5] text-[var(--yellow)]" : "text-[12px]"}`}>
-          <Typewriter key={`t${active}`} text={tx.title} run={active} />
-        </h2>
+        <div className="flex items-start justify-between gap-2 sm:block">
+          <h2 className={`min-w-0 flex-1 font-bold ${isFinal ? "text-[24px] leading-[1.5] text-[var(--yellow)]" : "text-[12px]"}`}>
+            <Typewriter key={`t${active}`} text={tx.title} run={active} />
+          </h2>
+          <span className="shrink-0 text-[10px] leading-[1.8] text-[var(--mute)] tabular-nums sm:hidden">{e.date.replaceAll("-", ".")}</span>
+        </div>
         {tx.distance && (
           <p className="-mt-1 text-[var(--cyan)]">
             <Typewriter key={`d${active}`} text={tx.distance} run={active} delay={tx.title.length} />
@@ -610,7 +627,7 @@ const EventSlot = memo(function EventSlot({
                 height={photo.height}
                 unoptimized
                 draggable={false}
-                style={{ display: "block", width: "auto", height: "auto", maxWidth: "100%", maxHeight: "min(32vh, 300px)" }}
+                className={`block h-auto w-auto max-w-full ${v.eventPhoto}`}
               />
             </button>
             <p className="self-center text-[var(--mute)]">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EVENTS, LAUNCH, LIGHT_DAY_AT } from "./data";
 import RadarPanel from "./RadarView";
 import { auToKm, fmtKm, fmtLight, lightSec } from "./format";
@@ -36,11 +36,20 @@ const KUIPER: [number, number] = [30, 50];
 export default function DistancePanel({ au, sunAu, ms }: { au: number; sunAu: number; ms: number }) {
   // 비교용 두 보기: 막대(실제 비율 1차원)와 레이더(실제 3D 경로)
   const [mode, setMode] = useState<"bar" | "radar">("bar");
+  useEffect(() => {
+    const mobile = window.matchMedia("(max-width: 639px)");
+    const showBarOnMobile = () => {
+      if (mobile.matches) setMode("bar");
+    };
+    showBarOnMobile();
+    mobile.addEventListener("change", showBarOnMobile);
+    return () => mobile.removeEventListener("change", showBarOnMobile);
+  }, []);
   const lang = useLang();
   const t = T[lang];
   const nm = (ko: string) => bodyName(ko, lang);
   const modeSwitch = (radar: boolean) => (
-    <span className="flex gap-1" role="group" aria-label={t.viewMode}>
+    <span className="hidden gap-1 sm:flex" role="group" aria-label={t.viewMode}>
       {(
         [
           ["bar", t.bar],
@@ -64,12 +73,12 @@ export default function DistancePanel({ au, sunAu, ms }: { au: number; sunAu: nu
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 tabular-nums">
         <span className="font-bold text-[var(--yellow)]">{t.fromEarth}</span>
         <span className="text-[24px] leading-[1.5] font-bold text-[var(--cyan)]">{fmtKm(auToKm(au), lang)}</span>
-        <span className="text-[var(--mute)]">{au.toFixed(au < 1 ? 3 : 1)} AU</span>
+        <span className="hidden text-[var(--mute)] sm:inline">{au.toFixed(au < 1 ? 3 : 1)} AU</span>
         <span>
           <span className="text-[var(--mute)]">{t.byLight}</span>
           <b>{fmtLight(lightSec(au), lang)}</b>
         </span>
-        <span className="text-[var(--mute)]">{t.fromSun(sunAu.toFixed(1))}</span>
+        <span className="hidden text-[var(--mute)] sm:inline">{t.fromSun(sunAu.toFixed(1))}</span>
         <span className="ml-auto">{modeSwitch(false)}</span>
       </div>
 
@@ -97,10 +106,10 @@ export default function DistancePanel({ au, sunAu, ms }: { au: number; sunAu: nu
             )}
             {/* 지구에서 지금까지 온 길: 점선이 오른쪽(보이저 쪽)으로 흐르고 끝으로 갈수록 밝아진다 */}
             <span className={`absolute inset-y-0 ${v.trail}`} style={{ left: `${earth * 100}%`, right: 0 }} />
-            {PLANETS.filter((p) => p.au < scale && (f(p.au) < DOT_BELOW && p.name !== "지구")).map((p) => (
+            {PLANETS.filter((p) => p.au < scale && f(p.au) < DOT_BELOW && p.name !== "지구").map((p) => (
               <span
                 key={p.name}
-                className="absolute top-1/2 size-1 -translate-x-1/2 -translate-y-1/2"
+                className="absolute top-1/2 hidden size-1 -translate-x-1/2 -translate-y-1/2 sm:block"
                 style={{ left: pct(p.au), background: p.color }}
                 title={`${nm(p.name)} ${p.au}AU`}
               />
@@ -123,7 +132,7 @@ export default function DistancePanel({ au, sunAu, ms }: { au: number; sunAu: nu
           {PLANETS.filter((p) => p.au < scale && f(p.au) >= DOT_BELOW && p.name !== "지구").map((p) => (
             <span
               key={p.name}
-              className={`absolute flex -translate-x-1/2 items-center leading-none ${p.row < 0 ? "top-0.5" : "bottom-0.5"}`}
+              className={`absolute hidden -translate-x-1/2 items-center leading-none sm:flex ${p.row < 0 ? "top-0.5" : "bottom-0.5"}`}
               style={{ left: pct(p.au) }}
               title={`${nm(p.name)} ${p.au}AU`}
             >
@@ -161,6 +170,7 @@ export default function DistancePanel({ au, sunAu, ms }: { au: number; sunAu: nu
             name={nm(p.name)}
             dim={p.au >= scale}
             align={i < 4 ? "left" : "right"}
+            mobileHidden={p.name !== "지구"}
             info={t.planetInfo(p.au, fmtKm(auToKm(p.au), lang), p.name === "지구", p.au >= scale)}
           />
         ))}
@@ -177,6 +187,7 @@ function Legend({
   info,
   dim,
   align,
+  mobileHidden,
 }: {
   sprite: SpriteName;
   scale: number;
@@ -184,9 +195,10 @@ function Legend({
   info: string;
   dim?: boolean;
   align: "left" | "right";
+  mobileHidden?: boolean;
 }) {
   return (
-    <li tabIndex={0} className={`group relative flex cursor-help items-center gap-1 outline-none focus-visible:text-[var(--ink)] ${dim ? "opacity-40" : ""}`}>
+    <li tabIndex={0} className={`group relative flex cursor-help items-center gap-1 outline-none focus-visible:text-[var(--ink)] ${dim ? "opacity-40" : ""} ${mobileHidden ? "max-sm:hidden" : ""}`}>
       <Sprite name={sprite} scale={scale} /> {name}
       <span
         role="tooltip"

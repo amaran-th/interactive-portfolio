@@ -1,6 +1,7 @@
 "use client";
 
 import { CircleHelp, X } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef } from "react";
 
 /**
@@ -82,6 +83,11 @@ export default function GuideDialog({
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {children}
+            <div className="border-t border-sub px-6 py-4 sm:hidden">
+              <Link href="/privacy" className="text-sm font-medium text-point underline underline-offset-4">
+                개인정보처리방침
+              </Link>
+            </div>
           </div>
         </div>
       </dialog>

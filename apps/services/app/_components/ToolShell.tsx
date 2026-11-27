@@ -78,7 +78,7 @@ export default function ToolShell({
           )}
           <Link
             href="/privacy"
-            className="text-xs font-medium text-neutral-400 transition-colors hover:text-white"
+            className="hidden text-xs font-medium text-neutral-400 transition-colors hover:text-white sm:inline"
           >
             개인정보처리방침
           </Link>

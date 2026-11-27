@@ -39,12 +39,12 @@ export default function RadarPanel({
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 tabular-nums">
         <span className="opacity-70">DIST/EARTH</span>
         <span className={`text-[22px] leading-[1.5] font-bold ${v.radarGlow}`}>{fmtKm(auToKm(au), lang)}</span>
-        <span className="opacity-70">{au.toFixed(au < 1 ? 3 : 1)} AU</span>
+        <span className="hidden opacity-70 sm:inline">{au.toFixed(au < 1 ? 3 : 1)} AU</span>
         <span>
           <span className="opacity-70">LIGHT </span>
           {fmtLight(lightSec(au), lang)}
         </span>
-        <span className="opacity-70">SUN {sunAu.toFixed(1)} AU</span>
+        <span className="hidden opacity-70 sm:inline">SUN {sunAu.toFixed(1)} AU</span>
         <span className="ml-auto flex flex-wrap gap-2">
           {modeSwitch}
         </span>
@@ -231,7 +231,7 @@ function RadarCanvas({ ms, lang }: { ms: number; lang: Lang }) {
     <div className="relative mt-1">
       <canvas
         ref={canvasRef}
-        className="block h-44 w-full cursor-grab touch-none active:cursor-grabbing sm:h-52"
+        className="block h-32 w-full cursor-grab touch-none active:cursor-grabbing sm:h-52"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

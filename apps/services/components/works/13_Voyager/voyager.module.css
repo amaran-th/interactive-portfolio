@@ -82,6 +82,13 @@
   opacity: 0.35;
   cursor: default;
 }
+.mobileNav {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+}
 .btn:focus-visible,
 .node:focus-visible,
 .tab:focus-visible,
@@ -262,11 +269,12 @@
 
 /* 엔딩 동안 트랙(지나온 기록·표식)이 왼쪽으로 계속 흘러간다 */
 .endScroll {
-  animation: endScroll 200s linear forwards;
+  animation: endScroll 200s linear both;
+  will-change: transform;
 }
 @keyframes endScroll {
   to {
-    transform: translateX(-24000px);
+    transform: translate3d(-24000px, 0, 0);
   }
 }
 .endLeave {
@@ -495,6 +503,16 @@
   background: #000;
   cursor: zoom-in;
   box-shadow: 0 0 0 2px #000;
+}
+
+/* 카드 안 사진은 작게 두어 모바일 로그가 스크롤 없이 읽히게 한다. 눌러 원본 크기로 볼 수 있다. */
+.eventPhoto {
+  max-height: min(18vh, 160px);
+}
+@media (min-width: 640px) {
+  .eventPhoto {
+    max-height: min(32vh, 300px);
+  }
 }
 
 .bob {
