@@ -417,6 +417,16 @@ export default function GoldenRecord({ onClose, onZoom }: { onClose: () => void;
                 ))}
               </div>
               <div className="flex min-w-0 flex-1 flex-col gap-3">
+                <div className={`grid px-3 py-2 ${v.frame}`} aria-live="polite">
+                  {spots.map((c, i) => (
+                    <div key={c.title} className={`col-start-1 row-start-1 ${spot === i ? "" : "invisible"}`} aria-hidden={spot !== i}>
+                      <p className="font-bold text-[var(--yellow)]">
+                        {i + 1}. {c.title}
+                      </p>
+                      <p className="text-[#d8daf0]">{c.body}</p>
+                    </div>
+                  ))}
+                </div>
                 <p className="text-[#d8daf0]">
                   {g.uranium}
                 </p>
@@ -427,17 +437,6 @@ export default function GoldenRecord({ onClose, onZoom }: { onClose: () => void;
                   <button type="button" className={v.btn} onClick={() => onZoom(diagram)}>
                     {g.nasaDiagram}
                   </button>
-                </div>
-                {/* 번호별 설명은 맨 아래. 모든 설명을 한 칸에 겹쳐 두고 고른 것만 보여 줘서, 번호를 바꿔도 칸 높이가 그대로다 */}
-                <div className={`grid px-3 py-2 ${v.frame}`} aria-live="polite">
-                  {spots.map((c, i) => (
-                    <div key={c.title} className={`col-start-1 row-start-1 ${spot === i ? "" : "invisible"}`} aria-hidden={spot !== i}>
-                      <p className="font-bold text-[var(--yellow)]">
-                        {i + 1}. {c.title}
-                      </p>
-                      <p className="text-[#d8daf0]">{c.body}</p>
-                    </div>
-                  ))}
                 </div>
               </div>
             </div>
